@@ -1,0 +1,20 @@
+<!ELEMENT DATA ( trialunit+ ) >
+
+<!ELEMENT trialunit ( trialunitspecimen+ ) >
+<!ATTLIST trialunit ReplicateNumber NMTOKEN #REQUIRED >
+<!ATTLIST trialunit SampleSupplierId NMTOKEN #IMPLIED >
+<!ATTLIST trialunit SourceTrialUnitId NMTOKEN #IMPLIED >
+<!ATTLIST trialunit TreatmentId NMTOKEN #IMPLIED >
+<!ATTLIST trialunit TrialUnitBarcode NMTOKEN #IMPLIED >
+<!ATTLIST trialunit TrialUnitNote NMTOKEN #IMPLIED >
+<!ATTLIST trialunit UnitPositionId NMTOKEN #REQUIRED >
+<!ATTLIST trialunit trialunitlocation CDATA #IMPLIED >
+
+<!ELEMENT trialunitspecimen EMPTY >
+<!ATTLIST trialunitspecimen HarvestDate NMTOKEN #IMPLIED >
+<!ATTLIST trialunitspecimen Notes NMTOKEN #IMPLIED  >
+<!ATTLIST trialunitspecimen PlantDate NMTOKEN #IMPLIED >
+<!ATTLIST trialunitspecimen HasDied NMTOKEN #IMPLIED >
+<!ATTLIST trialunitspecimen ItemId NMTOKEN #IMPLIED >
+<!ATTLIST trialunitspecimen SpecimenId NMTOKEN #REQUIRED >
+

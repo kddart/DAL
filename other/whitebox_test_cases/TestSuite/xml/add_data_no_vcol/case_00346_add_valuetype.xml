@@ -1,0 +1,11 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Add Layer Attribute Valuetype" TargetURL="add/layerattrib/valuetype" Type="BLOCKING" />
+  <INPUT ParaName="name" PrefixVal="Numeric - " Random="1" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Match Attr="ParaName" Tag="ReturnId" Value="id" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <ReturnId ParaName="id" Value="3" />
+  <RunInfo Success="1" Time="1409792292" />
+</TestCase>

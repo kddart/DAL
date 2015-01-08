@@ -1,0 +1,20 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Update Trialunit" TargetURL="update/trialunit/:TrialUnitId" Type="BLOCKING" />
+  <Delete TargetURL="delete/trial/:TrialId" />
+  <INPUT ParaName="TrialUnitId" SrcValue="xml/add_data_no_vcol/case_00358_add_trialunit.xml" />
+  <INPUT ParaName="UnitPositionId" SrcValue="xml/add_data_no_vcol/case_00200_add_unitposition.xml" />
+  <INPUT ParaName="SampleSupplierId" Value="1" />
+  <INPUT ParaName="ReplicateNumber" Value="2" />
+  <INPUT ParaName="SampleEntryNumber" Value="3" />
+  <INPUT ParaName="TrialUnitBarcode" Random="1" />
+  <INPUT ParaName="TrialUnitNote" Value="Trial unit part of automatic testing" />
+  <INPUT ParaName="SourceTrialUnitId" Value="0" />
+  <INPUT ParaName="trialunitlocation" Value="POINT(149.09269513467962 -35.30485280696332)" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00358_add_trialunit.xml" Order="3" />
+  <ReturnId ParaName="TrialId" Value="35" />
+  <RunInfo Success="1" Time="1409792113" />
+</TestCase>

@@ -1,0 +1,11 @@
+<TestCase>
+  <CaseInfo OutputFormat="JSON" CustomMethod="add_record" Description="Add a site type" TargetURL="add/sitetype?ctype=json" Type="BLOCKING" />
+  <Delete TargetURL="delete/sitetype/:SiteTypeId?ctype=json" />
+  <INPUT ParaName="SiteTypeName" Value="Test site type" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Parent CaseFile="json/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="json/login_testuser/case_00203_switch4testu.xml" Order="2" />
+  <ReturnId ParaName="SiteTypeId" Value="9" />
+  
+</TestCase>

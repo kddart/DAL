@@ -1,0 +1,6 @@
+<DATA>
+<trialunitspecimen SpecimenId="" ParaName="SpecimenId" SrcValue="xml/add_data_no_vcol/case_00114_add_specimen1.xml" Notes="none" HarvestDate="2008-08-01" PlantDate="2011-09-01" />
+<trialunitspecimen SpecimenId="" ParaName="SpecimenId" SrcValue="xml/add_data_no_vcol/case_00115_add_specimen2.xml" Notes="none" />
+<trialunitspecimen SpecimenId="" ParaName="SpecimenId" SrcValue="xml/add_data_no_vcol/case_00116_add_specimen3.xml" Notes="none" PlantDate="2011-09-01" />
+<trialunitspecimen SpecimenId="" ParaName="SpecimenId" SrcValue="xml/add_data_no_vcol/case_00117_add_specimen4.xml" Notes="none" PlantDate="2011-09-01" />
+</DATA>

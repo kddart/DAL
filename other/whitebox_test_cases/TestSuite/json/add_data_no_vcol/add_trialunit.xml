@@ -1,0 +1,24 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record_upload" Description="Add a trial unit" OutputFormat="JSON" TargetURL="trial/:TrialId/add/trialunit?ctype=json" Type="BLOCKING" />
+  <Delete TargetURL="delete/trialunit/:TrialUnitId?ctype=json" />
+  <INPUT ParaName="TrialId" SrcValue="json/add_data_no_vcol/case_00007_add_trial.xml" />
+  <INPUT ParaName="UnitPositionId" SrcValue="json/add_data_no_vcol/case_00200_add_unitposition.xml" />
+  <INPUT ParaName="SampleSupplierId" Value="1" />
+  <INPUT ParaName="TreatmentId" SrcValue="json/add_data_no_vcol/case_00119_add_treatment.xml" />
+  <INPUT ParaName="ReplicateNumber" Value="2" />
+  <INPUT ParaName="SampleEntryNumber" Value="3" />
+  <INPUT ParaName="TrialUnitComment" Value="Trial unit part of automatic testing" />
+  <INPUT ParaName="SourceTrialUnitId" Value="0" />
+  <INPUT ParaName="trialunitplant" Process="1" SrcFile="json/add_data_no_vcol/trialunit.xml" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Match Attr="ParaName" Tag="ReturnId" Value="TrialUnitId" />
+  <Parent CaseFile="json/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="json/login_testuser/case_00203_switch4testu.xml" Order="2" />
+  <Parent CaseFile="json/add_data_no_vcol/case_00007_add_trial.xml" Order="3" />
+  <Parent CaseFile="json/add_data_no_vcol/case_00114_add_plant1.xml" Order="4" />
+  <Parent CaseFile="json/add_data_no_vcol/case_00115_add_plant2.xml" Order="5" />
+  <Parent CaseFile="json/add_data_no_vcol/case_00116_add_plant3.xml" Order="6" />
+  <Parent CaseFile="json/add_data_no_vcol/case_00117_add_plant4.xml" Order="7" />
+  
+</TestCase>

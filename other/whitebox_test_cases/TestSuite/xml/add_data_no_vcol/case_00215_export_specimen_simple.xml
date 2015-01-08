@@ -1,0 +1,8 @@
+<TestCase>
+  <CaseInfo Description="Export Specimen" TargetURL="export/specimen" Type="BLOCKING" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="csv" MatchingVar="LINE_COUNT" Tag="OutputFile" TargetDataType="CSV_FILE" Value="boolex(x&gt;2)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  
+</TestCase>

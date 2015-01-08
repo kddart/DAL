@@ -1,0 +1,18 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Add a virtual column to contact" OutputFormat="JSON" TargetURL="factor/table/contactfactor/add/vcolumn?ctype=json" Type="BLOCKING" />
+  <FactorName Value="ConExtraCol_608" />
+  <INPUT ParaName="FactorName" PrefixVal="ConExtraCol_" Random="1" />
+  <INPUT ParaName="FactorCaption" PrefixVal="ConExtraCol_" Random="1" />
+  <INPUT ParaName="FactorDescription" Value="Extra Column" />
+  <INPUT ParaName="FactorDataType" Value="STRING" />
+  <INPUT ParaName="CanFactorHaveNull" Value="1" />
+  <INPUT ParaName="FactorValueMaxLength" Value="50" />
+  <INPUT ParaName="Public" Value="0" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Match Attr="ParaName" Tag="ReturnId" Value="FactorId" />
+  <Parent CaseFile="json/login_testuser/case_00201_login_testuser.xml" Force="1" Order="1" />
+  <Parent CaseFile="json/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <ReturnId ParaName="FactorId" Value="2046" />
+  
+</TestCase>

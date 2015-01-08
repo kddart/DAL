@@ -1,0 +1,18 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record_upload" Description="Add Trial Type" OutputFormat="JSON" TargetURL="add/trialtype?ctype=json" Type="BLOCKING" />
+  <Delete TargetURL="delete/trialtype/:TrialTypeId?ctype=json" />
+  <INPUT ParaName="TrialTypeName" Value="Test trial type" />
+  <INPUT ParaName="TrialTypeNote" Value="Automatic test trial type" />
+  <INPUT ParaName="TrialAcronymPrefix" Value="TST" />
+  <INPUT ParaName="CurrentTrialManagerId" SrcValue="./json/case_00102_add_con.xml" />
+  <INPUT ParaName="IsActiveTrialType" Value="1" />
+  <INPUT ParaName="trialtypegenotype" Process="1" SrcFile="./json/trialtype_genotype.xml" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Match Attr="ParaName" Tag="ReturnId" Value="TrialTypeId" />
+  <Parent CaseFile="./json/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="./json/case_00203_switch4testu.xml" Order="2" />
+  <Parent CaseFile="./json/case_00104_add_geno.xml" Order="3" />
+  <Parent CaseFile="./json/case_00102_add_con.xml" Order="4" />
+  
+</TestCase>

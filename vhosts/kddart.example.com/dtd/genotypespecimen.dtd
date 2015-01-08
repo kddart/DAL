@@ -1,0 +1,5 @@
+<!ELEMENT DATA ( genotypespecimen+ ) >
+
+<!ELEMENT genotypespecimen EMPTY >
+<!ATTLIST genotypespecimen GenotypeId NMTOKEN #REQUIRED >
+<!ATTLIST genotypespecimen GenotypeSpecimenType NMTOKEN #IMPLIED >

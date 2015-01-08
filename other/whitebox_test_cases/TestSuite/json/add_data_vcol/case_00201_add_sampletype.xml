@@ -1,0 +1,12 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Add Sample Type" OutputFormat="JSON" TargetURL="add/sampletype?ctype=json" Type="BLOCKING" />
+  <Delete TargetURL="delete/sampletype/:SampleTypeId?ctype=json" />
+  <INPUT ParaName="SampleTypeName" PrefixVal="SampType_" Random="1" />
+  <INPUT SrcName="json/add_data_vcol/case_01006_add_vcol_sampletype.xml" Value="Extra data" Virtual="1" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Match Attr="ParaName" Tag="ReturnId" Value="SampleTypeId" />
+  <Parent CaseFile="json/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="json/login_testuser/case_00203_switch4testu.xml" Order="2" />
+  
+</TestCase>

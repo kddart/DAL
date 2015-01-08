@@ -1,0 +1,13 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Add Unit Position" TargetURL="add/unitposition" Type="BLOCKING" />
+  <Delete TargetURL="delete/unitposition/:UnitPositionId" />
+  <INPUT ParaName="UnitPositionText" PrefixVal="upos" Random="1" />
+  <Match Attr="UnitPositionText" Exception="1" Order="1" Tag="Error" Value="regex(already exits)" />
+  <Match Attr="StatusCode" Order="2" Value="200" />
+  <Match Attr="Message" Order="3" Tag="Info" Value="regex(successfully)" />
+  <Match Attr="ParaName" Order="4" Tag="ReturnId" Value="UnitPositionId" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <ReturnId ParaName="UnitPositionId" Value="3" />
+  <RunInfo Success="1" Time="1409792383" />
+</TestCase>

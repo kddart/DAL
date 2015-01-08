@@ -1,0 +1,13 @@
+<TestCase>
+  <CaseInfo OutputFormat="JSON" CustomMethod="add_record" Description="Add a user" TargetURL="add/user?ctype=json" Type="BLOCKING" />
+  <INPUT ParaName="UserName" Value="utest" />
+  <INPUT ParaName="UserPassword" Value="5aaac9c46dd7f1fb24c71f7c13d66027f15bc4ce" />
+  <INPUT ParaName="ContactId" SrcValue="./json/case_00102_add_con.xml" />
+  <INPUT ParaName="UserType" Value="human" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Parent CaseFile="./json/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="./json/case_00203_switch4testu.xml" Order="2" />
+  <ReturnId ParaName="Username" Value="utest" />
+  
+</TestCase>

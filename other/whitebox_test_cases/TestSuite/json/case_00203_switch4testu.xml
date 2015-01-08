@@ -1,0 +1,8 @@
+<TestCase>
+  <CaseInfo Description="Switch Group" OutputFormat="JSON" TargetURL="switch/group/:GroupId?ctype=json" Type="BLOCKING" />
+  <INPUT ParaName="GroupId" SrcValue="./json/owngroup.xml" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Parent CaseFile="./json/case_00201_login_testuser.xml" Force="1" Order="1" />
+  
+</TestCase>

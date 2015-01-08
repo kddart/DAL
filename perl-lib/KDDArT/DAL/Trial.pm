@@ -1,0 +1,10868 @@
+#$Id: Trial.pm 785 2014-09-02 06:23:12Z puthick $
+#$Author: puthick $
+
+# COPYRIGHT AND LICENSE
+# 
+# Copyright (C) 2014 by Diversity Arrays Technology Pty Ltd
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# Author    : Puthick Hok
+# Version   : 2.2.5 build 795
+# Created   : 02/06/2010
+
+package KDDArT::DAL::Trial;
+
+use strict;
+use warnings;
+
+BEGIN {
+  use File::Spec;
+
+  my ($volume, $current_dir, $file) = File::Spec->splitpath(__FILE__);
+
+  $main::kddart_base_dir = "${current_dir}../../..";
+}
+
+use lib "$main::kddart_base_dir/perl-lib";
+
+use base 'KDDArT::DAL::Transformation';
+
+use KDDArT::DAL::Common;
+use KDDArT::DAL::Security;
+use CGI::Application::Plugin::Session;
+use Log::Log4perl qw(get_logger :levels);
+use XML::Checker::Parser;
+use Crypt::Random qw( makerandom );
+
+sub setup {
+
+  my $self = shift;
+
+  CGI::Session->name("KDDArT_DAL_SESSID");
+
+  __PACKAGE__->authen->init_config_parameters();
+  __PACKAGE__->authen->check_login_runmodes(':all');
+  __PACKAGE__->authen->check_content_type_runmodes(':all');
+  __PACKAGE__->authen->check_rand_runmodes('add_site_gadmin',
+                                           'add_designtype_gadmin',
+                                           'add_trial',
+                                           'add_trial_unit',
+                                           'add_unit_position_gadmin',
+                                           'update_site_gadmin',
+                                           'update_site_geography_gadmin',
+                                           'update_designtype_gadmin',
+                                           'update_trial',
+                                           'update_trial_geography',
+                                           'update_trial_unit',
+                                           'update_trial_unit_geography',
+                                           'add_trial_unit_specimen',
+                                           'remove_trial_unit_specimen',
+                                           'update_trial_unit_specimen',
+                                           'update_unit_position_gadmin',
+                                           'del_unit_position_gadmin',
+                                           'del_designtype_gadmin',
+                                           'del_site_gadmin',
+                                           'del_trial_gadmin',
+                                           'del_trial_unit_gadmin',
+                                           'add_trial_trait',
+                                           'update_trial_trait',
+                                           'remove_trial_trait',
+                                           'add_trial_unit_bulk',
+                                           'add_project_gadmin',
+                                           'update_project_gadmin',
+                                           'del_project_gadmin',
+      );
+  __PACKAGE__->authen->count_session_request_runmodes(':all');
+  __PACKAGE__->authen->check_signature_runmodes('add_designtype_gadmin',
+                                                'add_unit_position_gadmin',
+                                                'update_site_gadmin',
+                                                'update_designtype_gadmin',
+                                                'update_trial',
+                                                'update_trial_unit',
+                                                'add_trial_unit_specimen',
+                                                'remove_trial_unit_specimen',
+                                                'update_trial_unit_specimen',
+                                                'update_unit_position_gadmin',
+                                                'del_unit_position_gadmin',
+                                                'del_designtype_gadmin',
+                                                'del_site_gadmin',
+                                                'del_trial_gadmin',
+                                                'del_trial_unit_gadmin',
+                                                'add_site_gadmin',
+                                                'add_trial_trait',
+                                                'update_trial_trait',
+                                                'remove_trial_trait',
+                                                'add_trial',
+                                                'add_project_gadmin',
+                                                'update_project_gadmin',
+                                                'del_project_gadmin',
+                                                'update_site_geography_gadmin',
+      );
+
+  __PACKAGE__->authen->check_gadmin_runmodes('add_site_gadmin',
+                                             'add_designtype_gadmin',
+                                             'add_unit_position_gadmin',
+                                             'update_site_gadmin',
+                                             'update_site_geography_gadmin',
+                                             'update_designtype_gadmin',
+                                             'update_unit_position_gadmin',
+                                             'del_unit_position_gadmin',
+                                             'del_designtype_gadmin',
+                                             'del_site_gadmin',
+                                             'del_trial_gadmin',
+                                             'del_trial_unit_gadmin',
+                                             'add_project_gadmin',
+                                             'update_project_gadmin',
+                                             'del_project_gadmin',
+      );
+  
+  __PACKAGE__->authen->check_sign_upload_runmodes('add_trial_unit',
+                                                  'add_trial_unit_bulk',
+      );
+
+  $self->run_modes(
+    'add_site_gadmin'                        => 'add_site_runmode',
+    'add_designtype_gadmin'                  => 'add_designtype_runmode',
+    'add_trial'                              => 'add_trial_runmode',
+    'add_trial_unit'                         => 'add_trial_unit_runmode',
+    'add_unit_position_gadmin'               => 'add_unit_position_runmode',
+    'list_site_advanced'                     => 'list_site_advanced_runmode',
+    'get_site'                               => 'get_site_full_runmode',
+    'update_site_gadmin'                     => 'update_site_runmode',
+    'update_site_geography_gadmin'           => 'update_site_geography_runmode',
+    'list_designtype'                        => 'list_designtype_runmode',
+    'get_designtype'                         => 'get_designtype_runmode',
+    'update_designtype_gadmin'               => 'update_designtype_runmode',
+    'list_trial_advanced'                    => 'list_trial_advanced_runmode',
+    'get_trial'                              => 'get_trial_runmode',
+    'update_trial'                           => 'update_trial_runmode',
+    'update_trial_geography'                 => 'update_trial_geography_runmode',
+    'get_trial_unit'                         => 'get_trial_unit_runmode',
+    'update_trial_unit'                      => 'update_trial_unit_runmode',
+    'update_trial_unit_geography'            => 'update_trial_unit_geography_runmode',
+    'add_trial_unit_specimen'                => 'add_trial_unit_specimen_runmode',
+    'remove_trial_unit_specimen'             => 'remove_trial_unit_specimen_runmode',
+    'update_trial_unit_specimen'             => 'update_trial_unit_specimen_runmode',
+    'list_unit_position'                     => 'list_unit_position_runmode',
+    'get_unit_position'                      => 'get_unit_position_runmode',
+    'update_unit_position_gadmin'            => 'update_unit_position_runmode',
+    'list_trial_unit_advanced'               => 'list_trial_unit_advanced_runmode',
+    'list_trial_unit_specimen_advanced'      => 'list_trial_unit_specimen_advanced_runmode',
+    'del_unit_position_gadmin'               => 'del_unit_position_runmode',
+    'del_designtype_gadmin'                  => 'del_designtype_runmode',
+    'del_site_gadmin'                        => 'del_site_runmode',
+    'del_trial_gadmin'                       => 'del_trial_runmode',
+    'del_trial_unit_gadmin'                  => 'del_trial_unit_runmode',
+    'add_trial_trait'                        => 'add_trial_trait_runmode',
+    'list_trial_trait'                       => 'list_trial_trait_runmode',
+    'get_trial_trait'                        => 'get_trial_trait_runmode',
+    'update_trial_trait'                     => 'update_trial_trait_runmode',
+    'remove_trial_trait'                     => 'remove_trial_trait_runmode',
+    'add_trial_unit_bulk'                    => 'add_trial_unit_bulk_runmode',
+    'list_unitposition_field'                => 'list_unitposition_field_runmode',
+    'add_project_gadmin'                     => 'add_project_runmode',
+    'update_project_gadmin'                  => 'update_project_runmode',
+    'list_project_advanced'                  => 'list_project_advanced_runmode',
+    'get_project'                            => 'get_project_runmode',
+    'del_project_gadmin'                      => 'del_project_runmode',
+    'get_trial_unit_specimen'                => 'get_trial_unit_specimen_runmode',
+      );
+
+  my $logger = get_logger();
+  Log::Log4perl::MDC->put('client_ip', $ENV{'REMOTE_ADDR'});
+
+  if ( ! $logger->has_appenders() ) {
+    my $app = Log::Log4perl::Appender->new(
+                               "Log::Log4perl::Appender::Screen",
+                               utf8 => undef
+        );
+
+    my $layout = Log::Log4perl::Layout::PatternLayout->new("[%d] [%H] [%X{client_ip}] [%p] [%F{1}:%L] [%M] [%m]%n");
+    
+    $app->layout($layout);
+    
+    $logger->add_appender($app);
+  }
+  $logger->level($DEBUG);
+
+  $self->{logger} = $logger;
+
+  $self->authen->config(LOGIN_URL => '');
+  $self->session_config(
+          CGI_SESSION_OPTIONS => [ "driver:File", $self->query, {Directory=>$SESSION_STORAGE_PATH} ],
+      );
+}
+
+sub add_site_runmode {
+
+=pod add_site_gadmin_HELP_START
+{
+"OperationName" : "Add site",
+"Description": "Add a new site (breeding station, farm) to the system.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 1,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"KDDArTModule": "main",
+"KDDArTTable": "site",
+"KDDArTFactorTable": "sitefactor",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><ReturnId Value='10' ParaName='SiteId' /><Info Message='Site (10) has been added successfully.' /></DATA>",
+"SuccessMessageJSON": "{'ReturnId' : [{'Value' : '9','ParaName' : 'SiteId'}],'Info' : [{'Message' : 'Site (9) has been added successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error SiteTypeId='SiteType (111) does not exist.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'SiteTypeId' : 'SiteType (111) does not exist.'}]}"}],
+"HTTPParameter": [{"Name": "sitelocation", "DataType": "polygon_wkt", "Description": "GIS field defining the polygon geometry object of the site in a standard GIS well-known text.", "Type": "LCol", "Required": "1"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self = shift;
+  my $query = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  # Generic required static field checking
+
+  my $dbh_read = connect_kdb_read();
+
+  my $skip_field = {};
+
+  my ($get_scol_err, $get_scol_msg, $scol_data, $pkey_data) = get_static_field($dbh_read, 'site');
+
+  if ($get_scol_err) {
+
+    $self->logger->debug("Get static field info failed: $get_scol_msg");
+    
+    my $err_msg = "Unexpected Error.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $required_field_href = {};
+
+  for my $static_field (@{$scol_data}) {
+
+    my $field_name = $static_field->{'Name'};
+    
+    if ($skip_field->{$field_name}) { next; }
+
+    if ($static_field->{'Required'} == 1) {
+
+      $required_field_href->{$field_name} = $query->param($field_name);
+    }
+  }
+
+  $dbh_read->disconnect();
+
+  my ($missing_err, $missing_href) = check_missing_href( $required_field_href );
+
+  if ($missing_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  # Finish generic required static field checking
+
+  my $site_name          = $query->param('SiteName');
+  my $sitetype_id        = $query->param('SiteTypeId');
+  my $site_acronym       = $query->param('SiteAcronym');
+  my $cur_manager_id     = $query->param('CurrentSiteManagerId');
+  my $site_location      = $query->param('sitelocation');
+
+  ($missing_err, $missing_href) = check_missing_href( { 'sitelocation' => $site_location } );
+
+  if ($missing_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $dbh_gis_read = connect_gis_read();
+  my ($is_wkt_err, $wkt_err_href) = is_valid_wkt_href($dbh_gis_read, {'sitelocation' => $site_location}, 'POLYGON');
+  $dbh_gis_read->disconnect();
+
+  if ($is_wkt_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$wkt_err_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $site_sdate         = q{};
+  if ($query->param('SiteStartDate')) {
+
+    $site_sdate         = $query->param('SiteStartDate');
+    my ($sdate_err, $sdate_href) = check_dt_href( {'SiteStartDate' => $site_sdate} );
+
+    if ($sdate_err) {
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [$sdate_href]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  my $site_edate         = q{};
+  if ($query->param('SiteEndDate')) {
+
+    $site_edate         = $query->param('SiteEndDate');
+    my ($edate_err, $edate_href) = check_dt_href( {'SiteEndDate' => $site_edate} );
+
+    if ($edate_err) {
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [$edate_href]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength ";
+  $sql   .= "FROM factor ";
+  $sql   .= "WHERE TableNameOfFactor='sitefactor'";
+
+  my $dbh_k_read = connect_kdb_read();
+  my $vcol_data = $dbh_k_read->selectall_hashref($sql, 'FactorId');
+
+  my $vcol_param_data = {};
+  my $vcol_len_info   = {};
+  my $vcol_param_data_maxlen = {};
+  for my $vcol_id (keys(%{$vcol_data})) {
+
+    my $vcol_param_name = "VCol_${vcol_id}";
+    my $vcol_value      = $query->param($vcol_param_name);
+    if ($vcol_data->{$vcol_id}->{'CanFactorHaveNull'} != 1) {
+
+      $vcol_param_data->{$vcol_param_name} = $vcol_value;
+    }
+    $vcol_len_info->{$vcol_param_name} = $vcol_data->{$vcol_id}->{'FactorValueMaxLength'};
+    $vcol_param_data_maxlen->{$vcol_param_name} = $vcol_value;
+  }
+
+  my ($vcol_missing_err, $vcol_missing_href) = check_missing_href( $vcol_param_data );
+
+  if ($vcol_missing_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$vcol_missing_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  my ($vcol_maxlen_err, $vcol_maxlen_href) = check_maxlen_href($vcol_param_data_maxlen, $vcol_len_info);
+
+  if ($vcol_maxlen_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$vcol_maxlen_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $sitetype_existence = type_existence($dbh_k_read, 'site', $sitetype_id);
+
+  if (!$sitetype_existence) {
+
+    my $err_msg = "SiteType ($sitetype_id) does not exist.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'SiteTypeId' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $cur_manager_existence = record_existence($dbh_k_read, 'contact', 'ContactId', $cur_manager_id);
+
+  if (!$cur_manager_existence) {
+
+    my $err_msg = "CurrentManager ($cur_manager_id) does not exist.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'CurrentSiteManagerId' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh_k_read->disconnect();
+
+  my $inserted_id = {};
+  my $dbh_k_write = connect_kdb_write();
+
+  $sql  = 'INSERT INTO site SET ';
+  $sql .= 'SiteName=?, ';
+  $sql .= 'SiteTypeId=?, ';
+  $sql .= 'SiteAcronym=?, ';
+  $sql .= 'CurrentSiteManagerId=?, ';
+  $sql .= 'SiteStartDate=?, ';
+  $sql .= 'SiteEndDate=?';
+
+  my $sth = $dbh_k_write->prepare($sql);
+  $sth->execute($site_name, $sitetype_id, $site_acronym,
+                $cur_manager_id, $site_sdate, $site_edate);
+
+  my $site_id = -1;
+  if (!$dbh_k_write->err()) {
+
+    $site_id = $dbh_k_write->last_insert_id(undef, undef, 'site', 'SiteId');
+    $self->logger->debug("SiteId: $site_id");
+    $inserted_id->{'site'} = ['SiteId', $site_id];
+  }
+  else {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+  $sth->finish();
+
+  for my $vcol_id (keys(%{$vcol_data})) {
+
+    my $factor_value = $query->param('VCol_' . "$vcol_id");
+
+    if (length($factor_value) > 0) {
+
+      $sql  = 'INSERT INTO sitefactor SET ';
+      $sql .= 'SiteId=?, ';
+      $sql .= 'FactorId=?, ';
+      $sql .= 'FactorValue=?';
+      my $factor_sth = $dbh_k_write->prepare($sql);
+      $factor_sth->execute($site_id, $vcol_id, $factor_value);
+      
+      if ($dbh_k_write->err()) {
+        
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+        return $data_for_postrun_href;
+      }
+
+      $inserted_id->{'sitefactor'} = ['SiteId', $site_id];
+      $factor_sth->finish();
+    }
+  }
+
+  my $dbh_gis_write = connect_gis_write();
+
+  $sql  = 'INSERT INTO siteloc (siteid, sitelocation) ';
+  $sql .= 'VALUES (?, ST_GeomFromText(?, -1))';
+
+  $self->logger->debug("SQL: $sql");
+  $self->logger->debug("SiteId: $site_id");
+
+  my $gis_sth = $dbh_gis_write->prepare($sql);
+  $gis_sth->execute($site_id, $site_location);
+
+  if ($dbh_gis_write->err()) {
+
+    my $sql_err_str = $dbh_gis_write->errstr();
+
+    my ($rollback_err, $rollback_msg) = $self->rollback_cleanup($dbh_k_write, $inserted_id);
+
+    if ($rollback_err) {
+
+      $self->logger->debug("Rollback error msg: $rollback_msg");
+      
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    $self->logger->debug("SQL err number: " . $dbh_gis_write->err());
+    $self->logger->debug("SQL err: " . $dbh_gis_write->errstr());
+
+    if ($sql_err_str =~ /duplicate key/) {
+
+      my $err_msg = "Site ($site_id) already exists in siteloc.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+    else {
+
+      my $err_msg = 'Unexpected error: adding siteloc data';
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  $dbh_k_write->disconnect();
+
+  $gis_sth->finish();
+  $dbh_gis_write->disconnect();
+
+  my $info_msg_aref  = [{'Message' => "Site ($site_id) has been added successfully."}];
+  my $return_id_aref = [{'Value' => "$site_id", 'ParaName' => 'SiteId'}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'     => $info_msg_aref,
+                                           'ReturnId' => $return_id_aref,
+  };
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub add_designtype_runmode {
+
+=pod add_designtype_gadmin_HELP_START
+{
+"OperationName" : "Add design type",
+"Description": "Add a new trial design type to the system.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 1,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"KDDArTModule": "main",
+"KDDArTTable": "designtype",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><ReturnId Value='9' ParaName='DesignTypeId' /><Info Message='DesignType (9) has been added successfully.' /></DATA>",
+"SuccessMessageJSON": "{'ReturnId' : [{'Value' : '11','ParaName' : 'DesignTypeId'}],'Info' : [{'Message' : 'DesignType (11) has been added successfully.'}]}",
+"ErrorMessageXML": [{"NameAlreadyExists": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error DesignTypeName='DesignTypeName (Traditional): already exists.' /></DATA>"}],
+"ErrorMessageJSON": [{"NameAlreadyExists": "{'Error' : [{'DesignTypeName' : 'DesignTypeName (Traditional): already exists.'}]}"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self  = shift;
+  my $query = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  # Generic required static field checking
+
+  my $dbh_read = connect_kdb_read();
+
+  my $skip_field = {};
+
+  my ($get_scol_err, $get_scol_msg, $scol_data, $pkey_data) = get_static_field($dbh_read, 'designtype');
+
+  if ($get_scol_err) {
+
+    $self->logger->debug("Get static field info failed: $get_scol_msg");
+    
+    my $err_msg = "Unexpected Error.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $required_field_href = {};
+
+  for my $static_field (@{$scol_data}) {
+
+    my $field_name = $static_field->{'Name'};
+    
+    if ($skip_field->{$field_name}) { next; }
+
+    if ($static_field->{'Required'} == 1) {
+
+      $required_field_href->{$field_name} = $query->param($field_name);
+    }
+  }
+
+  $dbh_read->disconnect();
+
+  my ($missing_err, $missing_href) = check_missing_href( $required_field_href );
+
+  if ($missing_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  # Finish generic required static field checking
+
+  my $designtype_name                  = $query->param('DesignTypeName');
+
+  my $design_software                  = '';
+
+  if (defined $query->param('DesignSoftware')) {
+
+    $design_software = $query->param('DesignSoftware');
+  }
+
+  my $design_template_file             = '';
+
+  if (defined $query->param('DesignTemplateFile')) {
+
+    $design_template_file = $query->param('DesignTemplateFile');
+  }
+
+  my $design_geno_format               = '';
+
+  if (defined $query->param('DesignGenotypeFormat')) {
+
+    $design_geno_format = $query->param('DesignGenotypeFormat');
+  }
+
+  my $design_factor_alias_prefix       = '';
+
+  if (defined $query->param('DesignFactorAliasPrefix')) {
+
+    $design_factor_alias_prefix = $query->param('DesignFactorAliasPrefix');
+  }
+
+  my $dbh_k_write = connect_kdb_write();
+
+  if (record_existence($dbh_k_write, 'designtype', 'DesignTypeName', $designtype_name)) {
+
+    my $err_msg = "DesignTypeName ($designtype_name): already exists.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'DesignTypeName' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $sql = 'INSERT INTO designtype SET ';
+  $sql   .= 'DesignTypeName=?, ';
+  $sql   .= 'DesignSoftware=?, ';
+  $sql   .= 'DesignTemplateFile=?, ';
+  $sql   .= 'DesignGenotypeFormat=?, ';
+  $sql   .= 'DesignFactorAliasPrefix=?';
+
+  my $sth = $dbh_k_write->prepare($sql);
+  $sth->execute($designtype_name, $design_software, $design_template_file,
+                $design_geno_format, $design_factor_alias_prefix,
+      );
+
+  my $designtype_id = -1;
+  if (!$dbh_k_write->err()) {
+
+    $designtype_id = $dbh_k_write->last_insert_id(undef, undef, 'designtype', 'DesignTypeId');
+  }
+  else {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+  $sth->finish();
+
+  $dbh_k_write->disconnect();
+
+  my $info_msg_aref  = [{'Message' => "DesignType ($designtype_id) has been added successfully."}];
+  my $return_id_aref = [{'Value' => "$designtype_id", 'ParaName' => 'DesignTypeId'}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'     => $info_msg_aref,
+                                           'ReturnId' => $return_id_aref,
+  };
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub add_trial_runmode {
+
+=pod add_trial_HELP_START
+{
+"OperationName" : "Add trial",
+"Description": "Add a new trial (e.g. field or nursery experiment) into the system.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"KDDArTModule": "main",
+"KDDArTTable": "trial",
+"KDDArTFactorTable": "trialfactor",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><ReturnId Value='8' ParaName='TrialId' /><Info Message='Trial (8) has been added successfully.' /></DATA>",
+"SuccessMessageJSON": "{'ReturnId' : [{'Value' : '9','ParaName' : 'TrialId'}],'Info' : [{'Message' : 'Trial (9) has been added successfully.'}]}",
+"ErrorMessageXML": [{"MissingParameter": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error TrialName='TrialName is missing.' /></DATA>"}],
+"ErrorMessageJSON": [{"MissingParameter": "{'Error' : [{'TrialName' : 'TrialName is missing.'}]}"}],
+"HTTPParameter": [{"Name": "triallocation", "DataType": "polygon_wkt", "Description": "GIS field defining the polygon geometry object of the trial in a standard GIS well-known text.", "Type": "LCol", "Required": "0"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self  = shift;
+  my $query = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  # Generic required static field checking
+
+  my $dbh_read = connect_kdb_read();
+
+  my $skip_field = {'OwnGroupId'        => 1};
+
+  my ($get_scol_err, $get_scol_msg, $scol_data, $pkey_data) = get_static_field($dbh_read, 'trial');
+
+  if ($get_scol_err) {
+
+    $self->logger->debug("Get static field info failed: $get_scol_msg");
+    
+    my $err_msg = "Unexpected Error.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $required_field_href = {};
+
+  for my $static_field (@{$scol_data}) {
+
+    my $field_name = $static_field->{'Name'};
+    
+    if ($skip_field->{$field_name}) { next; }
+
+    if ($static_field->{'Required'} == 1) {
+
+      $required_field_href->{$field_name} = $query->param($field_name);
+    }
+  }
+
+  $dbh_read->disconnect();
+
+  my ($missing_err, $missing_href) = check_missing_href( $required_field_href );
+
+  if ($missing_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  # Finish generic required static field checking
+
+  my $site_id             = $query->param('SiteId');
+  my $trial_type_id       = $query->param('TrialTypeId');
+  my $trial_name          = $query->param('TrialName');
+  my $trial_number        = $query->param('TrialNumber');
+  my $trial_acronym       = $query->param('TrialAcronym');
+  my $design_type_id      = $query->param('DesignTypeId');
+  my $trial_manager_id    = $query->param('TrialManagerId');
+  my $trial_sdate         = $query->param('TrialStartDate');
+  my $access_group        = $query->param('AccessGroupId');
+  my $own_perm            = $query->param('OwnGroupPerm');
+  my $access_perm         = $query->param('AccessGroupPerm');
+  my $other_perm          = $query->param('OtherPerm');
+
+  my $project_id          = '';
+
+  if (defined $query->param('ProjectId')) {
+
+    if (length($query->param('ProjectId')) > 0) {
+
+      $project_id = $query->param('ProjectId');
+    }
+  }
+
+  my $workflow_id         = '0';
+
+  if (defined $query->param('CurrentWorkflowId')) {
+
+    $workflow_id = $query->param('CurrentWorkflowId');
+  }
+
+  my $trial_edate         = '';
+
+  if (defined $query->param('TrialEndDate')) {
+
+    $trial_edate = $query->param('TrialEndDate');
+  }
+
+  my $trial_note          = '';
+
+  if (defined $query->param('TrialNote')) {
+
+    $trial_note = $query->param('TrialNote');
+  }
+
+  my $trial_location      = '';
+
+  if (length($query->param('triallocation')) > 0) {
+
+    $trial_location = $query->param('triallocation');
+  }
+
+  if (length($trial_location) > 0) {
+
+    my $dbh_gis_read = connect_gis_read();
+    my ($is_wkt_err, $wkt_err_href) = is_valid_wkt_href($dbh_gis_read, {'triallocation' => $trial_location}, 'POLYGON');
+    $dbh_gis_read->disconnect();
+
+    if ($is_wkt_err) {
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [$wkt_err_href]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  my ($date_err, $date_href) = check_dt_href( { 'TrialStartDate' => $trial_sdate } );
+
+  if ($date_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$date_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (length($trial_edate) > 0) {
+
+    ($date_err, $date_href) = check_dt_href( { 'TrialEndDate'   => $trial_edate } );
+
+    if ($date_err) {
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [$date_href]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength ";
+  $sql   .= "FROM factor ";
+  $sql   .= "WHERE TableNameOfFactor='trialfactor'";
+
+  my $dbh_k_read = connect_kdb_read();
+  my $vcol_data = $dbh_k_read->selectall_hashref($sql, 'FactorId');
+
+  my $vcol_param_data = {};
+  my $vcol_len_info   = {};
+  my $vcol_param_data_maxlen = {};
+  for my $vcol_id (keys(%{$vcol_data})) {
+
+    my $vcol_param_name = "VCol_${vcol_id}";
+    my $vcol_value      = $query->param($vcol_param_name);
+    if ($vcol_data->{$vcol_id}->{'CanFactorHaveNull'} != 1) {
+
+      $vcol_param_data->{$vcol_param_name} = $vcol_value;
+    }
+    $vcol_len_info->{$vcol_param_name} = $vcol_data->{$vcol_id}->{'FactorValueMaxLength'};
+    $vcol_param_data_maxlen->{$vcol_param_name} = $vcol_value;
+  }
+
+  my ($vcol_missing_err, $vcol_missing_href) = check_missing_href( $vcol_param_data );
+
+  if ($vcol_missing_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$vcol_missing_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  my ($vcol_maxlen_err, $vcol_maxlen_href) = check_maxlen_href($vcol_param_data_maxlen, $vcol_len_info);
+
+  if ($vcol_maxlen_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$vcol_maxlen_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (length($project_id) > 0) {
+
+    my $project_existence = record_existence($dbh_k_read, 'project', 'ProjectId', $project_id);
+
+    if (!$project_existence) {
+
+      my $err_msg = "Project ($project_id) does not exist.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'ProjectId' => $err_msg}]};
+      
+      return $data_for_postrun_href;
+    }
+  }
+  else {
+
+    $project_id = undef;
+  }
+
+  if ($workflow_id ne '0') {
+
+    if (!record_existence($dbh_k_read, 'workflow', 'WorkflowId', $workflow_id)) {
+
+      my $err_msg = "CurrentWorkflowId ($workflow_id) does not exist.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'CurrentWorkflowId' => $err_msg}]};
+      
+      return $data_for_postrun_href;
+    }
+  }
+
+  my $site_existence = record_existence($dbh_k_read, 'site', 'SiteId', $site_id);
+
+  if (!$site_existence) {
+
+    my $err_msg = "Site ($site_id) does not exist.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'SiteId' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $trialtype_existence = type_existence($dbh_k_read, 'trial', $trial_type_id);
+
+  if (!$trialtype_existence) {
+
+    my $err_msg = "TrialType ($trial_type_id) does not exist.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'TrialTypeId' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $group_id = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  my $perm_str       = permission_phrase($group_id, 0, $gadmin_status, 'genotype');
+
+  my $design_type_existence = record_existence($dbh_k_read, 'designtype', 'DesignTypeId', $design_type_id);
+
+  if (!$design_type_existence) {
+
+    my $err_msg = "DesignType ($design_type_id) does not exist.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'DesignTypeId' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $trial_manager_existence = record_existence($dbh_k_read, 'contact', 'ContactId', $trial_manager_id);
+
+  if (!$trial_manager_existence) {
+
+    my $err_msg = "TrialManager ($trial_manager_id) does not exist.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'TrialManagerId' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $access_grp_existence = record_existence($dbh_k_read, 'systemgroup', 'SystemGroupId', $access_group);
+
+  if (!$access_grp_existence) {
+
+    my $err_msg = "AccessGroup ($access_group) does not exist.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'AccessGroupId' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if ( ($own_perm > 7 || $own_perm < 0) ) {
+
+    my $err_msg = "OwnGroupPerm ($own_perm) is invalid.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'OwnGroupPerm' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if ( ($access_perm > 7 || $access_perm < 0) ) {
+
+    my $err_msg = "AccesGroupPerm ($access_perm) is invalid.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'AccessGroupPerm' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if ( ($other_perm > 7 || $other_perm < 0) ) {
+
+    my $err_msg = "OtherPerm ($other_perm) is invalid.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'OtherPerm' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh_k_read->disconnect();
+
+  my $inserted_id = {};
+  my $dbh_k_write = connect_kdb_write();
+
+  $sql    = 'INSERT INTO trial SET ';
+  $sql   .= 'ProjectId=?, ';
+  $sql   .= 'CurrentWorkflowId=?, ';
+  $sql   .= 'SiteId=?, ';
+  $sql   .= 'TrialTypeId=?, ';
+  $sql   .= 'TrialNumber=?, ';
+  $sql   .= 'TrialAcronym=?, ';
+  $sql   .= 'DesignTypeId=?, ';
+  $sql   .= 'TrialManagerId=?, ';
+  $sql   .= 'TrialStartDate=?, ';
+  $sql   .= 'TrialEndDate=?, ';
+  $sql   .= 'TrialNote=?, ';
+  $sql   .= 'OwnGroupId=?, ';
+  $sql   .= 'AccessGroupId=?, ';
+  $sql   .= 'OwnGroupPerm=?, ';
+  $sql   .= 'AccessGroupPerm=?, ';
+  $sql   .= 'OtherPerm=?, ';
+  $sql   .= 'TrialName=?';
+
+  my $sth = $dbh_k_write->prepare($sql);
+  $sth->execute($project_id, $workflow_id, $site_id, $trial_type_id, $trial_number,
+                $trial_acronym, $design_type_id, $trial_manager_id, $trial_sdate, $trial_edate,
+                $trial_note, $group_id, $access_group, $own_perm, $access_perm, $other_perm,
+                $trial_name);
+
+  my $trial_id = -1;
+  if (!$dbh_k_write->err()) {
+
+    $trial_id = $dbh_k_write->last_insert_id(undef, undef, 'trial', 'TrialId');
+    $self->logger->debug("TrialId: $trial_id");
+    $inserted_id->{'trial'} = ['TrialId', $trial_id];
+  }
+  else {
+
+    my $err_msg = 'Unexpected error: adding trial.';
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+  $sth->finish();
+
+  for my $vcol_id (keys(%{$vcol_data})) {
+
+    my $factor_value = $query->param('VCol_' . "$vcol_id");
+
+    if (length($factor_value) > 0) {
+
+      $sql  = 'INSERT INTO trialfactor SET ';
+      $sql .= 'TrialId=?, ';
+      $sql .= 'FactorId=?, ';
+      $sql .= 'FactorValue=?';
+      my $factor_sth = $dbh_k_write->prepare($sql);
+      $factor_sth->execute($trial_id, $vcol_id, $factor_value);
+      
+      if ($dbh_k_write->err()) {
+        
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+        return $data_for_postrun_href;
+      }
+      $inserted_id->{'trialfactor'} = ['TrialId', $trial_id];
+      $factor_sth->finish();
+    }
+  }
+
+  my $dbh_gis_write = connect_gis_write();
+  if (length($trial_location) > 0) {
+
+    $sql  = 'INSERT INTO trialloc (trialid, triallocation) ';
+    $sql .= 'VALUES (?, ST_GeomFromText(?, -1))';
+
+    $self->logger->debug("SQL: $sql");
+    $self->logger->debug("TrialId: $trial_id");
+
+    my $gis_sth = $dbh_gis_write->prepare($sql);
+    $gis_sth->execute($trial_id, $trial_location);
+
+    if ($dbh_gis_write->err()) {
+
+      my $sql_err_str = $dbh_gis_write->errstr();
+
+      my ($rollback_err, $rollback_msg) = $self->rollback_cleanup($dbh_k_write, $inserted_id);
+
+      if ($rollback_err) {
+
+        $self->logger->debug("Rollback error msg: $rollback_msg");
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+        return $data_for_postrun_href;
+      }
+
+      $self->logger->debug("SQL err number: " . $dbh_gis_write->err());
+      $self->logger->debug("SQL err: " . $dbh_gis_write->errstr());
+
+      if ($sql_err_str =~ /(non\-closed rings)/) {
+
+        my $err_msg = "trialloc does not meet polygon requirements: $1";
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+        return $data_for_postrun_href;
+      }
+      elsif ($sql_err_str =~ /duplicate key/) {
+
+        my $err_msg = "There is trial ($trial_id) in gis database: duplicate.";
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+        return $data_for_postrun_href;
+      }
+      else {
+
+        my $err_msg = 'Unexpected error: adding trialloc data';
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+        return $data_for_postrun_href;
+      }
+    }
+    $gis_sth->finish();
+  }
+
+  my $info_msg_aref = [{'Message' => "Trial ($trial_id) has been added successfully."}];
+  my $return_id_aref = [{'Value' => "$trial_id", 'ParaName' => 'TrialId'}];
+
+  if (length($trial_location) > 0) {
+
+    my ($is_within_err, $is_within) = is_within($dbh_gis_write, 'siteloc', 'siteid',
+                                                'sitelocation', $trial_location, $site_id);
+
+    if ($is_within_err) {
+
+      $self->logger->debug("IsWithin Err: $is_within_err");
+      $self->logger->debug("IsWithin: $is_within");
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+    else {
+
+      if (!$is_within) {
+
+        if ($GIS_ENFORCE_GEO_WITHIN) {
+
+          my ($rollback_err, $rollback_msg) = $self->rollback_cleanup($dbh_k_write, $inserted_id);
+
+          if ($rollback_err) {
+
+            $self->logger->debug("Rollback error msg: $rollback_msg");
+            $data_for_postrun_href->{'Error'} = 1;
+            $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+            return $data_for_postrun_href;
+          }
+
+          $inserted_id = {};
+          $inserted_id->{'trialloc'} = ['trialid', $trial_id];
+
+          ($rollback_err, $rollback_msg) = $self->rollback_cleanup($dbh_gis_write, $inserted_id);
+
+          if ($rollback_err) {
+
+            $self->logger->debug("Rollback error msg: $rollback_msg");
+            $data_for_postrun_href->{'Error'} = 1;
+            $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+            return $data_for_postrun_href;
+          }
+
+          my $err_msg = "This trial geography is not within site (${site_id}) geography.";
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+          return $data_for_postrun_href;
+        }
+        else {
+
+          my $msg = "Trial ($trial_id) has been added successfully. ";
+          $msg   .= "However, this trial's geography is not within site (${site_id})'s geography.";
+          $info_msg_aref = [{'Message' => $msg}];
+        }
+      }
+    }
+  }
+
+  $dbh_k_write->disconnect();
+  $dbh_gis_write->disconnect();
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'     => $info_msg_aref,
+                                           'ReturnId' => $return_id_aref,
+  };
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub add_unit_position_runmode {
+
+=pod add_unit_position_gadmin_HELP_START
+{
+"OperationName" : "Add unit position",
+"Description": "Add a new unit position to all the unit positions dictionary.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 1,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"KDDArTModule": "main",
+"KDDArTTable": "unitposition",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><ReturnId Value='68' ParaName='UnitPositionId' /><Info Message='UnitPosition (68) has been added successfully.' /></DATA>",
+"SuccessMessageJSON": "{'ReturnId' : [{'Value' : '69','ParaName' : 'UnitPositionId'}],'Info' : [{'Message' : 'UnitPosition (69) has been added successfully.'}]}",
+"ErrorMessageXML": [{"NameAlreadyExists": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error UnitPositionText='UnitPosition (Row1|Column1) already exists.' /></DATA>"}],
+"ErrorMessageJSON": [{"NameAlreadyExists": "{'Error' : [{'UnitPositionText' : 'UnitPosition (Row1|Column1) already exists.'}]}"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self  = shift;
+  my $query = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  my $position_text        = $query->param('UnitPositionText');
+  
+  my ($missing_err, $missing_href) = check_missing_href( {'UnitPositionText' => $position_text } );
+
+  if ($missing_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $dbh_k_write = connect_kdb_write();
+
+  if (record_existence($dbh_k_write, 'unitposition', 'unitpositiontext', $position_text)) {
+
+    my $err_msg = "UnitPosition ($position_text) already exists.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'UnitPositionText' => $err_msg}]};
+        
+    return $data_for_postrun_href;
+  }
+
+  my $sql;
+  # Decompose unit position text into virtual column
+  my $decomp_utxt_href = {};
+
+  $sql    = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength ";
+  $sql   .= "FROM factor ";
+  $sql   .= "WHERE TableNameOfFactor='unitpositionfactor'";
+
+  my $vcol_data = $dbh_k_write->selectall_hashref($sql, 'FactorId');
+
+  my $vcol_param_data = {};
+  my $vcol_len_info   = {};
+  my $vcol_param_data_maxlen = {};
+  for my $vcol_id (keys(%{$vcol_data})) {
+
+    my $vcol_param_name = "VCol_${vcol_id}";
+    my $vcol_value      = $query->param($vcol_param_name);
+
+    if (!(defined($vcol_value))) {
+
+      $vcol_value = $decomp_utxt_href->{$vcol_param_name};
+    }
+    
+    if ($vcol_data->{$vcol_id}->{'CanFactorHaveNull'} != 1) {
+
+      $vcol_param_data->{$vcol_param_name} = $vcol_value;
+    }
+    $vcol_len_info->{$vcol_param_name} = $vcol_data->{$vcol_id}->{'FactorValueMaxLength'};
+    $vcol_param_data_maxlen->{$vcol_param_name} = $vcol_value;
+  }
+
+  my ($vcol_missing_err, $vcol_missing_msg) = check_missing_value( $vcol_param_data );
+
+  if ($vcol_missing_err) {
+
+    $vcol_missing_msg = $vcol_missing_msg . ' missing';
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $vcol_missing_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my ($vcol_maxlen_err, $vcol_maxlen_msg) = check_maxlen($vcol_param_data_maxlen, $vcol_len_info);
+
+  if ($vcol_maxlen_err) {
+
+    $vcol_maxlen_msg = $vcol_maxlen_msg . ' longer than maximum length.';
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $vcol_maxlen_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sql  = 'INSERT INTO unitposition SET ';
+  $sql .= 'UnitPositionText=?';
+
+  my $sth = $dbh_k_write->prepare($sql);
+  $sth->execute($position_text);
+
+  my $unit_position_id = -1;
+  if (!$dbh_k_write->err()) {
+
+    $unit_position_id = $dbh_k_write->last_insert_id(undef, undef, 'unitposition', 'UnitPositionId');
+    $self->logger->debug("UnitPositionId: $unit_position_id");
+  }
+  else {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+  $sth->finish();
+
+  for my $vcol_id (keys(%{$vcol_data})) {
+
+    my $factor_value = $query->param('VCol_' . "$vcol_id");
+
+    if (!(defined($factor_value))) {
+
+      $factor_value = $decomp_utxt_href->{'VCol_' . "$vcol_id"};
+    }
+
+    if (length($factor_value) > 0) {
+
+      $sql  = 'INSERT INTO unitpositionfactor SET ';
+      $sql .= 'UnitPositionId=?, ';
+      $sql .= 'FactorId=?, ';
+      $sql .= 'FactorValue=?';
+      my $factor_sth = $dbh_k_write->prepare($sql);
+      $factor_sth->execute($unit_position_id, $vcol_id, $factor_value);
+      
+      if ($dbh_k_write->err()) {
+        
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+        return $data_for_postrun_href;
+      }
+    
+      $factor_sth->finish();
+    }
+  }
+
+  $dbh_k_write->disconnect();
+
+  my $info_msg_aref  = [{'Message' => "UnitPosition ($unit_position_id) has been added successfully."}];
+  my $return_id_aref = [{'Value' => "$unit_position_id", 'ParaName' => 'UnitPositionId'}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'     => $info_msg_aref,
+                                           'ReturnId' => $return_id_aref,
+  };
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub add_trial_unit_runmode {
+
+=pod add_trial_unit_HELP_START
+{
+"OperationName" : "Add trial unit to the trial",
+"Description": "Add a new trial unit to the trial specified by id.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"KDDArTModule": "main",
+"KDDArTTable": "trialunit",
+"SkippedField": ["TrialId"],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><ReturnId Value='70' ParaName='TrialUnitId' /><Info Message='TrialUnit (70) has been added successfully.' /></DATA>",
+"SuccessMessageJSON": "{'ReturnId' : [{'Value' : '71','ParaName' : 'TrialUnitId'}],'Info' : [{'Message' : 'TrialUnit (71) has been added successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='ItemId (123) does not exist.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'ItemId (123) does not exist.'}]}"}],
+"HTTPParameter": [{"Name": "trialunitlocation", "DataType": "point_wkt", "Description": "GIS field defining the geometric point of the trial unit in a standard GIS well-known text.", "Type": "LCol", "Required": "0"}],
+"RequiredUpload": 1,
+"UploadFileFormat": "XML",
+"UploadFileParameterName": "uploadfile",
+"DTDFileNameForUploadXML": "addtrialunit_upload.dtd",
+"URLParameter": [{"ParameterName": "id", "Description": "Existing TrialId"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self  = shift;
+  my $query = $self->query();
+  
+  my $data_for_postrun_href = {};
+
+  # Generic required static field checking
+
+  my $dbh_read = connect_kdb_read();
+
+  my $skip_field = {'TrialId' => 1};
+
+  my ($get_scol_err, $get_scol_msg, $scol_data, $pkey_data) = get_static_field($dbh_read, 'trialunit');
+
+  if ($get_scol_err) {
+
+    $self->logger->debug("Get static field info failed: $get_scol_msg");
+    
+    my $err_msg = "Unexpected Error.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $required_field_href = {};
+
+  for my $static_field (@{$scol_data}) {
+
+    my $field_name = $static_field->{'Name'};
+    
+    if ($skip_field->{$field_name}) { next; }
+
+    if ($static_field->{'Required'} == 1) {
+
+      $required_field_href->{$field_name} = $query->param($field_name);
+    }
+  }
+
+  $dbh_read->disconnect();
+
+  my ($missing_err, $missing_href) = check_missing_href( $required_field_href );
+
+  if ($missing_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  # Finish generic required static field checking
+
+  my $trial_id            = $self->param('id');
+
+  my $unit_position_id    = $query->param('UnitPositionId');
+  my $replicate_number    = $query->param('ReplicateNumber');
+
+  my $src_trial_unit_id   = '0';
+
+  if (defined $query->param('SourceTrialUnitId')) {
+
+    $src_trial_unit_id = $query->param('SourceTrialUnitId');
+  }
+  
+  my $sample_supplier_id  = '0';
+
+  if (defined $query->param('SampleSupplierId')) {
+
+    $sample_supplier_id = $query->param('SampleSupplierId');
+  }
+
+  my $trialunitlocation   = '';
+  my $barcode             = '0';
+
+  my $trial_unit_comment  = '';
+
+  if (defined $query->param('TrialUnitNote')) {
+
+    $trial_unit_comment = $query->param('TrialUnitNote');
+  }
+
+  if (length($query->param('TrialUnitBarcode')) > 0) {
+
+    $barcode = $query->param('TrialUnitBarcode');
+  }
+
+  if (length($query->param('trialunitlocation')) > 0) {
+
+    $trialunitlocation = $query->param('trialunitlocation');
+  }
+
+  if (length($trialunitlocation) > 0) {
+
+    my $dbh_gis_read = connect_gis_read();
+    my ($is_wkt_err, $wkt_err_href) = is_valid_wkt_href($dbh_gis_read,
+                                                        { 'trialunitlocation' => $trialunitlocation },
+                                                        'POINT');
+    $dbh_gis_read->disconnect();
+
+    if ($is_wkt_err) {
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [$wkt_err_href]};
+      
+      return $data_for_postrun_href;
+    }
+  }
+
+  my $trialunit_info_xml_file = $self->authen->get_upload_file();
+  my $add_trialunit_dtd_file  = $self->get_addtrialunit_dtd_file();
+
+  add_dtd($add_trialunit_dtd_file, $trialunit_info_xml_file);
+
+  my $xml_checker_parser = new XML::Checker::Parser( Handlers => { } );
+
+  eval {
+
+    local $XML::Checker::FAIL = sub {
+      
+      my $code = shift;
+      my $err_str = XML::Checker::error_string ($code, @_);
+      $self->logger->debug("XML Parsing ERR: $code : $err_str");
+      die $err_str;
+    };
+    $xml_checker_parser->parsefile($trialunit_info_xml_file);
+  };
+
+  if ($@) {
+
+    my $err_msg = $@;
+    $self->logger->debug("Parsing XML error: $err_msg");
+    my $user_err_msg = "Uploaded xml (trialunitspecimen) file does not comply with its definition.\n";
+    $user_err_msg   .= "Details: $err_msg";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $user_err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $group_id  = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  my $dbh_k_write = connect_kdb_write();
+
+  my $treatment_id        = 0;
+
+  if (length($query->param('TreatmentId')) > 0) {
+
+    $treatment_id = $query->param('TreatmentId');
+    my $treatment_existence = record_existence($dbh_k_write, 'treatment', 'TreatmentId', $treatment_id);
+
+    if (!$treatment_existence) {
+
+      my $err_msg = "Treatment ($treatment_id) does not exist.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'TreatmentId' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  my $trial_existence = record_existence($dbh_k_write, 'trial', 'TrialId', $trial_id);
+
+  if (!$trial_existence) {
+
+    my $err_msg = "Trial ($trial_id) does not exist.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $unit_pos_existence = record_existence($dbh_k_write, 'unitposition', 'UnitPositionId', $unit_position_id);
+
+  if (!$unit_pos_existence) {
+
+    my $err_msg = "UnitPosition ($unit_position_id) does not exist.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'UnitPositionId' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if ( $barcode ne '0' ) {
+
+    if (record_existence($dbh_k_write, 'trialunit', 'TrialUnitBarcode', $barcode)) {
+
+      my $err_msg = "TrialUnitBarcode ($barcode): already exists.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'TrialUnitBarcode' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  if ($src_trial_unit_id ne '0') {
+
+    if (!record_existence($dbh_k_write, 'trialunit', 'TrialUnitId', $src_trial_unit_id)) {
+
+      my $err_msg = "SourceTrialUnitId ($src_trial_unit_id) not found.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'SourceTrialUnitId' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  my $trialunit_info_xml  = read_file($trialunit_info_xml_file);
+  my $trialunit_info_aref = xml2arrayref($trialunit_info_xml, 'trialunitspecimen');
+
+  my @geno_id_list;
+  my $sql = '';
+  for my $trialunitspecimen (@{$trialunit_info_aref}) {
+
+    my $specimen_id = $trialunitspecimen->{'SpecimenId'};
+
+    $sql = 'SELECT GenotypeId FROM genotypespecimen WHERE SpecimenId=?';
+    my $sth = $dbh_k_write->prepare($sql);
+    $sth->execute($specimen_id);
+    my $genotype_id_href = $sth->fetchall_hashref('GenotypeId');
+    $sth->finish();
+
+    my @geno_id = keys(%{$genotype_id_href});
+    if (scalar(@geno_id) == 0) {
+
+      my $err_msg = "SpecimenId ($specimen_id) does not exist.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my $item_id = 0;
+
+    if (length($trialunitspecimen->{'ItemId'}) > 0) {
+
+      $item_id = $trialunitspecimen->{'ItemId'};
+    }
+
+    if ( "$item_id" ne '0' ) {
+
+      my $item_existence = record_existence($dbh_k_write, 'item', 'ItemId', $item_id);
+
+      if (!$item_existence) {
+
+        my $err_msg = "ItemId ($item_id) does not exist.";
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+        
+        return $data_for_postrun_href;
+      }
+    }
+
+    push(@geno_id_list, @geno_id);
+
+    my $plant_date = $trialunitspecimen->{'PlantDate'};
+
+    if (length($plant_date) > 0 && (!($plant_date =~ /\d{4}\-\d{2}\-\d{2}/))) {
+
+      my $err_msg = "PlantDate ($plant_date) is not an acceptable date: yyyy-mm-dd";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my $harvest_date = $trialunitspecimen->{'HarvestDate'};
+
+    if (length($harvest_date) > 0 && (!($harvest_date =~ /\d{4}\-\d{2}\-\d{2}/))) {
+
+      my $err_msg = "HarvestDate ($harvest_date) is not an acceptable date: yyyy-mm-dd";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my $has_died = $trialunitspecimen->{'HasDied'};
+
+    if (length($has_died) > 0 && (!($has_died =~ /^[0|1]$/))) {
+
+      my $err_msg = "HasDied ($has_died) can be either 1 or 0 only.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  my ($is_trial_ok, $trouble_trial_id_aref) = check_permission($dbh_k_write, 'trial', 'TrialId',
+                                                               [$trial_id], $group_id, $gadmin_status,
+                                                               $LINK_PERM);
+
+  if (!$is_trial_ok) {
+
+    my $trouble_trial_id = $trouble_trial_id_aref->[0];
+    
+    my $err_msg = "Permission denied: Group ($group_id) and Trial ($trouble_trial_id).";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my ($is_geno_ok, $trouble_geno_id_aref) = check_permission($dbh_k_write, 'genotype', 'GenotypeId',
+                                                             \@geno_id_list, $group_id, $gadmin_status,
+                                                             $LINK_PERM);
+
+  if (!$is_geno_ok) {
+
+    my $trouble_geno_id_str = join(',', @{$trouble_geno_id_aref});
+
+    my $perm_err_msg = '';
+    $perm_err_msg   .= "Permission denied: Group ($group_id) and Genotype ($trouble_geno_id_str).";
+    
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $perm_err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sql    = 'INSERT INTO trialunit SET ';
+  $sql   .= 'TrialId=?, ';
+  $sql   .= 'UnitPositionId=?, ';
+  $sql   .= 'SampleSupplierId=?, ';
+  $sql   .= 'TreatmentId=?, ';
+  $sql   .= 'ReplicateNumber=?, ';
+  $sql   .= 'TrialUnitBarcode=?, ';
+  $sql   .= 'TrialUnitNote=?, ';
+  $sql   .= 'SourceTrialUnitId=?';
+
+  my $sth = $dbh_k_write->prepare($sql);
+  $sth->execute($trial_id, $unit_position_id, $sample_supplier_id, $treatment_id,
+                $replicate_number, $barcode, $trial_unit_comment, $src_trial_unit_id,
+      );
+
+  if ($dbh_k_write->err()) {
+
+    $self->logger->debug("SQL Error:" . $dbh_k_write->errstr());
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+  $sth->finish();
+
+  my $trial_unit_id = $dbh_k_write->last_insert_id(undef, undef, 'trialunit', 'TrialUnitId');
+
+  for my $trialunitspecimen (@{$trialunit_info_aref}) {
+
+    my $specimen_id  = $trialunitspecimen->{'SpecimenId'};
+
+    my $item_id      = 0;
+    my $plant_date   = q{};
+    my $harvest_date = q{};
+    my $has_died     = q{};
+    my $notes        = q{};
+
+    if ( length($trialunitspecimen->{'PlantDate'}) > 0 ) {
+
+      $plant_date = $trialunitspecimen->{'PlantDate'};
+    }
+
+    if ( length($trialunitspecimen->{'HarvestDate'}) > 0 ) {
+
+      $harvest_date = $trialunitspecimen->{'HarvestDate'};
+    }
+
+    if ( length($trialunitspecimen->{'HasDied'}) > 0 ) {
+
+      $has_died = $trialunitspecimen->{'HasDied'};
+    }
+
+    if ( length($trialunitspecimen->{'Notes'}) > 0 ) {
+
+      $notes = $trialunitspecimen->{'Notes'};
+    }
+
+    if ( length($trialunitspecimen->{'ItemId'}) > 0) {
+
+      $item_id = $trialunitspecimen->{'ItemId'};
+    }
+
+    $sql  = 'INSERT INTO trialunitspecimen SET ';
+    $sql .= 'SpecimenId=?, ';
+    $sql .= 'TrialUnitId=?, ';
+    $sql .= 'PlantDate=?, ';
+    $sql .= 'HarvestDate=?, ';
+    $sql .= 'HasDied=?, ';
+    $sql .= 'Notes=?';
+
+    my $trialunit_specimen_sth = $dbh_k_write->prepare($sql);
+    $trialunit_specimen_sth->execute($specimen_id, $trial_unit_id,
+                                     $plant_date, $harvest_date, $has_died, $notes);
+
+    if ($dbh_k_write->err()) {
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+    $trialunit_specimen_sth->finish();
+  }
+
+  $dbh_k_write->disconnect();
+
+  my $dbh_gis_write = connect_gis_write();
+
+  $sql  = 'INSERT INTO trialunitloc (trialunitid, trialunitlocation) ';
+  $sql .= 'VALUES (?, ST_GeomFromText(?, -1))';
+
+  my $gis_sth = $dbh_gis_write->prepare($sql);
+  $gis_sth->execute($trial_unit_id, $trialunitlocation);
+
+  if ($dbh_gis_write->err()) {
+
+    $self->logger->debug("SQL err: " . $dbh_gis_write->errstr());
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $gis_sth->finish();
+
+  $dbh_gis_write->disconnect();
+
+  my $info_msg_aref  = [{'Message' => "TrialUnit ($trial_unit_id) has been added successfully."}];
+  my $return_id_aref = [{'Value' => "$trial_unit_id", 'ParaName' => 'TrialUnitId'}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'     => $info_msg_aref,
+                                           'ReturnId' => $return_id_aref,
+  };
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub add_trial_unit_bulk_runmode {
+
+=pod add_trial_unit_bulk_HELP_START
+{
+"OperationName" : "Add trial units to the trial",
+"Description": "Add trial units in bulk to the trial specified by id.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='1 TrialUnits for Trial (1) have been added successfully.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : '1 TrialUnits for Trial (3) have been added successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Treatment (1872) does not exist.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Treatment (1872) does not exist.'}]}"}],
+"RequiredUpload": 1,
+"UploadFileFormat": "XML",
+"UploadFileParameterName": "uploadfile",
+"DTDFileNameForUploadXML": "addtrialunitbulk_upload.dtd",
+"URLParameter": [{"ParameterName": "id", "Description": "Existing TrialId"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self  = shift;
+  my $query = $self->query();
+  
+  my $data_for_postrun_href = {};
+
+  my $trial_id            = $self->param('id');
+
+  my $trialunit_info_xml_file = $self->authen->get_upload_file();
+  my $add_trialunit_dtd_file  = $self->get_addtrialunit_bulk_dtd_file();
+
+  add_dtd($add_trialunit_dtd_file, $trialunit_info_xml_file);
+
+  my $xml_checker_parser = new XML::Checker::Parser( Handlers => { } );
+
+  eval {
+
+    local $XML::Checker::FAIL = sub {
+      
+      my $code = shift;
+      my $err_str = XML::Checker::error_string ($code, @_);
+      $self->logger->debug("XML Parsing ERR: $code : $err_str");
+      die $err_str;
+    };
+    $xml_checker_parser->parsefile($trialunit_info_xml_file);
+  };
+
+  if ($@) {
+
+    my $err_msg = $@;
+    $self->logger->debug("Parsing XML error: $err_msg");
+    my $user_err_msg = "Uploaded xml (trialunitspecimen) file does not comply with its definition.\n";
+    $user_err_msg   .= "Details: $err_msg";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $user_err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $dbh_k_write   = connect_kdb_write();
+  my $dbh_gis_write = connect_gis_write();
+
+  my $trial_existence = record_existence($dbh_k_write, 'trial', 'TrialId', $trial_id);
+
+  if (!$trial_existence) {
+
+    my $err_msg = "Trial ($trial_id) does not exist.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $group_id  = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  my $trialunit_info_xml  = read_file($trialunit_info_xml_file);
+  my $trialunit_info_aref = xml2arrayref($trialunit_info_xml, 'trialunit');
+
+  my $uniq_unitposition = {};
+  my $sql = '';
+
+  for my $trialunit (@{$trialunit_info_aref}) {
+
+    my $unit_position_id    = $trialunit->{'UnitPositionId'};
+    my $replicate_number    = $trialunit->{'ReplicateNumber'};
+
+    my $trial_unit_comment  = '';
+
+    if (length($trialunit->{'TrialUnitNote'}) > 0) {
+
+      $trial_unit_comment = $trialunit->{'TrialUnitNote'};
+    }
+
+    my $sample_supplier_id  = '0';
+
+    if (length($trialunit->{'SampleSupplierId'}) > 0) {
+
+      $sample_supplier_id = $trialunit->{'SampleSupplierId'};
+    }
+
+    my $treatment_id        = '0';
+
+    if (length($trialunit->{'TreatmentId'}) > 0) {
+
+      $treatment_id = $trialunit->{'TreatmentId'};
+    }
+
+    if ($treatment_id ne '0') {
+
+      my $treatment_existence = record_existence($dbh_k_write, 'treatment', 'TreatmentId', $treatment_id);
+
+      if (!$treatment_existence) {
+
+        my $err_msg = "Treatment ($treatment_id) does not exist.";
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+        return $data_for_postrun_href;
+      }
+    }
+
+    my $src_trial_unit_id = '0';
+
+    if (length($trialunit->{'SourceTrialUnitId'}) > 0) {
+
+      $src_trial_unit_id = $trialunit->{'SourceTrialUnitId'};
+    }
+
+    if ($src_trial_unit_id ne '0') {
+
+      if (!record_existence($dbh_k_write, 'trialunit', 'TrialUnitId', $src_trial_unit_id)) {
+
+        my $err_msg = "SourceTrialUnitId ($src_trial_unit_id): not found.";
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+        return $data_for_postrun_href;
+      }
+    }
+
+    my $barcode = '0';
+
+    if (length($trialunit->{'TrialUnitBarcode'}) > 0) {
+
+      $barcode = $trialunit->{'TrialUnitBarcode'};
+    }
+
+    if ( $barcode ne '0' ) {
+
+      if (record_existence($dbh_k_write, 'trialunit', 'TrialUnitBarcode', $barcode)) {
+
+        my $err_msg = "TrialUnitBarcode ($barcode): already exists.";
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+        return $data_for_postrun_href;
+      }
+    }
+
+    my $unit_pos_existence = record_existence($dbh_k_write, 'unitposition', 'UnitPositionId', $unit_position_id);
+
+    if (!$unit_pos_existence) {
+
+      my $err_msg = "UnitPosition ($unit_position_id) does not exist.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    if ($uniq_unitposition->{$unit_position_id}) {
+
+      my $err_msg = "UnitPosition ($unit_position_id) has already been used in this upload.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    $sql = 'SELECT TrialUnitId FROM trialunit WHERE TrialId=? AND UnitPositionId=?';
+    my ($read_tu_id, $tu_id) = read_cell($dbh_k_write, $sql, [$trial_id, $unit_position_id]);
+
+    if (length($tu_id) > 0) {
+
+      my $err_msg = "UnitPosition ($unit_position_id) has already been used.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    $uniq_unitposition->{$unit_position_id} = 1;
+
+    if ( !(defined($trialunit->{'trialunitspecimen'})) ) {
+
+      my $err_msg = "Missing trialunitspecimen.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'uploadfile' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+    elsif (ref($trialunit->{'trialunitspecimen'}) eq 'HASH') {
+      
+      my $tu_spec_href = $trialunit->{'trialunitspecimen'};
+      my $tu_spec_aref = [];
+      push(@{$tu_spec_aref}, $tu_spec_href);
+      $trialunit->{'trialunitspecimen'} = $tu_spec_aref;
+    }
+
+    my $trialunit_location = '';
+
+    if (length($trialunit->{'trialunitlocation'}) > 0) {
+
+      $trialunit_location = $trialunit->{'trialunitlocation'};
+      my ($is_wkt_err, $wkt_err_href) = is_valid_wkt_href($dbh_gis_write,
+                                                          {'trialunitlocation' => $trialunit_location},
+                                                          'POINT');
+
+      if ($is_wkt_err) {
+
+        $self->logger->debug("Trial unit location: $trialunit_location");
+
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [$wkt_err_href]};
+
+        return $data_for_postrun_href;
+      }
+
+      $trialunit_location = $trialunit->{'trialunitlocation'};
+    }
+
+    my $tu_specimen_aref = $trialunit->{'trialunitspecimen'};
+
+    my @geno_id_list;
+    
+    for my $trialunitspecimen (@{$tu_specimen_aref}) {
+
+      my $specimen_id = $trialunitspecimen->{'SpecimenId'};
+
+      $sql = 'SELECT GenotypeId FROM genotypespecimen WHERE SpecimenId=?';
+      my $sth = $dbh_k_write->prepare($sql);
+      $sth->execute($specimen_id);
+      my $genotype_id_href = $sth->fetchall_hashref('GenotypeId');
+      $sth->finish();
+
+      my @geno_id = keys(%{$genotype_id_href});
+      if (scalar(@geno_id) == 0) {
+
+        my $err_msg = "Specimen ($specimen_id) does not exist.";
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+        return $data_for_postrun_href;
+      }
+
+      my $item_id = 0;
+
+      if (length($trialunitspecimen->{'ItemId'}) > 0) {
+
+        $item_id = $trialunitspecimen->{'ItemId'};
+      }
+
+      if ( "$item_id" ne '0' ) {
+
+        my $item_existence = record_existence($dbh_k_write, 'item', 'ItemId', $item_id);
+
+        if (!$item_existence) {
+
+          my $err_msg = "Item ($item_id) does not exist.";
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+          return $data_for_postrun_href;
+        }
+      }
+
+      push(@geno_id_list, @geno_id);
+
+      my $plant_date = $trialunitspecimen->{'PlantDate'};
+
+      if (length($plant_date) > 0 && (!($plant_date =~ /\d{4}\-\d{2}\-\d{2}/))) {
+
+        my $err_msg = "PlantDate ($plant_date) is not an acceptable date: yyyy-mm-dd";
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+        return $data_for_postrun_href;
+      }
+
+      my $harvest_date = $trialunitspecimen->{'HarvestDate'};
+      
+      if (length($harvest_date) > 0 && (!($harvest_date =~ /\d{4}\-\d{2}\-\d{2}/))) {
+
+        my $err_msg = "HarvestDate ($harvest_date) is not an acceptable date: yyyy-mm-dd";
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+        return $data_for_postrun_href;
+      }
+
+      my $has_died = $trialunitspecimen->{'HasDied'};
+
+      if (length($has_died) > 0 && (!($has_died =~ /^[0|1]$/))) {
+      
+        my $err_msg = "HasDied ($has_died) can be either 1 or 0 only.";
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+        return $data_for_postrun_href;
+      }
+    }
+
+    my ($is_trial_ok, $trouble_trial_id_aref) = check_permission($dbh_k_write, 'trial', 'TrialId',
+                                                                 [$trial_id], $group_id, $gadmin_status,
+                                                                 $LINK_PERM);
+
+    if (!$is_trial_ok) {
+
+      my $trouble_trial_id = $trouble_trial_id_aref->[0];
+    
+      my $err_msg = "Permission denied: Group ($group_id) and Trial ($trouble_trial_id).";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my ($is_geno_ok, $trouble_geno_id_aref) = check_permission($dbh_k_write, 'genotype', 'GenotypeId',
+                                                               \@geno_id_list, $group_id, $gadmin_status,
+                                                               $LINK_PERM);
+
+    if (!$is_geno_ok) {
+
+      my $trouble_geno_id_str = join(',', @{$trouble_geno_id_aref});
+
+      my $perm_err_msg = '';
+      $perm_err_msg   .= "Permission denied: Group ($group_id) and Genotype ($trouble_geno_id_str).";
+    
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $perm_err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  my $inserted_trialunit_records     = {};
+  my $inserted_trialunit_loc_records = {};
+
+  for my $trialunit (@{$trialunit_info_aref}) {
+
+    my $unit_position_id    = $trialunit->{'UnitPositionId'};
+    my $src_trial_unit_id   = $trialunit->{'SourceTrialUnitId'};
+    my $replicate_number    = $trialunit->{'ReplicateNumber'};
+    my $trial_unit_comment  = $trialunit->{'TrialUnitNote'};
+    my $sample_supplier_id  = $trialunit->{'SampleSupplierId'};
+    my $trialunit_location  = $trialunit->{'trialunitlocation'};
+
+    my $treatment_id        = 0;
+
+    if (length($trialunit->{'TreatmentId'}) > 0) {
+
+      $treatment_id = $trialunit->{'TreatmentId'};
+    }
+
+    my $barcode = undef;
+
+    if (defined $trialunit->{'TrialUnitBarcode'} > 0) {
+
+      if ($trialunit->{'TrialUnitBarcode'} ne '0') {
+
+        $barcode = $trialunit->{'TrialUnitBarcode'};
+      }
+    }
+
+    my $tu_specimen_aref = $trialunit->{'trialunitspecimen'};
+
+    $sql    = 'INSERT INTO trialunit SET ';
+    $sql   .= 'TrialId=?, ';
+    $sql   .= 'UnitPositionId=?, ';
+    $sql   .= 'SampleSupplierId=?, ';
+    $sql   .= 'TreatmentId=?, ';
+    $sql   .= 'ReplicateNumber=?, ';
+    $sql   .= 'TrialUnitBarcode=?, ';
+    $sql   .= 'TrialUnitNote=?, ';
+    $sql   .= 'SourceTrialUnitId=?';
+
+    my $sth = $dbh_k_write->prepare($sql);
+    $sth->execute($trial_id, $unit_position_id, $sample_supplier_id, $treatment_id,
+                  $replicate_number, $barcode, $trial_unit_comment, $src_trial_unit_id,
+        );
+
+    if ($dbh_k_write->err()) {
+
+      my ($rb_trialunit_err, $rb_trialunit_msg) = $self->rollback_cleanup($dbh_k_write, $inserted_trialunit_records);
+
+      if ($rb_trialunit_err) {
+
+        $self->logger->debug("Rollback error msg: $rb_trialunit_msg");
+      
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+        return $data_for_postrun_href;
+      }
+
+      my ($rb_trialunit_loc_err, $rb_trialunit_loc_msg) = $self->rollback_cleanup($dbh_gis_write,
+                                                                                  $inserted_trialunit_loc_records);
+
+      if ($rb_trialunit_loc_err) {
+
+        $self->logger->debug("Rollback error msg: $rb_trialunit_loc_msg");
+      
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+        return $data_for_postrun_href;
+      }
+
+      $self->logger->debug("SQL Error:" . $dbh_k_write->errstr());
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+    $sth->finish();
+
+    my $trial_unit_id = $dbh_k_write->last_insert_id(undef, undef, 'trialunit', 'TrialUnitId');
+
+    if ( !(defined $inserted_trialunit_records->{'trialunit'}) ) {
+
+      $inserted_trialunit_records->{'trialunit'} = ['TrialUnitId', $trial_unit_id];
+    }
+    else {
+
+      push(@{$inserted_trialunit_records->{'trialunit'}}, $trial_unit_id);
+    }
+
+    for my $trialunitspecimen (@{$tu_specimen_aref}) {
+
+      my $specimen_id  = $trialunitspecimen->{'SpecimenId'};
+
+      my $item_id      = 0;
+      my $plant_date   = q{};
+      my $harvest_date = q{};
+      my $has_died     = q{};
+      my $notes        = q{};
+
+      if ( length($trialunitspecimen->{'ItemId'}) > 0 ) {
+
+        $item_id = $trialunitspecimen->{'ItemId'};
+      }
+
+      if ( length($trialunitspecimen->{'PlantDate'}) > 0 ) {
+
+        $plant_date = $trialunitspecimen->{'PlantDate'};
+      }
+
+      if ( length($trialunitspecimen->{'HarvestDate'}) > 0 ) {
+
+        $harvest_date = $trialunitspecimen->{'HarvestDate'};
+      }
+
+      if ( length($trialunitspecimen->{'HasDied'}) > 0 ) {
+
+        $has_died = $trialunitspecimen->{'HasDied'};
+      }
+
+      if ( length($trialunitspecimen->{'Notes'}) > 0 ) {
+
+        $notes = $trialunitspecimen->{'Notes'};
+      }
+      
+      $sql  = 'INSERT INTO trialunitspecimen SET ';
+      $sql .= 'SpecimenId=?, ';
+      $sql .= 'ItemId=?, ';
+      $sql .= 'TrialUnitId=?, ';
+      $sql .= 'PlantDate=?, ';
+      $sql .= 'HarvestDate=?, ';
+      $sql .= 'HasDied=?, ';
+      $sql .= 'Notes=?';
+
+      my $trialunit_specimen_sth = $dbh_k_write->prepare($sql);
+      $trialunit_specimen_sth->execute($specimen_id, $item_id, $trial_unit_id,
+                                       $plant_date, $harvest_date, $has_died, $notes);
+
+      if ($dbh_k_write->err()) {
+
+        my ($rb_trialunit_err, $rb_trialunit_msg) = $self->rollback_cleanup($dbh_k_write, $inserted_trialunit_records);
+
+        if ($rb_trialunit_err) {
+
+          $self->logger->debug("Rollback error msg: $rb_trialunit_msg");
+      
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+          
+          return $data_for_postrun_href;
+        }
+
+        my ($rb_trialunit_loc_err, $rb_trialunit_loc_msg) = $self->rollback_cleanup($dbh_gis_write,
+                                                                                    $inserted_trialunit_loc_records);
+
+        if ($rb_trialunit_loc_err) {
+
+          $self->logger->debug("Rollback error msg: $rb_trialunit_loc_msg");
+      
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+          return $data_for_postrun_href;
+        }
+
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+        return $data_for_postrun_href;
+      }
+
+      my $tu_specimen_id = $dbh_k_write->last_insert_id(undef, undef, 'trialunitspecimen', 'TrialUnitSpecimenId');
+
+      if ( !(defined $inserted_trialunit_records->{'trialunitspecimen'}) ) {
+
+        $inserted_trialunit_records->{'trialunitspecimen'} = ['TrialUnitSpecimenId', $tu_specimen_id];
+      }
+      else {
+
+        push(@{$inserted_trialunit_records->{'trialunitspecimen'}}, $tu_specimen_id);
+      }
+
+      $trialunit_specimen_sth->finish();
+    }
+
+    if (length($trialunit_location) > 0) {
+
+      $sql  = 'INSERT INTO trialunitloc (trialunitid, trialunitlocation) ';
+      $sql .= 'VALUES (?, ST_GeomFromText(?, -1))';
+
+      my $gis_sth = $dbh_gis_write->prepare($sql);
+      $gis_sth->execute($trial_unit_id, $trialunit_location);
+
+      if ($dbh_gis_write->err()) {
+
+        my ($rb_trialunit_err, $rb_trialunit_msg) = $self->rollback_cleanup($dbh_k_write, $inserted_trialunit_records);
+
+        if ($rb_trialunit_err) {
+
+          $self->logger->debug("Rollback error msg: $rb_trialunit_msg");
+      
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+          
+          return $data_for_postrun_href;
+        }
+
+        my ($rb_trialunit_loc_err, $rb_trialunit_loc_msg) = $self->rollback_cleanup($dbh_gis_write,
+                                                                                    $inserted_trialunit_loc_records);
+
+        if ($rb_trialunit_loc_err) {
+
+          $self->logger->debug("Rollback error msg: $rb_trialunit_loc_msg");
+      
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+          return $data_for_postrun_href;
+        }
+
+        $self->logger->debug("SQL err: " . $dbh_gis_write->errstr());
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+      
+        return $data_for_postrun_href;
+      }
+
+      if ( !(defined $inserted_trialunit_loc_records->{'trialunitloc'}) ) {
+
+        $inserted_trialunit_loc_records->{'trialunitloc'} = ['trialunitid', $trial_unit_id];
+      }
+      else {
+
+        push(@{$inserted_trialunit_loc_records->{'trialunitloc'}}, $trial_unit_id);
+      }
+
+      $gis_sth->finish();
+    }
+  }
+
+  $dbh_k_write->disconnect();
+  $dbh_gis_write->disconnect();
+
+  my $nb_added_trial_unit = scalar(@{$trialunit_info_aref});
+  my $info_msg = "$nb_added_trial_unit TrialUnits for Trial ($trial_id) have been added successfully.";
+
+  my $info_msg_aref  = [{'Message' => $info_msg}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info' => $info_msg_aref };
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub list_site {
+
+  my $self              = $_[0];
+  my $extra_attr_yes    = $_[1];
+  my $field_list        = $_[2];
+  my $sql               = $_[3];
+  my $where_para_aref   = [];
+
+  if (defined $_[4]) {
+
+    $where_para_aref   = $_[4];
+  }
+
+  my $err = 0;
+  my $msg = '';
+
+  my $data_aref = [];
+
+  my $dbh = connect_kdb_read();
+
+  ($err, $msg, $data_aref) = read_data($dbh, $sql, $where_para_aref);
+
+  if ($err) {
+
+    return ($err, $msg, {});
+  }
+
+  my $field_list_loc_href = {};
+
+  for my $field (@{$field_list}) {
+
+    if ($field eq 'Longitude' || $field eq 'Latitude' || $field eq 'LCol*' || $field eq 'sitelocation') {
+
+      $field_list_loc_href->{$field} = 1;
+    }
+  }
+
+  my $group_id = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  my $site_loc_gis = {};
+
+  my $site_id_aref = [];
+
+  for my $row (@{$data_aref}) {
+
+    push(@{$site_id_aref}, $row->{'SiteId'});
+  }
+
+  if (scalar(keys(%{$field_list_loc_href})) > 0) {
+
+    if (scalar(@{$site_id_aref}) > 0) {
+    
+      my $dbh_gis = connect_gis_read();
+
+      my $gis_where = 'WHERE siteid IN (' . join(',', @{$site_id_aref}) . ')';
+  
+      my $siteloc_sql = 'SELECT siteid, ST_AsText(sitelocation) AS sitelocation, ';
+      $siteloc_sql   .= 'ST_AsText(ST_Centroid(geometry(sitelocation))) AS sitecentroid ';
+      $siteloc_sql   .= 'FROM siteloc ';
+      $siteloc_sql   .= $gis_where;
+
+      $self->logger->debug("siteloc_sql: $siteloc_sql");
+    
+      my $sth_gis = $dbh_gis->prepare($siteloc_sql);
+      $sth_gis->execute();
+    
+      if (!$dbh_gis->err()) {
+
+        my $gis_href = $sth_gis->fetchall_hashref('siteid');
+    
+        if (!$sth_gis->err()) {
+
+          $site_loc_gis = $gis_href;
+        }
+        else {
+
+          $err = 1;
+          $msg = 'Unexpected error';
+          $self->logger->debug('Err: ' . $dbh_gis->errstr());
+        }
+      }
+      else {
+
+        $err = 1;
+        $msg = 'Unexpected error';
+        $self->logger->debug('Err: ' . $dbh_gis->errstr());
+      }
+    
+      $dbh_gis->disconnect();
+    }
+  }
+
+  $dbh->disconnect();
+  my $site_loc_gis_count = scalar(keys(%{$site_loc_gis}));
+  $self->logger->debug("GIS site loc count: $site_loc_gis_count");
+
+  my @extra_attr_site_data;
+
+  my $chk_id_err        = 0;
+  my $chk_id_msg        = '';
+  my $used_id_href      = {};
+  my $not_used_id_href  = {};
+
+  if ($extra_attr_yes) {
+
+    if (scalar(@{$site_id_aref}) > 0) {
+
+      my $chk_table_aref = [{'TableName' => 'trial', 'FieldName' => 'SiteId'}];
+
+      ($chk_id_err, $chk_id_msg,
+       $used_id_href, $not_used_id_href) = id_existence_bulk($dbh, $chk_table_aref, $site_id_aref);
+
+      if ($chk_id_err) {
+
+        $self->logger->debug("Check id existence error: $chk_id_msg");
+        $err = 1;
+        $msg = $chk_id_msg;
+        
+        return ($err, $msg, []);
+      }
+
+    }
+  }
+
+  for my $site_row (@{$data_aref}) {
+
+    my $site_id       = $site_row->{'SiteId'};
+    my $site_centroid = $site_loc_gis->{$site_id}->{'sitecentroid'};
+    
+    $site_centroid    =~ /POINT\((.+) (.+)\)/;
+    my $longitude     = $1;
+    my $latitude      = $2;
+
+    if ($field_list_loc_href->{'LCol*'} || $field_list_loc_href->{'Longitude'}) {
+
+      $site_row->{'Longitude'} = $longitude;
+    }
+
+    if ($field_list_loc_href->{'LCol*'} || $field_list_loc_href->{'Latitude'}) {
+
+      $site_row->{'Latitude'}  = $latitude;
+    }
+
+    if ($field_list_loc_href->{'LCol*'} || $field_list_loc_href->{'sitelocation'}) {
+
+      $site_row->{'sitelocation'} = $site_loc_gis->{$site_id}->{'sitelocation'};
+    }
+
+    if ($extra_attr_yes) {
+    
+      if ($gadmin_status eq '1') {
+      
+        $site_row->{'update'} = "update/site/$site_id";
+      
+        if ( $not_used_id_href->{$site_id} ) {
+        
+          $site_row->{'delete'}   = "delete/site/$site_id";
+        }
+      }
+    }
+    
+    push(@extra_attr_site_data, $site_row);
+  }
+
+  return ($err, $msg, \@extra_attr_site_data);
+}
+
+sub get_site_full_runmode {
+
+=pod get_site_HELP_START
+{
+"OperationName" : "Get site",
+"Description": "Get detailed information about the site specified by id.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Site Longitude='149.10164' CurrentSiteManagerName='Testing User-5411143' SiteId='1' sitelocation='POLYGON((148.99658 -35.48192,149.2067 -35.48192,149.2067 -35.19626,148.99658 -35.19626,148.99658 -35.48192))' CurrentSiteManagerId='3' SiteTypeName='SiteType - 2130908' SiteEndDate='' SiteName='DArT Test Site (Updated)' Latitude='-35.33909' SiteStartDate='' SiteTypeId='6' SiteAcronym='GH' delete='delete/site/1' update='update/site/1' /><RecordMeta TagName='Site' /></DATA>",
+"SuccessMessageJSON": "{'VCol' : [],'Site' : [{'Longitude' : '149.10164','CurrentSiteManagerName' : 'Testing User-5411143','sitelocation' : 'POLYGON((148.99658 -35.48192,149.2067 -35.48192,149.2067 -35.19626,148.99658 -35.19626,148.99658 -35.48192))','SiteId' : '1','CurrentSiteManagerId' : '3','SiteName' : 'DArT Test Site (Updated)','SiteEndDate' : null,'SiteTypeName' : 'SiteType - 2130908','Latitude' : '-35.33909','SiteStartDate' : null,'SiteTypeId' : '6','SiteAcronym' : 'GH','delete' : 'delete/site/1','update' : 'update/site/1'}],'RecordMeta' : [{'TagName' : 'Site'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Site (20) not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Site (20) not found.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing SiteId"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self    = shift;
+  my $site_id = $self->param('id');
+
+  my $data_for_postrun_href = {};
+
+  my $dbh = connect_kdb_read();
+  my $site_exist = record_existence($dbh, 'site', 'SiteId', $site_id);
+
+  if (!$site_exist) {
+
+    my $err_msg = "Site ($site_id) not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $field_list = ['site.*', 'generaltype.TypeName AS SiteTypeName', 'VCol*', 'LCol*',
+                    "concat(contact.ContactFirstName, concat(' ', contact.ContactLastName)) As CurrentSiteManagerName"];
+  
+  my $other_join = ' LEFT JOIN generaltype ON site.SiteTypeId = generaltype.TypeId ';
+  $other_join   .= ' LEFT JOIN contact ON site.CurrentSiteManagerId = contact.ContactId ';
+
+  my ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_sql($dbh, $field_list, 'site',
+                                                                        'SiteId', $other_join);
+  $dbh->disconnect();
+
+  if ($vcol_err) {
+
+    my $err_msg = "Problem with virtual column ($trouble_vcol) containing space.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sql   .= ' HAVING SiteId=?';
+
+  $self->logger->debug("SQL with VCol: $sql");
+
+  my ($read_site_err, $read_site_msg, $site_data) = $self->list_site(1, $field_list, $sql, [$site_id]);
+
+  if ($read_site_err) {
+
+    $self->logger->debug($read_site_msg);
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'geojson'}   = 1;
+  $data_for_postrun_href->{'GJSonInfo'} = {'GeometryField' => 'sitelocation',
+                                           'FeatureName'   => 'SiteName [ id: SiteId ]',
+                                           'FeatureId'     => 'SiteId',
+  };
+  $data_for_postrun_href->{'Data'}      = {'Site'       => $site_data,
+                                           'VCol'       => $vcol_list,
+                                           'RecordMeta' => [{'TagName' => 'Site'}],
+  };
+
+  return $data_for_postrun_href;
+}
+
+sub update_site_runmode {
+
+=pod update_site_gadmin_HELP_START
+{
+"OperationName" : "Update site",
+"Description": "Update information about the site using specified id.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 1,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"KDDArTModule": "main",
+"KDDArTTable": "site",
+"KDDArTFactorTable": "sitefactor",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='Site (1) has been updated successfully.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'Site (1) has been updated successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Site (20) not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Site (20) not found.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing SiteId"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self    = shift;
+  my $site_id = $self->param('id');
+  my $query   = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  # Generic required static field checking
+
+  my $dbh_read = connect_kdb_read();
+
+  my $skip_field = {};
+
+  my ($get_scol_err, $get_scol_msg, $scol_data, $pkey_data) = get_static_field($dbh_read, 'site');
+
+  if ($get_scol_err) {
+
+    $self->logger->debug("Get static field info failed: $get_scol_msg");
+    
+    my $err_msg = "Unexpected Error.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $required_field_href = {};
+
+  for my $static_field (@{$scol_data}) {
+
+    my $field_name = $static_field->{'Name'};
+    
+    if ($skip_field->{$field_name}) { next; }
+
+    if ($static_field->{'Required'} == 1) {
+
+      $required_field_href->{$field_name} = $query->param($field_name);
+    }
+  }
+
+  $dbh_read->disconnect();
+
+  my ($missing_err, $missing_href) = check_missing_href( $required_field_href );
+
+  if ($missing_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  # Finish generic required static field checking
+
+  my $dbh_k_read = connect_kdb_read();
+
+  my $site_exist = record_existence($dbh_k_read, 'site', 'SiteId', $site_id);
+  
+  if (!$site_exist) {
+
+    my $err_msg = "Site ($site_id) not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $site_name          = $query->param('SiteName');
+  my $sitetype_id        = $query->param('SiteTypeId');
+  my $site_acronym       = $query->param('SiteAcronym');
+  my $cur_manager_id     = $query->param('CurrentSiteManagerId');
+
+  my $site_sdate         = read_cell_value($dbh_k_read, 'site', 'SiteStartDate', 'SiteId', $site_id);
+
+  if (defined $query->param('SiteStartDate')) {
+
+    $site_sdate         = $query->param('SiteStartDate');
+    my ($sdate_err, $sdate_msg) = check_dt_value( {'SiteStartDate' => $site_sdate} );
+
+    if ($sdate_err) {
+
+      my $err_msg = "$sdate_msg not date/time.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  # Unknown Start DateTime value from database 0000-00-00 00:00:00 which should be reset to undef,
+  # and then null in the db
+
+  if ($site_sdate eq '0000-00-00 00:00:00') {
+
+    $site_sdate = undef;
+  }
+
+  my $site_edate         = read_cell_value($dbh_k_read, 'site', 'SiteEndDate', 'SiteId', $site_id);
+
+  if (defined $query->param('SiteEndDate')) {
+
+    $site_edate         = $query->param('SiteEndDate');
+    my ($edate_err, $edate_msg) = check_dt_value( {'SiteEndDate' => $site_edate} );
+
+    if ($edate_err) {
+
+      my $err_msg = "$edate_msg not date/time.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  # Unknown End DateTime value from database 0000-00-00 00:00:00 which should be reset to undef,
+  # and then null in the db
+
+  if ($site_edate eq '0000-00-00 00:00:00') {
+
+    $site_edate = undef;
+  }
+
+  my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength ";
+  $sql   .= "FROM factor ";
+  $sql   .= "WHERE TableNameOfFactor='sitefactor'";
+
+  my $vcol_data = $dbh_k_read->selectall_hashref($sql, 'FactorId');
+
+  my $vcol_param_data = {};
+  my $vcol_len_info   = {};
+  my $vcol_param_data_maxlen = {};
+  for my $vcol_id (keys(%{$vcol_data})) {
+
+    my $vcol_param_name = "VCol_${vcol_id}";
+    my $vcol_value      = $query->param($vcol_param_name);
+    if ($vcol_data->{$vcol_id}->{'CanFactorHaveNull'} != 1) {
+
+      $vcol_param_data->{$vcol_param_name} = $vcol_value;
+    }
+    $vcol_len_info->{$vcol_param_name} = $vcol_data->{$vcol_id}->{'FactorValueMaxLength'};
+    $vcol_param_data_maxlen->{$vcol_param_name} = $vcol_value;
+  }
+
+  my ($vcol_missing_err, $vcol_missing_msg) = check_missing_value( $vcol_param_data );
+
+  if ($vcol_missing_err) {
+
+    $vcol_missing_msg = $vcol_missing_msg . ' missing';
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $vcol_missing_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my ($vcol_maxlen_err, $vcol_maxlen_msg) = check_maxlen($vcol_param_data_maxlen, $vcol_len_info);
+
+  if ($vcol_maxlen_err) {
+
+    $vcol_maxlen_msg = $vcol_maxlen_msg . ' longer than maximum length.';
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $vcol_maxlen_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $sitetype_existence = type_existence($dbh_k_read, 'site', $sitetype_id);
+
+  if (!$sitetype_existence) {
+
+    my $err_msg = "SiteType ($sitetype_id) does not exist.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $cur_manager_existence = record_existence($dbh_k_read, 'contact', 'ContactId', $cur_manager_id);
+
+  if (!$cur_manager_existence) {
+
+    my $err_msg = "CurrentManager ($cur_manager_id) does not exist.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh_k_read->disconnect();
+
+  my $dbh_k_write = connect_kdb_write();
+
+  $sql  = 'UPDATE site SET ';
+  $sql .= 'SiteName=?, ';
+  $sql .= 'SiteTypeId=?, ';
+  $sql .= 'SiteAcronym=?, ';
+  $sql .= 'CurrentSiteManagerId=?, ';
+  $sql .= 'SiteStartDate=?, ';
+  $sql .= 'SiteEndDate=? ';
+  $sql .= 'WHERE SiteId=?';
+
+  my $sth = $dbh_k_write->prepare($sql);
+  $sth->execute($site_name, $sitetype_id, $site_acronym,
+                $cur_manager_id, $site_sdate, $site_edate, $site_id);
+
+  if ($dbh_k_write->err()) {
+
+    $self->logger->debug("Update site failed");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+  $sth->finish();
+
+  for my $vcol_id (keys(%{$vcol_data})) {
+
+    if (defined $query->param('VCol_' . "$vcol_id")) {
+
+      my $factor_value = $query->param('VCol_' . "$vcol_id");
+
+      $sql  = 'SELECT Count(*) ';
+      $sql .= 'FROM sitefactor ';
+      $sql .= 'WHERE SiteId=? AND FactorId=?';
+
+      my ($read_err, $count) = read_cell($dbh_k_write, $sql, [$site_id, $vcol_id]);
+
+      if (length($factor_value) > 0) {
+
+        if ($count > 0) {
+
+          $sql  = 'UPDATE sitefactor SET ';
+          $sql .= 'FactorValue=? ';
+          $sql .= 'WHERE SiteId=? AND FactorId=?';
+
+          my $factor_sth = $dbh_k_write->prepare($sql);
+          $factor_sth->execute($factor_value, $site_id, $vcol_id);
+      
+          if ($dbh_k_write->err()) {
+        
+            $data_for_postrun_href->{'Error'} = 1;
+            $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+            return $data_for_postrun_href;
+          }
+          $factor_sth->finish();
+        }
+        else {
+
+          $sql  = 'INSERT INTO sitefactor SET ';
+          $sql .= 'SiteId=?, ';
+          $sql .= 'FactorId=?, ';
+          $sql .= 'FactorValue=?';
+          my $factor_sth = $dbh_k_write->prepare($sql);
+          $factor_sth->execute($site_id, $vcol_id, $factor_value);
+          
+          if ($dbh_k_write->err()) {
+        
+            $data_for_postrun_href->{'Error'} = 1;
+            $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+            return $data_for_postrun_href;
+          }
+          $factor_sth->finish();
+        }
+      }
+      else {
+
+        if ($count > 0) {
+
+          $sql  = 'DELETE FROM sitefactor ';
+          $sql .= 'WHERE SiteId=? AND FactorId=?';
+
+          my $factor_sth = $dbh_k_write->prepare($sql);
+          $factor_sth->execute($site_id, $vcol_id);
+      
+          if ($dbh_k_write->err()) {
+        
+            $data_for_postrun_href->{'Error'} = 1;
+            $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+            return $data_for_postrun_href;
+          }
+          $factor_sth->finish();
+        }
+      }
+    }
+  }
+
+  $dbh_k_write->disconnect();
+
+  my $info_msg_aref = [{'Message' => "Site ($site_id) has been updated successfully."}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'     => $info_msg_aref};
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub update_site_geography_runmode {
+
+=pod update_site_geography_gadmin_HELP_START
+{
+"OperationName" : "Update site location",
+"Description": "Update site's geographical location.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 1,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='Site (1) location has been updated successfully.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'Site (1) location has been updated successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Site (20) not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Site (20) not found.'}]}"}],
+"HTTPParameter": [{"Name": "sitelocation", "DataType": "polygon_wkt", "Description": "GIS field defining the polygon geometry object of the site in a standard GIS well-known text.", "Type": "LCol", "Required": "1"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing SiteId"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self    = shift;
+  my $site_id = $self->param('id');
+  my $query   = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  my $dbh_k_read = connect_kdb_read();
+  my $site_exist = record_existence($dbh_k_read, 'site', 'SiteId', $site_id);
+  $dbh_k_read->disconnect();
+
+  if (!$site_exist) {
+
+    my $err_msg = "Site ($site_id) not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $site_location = $query->param('sitelocation');
+
+  my ($missing_err, $missing_href) = check_missing_href( { 'sitelocation' => $site_location } );
+
+  if ($missing_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $dbh_gis_read = connect_gis_read();
+  my ($is_wkt_err, $wkt_err_href) = is_valid_wkt_href($dbh_gis_read, {'sitelocation' => $site_location}, 'POLYGON');
+  $dbh_gis_read->disconnect();
+
+  if ($is_wkt_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$wkt_err_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $dbh_gis_write = connect_gis_write();
+
+  my $sql  = 'UPDATE siteloc SET ';
+  $sql    .= 'sitelocation=ST_GeomFromText(?, -1) ';
+  $sql    .= 'WHERE siteid=?';
+
+  $self->logger->debug("SQL: $sql");
+  $self->logger->debug("SiteId: $site_id");
+
+  my $gis_sth = $dbh_gis_write->prepare($sql);
+  $gis_sth->execute($site_location, $site_id);
+
+  if ($dbh_gis_write->err()) {
+
+    my $sql_err_str = $dbh_gis_write->errstr();
+
+    $self->logger->debug("SQL err number: " . $dbh_gis_write->err());
+    $self->logger->debug("SQL err: " . $dbh_gis_write->errstr());
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $gis_sth->finish();
+  $dbh_gis_write->disconnect();
+
+  my $info_msg_aref = [{'Message' => "Site ($site_id) location has been updated successfully."}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'     => $info_msg_aref};
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub list_designtype {
+
+  my $self           = shift;
+  my $extra_attr_yes = shift;
+  my $sql            = shift;
+
+  my $count = 0;
+  while ($sql =~ /\?/g) {
+
+    $count += 1;
+  }
+
+  if ( scalar(@_) != $count ) {
+
+    my $msg = 'Number of arguments does not match with ';
+    $msg   .= 'number of SQL parameter.';
+    return (1, $msg, []);
+  }
+
+  my $dbh = connect_kdb_read();
+  my $sth = $dbh->prepare($sql);
+  # parameters provided by the caller
+  # for example, ('WHERE FieldA=?', '1') 
+  $sth->execute(@_);
+
+  my $err = 0;
+  my $msg = '';
+  my $designtype_data = [];
+
+  if ( !$dbh->err() ) {
+
+    my $array_ref = $sth->fetchall_arrayref({});
+
+    if ( !$sth->err() ) {
+
+      $designtype_data = $array_ref;
+    }
+    else {
+
+      $err = 1;
+      $msg = 'Unexpected error';
+      $self->logger->debug('Err: ' . $dbh->errstr());
+    }
+  }
+  else {
+
+    $err = 1;
+    $msg = 'Unexpected error';
+    $self->logger->debug('Err: ' . $dbh->errstr());
+  }
+
+  $sth->finish();
+  $dbh->disconnect();
+
+  my $extra_attr_designtype_data = [];
+
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  if ($extra_attr_yes && ($gadmin_status eq '1')) {
+
+    my $designtype_id_aref = [];
+
+    for my $row (@{$designtype_data}) {
+
+      push(@{$designtype_id_aref}, $row->{'DesignTypeId'});
+    }
+
+    my $chk_id_err        = 0;
+    my $chk_id_msg        = '';
+    my $used_id_href      = {};
+    my $not_used_id_href  = {};
+
+    if (scalar(@{$designtype_id_aref}) > 0) {
+
+      my $chk_table_aref = [{'TableName' => 'trial', 'FieldName' => 'DesignTypeId'}];
+
+      ($chk_id_err, $chk_id_msg,
+       $used_id_href, $not_used_id_href) = id_existence_bulk($dbh, $chk_table_aref, $designtype_id_aref);
+
+      if ($chk_id_err) {
+
+        $self->logger->debug("Check id existence error: $chk_id_msg");
+        $err = 1;
+        $msg = $chk_id_msg;
+        
+        return ($err, $msg, []);
+      }
+    }
+
+    for my $row (@{$designtype_data}) {
+    
+      my $designtype_id = $row->{'DesignTypeId'};
+      $row->{'update'}   = "update/designtype/$designtype_id";
+
+      if ($not_used_id_href->{$designtype_id}) {
+
+        $row->{'delete'}   = "delete/designtype/$designtype_id";
+      }
+      
+      push(@{$extra_attr_designtype_data}, $row);
+    }
+  }
+  else {
+
+    $extra_attr_designtype_data = $designtype_data;
+  }
+
+  return ($err, $msg, $extra_attr_designtype_data);
+}
+
+sub list_designtype_runmode {
+
+=pod list_designtype_HELP_START
+{
+"OperationName" : "List design types",
+"Description": "List all available trial design types in the system. This listing does not require pagination information.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><DesignType DesignTypeId='1' DesignTemplateFile='none' DesignFactorAliasPrefix='DiG' DesignGenotypeFormat='normal' DesignSoftware='Optimal Trial Design' DesignTypeName='Traditional - 6815031' delete='delete/designtype/1' update='update/designtype/1' /><RecordMeta TagName='DesignType' /></DATA>",
+"SuccessMessageJSON": "{'DesignType' : [{'DesignTypeId' : '1','DesignTemplateFile' : 'none','DesignFactorAliasPrefix' : 'DiG','DesignGenotypeFormat' : 'normal','DesignSoftware' : 'Optimal Trial Design','DesignTypeName' : 'Traditional - 6815031','delete' : 'delete/designtype/1','update' : 'update/designtype/1'}],'RecordMeta' : [{'TagName' : 'DesignType'}]}",
+"ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
+"ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self = shift;
+  
+  my $data_for_postrun_href = {};
+
+  my $msg = '';
+
+  my $sql = 'SELECT * ';
+  $sql   .= 'FROM designtype ';
+  $sql   .= 'ORDER BY DesignTypeId DESC';
+
+  my ($designtype_err, $designtype_msg, $designtype_data) = $self->list_designtype(1, $sql);
+
+  if ($designtype_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'DesignType' => $designtype_data,
+                                           'RecordMeta' => [{'TagName' => 'DesignType'}],
+  };
+
+  return $data_for_postrun_href;
+}
+
+sub get_designtype_runmode {
+
+=pod get_designtype_HELP_START
+{
+"OperationName" : "Get design type",
+"Description": "Get detailed information about trial design type specified by id.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><DesignType DesignTypeId='1' DesignTemplateFile='none' DesignFactorAliasPrefix='DiG' DesignGenotypeFormat='normal' DesignSoftware='Optimal Trial Design' DesignTypeName='Traditional - 6815031' delete='delete/designtype/1' update='update/designtype/1' /><RecordMeta TagName='DesignType' /></DATA>",
+"SuccessMessageJSON": "{'DesignType' : [{'DesignTypeId' : '1','DesignTemplateFile' : 'none','DesignFactorAliasPrefix' : 'DiG','DesignGenotypeFormat' : 'normal','DesignSoftware' : 'Optimal Trial Design','DesignTypeName' : 'Traditional - 6815031','delete' : 'delete/designtype/1','update' : 'update/designtype/1'}],'RecordMeta' : [{'TagName' : 'DesignType'}]}",
+"ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
+"ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing DesignTypeId."}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self          = shift;
+  my $designtype_id = $self->param('id');
+
+  my $data_for_postrun_href = {};
+
+  my $msg = '';
+
+  my $dbh = connect_kdb_read();
+  my $designtype_exist = record_existence($dbh, 'designtype', 'DesignTypeId', $designtype_id);
+  $dbh->disconnect();
+
+  if (!$designtype_exist) {
+
+    my $err_msg = "DesignType ($designtype_id) not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $sql = 'SELECT * ';
+  $sql   .= 'FROM designtype ';
+  $sql   .= 'WHERE DesignTypeId=? ';
+  $sql   .= 'ORDER BY DesignTypeId DESC';
+
+  my ($designtype_err, $designtype_msg, $designtype_data) = $self->list_designtype(1, $sql, $designtype_id);
+
+  if ($designtype_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'DesignType' => $designtype_data,
+                                           'RecordMeta' => [{'TagName' => 'DesignType'}],
+  };
+
+  return $data_for_postrun_href;
+}
+
+sub update_designtype_runmode {
+
+=pod update_designtype_gadmin_HELP_START
+{
+"OperationName" : "Update design type",
+"Description": "Update definition of the trial design type.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='DesignType (1) has been updated successfully.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'DesignType (1) has been updated successfully.'}]}",
+"ErrorMessageXML": [{"NameAlreadyExists": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error DesignTypeName='DesignTypeName (Traditional): already exists.' /></DATA>"}],
+"ErrorMessageJSON": [{"NameAlreadyExists": "{'Error' : [{'DesignTypeName' : 'DesignTypeName (Traditional): already exists.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing DesignTypeId."}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self          = shift;
+  my $designtype_id = $self->param('id');
+
+  my $data_for_postrun_href = {};
+
+  my $query = $self->query();
+
+  # Generic required static field checking
+
+  my $dbh_read = connect_kdb_read();
+
+  my $skip_field = {};
+
+  my ($get_scol_err, $get_scol_msg, $scol_data, $pkey_data) = get_static_field($dbh_read, 'designtype');
+
+  if ($get_scol_err) {
+
+    $self->logger->debug("Get static field info failed: $get_scol_msg");
+    
+    my $err_msg = "Unexpected Error.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $required_field_href = {};
+
+  for my $static_field (@{$scol_data}) {
+
+    my $field_name = $static_field->{'Name'};
+    
+    if ($skip_field->{$field_name}) { next; }
+
+    if ($static_field->{'Required'} == 1) {
+
+      $required_field_href->{$field_name} = $query->param($field_name);
+    }
+  }
+
+  $dbh_read->disconnect();
+
+  my ($missing_err, $missing_href) = check_missing_href( $required_field_href );
+
+  if ($missing_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  # Finish generic required static field checking
+
+  my $dbh = connect_kdb_read();
+  my $designtype_exist = record_existence($dbh, 'designtype', 'DesignTypeId', $designtype_id);
+
+  if (!$designtype_exist) {
+
+    my $err_msg = "DesignType ($designtype_id) not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $designtype_name                  = $query->param('DesignTypeName');
+
+  my $chk_designtype_name_sql = 'SELECT DesignTypeId FROM designtype WHERE DesignTypeName=? AND DesignTypeId<>?';
+
+  my ($read_err, $db_designtype_id) = read_cell($dbh, $chk_designtype_name_sql, [$designtype_name, $designtype_id]);
+
+  if ($read_err) {
+
+    $self->logger->debug("Check DesignTypeName failed");
+
+    my $err_msg = "Unexpected Error.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (length($db_designtype_id) > 0) {
+
+    my $err_msg = "DesignTypeName ($designtype_name): already exists.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'DesignTypeName' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $design_software  = read_cell_value($dbh, 'designtype', 'DesignSoftware', 'DesignTypeId', $designtype_id);
+
+  if (defined $query->param('DesignSoftware')) {
+
+    $design_software = $query->param('DesignSoftware');
+  }
+
+  my $design_template_file = read_cell_value($dbh, 'designtype', 'DesignTemplateFile',
+                                             'DesignTypeId', $designtype_id);
+
+  if (defined $query->param('DesignTemplateFile')) {
+
+    $design_template_file = $query->param('DesignTemplateFile');
+  }
+
+  my $design_geno_format = read_cell_value($dbh, 'designtype', 'DesignGenotypeFormat',
+                                           'DesignTypeId', $designtype_id);
+
+  if (defined $query->param('DesignGenotypeFormat')) {
+
+    $design_geno_format = $query->param('DesignGenotypeFormat');
+  }
+
+  my $design_factor_alias_prefix = read_cell_value($dbh, 'designtype', 'DesignFactorAliasPrefix',
+                                                   'DesignTypeId', $designtype_id);
+
+  if (defined $query->param('DesignFactorAliasPrefix')) {
+
+    $design_factor_alias_prefix = $query->param('DesignFactorAliasPrefix');
+  }
+
+  $dbh->disconnect();
+
+  my $dbh_k_write = connect_kdb_write();
+
+  my $sql = 'UPDATE designtype SET ';
+  $sql   .= 'DesignTypeName=?, ';
+  $sql   .= 'DesignSoftware=?, ';
+  $sql   .= 'DesignTemplateFile=?, ';
+  $sql   .= 'DesignGenotypeFormat=?, ';
+  $sql   .= 'DesignFactorAliasPrefix=? ';
+  $sql   .= 'WHERE DesignTypeId=?';
+
+  my $sth = $dbh_k_write->prepare($sql);
+  $sth->execute($designtype_name, $design_software, $design_template_file,
+                $design_geno_format, $design_factor_alias_prefix, $designtype_id,
+      );
+
+  if ($dbh_k_write->err()) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+  $sth->finish();
+  $dbh_k_write->disconnect();
+
+  my $info_msg_aref = [{'Message' => "DesignType ($designtype_id) has been updated successfully."}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'     => $info_msg_aref};
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub list_trial {
+
+  my $self            = $_[0];
+  my $extra_attr_yes  = $_[1];
+  my $field_list      = $_[2];
+  my $sql             = $_[3];
+  my $where_para_aref = [];
+
+  if (defined $_[4]) {
+
+    $where_para_aref = $_[4];
+  }
+
+  my $err = 0;
+  my $msg = '';
+
+  my $data_aref = [];
+
+  my $count = 0;
+  while ($sql =~ /\?/g) {
+
+    $count += 1;
+  }
+
+  if ( scalar(@{$where_para_aref}) != $count ) {
+
+    my $msg = 'Number of arguments does not match with ';
+    $msg   .= 'number of SQL parameter.';
+    return (1, $msg, []);
+  }
+
+  my $dbh = connect_kdb_read();
+
+  ($err, $msg, $data_aref) = read_data($dbh, $sql, $where_para_aref);
+
+  if ($err) {
+
+    return ($err, $msg, []);
+  }
+
+  my $field_list_loc_href = {};
+
+  for my $field (@{$field_list}) {
+
+    if ($field eq 'Longitude' || $field eq 'Latitude' || $field eq 'LCol*' || $field eq 'triallocation') {
+
+      $field_list_loc_href->{$field} = 1;
+    }
+  }
+
+  my $trial_loc_gis = {};
+
+  my @trial_id_list;
+
+  for my $trial_rec (@{$data_aref}) {
+
+    push(@trial_id_list, $trial_rec->{'TrialId'});
+  }
+
+  my $trait_count_href       = {};
+  my $trialunit_count_href   = {};
+  my $trait_value_count_href = {};
+
+  my $chk_id_err        = 0;
+  my $chk_id_msg        = '';
+  my $used_id_href      = {};
+  my $not_used_id_href  = {};
+
+  if ($extra_attr_yes) {
+
+    $self->logger->debug("Number of trial id: " . scalar(@trial_id_list));
+    $self->logger->debug("TrialID list: " . join(',', @trial_id_list));
+
+    if (scalar(@trial_id_list) > 0) {
+
+      my $trial_trait_sql = 'SELECT trial.TrialId, count(TraitId) AS NumOfTrait ';
+      $trial_trait_sql   .= 'FROM trial LEFT JOIN trialtrait ON trial.TrialId = trialtrait.TrialId ';
+      $trial_trait_sql   .= 'WHERE trial.TrialId IN (' . join(',', @trial_id_list) . ') ';
+      $trial_trait_sql   .= 'GROUP BY TrialId ';
+      
+      my $sth_trial_trait = $dbh->prepare($trial_trait_sql);
+      $sth_trial_trait->execute();
+      
+      if (!$dbh->err()) {
+        
+        my $count_href = $sth_trial_trait->fetchall_hashref('TrialId');
+        
+        if (!$sth_trial_trait->err()) {
+        
+          $trait_count_href = $count_href;
+        }
+        else {
+
+          $err = 1;
+          $msg = 'Unexpected error';
+          $self->logger->debug('Err: ' . $dbh->errstr());
+        }
+      }
+      else {
+
+        $err = 1;
+        $msg = 'Unexpected error';
+        $self->logger->debug('Err: ' . $dbh->errstr());
+      }
+      $sth_trial_trait->finish();
+
+      my $trial_unit_sql = 'SELECT trial.TrialId, count(TrialUnitId) AS NumOfTrialUnit ';
+      $trial_unit_sql   .= 'FROM trial LEFT JOIN trialunit ON trial.TrialId = trialunit.TrialId ';
+      $trial_unit_sql   .= 'WHERE trial.TrialId IN (' . join(',', @trial_id_list) . ') ';
+      $trial_unit_sql   .= 'GROUP BY TrialId ';
+      
+      my $sth_trial_unit = $dbh->prepare($trial_unit_sql);
+      $sth_trial_unit->execute();
+      
+      if (!$dbh->err()) {
+        
+        my $count_href = $sth_trial_unit->fetchall_hashref('TrialId');
+        
+        if (!$sth_trial_unit->err()) {
+        
+          $trialunit_count_href = $count_href;
+        }
+        else {
+
+          $err = 1;
+          $msg = 'Unexpected error';
+          $self->logger->debug('Err: ' . $dbh->errstr());
+        }
+      }
+      else {
+
+        $err = 1;
+        $msg = 'Unexpected error';
+        $self->logger->debug('Err: ' . $dbh->errstr());
+      }
+      $sth_trial_unit->finish();
+      
+      my $trait_value_sql = 'SELECT TrialId, count(TraitValue) AS NumOfTraitValue ';
+      $trait_value_sql   .= 'FROM trialunit LEFT JOIN samplemeasurement ';
+      $trait_value_sql   .= 'ON trialunit.TrialUnitId = samplemeasurement.TrialUnitId ';
+      $trait_value_sql   .= 'WHERE TrialId IN (' . join(',', @trial_id_list) . ') ';
+      $trait_value_sql   .= 'GROUP BY TrialId';
+      
+      my $sth_trait_val = $dbh->prepare($trait_value_sql);
+      $sth_trait_val->execute();
+      
+      if (!$dbh->err()) {
+        
+        my $count_href = $sth_trait_val->fetchall_hashref('TrialId');
+        
+        if (!$sth_trait_val->err()) {
+        
+          $trait_value_count_href = $count_href;
+        }
+        else {
+
+          $err = 1;
+          $msg = 'Unexpected error';
+          $self->logger->debug('Err: ' . $dbh->errstr());
+        }
+      }
+      else {
+
+        $err = 1;
+        $msg = 'Unexpected error';
+        $self->logger->debug('Err: ' . $dbh->errstr());
+      }
+      $sth_trait_val->finish();
+
+      my $chk_table_aref = [{'TableName' => 'trialunit', 'FieldName' => 'TrialId'},
+                            {'TableName' => 'trialevent', 'FieldName' => 'TrialId'},
+                            {'TableName' => 'trialanalysis', 'FieldName' => 'TrialId'},
+                            {'TableName' => 'metgrouptrial', 'FieldName' => 'TrialId'},
+                            {'TableName' => 'trialworkflow', 'FieldName' => 'TrialId'}
+          ];
+
+      ($chk_id_err, $chk_id_msg,
+       $used_id_href, $not_used_id_href) = id_existence_bulk($dbh, $chk_table_aref, \@trial_id_list);
+
+      if ($chk_id_err) {
+
+        $self->logger->debug("Check id existence error: $chk_id_msg");
+        $err = 1;
+        $msg = $chk_id_msg;
+        
+        return ($err, $msg, []);
+      }
+    }
+  }
+
+  if (scalar(keys(%{$field_list_loc_href})) > 0) {
+
+    my $dbh_gis = connect_gis_read();
+
+    if (scalar(@trial_id_list) > 0) {
+
+      my $gis_where = "WHERE trialid IN (" . join(',', @trial_id_list) . ")";
+  
+      my $trialloc_sql = 'SELECT trialid, ST_AsText(triallocation) AS triallocation, ';
+      $trialloc_sql   .= 'ST_AsText(ST_Centroid(geometry(triallocation))) AS trialcentroid ';
+      $trialloc_sql   .= 'FROM trialloc ';
+      $trialloc_sql   .= $gis_where;
+      
+      my $sth_gis = $dbh_gis->prepare($trialloc_sql);
+      $sth_gis->execute();
+      
+      if (!$dbh_gis->err()) {
+        
+        my $gis_href = $sth_gis->fetchall_hashref('trialid');
+        
+        if (!$sth_gis->err()) {
+          
+          $trial_loc_gis = $gis_href;
+        }
+        else {
+          
+          $err = 1;
+          $msg = 'Unexpected error';
+          $self->logger->debug('Err: ' . $dbh_gis->errstr());
+        }
+      }
+      else {
+        
+        $err = 1;
+        $msg = 'Unexpected error';
+        $self->logger->debug('Err: ' . $dbh_gis->errstr());
+      }
+    }
+      
+    $dbh_gis->disconnect();
+  }
+
+  my $group_sql    = 'SELECT SystemGroupId, SystemGroupName FROM systemgroup';
+  my $group_lookup = $dbh->selectall_hashref($group_sql, 'SystemGroupId');
+  
+  my $perm_lookup  = {'0' => 'None',
+                      '1' => 'Link',
+                      '2' => 'Write',
+                      '3' => 'Write/Link',
+                      '4' => 'Read',
+                      '5' => 'Read/Link',
+                      '6' => 'Read/Write',
+                      '7' => 'Read/Write/Link',
+  };
+  
+  my @extra_attr_trial_data;
+  
+  my $gadmin_status = $self->authen->gadmin_status();
+  my $group_id      = $self->authen->group_id();
+  
+  for my $row (@{$data_aref}) {
+    
+    my $trial_id       = $row->{'TrialId'};
+    my $trial_centroid = $trial_loc_gis->{$trial_id}->{'trialcentroid'};
+    
+    $trial_centroid   =~ /POINT\((.+) (.+)\)/;
+    my $longitude     = $1;
+    my $latitude      = $2;
+
+    if ($field_list_loc_href->{'LCol*'} || $field_list_loc_href->{'Longitude'}) {
+
+      $row->{'Longitude'} = $longitude;
+    }
+
+    if ($field_list_loc_href->{'LCol*'} || $field_list_loc_href->{'Latitude'}) {
+
+      $row->{'Latitude'}  = $latitude;
+    }
+    
+    if ($field_list_loc_href->{'LCol*'} || $field_list_loc_href->{'triallocation'}) {
+
+      $row->{'triallocation'} = $trial_loc_gis->{$trial_id}->{'triallocation'};
+    }
+    
+    my $own_grp_id   = $row->{'OwnGroupId'};
+    my $acc_grp_id   = $row->{'AccessGroupId'};
+    my $own_perm     = $row->{'OwnGroupPerm'};
+    my $acc_perm     = $row->{'AccessGroupPerm'};
+    my $oth_perm     = $row->{'OtherPerm'};
+    my $ulti_perm    = $row->{'UltimatePerm'};
+
+    if ($extra_attr_yes) {
+    
+      $row->{'OwnGroupName'}          = $group_lookup->{$own_grp_id}->{'SystemGroupName'};
+      $row->{'AccessGroupName'}       = $group_lookup->{$acc_grp_id}->{'SystemGroupName'};
+      $row->{'OwnGroupPermission'}    = $perm_lookup->{$own_perm};
+      $row->{'AccessGroupPermission'} = $perm_lookup->{$acc_perm};
+      $row->{'OtherPermission'}       = $perm_lookup->{$oth_perm};
+      $row->{'UltimatePermission'}    = $perm_lookup->{$ulti_perm};
+    
+      #$self->logger->debug("TrialId: $trial_id, GroupId: $group_id, UltiPerm: $ulti_perm, WritePerm: $WRITE_PERM");
+    
+      $row->{'map'}       = "trial/$trial_id/on/map";
+
+      if ( $trait_count_href->{$trial_id}->{'NumOfTrait'} > 0 ) {
+
+        $row->{'listTrait'} = "trial/$trial_id/list/trait";
+      }
+
+      if ( ($trait_count_href->{$trial_id}->{'NumOfTrait'} > 0) &&
+           ($trialunit_count_href->{$trial_id}->{'NumOfTrialUnit'} > 0) ) {
+
+        $row->{'expDkTmpl'} = "trial/$trial_id/export/datakapturetemplate";
+      }
+
+      if ($trait_value_count_href->{$trial_id}->{'NumOfTraitValue'} > 0) {
+
+        $row->{'expDkData'} = "trial/$trial_id/export/dkdata";
+      }
+
+      if ($trialunit_count_href->{$trial_id}->{'NumOfTrialUnit'} > 0) {
+
+        $row->{'listTrialUnit'} = "trial/$trial_id/list/trialunit";
+      }
+    
+      if (($ulti_perm & $WRITE_PERM) == $WRITE_PERM) {
+      
+        $row->{'update'}    = "update/trial/$trial_id";
+        $row->{'addTrait'}  = "trial/$trial_id/add/trait";
+
+        if ($trait_count_href->{$trial_id}->{'NumOfTrait'} > 0) {
+
+          $row->{'impDkData'} = "trial/$trial_id/import/datakapturedata/csv";
+        }
+      }
+    
+      if ($own_grp_id == $group_id) {
+      
+        $row->{'chgPerm'} = "trial/$trial_id/change/permission";
+      
+        if ($gadmin_status eq '1') {
+        
+          $row->{'chgOwner'} = "trial/$trial_id/change/owner";
+        
+          if ( $not_used_id_href->{$trial_id} ) {
+            
+            $row->{'delete'}   = "delete/trial/$trial_id";
+          }
+        }
+      }
+    }
+      
+    push(@extra_attr_trial_data, $row);
+  }
+    
+  $dbh->disconnect();
+    
+  return ($err, $msg, \@extra_attr_trial_data);
+}
+
+sub list_trial_advanced_runmode {
+
+=pod list_trial_advanced_HELP_START
+{
+"OperationName" : "List trials",
+"Description": "List trials available in the system. This listing requires pagination information.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "FILTERING"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Pagination NumOfRecords='10' NumOfPages='10' Page='1' NumPerPage='1' /><RecordMeta TagName='Trial' /><Trial TrialNote='none' TrialAcronym='TEST' AccessGroupId='0' chgPerm='trial/11/change/permission' map='trial/11/on/map' TrialManagerId='16' OwnGroupPermission='Read/Write/Link' TrialTypeName='TrialType - 9439035' DesignTypeId='15' SiteName='DArT Test Site' AccessGroupName='admin' Latitude='-35.3048782165934' addTrait='trial/11/add/trait' CurrentWorkflowId='0' TrialNumber='1' OwnGroupId='0' UltimatePerm='7' TrialEndDate='2011-03-31 00:00:00' TrialTypeId='95' Longitude='149.092717866478' AccessGroupPerm='5' SiteId='14' AccessGroupPermission='Read/Link' OtherPermission='Read/Link' OtherPerm='5' OwnGroupPerm='7' DesignTypeName='Traditional - 6428435' ProjectId='' listTrialUnit='trial/11/list/trialunit' OwnGroupName='admin' ProjectName='' triallocation='POLYGON((149.092666904502 -35.3047819041308,149.092784921705 -35.3047819041308,149.09276882845 -35.3049745290585,149.092650811256 -35.3049745290585,149.092666904502 -35.3047819041308))' TrialStartDate='2010-10-15 00:00:00' TrialName='Trial_4571671' TrialManagerName='Testing User-5854495' chgOwner='trial/11/change/owner' UltimatePermission='Read/Write/Link' update='update/trial/11' TrialId='11' /></DATA>",
+"SuccessMessageJSON": "{'Pagination' : [{'NumOfRecords' : '10','NumOfPages' : 10,'NumPerPage' : '1','Page' : '1'}],'VCol' : [],'RecordMeta' : [{'TagName' : 'Trial'}],'Trial' : [{'TrialNote' : 'none','TrialAcronym' : 'TEST','AccessGroupId' : '0','chgPerm' : 'trial/11/change/permission','map' : 'trial/11/on/map','TrialManagerId' : '16','OwnGroupPermission' : 'Read/Write/Link','TrialTypeName' : 'TrialType - 9439035','DesignTypeId' : '15','SiteName' : 'DArT Test Site','AccessGroupName' : 'admin','Latitude' : '-35.3048782165934','addTrait' : 'trial/11/add/trait','CurrentWorkflowId' : '0','TrialNumber' : '1','OwnGroupId' : '0','UltimatePerm' : '7','TrialEndDate' : '2011-03-31 00:00:00','TrialTypeId' : '95','Longitude' : '149.092717866478','AccessGroupPerm' : '5','SiteId' : '14','AccessGroupPermission' : 'Read/Link','OtherPermission' : 'Read/Link','OtherPerm' : '5','OwnGroupPerm' : '7','DesignTypeName' : 'Traditional - 6428435','ProjectId' : null,'listTrialUnit' : 'trial/11/list/trialunit','OwnGroupName' : 'admin','ProjectName' : null,'triallocation' : 'POLYGON((149.092666904502 -35.3047819041308,149.092784921705 -35.3047819041308,149.09276882845 -35.3049745290585,149.092650811256 -35.3049745290585,149.092666904502 -35.3047819041308))','TrialStartDate' : '2010-10-15 00:00:00','chgOwner' : 'trial/11/change/owner','TrialManagerName' : 'Testing User-5854495','TrialName' : 'Trial_4571671','UltimatePermission' : 'Read/Write/Link','update' : 'update/trial/11','TrialId' : '11'}]}",
+"ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
+"ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
+"URLParameter": [{"ParameterName": "nperpage", "Description": "Number of records in a page for pagination"}, {"ParameterName": "num", "Description": "The page number of the pagination"}],
+"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database filed name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "FieldList", "Description": "Comma separated value of wanted fields."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases."}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self  = shift;
+  my $query = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  my $pagination  = 0;
+  my $nb_per_page = -1;
+  my $page        = -1;
+
+  if ( (defined $self->param('nperpage')) && (defined $self->param('num')) ) {
+
+    $pagination = 1;
+    $nb_per_page = $self->param('nperpage');
+    $page        = $self->param('num');
+  }
+
+  my $field_list_csv = '';
+
+  if (defined $query->param('FieldList')) {
+
+    $field_list_csv = $query->param('FieldList');
+  }
+
+  my $filtering_csv = '';
+  
+  if (defined $query->param('Filtering')) {
+
+    $filtering_csv = $query->param('Filtering');
+  }
+
+  if (defined $self->param('siteid')) {
+
+    my $site_id = $self->param('siteid');
+
+    if ($filtering_csv =~ /SiteId=(.*),?/) {
+
+      if ( "$site_id" ne "$1" ) {
+
+        my $err_msg = 'Duplicate filtering condition for SiteId.';
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+        return $data_for_postrun_href;
+      }
+    }
+    else {
+
+      if (length($filtering_csv) > 0) {
+
+        if ($filtering_csv =~ /&$/) {
+
+          $filtering_csv  .= "SiteId=$site_id";
+        }
+        else {
+
+          $filtering_csv .= "&SiteId=$site_id";
+        }
+      }
+      else {
+
+        $filtering_csv .= "SiteId=$site_id";
+      }
+    }
+  }
+
+  $self->logger->debug("Filtering csv: $filtering_csv");
+
+  my $sorting = '';
+
+  if (defined $query->param('Sorting')) {
+
+    $sorting = $query->param('Sorting');
+  }
+
+  my $group_id = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+  my $perm_str = permission_phrase($group_id, 0, $gadmin_status, 'trial');
+
+  my $dbh = connect_kdb_read();
+  my $field_list = ['trial.*', 'VCol*', 'LCol*'];
+  my $pre_data_other_join = '';
+
+  my ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_sql($dbh, $field_list, 'trial',
+                                                                        'TrialId', '');
+
+  if ($vcol_err) {
+
+    my $err_msg = "Problem with virtual column ($trouble_vcol) containing space.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+    
+    return $data_for_postrun_href;
+  }
+
+  $sql   .= " LIMIT 1";
+
+  $self->logger->debug("SQL with VCol: $sql");
+
+  my ($sam_trial_err, $sam_trial_msg, $sam_trial_data) = $self->list_trial(0, $field_list, $sql);
+
+  if ($sam_trial_err) {
+
+    $self->logger->debug($sam_trial_msg);
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $sample_trial_aref = $sam_trial_data;
+
+  my @field_list_all = keys(%{$sample_trial_aref->[0]});
+
+  # no field return, it means no record. error prevention
+  if (scalar(@field_list_all) == 0) {
+    
+    push(@field_list_all, '*');
+  }
+
+  my $final_field_list     = \@field_list_all;
+  my $sql_field_list       = [];
+
+  if (length($field_list_csv) > 0) {
+
+    my ($sel_field_err, $sel_field_msg, $sel_field_list) = parse_selected_field($field_list_csv,
+                                                                                $final_field_list,
+                                                                                'TrialId');
+
+    if ($sel_field_err) {
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $sel_field_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    $final_field_list = $sel_field_list;
+   
+    if ($filtering_csv =~ /SiteId/) {
+
+      push(@{$final_field_list}, 'SiteId');
+    }
+
+    $sql_field_list       = [];
+    for my $fd_name (@{$final_field_list}) {
+
+      # need to remove location field because generate_factor_sql does not understand these field
+      if ( (!($fd_name =~ /Longitude/)) && (!($fd_name =~ /Latitude/)) && (!($fd_name =~ /triallocation/)) ) {
+
+        push(@{$sql_field_list}, $fd_name);
+      }
+    }
+  }
+  else {
+
+    for my $fd_name (@{$final_field_list}) {
+
+      # need to remove location field because generate_factor_sql does not understand these field
+      if ( (!($fd_name =~ /Longitude/)) && (!($fd_name =~ /Latitude/)) && (!($fd_name =~ /triallocation/)) ) {
+
+        push(@{$sql_field_list}, $fd_name);
+      }
+    }
+  }
+
+  my $sql_field_lookup = {};
+
+  for my $fd_name (@{$sql_field_list}) {
+
+    $sql_field_lookup->{$fd_name} = 1;
+  }
+
+  my $other_join = '';
+  if ($sql_field_lookup->{'SiteId'}) {
+
+    push(@{$sql_field_list}, 'site.SiteName');
+    $other_join .= ' LEFT JOIN site ON trial.SiteId = site.SiteId ';
+  }
+
+  if ($sql_field_lookup->{'TrialTypeId'}) {
+
+    push(@{$sql_field_list}, 'generaltype.TypeName AS TrialTypeName');
+    $other_join   .= ' LEFT JOIN generaltype ON trial.TrialTypeId = generaltype.TypeId ';
+  }
+
+  if ($sql_field_lookup->{'DesignTypeId'}) {
+    
+    push(@{$sql_field_list}, 'designtype.DesignTypeName');
+    $other_join   .= ' LEFT JOIN designtype ON trial.DesignTypeId = designtype.DesignTypeId ';
+  }
+
+  if ($sql_field_lookup->{'TrialManagerId'}) {
+
+    push(@{$sql_field_list}, "CONCAT(contact.ContactFirstName, ' ', contact.ContactLastName) AS TrialManagerName ");
+    $other_join   .= ' LEFT JOIN contact ON trial.TrialManagerId = contact.ContactId ';
+  }
+
+  if ($sql_field_lookup->{'ProjectId'}) {
+
+    push(@{$sql_field_list}, 'project.ProjectName');
+    $other_join   .= ' LEFT JOIN project ON trial.ProjectId = project.ProjectId ';
+  }
+
+  my $compulsory_perm_fields = ['OwnGroupId',
+                                'AccessGroupId',
+                                'OwnGroupPerm',
+                                'AccessGroupPerm',
+                                'OtherPerm',
+      ];
+
+  for my $com_fd_name (@{$compulsory_perm_fields}) {
+
+    if (length($sql_field_lookup->{$com_fd_name}) == 0) {
+
+      push(@{$sql_field_list}, $com_fd_name);
+    }
+  }
+  
+  push(@{$sql_field_list}, "$perm_str AS UltimatePerm");
+
+  if ($filtering_csv !~ /Factor/) {
+
+    ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_sql($dbh, $sql_field_list, 'trial',
+                                                                       'TrialId', $other_join);
+  }
+  else {
+
+    ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_sql_v2($dbh, $sql_field_list, 'trial',
+                                                                          'TrialId', $other_join);
+  }
+
+  if ($vcol_err) {
+
+    my $err_msg = "Problem with virtual column ($trouble_vcol) containing space.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my ($filter_err, $filter_msg,
+      $filter_phrase, $where_arg,
+      $having_phrase, $count_filter_phrase,
+      $nb_filter_factor) = parse_filtering_v2('TrialId',
+                                              'trial',
+                                              $filtering_csv,
+                                              $final_field_list,
+                                              $vcol_list);
+
+  $self->logger->debug("Filter phrase: $filter_phrase");
+  $self->logger->debug("Where argument: " . join(',', @{$where_arg}));
+
+  if ($filter_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $filter_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $filter_where_phrase = '';
+  if (length($filter_phrase) > 0) {
+
+    $filter_where_phrase = " AND $filter_phrase ";
+  }
+
+  my $filtering_exp = " WHERE (($perm_str) & $READ_PERM) = $READ_PERM $filter_where_phrase ";
+
+  if (length($having_phrase) > 0) {
+
+    $sql =~ s/FACTORHAVING/ HAVING $having_phrase/;
+
+    $sql .= " $filtering_exp ";
+  }
+  else {
+
+    $sql =~ s/GROUP BY/ $filtering_exp GROUP BY /;
+  }
+
+  my $pagination_aref    = [];
+  my $paged_limit_clause = '';
+
+  if ($pagination) {
+
+    my ($int_err, $int_err_msg) = check_integer_value( {'nperpage' => $nb_per_page,
+                                                        'num'      => $page
+                                                       });
+
+    if ($int_err) {
+
+      $int_err_msg .= ' not integer.';
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $int_err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my ($pg_id_err, $pg_id_msg, $nb_records,
+        $nb_pages, $limit_clause, $rcount_time);
+
+    if (length($having_phrase) == 0) {
+
+      $self->logger->debug("COUNT NB RECORD: NO FACTOR IN FILTERING");
+
+      ($pg_id_err, $pg_id_msg, $nb_records,
+       $nb_pages, $limit_clause, $rcount_time) = get_paged_filter($dbh,
+                                                                  $nb_per_page,
+                                                                  $page,
+                                                                  'trial',
+                                                                  'TrialId',
+                                                                  $filtering_exp,
+                                                                  $where_arg);
+    }
+    else {
+
+      $self->logger->debug("COUNT NB RECORD: FACTOR IN FILTERING");
+
+      my $count_sql = "SELECT COUNT(trial.TrialId) ";
+      $count_sql   .= "FROM trial INNER JOIN ";
+      $count_sql   .= " (SELECT TrialId, COUNT(TrialId) ";
+      $count_sql   .= " FROM trialfactor WHERE $count_filter_phrase ";
+      $count_sql   .= " GROUP BY TrialId HAVING COUNT(TrialId)=$nb_filter_factor) AS subq ";
+      $count_sql   .= "ON trial.TrialId = subq.TrialId ";
+      $count_sql   .= "$filtering_exp";
+
+      $self->logger->debug("COUNT SQL: $count_sql");
+
+      ($pg_id_err, $pg_id_msg, $nb_records,
+       $nb_pages, $limit_clause, $rcount_time) = get_paged_filter_sql($dbh,
+                                                                      $nb_per_page,
+                                                                      $page,
+                                                                      $count_sql,
+                                                                      $where_arg);
+
+      $self->logger->debug("COUNT WITH Factor TIME: $rcount_time");
+    }
+
+    $self->logger->debug("SQL Row count time: $rcount_time");
+
+    if ($pg_id_err == 1) {
+    
+      $self->logger->debug($pg_id_msg);
+    
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    if ($pg_id_err == 2) {
+      
+      $page = 0;
+    }
+
+    $pagination_aref = [{'NumOfRecords' => $nb_records,
+                         'NumOfPages'   => $nb_pages,
+                         'Page'         => $page,
+                         'NumPerPage'   => $nb_per_page,
+                        }];
+
+    $paged_limit_clause = $limit_clause;
+  }
+  
+  $dbh->disconnect();
+
+  my ($sort_err, $sort_msg, $sort_sql) = parse_sorting($sorting, $sql_field_list);
+
+  if ($sort_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $sort_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (length($sort_sql) > 0) {
+
+    $sql .= " ORDER BY $sort_sql ";
+  }
+  else {
+
+    $sql .= ' ORDER BY trial.TrialId DESC';
+  }
+
+  $sql .= " $paged_limit_clause ";
+
+  $self->logger->debug("SQL with VCol: $sql");
+
+  $self->logger->debug('Where arg: ' . join(',', @{$where_arg}));
+
+  # where_arg here in the list function because of the filtering 
+  my ($read_trial_err, $read_trial_msg, $trial_data) = $self->list_trial(1,
+                                                                         $final_field_list,
+                                                                         $sql,
+                                                                         $where_arg);
+
+  if ($read_trial_err) {
+
+    $self->logger->debug($read_trial_msg);
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $data_for_postrun_href->{'Error'} = 0;
+  $data_for_postrun_href->{'Data'}  = {'Trial'      => $trial_data,
+                                       'VCol'       => $vcol_list,
+                                       'Pagination' => $pagination_aref,
+                                       'RecordMeta' => [{'TagName' => 'Trial'}],
+  };
+
+  return $data_for_postrun_href;
+}
+
+sub get_trial_runmode {
+
+=pod get_trial_HELP_START
+{
+"OperationName" : "Get trial",
+"Description": "Get detailed information about a trial specified by id.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><RecordMeta TagName='Trial' /><Trial TrialNote='none' TrialAcronym='TEST' AccessGroupId='0' chgPerm='trial/1/change/permission' map='trial/1/on/map' TrialManagerId='4' OwnGroupPermission='Read/Write/Link' TrialTypeName='TrialType - 8010193' DesignTypeId='2' SiteName='DArT Test Site' AccessGroupName='admin' Latitude='-35.3048782165934' addTrait='trial/1/add/trait' TrialNumber='1' CurrentWorkflowId='0' OwnGroupId='0' UltimatePerm='7' TrialEndDate='2011-03-31 00:00:00' TrialTypeId='14' Longitude='149.092717866478' AccessGroupPerm='5' SiteId='2' AccessGroupPermission='Read/Link' OtherPermission='Read/Link' OtherPerm='5' OwnGroupPerm='7' DesignTypeName='Traditional - 9354393' ProjectId='' listTrialUnit='trial/1/list/trialunit' OwnGroupName='admin' triallocation='POLYGON((149.092666904502 -35.3047819041308,149.092784921705 -35.3047819041308,149.09276882845 -35.3049745290585,149.092650811256 -35.3049745290585,149.092666904502 -35.3047819041308))' TrialStartDate='2010-10-15 00:00:00' TrialManagerName='Testing User-2157263' TrialName='Trial_3426887' chgOwner='trial/1/change/owner' UltimatePermission='Read/Write/Link' update='update/trial/1' TrialId='1' /></DATA>",
+"SuccessMessageJSON": "{'VCol' : [],'RecordMeta' : [{'TagName' : 'Trial'}],'Trial' : [{'TrialNote' : 'none','TrialAcronym' : 'TEST','AccessGroupId' : '0','chgPerm' : 'trial/1/change/permission','map' : 'trial/1/on/map','TrialManagerId' : '4','OwnGroupPermission' : 'Read/Write/Link','TrialTypeName' : 'TrialType - 8010193','DesignTypeId' : '2','SiteName' : 'DArT Test Site','AccessGroupName' : 'admin','Latitude' : '-35.3048782165934','addTrait' : 'trial/1/add/trait','CurrentWorkflowId' : '0','TrialNumber' : '1','OwnGroupId' : '0','UltimatePerm' : '7','TrialEndDate' : '2011-03-31 00:00:00','TrialTypeId' : '14','Longitude' : '149.092717866478','AccessGroupPerm' : '5','SiteId' : '2','AccessGroupPermission' : 'Read/Link','OtherPermission' : 'Read/Link','OtherPerm' : '5','OwnGroupPerm' : '7','DesignTypeName' : 'Traditional - 9354393','ProjectId' : null,'listTrialUnit' : 'trial/1/list/trialunit','OwnGroupName' : 'admin','triallocation' : 'POLYGON((149.092666904502 -35.3047819041308,149.092784921705 -35.3047819041308,149.09276882845 -35.3049745290585,149.092650811256 -35.3049745290585,149.092666904502 -35.3047819041308))','TrialStartDate' : '2010-10-15 00:00:00','chgOwner' : 'trial/1/change/owner','TrialName' : 'Trial_3426887','TrialManagerName' : 'Testing User-2157263','UltimatePermission' : 'Read/Write/Link','update' : 'update/trial/1','TrialId' : '1'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Trial (20) not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Trial (20) not found.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing TrialId"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self     = shift;
+  my $trial_id = $self->param('id');
+
+  my $data_for_postrun_href = {};
+
+  my $dbh = connect_kdb_read();
+
+  my $group_id = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+  my $perm_str = permission_phrase($group_id, 0, $gadmin_status, 'trial');
+
+  my $trial_perm_sql = "SELECT $perm_str as UltimatePerm ";
+  $trial_perm_sql   .= 'FROM trial ';
+  $trial_perm_sql   .= 'WHERE TrialId=?';
+
+  my $trial_perm = read_cell($dbh, $trial_perm_sql, [$trial_id]);
+
+  if (length($trial_perm) == 0) {
+
+    my $err_msg = "Trial ($trial_id) not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+  elsif ( ($trial_perm & $READ_PERM) != $READ_PERM ) {
+
+    my $err_msg = "Permission denied: trial ($trial_id).";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $field_list = ['trial.*', 'VCol*', 'LCol*',
+                    'site.SiteName', 'generaltype.TypeName AS TrialTypeName',
+                    'designtype.DesignTypeName',
+                    "CONCAT(contact.ContactFirstName, ' ', contact.ContactLastName) AS TrialManagerName ",
+                    "$perm_str AS UltimatePerm",
+      ];
+  
+  my $other_join = ' LEFT JOIN site ON trial.SiteId = site.SiteId ';
+  $other_join   .= ' LEFT JOIN generaltype ON trial.TrialTypeId = generaltype.TypeId ';
+  $other_join   .= ' LEFT JOIN designtype ON trial.DesignTypeId = designtype.DesignTypeId ';
+  $other_join   .= ' LEFT JOIN contact ON trial.TrialManagerId = contact.Contactid ';
+
+  my ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_sql($dbh, $field_list, 'trial',
+                                                                        'TrialId', $other_join);
+  $dbh->disconnect();
+
+  if ($vcol_err) {
+
+    my $err_msg = "Problem with virtual column ($trouble_vcol) containing space.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $where_exp = " WHERE (($perm_str) & $READ_PERM) = $READ_PERM AND trial.TrialId=? ";
+
+  $sql =~ s/GROUP BY/ $where_exp GROUP BY /;
+
+  $self->logger->debug("SQL with VCol: $sql");
+
+  my ($read_trial_err, $read_trial_msg, $trial_data) = $self->list_trial(1, $field_list, $sql, [$trial_id]);
+
+  if ($read_trial_err) {
+
+    $self->logger->debug($read_trial_msg);
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $data_for_postrun_href->{'Error'} = 0;
+  $data_for_postrun_href->{'Data'}  = {'Trial'      => $trial_data,
+                                       'VCol'       => $vcol_list,
+                                       'RecordMeta' => [{'TagName' => 'Trial'}],
+  };
+
+  return $data_for_postrun_href;
+}
+
+sub update_trial_runmode {
+
+=pod update_trial_HELP_START
+{
+"OperationName" : "Update trial",
+"Description": "Update information about a trial specified by id.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"KDDArTModule": "main",
+"KDDArTTable": "trial",
+"SkippedField": ["OwnGroupId", "AccessGroupId", "OwnGroupPerm", "AccessGroupPerm", "OtherPerm"],
+"KDDArTFactorTable": "trialfactor",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='Trial (1) has been updated successfully.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'Trial (1) has been updated successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Trial (20) not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Trial (20) not found.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing TrialId"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self     = shift;
+  my $trial_id = $self->param('id');
+  my $query    = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  # Generic required static field checking
+
+  my $dbh_read = connect_kdb_read();
+
+  my $skip_field = {'OwnGroupId'        => 1,
+                    'AccessGroupId'     => 1,
+                    'OwnGroupPerm'      => 1,
+                    'AccessGroupPerm'   => 1,
+                    'OtherPerm'         => 1,
+                   };
+
+  my ($get_scol_err, $get_scol_msg, $scol_data, $pkey_data) = get_static_field($dbh_read, 'trial');
+
+  if ($get_scol_err) {
+
+    $self->logger->debug("Get static field info failed: $get_scol_msg");
+    
+    my $err_msg = "Unexpected Error.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $required_field_href = {};
+
+  for my $static_field (@{$scol_data}) {
+
+    my $field_name = $static_field->{'Name'};
+    
+    if ($skip_field->{$field_name}) { next; }
+
+    if ($static_field->{'Required'} == 1) {
+
+      $required_field_href->{$field_name} = $query->param($field_name);
+    }
+  }
+
+  $dbh_read->disconnect();
+
+  my ($missing_err, $missing_href) = check_missing_href( $required_field_href );
+
+  if ($missing_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  # Finish generic required static field checking
+
+  my $trial_name          = $query->param('TrialName');
+  my $site_id             = $query->param('SiteId');
+  my $trial_type_id       = $query->param('TrialTypeId');
+  my $trial_number        = $query->param('TrialNumber');
+  my $trial_acronym       = $query->param('TrialAcronym');
+  my $design_type_id      = $query->param('DesignTypeId');
+  my $trial_manager_id    = $query->param('TrialManagerId');
+  my $trial_sdate         = $query->param('TrialStartDate');
+
+  my $dbh_k_read = connect_kdb_read();
+
+  my $project_id = read_cell_value($dbh_k_read, 'trial', 'ProjectId', 'TrialId', $trial_id);
+
+  if (defined $query->param('ProjectId')) {
+
+    if (length($query->param('ProjectId')) > 0) {
+
+      $project_id = $query->param('ProjectId');
+
+      my $project_existence = record_existence($dbh_k_read, 'project', 'ProjectId', $project_id);
+
+      if (!$project_existence) {
+
+        my $err_msg = "Project ($project_id) does not exist.";
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'ProjectId' => $err_msg}]};
+      
+        return $data_for_postrun_href;
+      }
+    }
+    else {
+
+      $project_id = undef;
+    }
+  }
+
+  if (length($project_id) == 0) {
+
+    $project_id = undef;
+  }
+
+  my $workflow_id = read_cell_value($dbh_k_read, 'trial', 'CurrentWorkflowId', 'TrialId', $trial_id);
+
+  if (defined $query->param('CurrentWorkflowId')) {
+
+    if (length($query->param('CurrentWorkflowId')) > 0) {
+
+      $workflow_id = $query->param('CurrentWorkflowId');
+    }
+  }
+
+  if (length($workflow_id) == 0) {
+
+    $workflow_id = '0';
+  }
+
+  my $trial_edate = read_cell_value($dbh_k_read, 'trial', 'TrialEndDate', 'TrialId', $trial_id);
+
+  if (defined $query->param('TrialEndDate')) {
+
+    if (length($query->param('TrialEndDate')) > 0) {
+
+      $trial_edate = $query->param('TrialEndDate');
+    }
+  }
+
+  # Unknown end DateTime value from database 0000-00-00 00:00:00 which should be reset to empty string, undef,
+  # and then null in the db
+
+  if ($trial_edate eq '0000-00-00 00:00:00') {
+
+    $trial_edate = '';
+  }
+
+  my $trial_note = read_cell_value($dbh_k_read, 'trial', 'TrialNote', 'TrialId', $trial_id);
+
+  if (defined $query->param('TrialNote')) {
+
+    $trial_note = $query->param('TrialNote');
+  }
+
+  # Don't need to read from db since if this variable contains the empty string, nothing is done
+  my $trial_location      = '';
+
+  if (defined $query->param('triallocation')) {
+
+    if (length($query->param('triallocation')) > 0) {
+
+      $trial_location = $query->param('triallocation');
+    }
+  }
+  
+  my $group_id = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  my $sql;
+
+  if (!(record_existence($dbh_k_read, 'trial', 'TrialId', $trial_id))) {
+
+    my $err_msg = "Trial ($trial_id) not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+  else {
+
+    my ($is_ok, $trouble_trial_id_aref) = check_permission($dbh_k_read, 'trial', 'TrialId',
+                                                           [$trial_id], $group_id, $gadmin_status,
+                                                           $READ_WRITE_PERM);
+
+    if (!$is_ok) {
+    
+      my $err_msg = "Trial ($trial_id): permission denied.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [$err_msg]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  $sql    = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength ";
+  $sql   .= "FROM factor ";
+  $sql   .= "WHERE TableNameOfFactor='trialfactor'";
+
+  my $vcol_data = $dbh_k_read->selectall_hashref($sql, 'FactorId');
+
+  my $vcol_param_data = {};
+  my $vcol_len_info   = {};
+  my $vcol_param_data_maxlen = {};
+  for my $vcol_id (keys(%{$vcol_data})) {
+
+    my $vcol_param_name = "VCol_${vcol_id}";
+    my $vcol_value      = $query->param($vcol_param_name);
+    if ($vcol_data->{$vcol_id}->{'CanFactorHaveNull'} != 1) {
+
+      $vcol_param_data->{$vcol_param_name} = $vcol_value;
+    }
+    $vcol_len_info->{$vcol_param_name} = $vcol_data->{$vcol_id}->{'FactorValueMaxLength'};
+    $vcol_param_data_maxlen->{$vcol_param_name} = $vcol_value;
+  }
+
+  my ($vcol_missing_err, $vcol_missing_href) = check_missing_href( $vcol_param_data );
+
+  if ($vcol_missing_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$vcol_missing_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  my ($vcol_maxlen_err, $vcol_maxlen_href) = check_maxlen_href($vcol_param_data_maxlen, $vcol_len_info);
+
+  if ($vcol_maxlen_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$vcol_maxlen_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  if ($workflow_id ne '0') {
+
+    if (!record_existence($dbh_k_read, 'workflow', 'WorkflowId', $workflow_id)) {
+
+      my $err_msg = "CurrentWorkflowId ($workflow_id) does not exist.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'CurrentWorkflowId' => $err_msg}]};
+      
+      return $data_for_postrun_href;
+    }
+  }
+
+  my ($date_err, $date_href) = check_dt_href( { 'TrialStartDate'   => $trial_sdate } );
+
+  if ($date_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$date_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (length($trial_edate) > 0) {
+
+    ($date_err, $date_href) = check_dt_href( { 'TrialEndDate'   => $trial_edate } );
+
+    if ($date_err) {
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [$date_href]};
+
+      return $data_for_postrun_href;
+    }
+  }
+  else {
+
+    $trial_edate = undef;
+  }
+
+  my $site_existence = record_existence($dbh_k_read, 'site', 'SiteId', $site_id);
+
+  if (!$site_existence) {
+
+    my $err_msg = " ($site_id) does not exist.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'SiteId' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $dbh_gis_read = connect_gis_read();
+
+  if (length($trial_location) > 0) {
+
+    my ($is_wkt_err, $wkt_err_href) = is_valid_wkt_href($dbh_gis_read, {'triallocation' => $trial_location}, 'POLYGON');
+
+    if ($is_wkt_err) {
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [$wkt_err_href]};
+
+      return $data_for_postrun_href;
+    }
+  }
+  else {
+
+    my $get_tlocation_sql = 'SELECT ST_AsText(triallocation) AS TrialLocation ';
+    $get_tlocation_sql   .= 'FROM trialloc ';
+    $get_tlocation_sql   .= 'WHERE trialid=?';
+
+    my ($read_tloc_err, $db_tlocation) = read_cell($dbh_gis_read, $get_tlocation_sql, [$trial_id]);
+
+    if (length($db_tlocation) > 0) {
+
+      $trial_location = $db_tlocation;
+    }
+  }
+
+  if (length($trial_location) > 0) {
+
+    my ($is_within_err, $is_within) = is_within($dbh_gis_read, 'siteloc', 'siteid',
+                                                'sitelocation', $trial_location, $site_id);
+
+    if ($is_within_err) {
+
+      $self->logger->debug("IsWithin Err: $is_within_err");
+      $self->logger->debug("IsWithin: $is_within");
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+    else {
+
+      if (!$is_within) {
+
+        if ($GIS_ENFORCE_GEO_WITHIN) {
+
+          my $err_msg = "Inconsistent trial location.";
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+          return $data_for_postrun_href;
+        }
+      }
+    }
+  }
+
+  $dbh_gis_read->disconnect();
+
+  my $trialtype_existence = type_existence($dbh_k_read, 'trial', $trial_type_id);
+
+  if (!$trialtype_existence) {
+
+    my $err_msg = "TrialType ($trial_type_id) does not exist.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'TrialTypeId' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $design_type_existence = record_existence($dbh_k_read, 'designtype', 'DesignTypeId', $design_type_id);
+
+  if (!$design_type_existence) {
+
+    my $err_msg = "DesignType ($design_type_id) does not exist.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'DesignTypeId' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $trial_manager_existence = record_existence($dbh_k_read, 'contact', 'ContactId', $trial_manager_id);
+
+  if (!$trial_manager_existence) {
+
+    my $err_msg = "TrialManager ($trial_manager_id) does not exist.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'TrialManagerId' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $chk_trial_name_sql = 'SELECT TrialId ';
+  $chk_trial_name_sql   .= 'FROM trial ';
+  $chk_trial_name_sql   .= 'WHERE TrialName=? AND TrialId<>?';
+
+  my ($chk_trial_id_err, $collided_trial_id) = read_cell($dbh_k_read, $chk_trial_name_sql, [$trial_name, $trial_id]);
+
+  if (length($collided_trial_id) > 0) {
+
+    my $err_msg = " ($trial_name) already exists.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'TrialName' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh_k_read->disconnect();
+
+  my $dbh_k_write = connect_kdb_write();
+
+  $sql    = 'UPDATE trial SET ';
+  $sql   .= 'ProjectId=?, ';
+  $sql   .= 'CurrentWorkflowId=?, ';
+  $sql   .= 'TrialName=?, ';
+  $sql   .= 'SiteId=?, ';
+  $sql   .= 'TrialTypeId=?, ';
+  $sql   .= 'TrialNumber=?, ';
+  $sql   .= 'TrialAcronym=?, ';
+  $sql   .= 'DesignTypeId=?, ';
+  $sql   .= 'TrialManagerId=?, ';
+  $sql   .= 'TrialStartDate=?, ';
+  $sql   .= 'TrialEndDate=?, ';
+  $sql   .= 'TrialNote=? ';
+  $sql   .= 'WHERE TrialId=?';
+
+  my $sth = $dbh_k_write->prepare($sql);
+  $sth->execute($project_id, $workflow_id, $trial_name, $site_id, $trial_type_id, $trial_number, $trial_acronym,
+                $design_type_id, $trial_manager_id, $trial_sdate, $trial_edate, $trial_note, $trial_id,
+      );
+
+  if ($dbh_k_write->err()) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+  $sth->finish();
+
+  for my $vcol_id (keys(%{$vcol_data})) {
+
+    if (defined $query->param('VCol_' . "$vcol_id")) {
+
+      my $factor_value = $query->param('VCol_' . "$vcol_id");
+
+      $sql  = 'SELECT Count(*) ';
+      $sql .= 'FROM trialfactor ';
+      $sql .= 'WHERE TrialId=? AND FactorId=?';
+      
+      my ($read_err, $count) = read_cell($dbh_k_write, $sql, [$trial_id, $vcol_id]);
+
+      if (length($factor_value) > 0) {
+
+        if ($count > 0) {
+
+          $sql  = 'UPDATE trialfactor SET ';
+          $sql .= 'FactorValue=? ';
+          $sql .= 'WHERE TrialId=? AND FactorId=?';
+          my $factor_sth = $dbh_k_write->prepare($sql);
+          $factor_sth->execute($factor_value, $trial_id, $vcol_id);
+          
+          if ($dbh_k_write->err()) {
+          
+            $data_for_postrun_href->{'Error'} = 1;
+            $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+            return $data_for_postrun_href;
+          }
+          $factor_sth->finish();
+        }
+        else {
+
+          $sql  = 'INSERT INTO trialfactor SET ';
+          $sql .= 'TrialId=?, ';
+          $sql .= 'FactorId=?, ';
+          $sql .= 'FactorValue=?';
+          my $factor_sth = $dbh_k_write->prepare($sql);
+          $factor_sth->execute($trial_id, $vcol_id, $factor_value);
+      
+          if ($dbh_k_write->err()) {
+        
+            $data_for_postrun_href->{'Error'} = 1;
+            $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+            return $data_for_postrun_href;
+          }
+          $factor_sth->finish();
+        }
+      }
+      else {
+
+        if ($count > 0) {
+
+          $sql  = 'DELETE FROM trialfactor ';
+          $sql .= 'WHERE TrialId=? AND FactorId=?';
+
+          my $factor_sth = $dbh_k_write->prepare($sql);
+          $factor_sth->execute($trial_id, $vcol_id);
+      
+          if ($dbh_k_write->err()) {
+        
+            $data_for_postrun_href->{'Error'} = 1;
+            $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+            return $data_for_postrun_href;
+          }
+          $factor_sth->finish();
+        }
+      }
+    }
+  }
+
+  my $dbh_gis_write = connect_gis_write();
+  if (length($trial_location) > 0) {
+
+    my $trialloc_sql = '';
+    my @sql_arg;
+
+    if (!record_existence($dbh_gis_write, 'trialloc', 'trialid', $trial_id)) {
+
+      $trialloc_sql  = 'INSERT INTO trialloc (trialid, triallocation) ';
+      $trialloc_sql .= 'VALUES (?, ST_GeomFromText(?, -1))';
+      @sql_arg = ($trial_id, $trial_location);
+    }
+    else {
+
+      $trialloc_sql  = 'UPDATE trialloc SET ';
+      $trialloc_sql .= 'triallocation = ST_GeomFromText(?, -1) ';
+      $trialloc_sql .= 'WHERE trialid=?';
+      @sql_arg = ($trial_location, $trial_id);
+    }
+
+    $self->logger->debug("SQL: $sql");
+    $self->logger->debug("TrialId: $trial_id");
+
+    my $gis_sth = $dbh_gis_write->prepare($trialloc_sql);
+    $gis_sth->execute(@sql_arg);
+
+    if ($dbh_gis_write->err()) {
+
+      $self->logger->debug("SQL err number: " . $dbh_gis_write->err());
+      $self->logger->debug("SQL err: " . $dbh_gis_write->errstr());
+
+      my $err_msg = 'Unexpected error';
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+    }
+    $gis_sth->finish();
+  }
+  $dbh_gis_write->disconnect();
+
+  my $info_msg_aref = [{'Message' => "Trial ($trial_id) has been updated successfully."}];
+
+  $dbh_k_write->disconnect();
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'       => $info_msg_aref};
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub update_trial_geography_runmode {
+
+=pod update_trial_geography_HELP_START
+{
+"OperationName" : "Update trial location",
+"Description": "Update trial's geographical position.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='Trial (1) geography has been updated successfully.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'Trial (1) geography has been updated successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Trial (20) not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Trial (20) not found.'}]}"}],
+"HTTPParameter": [{"Name": "triallocation", "DataType": "polygon_wkt", "Description": "GIS field defining the polygon geometry object of the trial in a standard GIS well-known text.", "Type": "LCol", "Required": "0"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing TrialId"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self     = shift;
+  my $trial_id = $self->param('id');
+  my $query    = $self->query();
+
+  my $data_for_postrun_href = {};
+  
+  my $dbh_k_read = connect_kdb_read();
+
+  my $group_id = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  my $sql;
+  
+  if (!(record_existence($dbh_k_read, 'trial', 'TrialId', $trial_id))) {
+
+    my $err_msg = "Trial ($trial_id) not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$err_msg]};
+
+    return $data_for_postrun_href;
+  }
+  else {
+
+    my ($is_ok, $trouble_trial_id_aref) = check_permission($dbh_k_read, 'trial', 'TrialId',
+                                                           [$trial_id], $group_id, $gadmin_status,
+                                                           $READ_WRITE_PERM);
+
+    if (!$is_ok) {
+    
+      my $err_msg = "Trial ($trial_id): permission denied.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [$err_msg]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  
+  my $site_id = read_cell_value($dbh_k_read, 'trial', 'SiteId', 'TrialId', $trial_id);
+
+  $dbh_k_read->disconnect();
+
+  my $trial_location = $query->param('triallocation');
+
+  my ($missing_err, $missing_href) = check_missing_href( { 'triallocation' => $trial_location } );
+
+  if ($missing_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $dbh_gis_read = connect_gis_read();
+  my ($is_wkt_err, $wkt_err_href) = is_valid_wkt_href($dbh_gis_read,
+                                                      {'triallocation' => $trial_location},
+                                                      'POLYGON');
+  $dbh_gis_read->disconnect();
+
+  if ($is_wkt_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$wkt_err_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $dbh_gis_write = connect_gis_write();
+
+  my ($is_within_err, $is_within) = is_within($dbh_gis_write, 'siteloc', 'siteid',
+                                              'sitelocation', $trial_location, $site_id);
+
+  my $msg = '';
+  my $does_actual_update = 0;
+
+  if ($is_within_err) {
+
+    $self->logger->debug("IsWithin Err: $is_within_err");
+    $self->logger->debug("IsWithin: $is_within");
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+  else {
+
+    if (!$is_within) {
+
+      if ($GIS_ENFORCE_GEO_WITHIN) {
+
+        my $err_msg = "New geography is not within site (${site_id}).";
+
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+        return $data_for_postrun_href;
+      }
+      else {
+
+        $msg    = "Trial ($trial_id) has been updated successfully. ";
+        $msg   .= "However, this new geography is not within its site (${site_id}).";
+      }
+    }
+    else {
+
+      $msg = "Trial ($trial_id) geography has been updated successfully.";
+      $does_actual_update = 1;
+    }
+  }
+
+  if ($does_actual_update) {
+
+    $sql  = 'UPDATE trialloc SET ';
+    $sql .= 'triallocation = ST_GeomFromText(?, -1) ';
+    $sql .= 'WHERE trialid=?';
+
+    my $gis_sth = $dbh_gis_write->prepare($sql);
+    $gis_sth->execute($trial_location, $trial_id);
+
+    if ($dbh_gis_write->err()) {
+
+      $self->logger->debug("SQL err number: " . $dbh_gis_write->err());
+      $self->logger->debug("SQL err: " . $dbh_gis_write->errstr());
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+    $gis_sth->finish();
+  }
+
+  $dbh_gis_write->disconnect();
+
+  my $info_msg_aref = [{'Message' => $msg}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'       => $info_msg_aref};
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub list_trial_unit {
+
+  my $self            = $_[0];
+  my $extra_attr_yes  = $_[1];
+  my $gis_field_list  = $_[2];
+  my $sql             = $_[3];
+  my $where_para_aref = $_[4];
+
+  my $err = 0;
+  my $msg = '';
+
+  my $data_aref = [];
+
+  my $dbh = connect_kdb_read();
+
+  ($err, $msg, $data_aref) = read_data($dbh, $sql, $where_para_aref);
+
+  if ($err) {
+
+    return ($err, $msg, []);
+  }
+
+  my $field_list_loc_href = {};
+
+  for my $field (@{$gis_field_list}) {
+
+    if ($field eq 'Longitude' || $field eq 'Latitude' || $field eq 'LCol*' || $field eq 'sitelocation') {
+
+      $field_list_loc_href->{$field} = 1;
+    }
+  }
+
+  my $trial_unit_loc_gis = {};
+
+  my @trial_unit_id_list;
+
+  for my $trialunit_rec (@{$data_aref}) {
+
+    push(@trial_unit_id_list, $trialunit_rec->{'TrialUnitId'});
+  }
+
+  my $chk_id_err        = 0;
+  my $chk_id_msg        = '';
+  my $used_id_href      = {};
+  my $not_used_id_href  = {};
+
+  my $tu_specimen_href = {};
+
+  if ($extra_attr_yes) {
+
+    my $tu_specimen_sql = '';
+
+    $self->logger->debug("Number of TrialUnitId: " . scalar(@trial_unit_id_list));
+    $self->logger->debug("TrialUnitId list: " . join(',', @trial_unit_id_list));
+
+    if (scalar(@trial_unit_id_list) > 0) {
+
+      $tu_specimen_sql   .= 'SELECT trialunitspecimen.*, specimen.SpecimenName ';
+      $tu_specimen_sql   .= 'FROM trialunitspecimen LEFT JOIN specimen ON ';
+      $tu_specimen_sql   .= 'trialunitspecimen.SpecimenId = specimen.SpecimenId ';
+      $tu_specimen_sql   .= 'WHERE TrialUnitId IN (' . join(',', @trial_unit_id_list) . ')';
+
+      my $tu_spec_data_aref = [];
+
+      ($err, $msg, $tu_spec_data_aref) = read_data($dbh, $tu_specimen_sql, []);
+
+      if ($err) {
+
+        return ($err, $msg, []);
+      }
+
+      for my $tu_spec_rec (@{$tu_spec_data_aref}) {
+
+        my $tu_id = $tu_spec_rec->{'TrialUnitId'};
+        
+        my $specimen_aref = [];
+
+        if (defined($tu_specimen_href->{$tu_id})) {
+
+          $specimen_aref = $tu_specimen_href->{$tu_id};
+        }
+
+        push(@{$specimen_aref}, $tu_spec_rec);
+
+        $tu_specimen_href->{$tu_id} = $specimen_aref;
+      }
+
+      my $chk_table_aref = [{'TableName' => 'samplemeasurement', 'FieldName' => 'TrialUnitId'},
+                            {'TableName' => 'trialunitspecimen', 'FieldName' => 'TrialUnitId'}
+          ];
+
+      ($chk_id_err, $chk_id_msg,
+       $used_id_href, $not_used_id_href) = id_existence_bulk($dbh, $chk_table_aref, \@trial_unit_id_list);
+    }
+  }
+
+
+  if (scalar(keys(%{$field_list_loc_href})) > 0) {
+
+    if (scalar(@trial_unit_id_list) > 0) {
+
+      my $dbh_gis = connect_gis_read();
+
+      my $gis_where = "WHERE trialunitid IN (" . join(',', @trial_unit_id_list) . ")";
+
+      my $trialunitloc_sql = 'SELECT trialunitid, ST_AsText(trialunitlocation) AS trialunitlocation, ';
+      $trialunitloc_sql   .= 'ST_AsText(ST_Centroid(geometry(trialunitlocation))) AS trialunitcentroid ';
+      $trialunitloc_sql   .= 'FROM trialunitloc ';
+      $trialunitloc_sql   .= $gis_where;
+      
+      my $sth_gis = $dbh_gis->prepare($trialunitloc_sql);
+      $sth_gis->execute();
+    
+      if (!$dbh_gis->err()) {
+      
+        my $gis_href = $sth_gis->fetchall_hashref('trialunitid');
+      
+        if (!$sth_gis->err()) {
+        
+          $trial_unit_loc_gis = $gis_href;
+        }
+        else {
+        
+          $err = 1;
+          $msg = 'Unexpected error';
+          $self->logger->debug('Err: ' . $dbh_gis->errstr());
+        }
+      }
+      else {
+      
+        $err = 1;
+        $msg = 'Unexpected error';
+        $self->logger->debug('Err: ' . $dbh_gis->errstr());
+      }
+    
+      $dbh_gis->disconnect();
+    }
+  }
+
+  $dbh->disconnect();
+
+  my $trial_unit_loc_gis_count = scalar(keys(%{$trial_unit_loc_gis}));
+  $self->logger->debug("GIS trial unit loc count: $trial_unit_loc_gis_count");
+
+  my $perm_lookup  = {'0' => 'None',
+                      '1' => 'Link',
+                      '2' => 'Write',
+                      '3' => 'Write/Link',
+                      '4' => 'Read',
+                      '5' => 'Read/Link',
+                      '6' => 'Read/Write',
+                      '7' => 'Read/Write/Link',
+  };
+
+  my @extra_attr_trial_unit_data;
+
+  for my $row (@{$data_aref}) {
+    
+    my $trial_unit_id = $row->{'TrialUnitId'};
+    my $permission    = $row->{'UltimatePerm'};
+    
+    my $trial_unit_centroid = $trial_unit_loc_gis->{$trial_unit_id}->{'trialunitcentroid'};
+    $trial_unit_centroid    =~ /POINT\((.+) (.+)\)/;
+    my $longitude     = $1;
+    my $latitude      = $2;
+
+    if ($field_list_loc_href->{'LCol*'} || $field_list_loc_href->{'Longitude'}) {
+
+      $row->{'Longitude'} = $longitude;
+    }
+
+    if ($field_list_loc_href->{'LCol*'} || $field_list_loc_href->{'Latitude'}) {
+
+      $row->{'Latitude'}  = $latitude;
+    }
+
+    if ($field_list_loc_href->{'LCol*'} || $field_list_loc_href->{'trialunitlocation'}) {
+
+      $row->{'trialunitlocation'} = $trial_unit_loc_gis->{$trial_unit_id}->{'trialunitlocation'};
+    }
+
+    if ($extra_attr_yes) {
+
+      if (defined($tu_specimen_href->{$trial_unit_id})) {
+
+        my $specimen_aref = $tu_specimen_href->{$trial_unit_id};
+        $row->{'Specimen'} = $specimen_aref;
+      }
+
+      $row->{'UltimatePermission'} = $perm_lookup->{$permission};
+    
+      if ( ($permission & $READ_WRITE_PERM) == $READ_WRITE_PERM ) {
+      
+        $row->{'update'}    = "update/trialunit/$trial_unit_id";
+        $row->{'addSpecimen'}  = "trialunit/$trial_unit_id/add/specimen";
+        $row->{'listSpecimen'} = "trialunit/$trial_unit_id/list/specimen";
+        
+        if ( $not_used_id_href->{$trial_unit_id} ) {
+          
+          $row->{'delete'}   = "delete/trialunit/$trial_unit_id";
+        }
+      }
+    }
+    push(@extra_attr_trial_unit_data, $row);
+  }
+  
+  return ($err, $msg, \@extra_attr_trial_unit_data);
+}
+
+sub get_trial_unit_runmode {
+
+=pod get_trial_unit_HELP_START
+{
+"OperationName" : "Get trial unit",
+"Description": "Get detailed information about trial unit specified by id.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><RecordMeta TagName='TrialUnit' /><TrialUnit Longitude='149.09269513468' listSpecimen='trialunit/1/list/specimen' UnitPositionId='2' UnitPositionText='block01|row1|column1' TrialUnitId='1' SampleSupplierId='1' TreatmentId='2' TrialUnitBarcode='3963264' SiteName='DArT Glass house' ReplicateNumber='2' Latitude='-35.3048528069633' TrialUnitNote='Trial unit part of automatic testing' UltimatePermission='Read/Write/Link' trialunitlocation='POINT(149.09269513468 -35.3048528069633)' TreatmentText='Removing weeds' addSpecimen='trialunit/1/add/specimen' update='update/trialunit/1' SourceTrialUnitId='0' UltimatePerm='7' TrialId='1'><Specimen SpecimenName='Specimen4TrialUnit_4774155' Notes='none' ItemId='' TrialUnitId='1' TrialUnitSpecimenId='1' HarvestDate='2008-08-01' PlantDate='2011-09-01' HasDied='0' SpecimenId='4' /><Specimen SpecimenName='Specimen4TrialUnit_1134469' Notes='none' ItemId='' TrialUnitId='1' TrialUnitSpecimenId='2' HarvestDate='0000-00-00' PlantDate='0000-00-00' HasDied='0' SpecimenId='5' /><Specimen SpecimenName='Specimen4TrialUnit_8074320' Notes='none' ItemId='' TrialUnitId='1' TrialUnitSpecimenId='3' HarvestDate='0000-00-00' PlantDate='2011-09-01' HasDied='0' SpecimenId='6' /><Specimen SpecimenName='Specimen4TrialUnit_3163264' Notes='none' ItemId='' TrialUnitId='1' TrialUnitSpecimenId='4' HarvestDate='0000-00-00' PlantDate='2011-09-01' HasDied='0' SpecimenId='7' /></TrialUnit></DATA>",
+"SuccessMessageJSON": "{'RecordMeta' : [{'TagName' : 'TrialUnit'}],'TrialUnit' : [{'Longitude' : '149.09269513468','listSpecimen' : 'trialunit/1/list/specimen','UnitPositionId' : '2','TrialUnitId' : '1','UnitPositionText' : 'block01|row1|column1','Specimen' : [{'SpecimenName' : 'Specimen4TrialUnit_4774155','Notes' : 'none','ItemId' : null,'TrialUnitId' : '1','TrialUnitSpecimenId' : '1','HarvestDate' : '2008-08-01','PlantDate' : '2011-09-01','HasDied' : '0','SpecimenId' : '4'},{'SpecimenName' : 'Specimen4TrialUnit_1134469','Notes' : 'none','ItemId' : null,'TrialUnitId' : '1','TrialUnitSpecimenId' : '2','HarvestDate' : '0000-00-00','PlantDate' : '0000-00-00','HasDied' : '0','SpecimenId' : '5'},{'SpecimenName' : 'Specimen4TrialUnit_8074320','Notes' : 'none','ItemId' : null,'TrialUnitId' : '1','TrialUnitSpecimenId' : '3','HarvestDate' : '0000-00-00','PlantDate' : '2011-09-01','HasDied' : '0','SpecimenId' : '6'},{'SpecimenName' : 'Specimen4TrialUnit_3163264','Notes' : 'none','ItemId' : null,'TrialUnitId' : '1','TrialUnitSpecimenId' : '4','HarvestDate' : '0000-00-00','PlantDate' : '2011-09-01','HasDied' : '0','SpecimenId' : '7'}],'SampleSupplierId' : '1','TreatmentId' : '2','TrialUnitBarcode' : '3963264','SiteName' : 'DArT Glass house','ReplicateNumber' : '2','Latitude' : '-35.3048528069633','TrialUnitNote' : 'Trial unit part of automatic testing','UltimatePermission' : 'Read/Write/Link','trialunitlocation' : 'POINT(149.09269513468 -35.3048528069633)','TreatmentText' : 'Removing weeds','addSpecimen' : 'trialunit/1/add/specimen','update' : 'update/trialunit/1','UltimatePerm' : '7','TrialId' : '1','SourceTrialUnitId' : '0'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='TrialUnit (100) not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'TrialUnit (100) not found.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing TrialUnitId"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self          = shift;
+  my $trial_unit_id = $self->param('id');
+
+  my $data_for_postrun_href = {};
+
+  my $dbh = connect_kdb_read();
+  my $trial_id = read_cell_value($dbh, 'trialunit', 'TrialId', 'TrialUnitId', $trial_unit_id);
+
+  if (length($trial_id) == 0) {
+
+    my $err_msg = "TrialUnit ($trial_unit_id) not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $group_id = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+  my $perm_str = permission_phrase($group_id, 0, $gadmin_status, 'trial');
+
+  my $sql      = "SELECT $perm_str AS UltimatePermission ";
+  $sql        .= 'FROM trial ';
+  $sql        .= 'WHERE TrialId=?';
+
+  my ($read_err, $permission) = read_cell($dbh, $sql, [$trial_id]);
+  $dbh->disconnect();
+
+  if ( ($permission & $READ_PERM) != $READ_PERM ) {
+
+    my $err_msg = "Trial ($trial_id): permission denied.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $msg = '';
+
+  $sql    = 'SELECT trialunit.*, unitposition.UnitPositionText, treatment.TreatmentText, ';
+  $sql   .= 'site.SiteName, ';
+  $sql   .= "$perm_str AS UltimatePerm ";
+  $sql   .= 'FROM trialunit ';
+  $sql   .= 'LEFT JOIN trial ON trialunit.TrialId = trial.TrialId ';
+  $sql   .= 'LEFT JOIN site ON trial.SiteId = site.SiteId ';
+  $sql   .= 'LEFT JOIN unitposition ON trialunit.UnitPositionId = unitposition.UnitPositionId ';
+  $sql   .= 'LEFT JOIN treatment ON trialunit.TreatmentId = treatment.TreatmentId ';
+  $sql   .= "WHERE trialunit.TrialUnitId=? AND (($perm_str) & $READ_PERM) = $READ_PERM ";
+  $sql   .= 'ORDER BY trialunit.TrialUnitId DESC';
+
+  my ($trial_unit_err, $trial_unit_msg, $trial_unit_data) = $self->list_trial_unit(1, ['LCol*'], $sql, [$trial_unit_id]);
+
+  if ($trial_unit_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $data_for_postrun_href->{'Error'} = 0;
+  $data_for_postrun_href->{'Data'}  = {'TrialUnit'  => $trial_unit_data,
+                                       'RecordMeta' => [{'TagName' => 'TrialUnit'}],
+  };
+
+  return $data_for_postrun_href;
+}
+
+sub update_trial_unit_runmode {
+
+=pod update_trial_unit_HELP_START
+{
+"OperationName" : "Update trial unit",
+"Description": "Update trial unit specified by id.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"KDDArTModule": "main",
+"KDDArTTable": "trialunit",
+"SkippedField": ["TrialId"],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='TrialUnit (1) has been updated successfully.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'TrialUnit (1) has been updated successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='TrialUnit (100) not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'TrialUnit (100) not found.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing TrialUnitId"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self          = shift;
+  my $trial_unit_id = $self->param('id');
+  my $query         = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  # Generic required static field checking
+
+  my $dbh_read = connect_kdb_read();
+
+  my $skip_field = {'TrialId' => 1};
+
+  my ($get_scol_err, $get_scol_msg, $scol_data, $pkey_data) = get_static_field($dbh_read, 'trialunit');
+
+  if ($get_scol_err) {
+
+    $self->logger->debug("Get static field info failed: $get_scol_msg");
+    
+    my $err_msg = "Unexpected Error.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $required_field_href = {};
+
+  for my $static_field (@{$scol_data}) {
+
+    my $field_name = $static_field->{'Name'};
+    
+    if ($skip_field->{$field_name}) { next; }
+
+    if ($static_field->{'Required'} == 1) {
+
+      $required_field_href->{$field_name} = $query->param($field_name);
+    }
+  }
+
+  $dbh_read->disconnect();
+
+  my ($missing_err, $missing_href) = check_missing_href( $required_field_href );
+
+  if ($missing_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  # Finish generic required static field checking
+
+  my $dbh_k_write = connect_kdb_write();
+  my $trial_id = read_cell_value($dbh_k_write, 'trialunit', 'TrialId', 'TrialUnitId', $trial_unit_id);
+
+  if (length($trial_id) == 0) {
+
+    my $err_msg = "TrialUnit ($trial_unit_id) not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $group_id = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+  my $perm_str = permission_phrase($group_id, 0, $gadmin_status, 'trial');
+  my $sql      = "SELECT $perm_str AS UltimatePermission ";
+  $sql        .= 'FROM trial ';
+  $sql        .= 'WHERE TrialId=?';
+
+  my ($read_err, $permission) = read_cell($dbh_k_write, $sql, [$trial_id]);
+
+  if ( ($permission & $READ_WRITE_PERM) != $READ_WRITE_PERM ) {
+
+    my $err_msg = "Trial ($trial_id): permission denied.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $unit_position_id    = $query->param('UnitPositionId');
+  my $replicate_number    = $query->param('ReplicateNumber');
+
+  my $src_trial_unit_id   = read_cell_value($dbh_k_write, 'trialunit', 'SourceTrialUnitId',
+                                            'TrialUnitId', $trial_unit_id);
+
+  if (defined $query->param('SourceTrialUnitId')) {
+
+    if (length($query->param('SourceTrialUnitId')) > 0) {
+
+      $src_trial_unit_id = $query->param('SourceTrialUnitId');
+    }
+  }
+
+  if (length($src_trial_unit_id) == 0) {
+
+    $src_trial_unit_id = '0';
+  }
+  
+  my $sample_supplier_id  = read_cell_value($dbh_k_write, 'trialunit', 'SampleSupplierId',
+                                            'TrialUnitId', $trial_unit_id);
+
+  if (defined $query->param('SampleSupplierId')) {
+
+    if (length($query->param('SampleSupplierId')) > 0) {
+
+      $sample_supplier_id = $query->param('SampleSupplierId');
+    }
+  }
+
+  my $trial_unit_comment  = read_cell_value($dbh_k_write, 'trialunit', 'TrialUnitNote',
+                                            'TrialUnitId', $trial_unit_id);
+
+  if (defined $query->param('TrialUnitNote')) {
+
+    $trial_unit_comment = $query->param('TrialUnitNote');
+  }
+
+  my $barcode = read_cell_value($dbh_k_write, 'trialunit', 'TrialUnitBarcode',
+                                'TrialUnitId', $trial_unit_id);
+
+  if (defined $query->param('TrialUnitBarcode')) {
+
+    if (length($query->param('TrialUnitBarcode')) > 0) {
+
+      $barcode = $query->param('TrialUnitBarcode');
+    }
+  }
+
+  if (length($barcode) == 0) {
+
+    $barcode = '0';
+  }
+
+  my $treatment_id = read_cell_value($dbh_k_write, 'trialunit', 'TreatmentId',
+                                     'TrialUnitId', $trial_unit_id);;
+
+  if (defined $query->param('TreatmentId')) {
+
+    if (length($query->param('TreatmentId')) > 0) {
+
+      $treatment_id = $query->param('TreatmentId');
+    }
+  }
+
+  if (length($treatment_id) == 0) {
+
+    $treatment_id = '0';
+  }
+
+  if ($treatment_id ne '0') {
+
+    my $treatment_existence = record_existence($dbh_k_write, 'treatment', 'TreatmentId', $treatment_id);
+
+    if (!$treatment_existence) {
+
+      my $err_msg = "Treatment ($treatment_id) does not exist.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'TreatmentId' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  my $unit_pos_existence = record_existence($dbh_k_write, 'unitposition', 'UnitPositionId', $unit_position_id);
+
+  if (!$unit_pos_existence) {
+
+    my $err_msg = "UnitPosition ($unit_position_id) does not exist.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'UnitPositionId' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if ( $barcode ne '0' ) {
+
+    my $barcode_sql = 'SELECT TrialUnitId FROM trialunit WHERE TrialUnitId<>? AND TrialUnitBarcode=?';
+
+    my ($r_barcode_err, $db_trial_unit_id) = read_cell($dbh_k_write, $barcode_sql, [$trial_unit_id, $barcode]);
+
+    if ($r_barcode_err) {
+
+      $self->logger->debug("Check barcode failed.");
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    if (length($db_trial_unit_id) > 0) {
+
+      my $err_msg = "TrialUnitBarcode ($barcode) already exists.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'TrialUnitBarcode' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+  else {
+
+    $barcode = undef;
+  }
+
+  if ($src_trial_unit_id ne '0') {
+
+    if (!record_existence($dbh_k_write, 'trialunit', 'TrialUnitId', $src_trial_unit_id)) {
+
+      my $err_msg = "SourceTrialUnitId ($src_trial_unit_id): not found.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  if ($treatment_id ne '0') {
+
+    my $treatment_existence = record_existence($dbh_k_write, 'treatment', 'TreatmentId', $treatment_id);
+
+    if (!$treatment_existence) {
+
+      my $err_msg = "Treatment ($treatment_id) does not exist.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'TreatmentId' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  $self->logger->debug("Parameter list: " . join(',', ($unit_position_id, $sample_supplier_id, $treatment_id,
+                                                       $replicate_number, $barcode, $trial_unit_comment,
+                                                       $src_trial_unit_id, $trial_unit_id ) ) );
+
+  $sql    = 'UPDATE trialunit SET ';
+  $sql   .= 'UnitPositionId=?, ';
+  $sql   .= 'SampleSupplierId=?, ';
+  $sql   .= 'TreatmentId=?, ';
+  $sql   .= 'ReplicateNumber=?, ';
+  $sql   .= 'TrialUnitBarcode=?, ';
+  $sql   .= 'TrialUnitNote=?, ';
+  $sql   .= 'SourceTrialUnitId=? ';
+  $sql   .= 'WHERE TrialUnitId=?';
+
+  my $sth = $dbh_k_write->prepare($sql);
+  $sth->execute($unit_position_id, $sample_supplier_id, $treatment_id,
+                $replicate_number, $barcode, $trial_unit_comment, $src_trial_unit_id, $trial_unit_id,
+      );
+
+  if ($dbh_k_write->err()) {
+
+    $self->logger->debug("Update trialunit failed");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+  $sth->finish();
+
+
+  $dbh_k_write->disconnect();
+
+  my $info_msg_aref = [{'Message' => "TrialUnit ($trial_unit_id) has been updated successfully."}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'       => $info_msg_aref};
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub update_trial_unit_geography_runmode {
+
+=pod update_trial_unit_geography_HELP_START
+{
+"OperationName" : "Update trial unit location",
+"Description": "Updates trial unit's geographical position.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='TrialUnit (1) geography has been updated successfully.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'TrialUnit (1) geography has been updated successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='TrialUnit (100) not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'TrialUnit (100) not found.'}]}"}],
+"HTTPParameter": [{"Name": "trialunitlocation", "DataType": "point_wkt", "Description": "GIS field defining the geometric point of the trial unit in a standard GIS well-known text.", "Type": "LCol", "Required": "1"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing TrialUnitId"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self          = shift;
+  my $trial_unit_id = $self->param('id');
+  my $query         = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  my $dbh_k_read = connect_kdb_read();
+
+  my $trial_id = read_cell_value($dbh_k_read, 'trialunit', 'TrialId', 'TrialUnitId', $trial_unit_id);
+
+  if (length($trial_id) == 0) {
+
+    my $err_msg = "TrialUnit ($trial_unit_id) not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $group_id = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+  my $perm_str = permission_phrase($group_id, 0, $gadmin_status, 'trial');
+  my $sql      = "SELECT $perm_str AS UltimatePermission ";
+  $sql        .= 'FROM trial ';
+  $sql        .= 'WHERE TrialId=?';
+
+  my ($read_err, $permission) = read_cell($dbh_k_read, $sql, [$trial_id]);
+
+  $dbh_k_read->disconnect();
+
+  if ( ($permission & $READ_WRITE_PERM) != $READ_WRITE_PERM ) {
+
+    my $err_msg = "Trial ($trial_id): permission denied.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $trial_unit_location = $query->param('trialunitlocation');
+
+  my ($missing_err, $missing_href) = check_missing_href( { 'trialunitlocation' => $trial_unit_location } );
+
+  if ($missing_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $dbh_gis_read = connect_gis_read();
+  my ($is_wkt_err, $wkt_err_href) = is_valid_wkt_href($dbh_gis_read,
+                                                      {'trialunitlocation' => $trial_unit_location},
+                                                      'POINT');
+  $dbh_gis_read->disconnect();
+
+  if ($is_wkt_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$wkt_err_href]};
+
+    return $data_for_postrun_href;
+  }
+
+
+  my $dbh_gis_write = connect_gis_write();
+
+  $sql    = 'UPDATE trialunitloc SET  ';
+  $sql   .= 'trialunitlocation=ST_GeomFromText(?, -1) ';
+  $sql   .= 'WHERE trialunitid=?';
+
+  my $gis_sth = $dbh_gis_write->prepare($sql);
+  $gis_sth->execute($trial_unit_location, $trial_unit_id);
+
+  if ($dbh_gis_write->err()) {
+
+    $self->logger->debug("SQL err: " . $dbh_gis_write->errstr());
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $gis_sth->finish();
+
+  $dbh_gis_write->disconnect();
+
+  my $info_msg_aref = [{'Message' => "TrialUnit ($trial_unit_id) geography has been updated successfully."}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'       => $info_msg_aref};
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub list_trial_unit_specimen {
+
+  my $self              = $_[0];
+  my $extra_attr_yes    = $_[1];
+  my $sql               = $_[2];
+  my $where_para_aref   = $_[3];
+
+  my $err = 0;
+  my $msg = '';
+
+  my $data_aref = [];
+
+  my $dbh = connect_kdb_read();
+
+  ($err, $msg, $data_aref) = read_data($dbh, $sql, $where_para_aref);
+
+  if ($err) {
+
+    return ($err, $msg, []);
+  }
+
+  $dbh->disconnect();
+
+  my $extra_attr_tunit_specimen_data = [];
+
+  if ($extra_attr_yes) {
+
+    my $perm_lookup  = {'0' => 'None',
+                        '1' => 'Link',
+                        '2' => 'Write',
+                        '3' => 'Write/Link',
+                        '4' => 'Read',
+                        '5' => 'Read/Link',
+                        '6' => 'Read/Write',
+                        '7' => 'Read/Write/Link',
+    };
+
+    my $tu_spec_id_aref = [];
+
+    for my $row (@{$data_aref}) {
+
+      push(@{$tu_spec_id_aref}, $row->{'TrialUnitSpecimenId'});
+    }
+
+    my $chk_id_err        = 0;
+    my $chk_id_msg        = '';
+    my $used_id_href      = {};
+    my $not_used_id_href  = {};
+
+    if (scalar(@{$tu_spec_id_aref}) > 0) {
+
+      my $chk_table_aref = [{'TableName' => 'item', 'FieldName' => 'TrialUnitSpecimenId'}];
+
+      ($chk_id_err, $chk_id_msg,
+       $used_id_href, $not_used_id_href) = id_existence_bulk($dbh, $chk_table_aref, $tu_spec_id_aref);
+
+      if ($chk_id_err) {
+
+        $self->logger->debug("Check id existence error: $chk_id_msg");
+        $err = 1;
+        $msg = $chk_id_msg;
+        
+        return ($err, $msg, []);
+      }
+    }
+
+    for my $row (@{$data_aref}) {
+
+      my $trial_unit_specimen_id   = $row->{'TrialUnitSpecimenId'};
+      my $permission               = $row->{'UltimatePerm'};
+      $row->{'UltimatePermission'} = $perm_lookup->{$permission};
+
+      if ( ($permission & $READ_WRITE_PERM) == $READ_WRITE_PERM ) {
+
+        $row->{'update'} = "update/trialunitspecimen/$trial_unit_specimen_id";
+
+        if ( $not_used_id_href->{$trial_unit_specimen_id} ) {
+
+          $row->{'remove'} = "remove/trialunitspecimen/$trial_unit_specimen_id";
+        }
+      }
+
+      push(@{$extra_attr_tunit_specimen_data}, $row);
+    }
+  }
+  else {
+
+    $extra_attr_tunit_specimen_data = $data_aref;
+  }
+
+  return ($err, $msg, $extra_attr_tunit_specimen_data);
+}
+
+sub add_trial_unit_specimen_runmode {
+
+=pod add_trial_unit_specimen_HELP_START
+{
+"OperationName" : "Add specimen to trial unit",
+"Description": "Associate a new specimen with a trial unit specified by id.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"KDDArTModule": "main",
+"KDDArTTable": "trialunitspecimen",
+"SkippedField": ["TrialUnitId"],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><ReturnId Value='103' ParaName='TrialUnitSpecimenId' /><Info Message='TrialUnitSpecimen (103) has been added successfully.' /></DATA>",
+"SuccessMessageJSON": "{'ReturnId' : [{'Value' : '104','ParaName' : 'TrialUnitSpecimenId'}],'Info' : [{'Message' : 'TrialUnitSpecimen (104) has been added successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='TrialUnitId (123): not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'TrialUnitId (123): not found.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing TrialUnitId"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self          = shift;
+  my $trial_unit_id = $self->param('id');
+  my $query         = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  # Generic required static field checking
+
+  my $dbh_read = connect_kdb_read();
+
+  my $skip_field = {'TrialUnitId' => 1};
+
+  my ($get_scol_err, $get_scol_msg, $scol_data, $pkey_data) = get_static_field($dbh_read, 'trialunitspecimen');
+
+  if ($get_scol_err) {
+
+    $self->logger->debug("Get static field info failed: $get_scol_msg");
+    
+    my $err_msg = "Unexpected Error.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $required_field_href = {};
+
+  for my $static_field (@{$scol_data}) {
+
+    my $field_name = $static_field->{'Name'};
+    
+    if ($skip_field->{$field_name}) { next; }
+
+    if ($static_field->{'Required'} == 1) {
+
+      $required_field_href->{$field_name} = $query->param($field_name);
+    }
+  }
+
+  $dbh_read->disconnect();
+
+  my ($missing_err, $missing_href) = check_missing_href( $required_field_href );
+
+  if ($missing_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  # Finish generic required static field checking
+
+  my $specimen_id   = $query->param('SpecimenId');
+
+  my $item_id          = '0';
+
+  if (defined $query->param('ItemId')) {
+
+    if (length($query->param('ItemId')) > 0) {
+
+      $item_id = $query->param('ItemId');
+    }
+  }
+
+  $dbh_read = connect_kdb_read();
+  
+  my $trial_id = read_cell_value($dbh_read, 'trialunit', 'TrialId', 'TrialUnitId', $trial_unit_id);
+ 
+  if (length($trial_id) == 0) {
+
+    my $err_msg = "TrialUnitId ($trial_unit_id): not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $group_id = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+  my $perm_str = permission_phrase($group_id, 0, $gadmin_status, 'trial');
+  my $sql      = "SELECT $perm_str AS UltimatePermission ";
+  $sql        .= 'FROM trial ';
+  $sql        .= 'WHERE TrialId=?';
+
+  my ($read_err, $permission) = read_cell($dbh_read, $sql, [$trial_id]);
+
+  if ( ($permission & $READ_WRITE_PERM) != $READ_WRITE_PERM ) {
+
+    my $err_msg = "Trial ($trial_id): permission denied.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $specimen_exist = record_existence($dbh_read, 'specimen', 'SpecimenId', $specimen_id);
+
+  if (!$specimen_exist) {
+
+    my $err_msg = "Specimen ($specimen_id) not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'SpecimenId' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $geno_specimen_sql = 'SELECT genotype.GenotypeId ';
+  $geno_specimen_sql   .= 'FROM genotype LEFT JOIN genotypespecimen ON ';
+  $geno_specimen_sql   .= 'genotype.GenotypeId = genotypespecimen.GenotypeId ';
+  $geno_specimen_sql   .= 'WHERE genotypespecimen.SpecimenId=?';
+    
+  my ($geno_specimen_err, $geno_specimen_msg, $geno_specimen_data) = read_data($dbh_read,
+                                                                      $geno_specimen_sql,
+                                                                      [$specimen_id]);
+
+  if ($geno_specimen_err) {
+
+    $self->logger->debug("Read genotype failed");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $perm_str          = permission_phrase($group_id, 0, $gadmin_status, 'genotype');
+  $geno_specimen_sql   .= " AND ((($perm_str) & $LINK_PERM) = $LINK_PERM)";
+
+  $self->logger->debug("Genotype specimen permission SQL: $geno_specimen_sql");
+
+  my ($geno_p_err, $geno_p_msg, $geno_p_data_perm) = read_data($dbh_read, $geno_specimen_sql, [$specimen_id]);
+
+  if ($geno_p_err) {
+
+    $self->logger->debug("Read genotype with permission failed");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (scalar(@{$geno_specimen_data}) != scalar(@{$geno_p_data_perm})) {
+      
+    my $err_msg = "Permission denied: specimen ($specimen_id)";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'SpecimenId' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if ($item_id ne '0') {
+
+    if (!record_existence($dbh_read, 'item', 'ItemId', $item_id)) {
+
+      my $err_msg = "ItemId ($item_id) not found.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'ItemId' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  $dbh_read->disconnect();
+
+  my $planted_date = q{};
+  if ($query->param('PlantDate')) {
+
+    $planted_date = $query->param('PlantDate');
+    my ($pdate_err, $pdate_msg) = check_dt_value( {'PlantDate' => $planted_date} );
+
+    if ($pdate_err) {
+
+      my $err_msg = "$pdate_msg not date/time.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'PlateDate' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  my $harvested_date = q{};
+  if ($query->param('HarvestDate')) {
+
+    $harvested_date = $query->param('HarvestDate');
+    my ($hdate_err, $hdate_msg) = check_dt_value( {'HarvestDate' => $harvested_date} );
+
+    if ($hdate_err) {
+
+      my $err_msg = "$hdate_msg not date/time.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'HarvestDate' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  my $has_died = '0';
+  if ($query->param('HasDied')) {
+
+    $has_died = $query->param('HasDied');
+    if (!($has_died =~ /[0|1]/)) {
+
+      my $err_msg = "HasDied not 1 nor 0.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'HasDied' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  my $notes = q{};
+  if ($query->param('Notes')) {
+
+    $notes = $query->param('Notes');
+  }
+
+  my $dbh_write = connect_kdb_write();
+
+  $sql  = 'INSERT INTO trialunitspecimen SET ';
+  $sql .= 'SpecimenId=?, ';
+  $sql .= 'ItemId=?, ';
+  $sql .= 'TrialUnitId=?, ';
+  $sql .= 'PlantDate=?, ';
+  $sql .= 'HarvestDate=?, ';
+  $sql .= 'HasDied=?, ';
+  $sql .= 'Notes=?';
+
+  my $sth = $dbh_write->prepare($sql);
+  $sth->execute($specimen_id, $item_id, $trial_unit_id, $planted_date, $harvested_date, $has_died, $notes);
+
+  my $tunit_specimen_id = -1;
+  if ($dbh_write->err()) {
+
+    $self->logger->debug("Insert into trialunitspecimen failed.");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+  $tunit_specimen_id = $dbh_write->last_insert_id(undef, undef, 'trialunitspecimen', 'TrialUnitSpecimenId');
+  $sth->finish();
+
+  $dbh_write->disconnect();
+
+  my $info_msg_aref  = [{'Message' => "TrialUnitSpecimen ($tunit_specimen_id) has been added successfully."}];
+  my $return_id_aref = [{'Value' => "$tunit_specimen_id", 'ParaName' => 'TrialUnitSpecimenId'}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'       => $info_msg_aref,
+                                           'ReturnId'   => $return_id_aref,
+  };
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub remove_trial_unit_specimen_runmode {
+
+=pod remove_trial_unit_specimen_HELP_START
+{
+"OperationName" : "Remove trial unit specimen",
+"Description": "Delete association between trial unit and specimen specified by trialunitsepcimen id.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='TrialUnitSpecimen (103) has been removed successfully.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'TrialUnitSpecimen (104) has been removed successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='TrialUnitSpecimen (103) not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'TrialUnitSpecimen (103) not found.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing TrialUnitSpecimenId"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self           = shift;
+  my $tunit_specimen_id = $self->param('id');
+
+  my $data_for_postrun_href = {};
+
+  my $dbh_read = connect_kdb_read();
+  my $trial_unit_id = read_cell_value($dbh_read, 'trialunitspecimen', 'TrialUnitId',
+                                      'TrialUnitSpecimenId', $tunit_specimen_id);
+
+  if (length($trial_unit_id) == 0) {
+
+    my $err_msg = "TrialUnitSpecimen ($tunit_specimen_id) not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $trial_id = read_cell_value($dbh_read, 'trialunit', 'TrialId', 'TrialUnitId', $trial_unit_id);
+
+  my $group_id = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+  my $perm_str = permission_phrase($group_id, 0, $gadmin_status, 'trial');
+  my $sql      = "SELECT $perm_str AS UltimatePermission ";
+  $sql        .= 'FROM trial ';
+  $sql        .= 'WHERE TrialId=?';
+
+  my ($read_err, $permission) = read_cell($dbh_read, $sql, [$trial_id]);
+
+  if ( ($permission & $READ_WRITE_PERM) != $READ_WRITE_PERM ) {
+
+    my $err_msg = "Trial ($trial_id): permission denied.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (record_existence($dbh_read, 'item', 'TrialUnitSpecimenId', $tunit_specimen_id)) {
+
+    my $err_msg = "TrialUnitSpecimenId ($tunit_specimen_id) is used in item.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh_read->disconnect();
+
+  my $dbh_write = connect_kdb_write();
+
+  $sql = 'DELETE FROM trialunitspecimen WHERE TrialUnitSpecimenId=?';
+
+  my $sth = $dbh_write->prepare($sql);
+  $sth->execute($tunit_specimen_id);
+
+  if ($dbh_write->err()) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sth->finish();
+
+  $dbh_write->disconnect();
+
+  my $info_msg_aref = [{'Message' => "TrialUnitSpecimen ($tunit_specimen_id) has been removed successfully."}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'       => $info_msg_aref};
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub update_trial_unit_specimen_runmode {
+
+=pod update_trial_unit_specimen_HELP_START
+{
+"OperationName" : "Update trial unit specimen",
+"Description": "Update information about association between trial unit and specimen specified by trialunitsepcimen id.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"KDDArTModule": "main",
+"KDDArTTable": "trialunitspecimen",
+"SkippedField": ["TrialUnitId", "SpecimenId"],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='TrialUnitSpecimen (109) has been updated successfully.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'TrialUnitSpecimen (109) has been updated successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='TrialUnitSpecimen (103) not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'TrialUnitSpecimen (103) not found.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing TrialUnitSpecimenId"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self              = shift;
+  my $tunit_specimen_id = $self->param('id');
+  my $query             = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  my $dbh_read = connect_kdb_read();
+
+  my $trial_unit_id = read_cell_value($dbh_read, 'trialunitspecimen', 'TrialUnitId',
+                                      'TrialUnitSpecimenId', $tunit_specimen_id);
+
+  if (length($trial_unit_id) == 0) {
+
+    my $err_msg = "TrialUnitSpecimen ($tunit_specimen_id) not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $trial_id = read_cell_value($dbh_read, 'trialunit', 'TrialId', 'TrialUnitId', $trial_unit_id);
+
+  my $group_id = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+  my $perm_str = permission_phrase($group_id, 0, $gadmin_status, 'trial');
+  my $sql      = "SELECT $perm_str AS UltimatePermission ";
+  $sql        .= 'FROM trial ';
+  $sql        .= 'WHERE TrialId=?';
+
+  my ($read_err, $permission) = read_cell($dbh_read, $sql, [$trial_id]);
+
+  if ( ($permission & $READ_WRITE_PERM) != $READ_WRITE_PERM ) {
+
+    my $err_msg = "Trial ($trial_id): permission denied.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $data_submitted = 0;
+
+  my $planted_date = read_cell_value($dbh_read, 'trialunitspecimen',
+                                     'PlantDate', 'TrialUnitSpecimenId', $tunit_specimen_id);
+
+  if (defined $query->param('PlantDate')) {
+
+    if (length($query->param('PlantDate')) > 0) {
+
+      $planted_date = $query->param('PlantDate');
+      my ($pdate_err, $pdate_msg) = check_dt_value( {'PlantDate' => $planted_date} );
+
+      if ($pdate_err) {
+
+        my $err_msg = "$pdate_msg not date/time.";
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'PlateDate' => $err_msg}]};
+
+        return $data_for_postrun_href;
+      }
+
+      $data_submitted = 1;
+    }
+  }
+
+  # Unknown planted DateTime value from database 0000-00-00 00:00:00 which should be reset to undef,
+  # and then null in the db
+
+  if ($planted_date eq '0000-00-000 00:00:00') {
+
+    $planted_date = undef;
+  }
+
+  my $harvested_date = read_cell_value($dbh_read, 'trialunitspecimen',
+                                       'HarvestDate', 'TrialUnitSpecimenId', $tunit_specimen_id);
+
+  if (defined $query->param('HarvestDate')) {
+
+    if (length($query->param('HarvestDate')) > 0) {
+
+      $harvested_date = $query->param('HarvestDate');
+      my ($hdate_err, $hdate_msg) = check_dt_value( {'HarvestDate' => $harvested_date} );
+
+      if ($hdate_err) {
+
+        my $err_msg = "$hdate_msg not date/time.";
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'HarvestDate' => $err_msg}]};
+
+        return $data_for_postrun_href;
+      }
+
+      $data_submitted = 1;
+    }
+  }
+
+  # Unknown harvested DateTime value from database 0000-00-00 00:00:00 which should be reset to undef,
+  # and then null in the db
+
+  if ($harvested_date eq '0000-00-00 00:00:00') {
+
+    $harvested_date = undef;
+  }
+
+  my $has_died = read_cell_value($dbh_read, 'trialunitspecimen',
+                                 'HasDied', 'TrialUnitSpecimenId', $tunit_specimen_id);
+
+  if (defined $query->param('HasDied')) {
+
+    if (length($query->param('HasDied')) > 0) {
+
+      $has_died = $query->param('HasDied');
+      if (!($has_died =~ /[0|1]/)) {
+
+        my $err_msg = "HasDied not a binary value.";
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'HasDied' => $err_msg}]};
+
+        return $data_for_postrun_href;
+      }
+
+      $data_submitted = 1;
+    }
+  }
+
+  my $notes = read_cell_value($dbh_read, 'trialunitspecimen',
+                              'Notes', 'TrialUnitSpecimenId', $tunit_specimen_id);
+
+  if (defined $query->param('Notes')) {
+
+    $notes = $query->param('Notes');
+    $data_submitted = 1;
+  }
+
+  $dbh_read->disconnect();
+
+  if ($data_submitted == 0) {
+
+    my $err_msg = 'No data submitted.';
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $dbh_write = connect_kdb_write();
+
+  $sql  = 'UPDATE trialunitspecimen SET ';
+  $sql .= 'PlantDate=?, ';
+  $sql .= 'HarvestDate=?, ';
+  $sql .= 'HasDied=?, ';
+  $sql .= 'Notes=? ';
+  $sql .= 'WHERE TrialUnitSpecimenId=?';
+
+  my $sth = $dbh_write->prepare($sql);
+  $sth->execute($planted_date, $harvested_date, $has_died, $notes, $tunit_specimen_id);
+
+  if ($dbh_write->err()) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+  $sth->finish();
+
+  $dbh_write->disconnect();
+
+  my $info_msg_aref = [{'Message' => "TrialUnitSpecimen ($tunit_specimen_id) has been updated successfully."}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'       => $info_msg_aref};
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub list_unit_position {
+
+  my $self           = shift;
+  my $extra_attr_yes = shift;
+  my $sql            = shift;
+
+  my $count = 0;
+  while ($sql =~ /\?/g) {
+
+    $count += 1;
+  }
+
+  if ( scalar(@_) != $count ) {
+    
+    my $msg = 'Number of arguments does not match with ';
+    $msg   .= 'number of SQL parameter.';
+    return (1, $msg, []);
+  }
+
+  my $dbh = connect_kdb_read();
+  my $sth = $dbh->prepare($sql);
+  # parameters provided by the caller
+  # for example, ('WHERE FieldA=?', '1') 
+  $sth->execute(@_);
+
+  my $err = 0;
+  my $msg = '';
+  my $unit_position_data = [];
+
+  if ( !$dbh->err() ) {
+
+    my $array_ref = $sth->fetchall_arrayref({});
+
+    if ( !$sth->err() ) {
+
+      $unit_position_data = $array_ref;
+    }
+    else {
+
+      $err = 1;
+      $msg = 'Unexpected error';
+      $self->logger->debug('Err: ' . $dbh->errstr());
+    }
+  }
+  else {
+
+    $err = 1;
+    $msg = 'Unexpected error';
+    $self->logger->debug('Err: ' . $dbh->errstr());
+  }
+
+  $sth->finish();
+
+  my $extra_attr_uposition_data = [];
+
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  if ($extra_attr_yes && ($gadmin_status eq '1')) {
+
+    my $unit_pos_id_aref = [];
+
+    for my $row (@{$unit_position_data}) {
+
+      push(@{$unit_pos_id_aref}, $row->{'UnitPositionId'});
+    }
+
+    my $chk_id_err        = 0;
+    my $chk_id_msg        = '';
+    my $used_id_href      = {};
+    my $not_used_id_href  = {};
+
+    if (scalar(@{$unit_pos_id_aref}) > 0) {
+
+      my $chk_table_aref = [{'TableName' => 'trialunit', 'FieldName' => 'UnitPositionId'}];
+
+      ($chk_id_err, $chk_id_msg,
+       $used_id_href, $not_used_id_href) = id_existence_bulk($dbh, $chk_table_aref, $unit_pos_id_aref);
+
+      if ($chk_id_err) {
+
+        $self->logger->debug("Check id existence error: $chk_id_msg");
+        $err = 1;
+        $msg = $chk_id_msg;
+        
+        return ($err, $msg, []);
+      }
+    }
+
+    for my $row (@{$unit_position_data}) {
+    
+      my $uposition_id   = $row->{'UnitPositionId'};
+      $row->{'update'}   = "update/unit/position/$uposition_id";
+
+      if ( $not_used_id_href->{$uposition_id} ) {
+
+        $row->{'delete'}   = "delete/unitposition/$uposition_id";
+      }
+      
+      push(@{$extra_attr_uposition_data}, $row);
+    }
+  }
+  else {
+
+    $extra_attr_uposition_data = $unit_position_data;
+  }
+
+  $dbh->disconnect();
+
+  return ($err, $msg, $extra_attr_uposition_data);
+}
+
+sub list_unit_position_runmode {
+
+=pod list_unit_position_HELP_START
+{
+"OperationName" : "List unit postions",
+"Description": "List all the unit positions in the dictionary.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><RecordMeta TagName='UnitPosition' /><UnitPosition UnitPositionId='69' UnitPositionText='Row1|Column1' delete='delete/unitposition/69' update='update/unit/position/69' /></DATA>",
+"SuccessMessageJSON": "{'VCol' : [],'RecordMeta' : [{'TagName' : 'UnitPosition'}],'UnitPosition' : [{'UnitPositionId' : '69','delete' : 'delete/unitposition/69','UnitPositionText' : 'Row1|Column1','update' : 'update/unit/position/69'}]}",
+"ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
+"ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self  = shift;
+
+  my $data_for_postrun_href = {};
+
+  my $group_id = $self->authen->group_id();
+
+  my $dbh = connect_kdb_read();
+  my $field_list = ['*'];
+
+  my $other_join = '';
+
+  my ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_sql($dbh, $field_list, 'unitposition',
+                                                                        'UnitPositionId', $other_join);
+  $dbh->disconnect();
+
+  if ($vcol_err) {
+
+    my $err_msg = "Problem with virtual column ($trouble_vcol) containing space.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sql   .= ' ORDER BY unitposition.UnitPositionId DESC';
+
+  $self->logger->debug("SQL with VCol: $sql");
+
+  my ($read_uposition_err, $read_uposition_msg, $uposition_data) = $self->list_unit_position(1, $sql);
+
+  if ($read_uposition_err) {
+
+    $self->logger->debug($read_uposition_msg);
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $data_for_postrun_href->{'Error'} = 0;
+  $data_for_postrun_href->{'Data'}  = {'UnitPosition' => $uposition_data,
+                                       'VCol'         => $vcol_list,
+                                       'RecordMeta'   => [{'TagName' => 'UnitPosition'}],
+  };
+
+  return $data_for_postrun_href;
+}
+
+sub get_unit_position_runmode {
+
+=pod get_unit_position_HELP_START
+{
+"OperationName" : "Get unit position",
+"Description": "Get detailed information about unit position specified by id.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><RecordMeta TagName='UnitPosition' /><UnitPosition UnitPositionId='1' UnitPositionText='block01|row1|column1 (UPDATED)' update='update/unit/position/1' /></DATA>",
+"SuccessMessageJSON": "{'VCol' : [],'RecordMeta' : [{'TagName' : 'UnitPosition'}],'UnitPosition' : [{'UnitPositionId' : '1','delete' : 'delete/unitposition/1','UnitPositionText' : 'Row1|Column1','update' : 'update/unit/position/1'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='UnitPosition (200) not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'UnitPosition (200) not found.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing UnitPositionId"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self         = shift;
+  my $uposition_id = $self->param('id');
+
+  my $data_for_postrun_href = {};
+
+  my $group_id = $self->authen->group_id();
+
+  my $dbh = connect_kdb_read();
+
+  my $uposition_exist = record_existence($dbh, 'unitposition', 'UnitPositionId', $uposition_id);
+
+  if (!$uposition_exist) {
+
+    my $err_msg = "UnitPosition ($uposition_id) not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $field_list = ['*'];
+  
+  my $other_join = '';
+
+  my ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_sql($dbh, $field_list, 'unitposition',
+                                                                        'UnitPositionId', $other_join);
+  $dbh->disconnect();
+
+  if ($vcol_err) {
+
+    my $err_msg = "Problem with virtual column ($trouble_vcol) containing space.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sql   .= ' HAVING unitposition.UnitPositionId=?';
+  $sql   .= ' ORDER BY unitposition.UnitPositionId DESC';
+
+  $self->logger->debug("SQL with VCol: $sql");
+
+  my ($read_uposition_err, $read_uposition_msg, $uposition_data) = $self->list_unit_position(1,
+                                                                                             $sql,
+                                                                                             $uposition_id
+      );
+
+  if ($read_uposition_err) {
+
+    $self->logger->debug($read_uposition_msg);
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'UnitPosition' => $uposition_data,
+                                           'VCol'         => $vcol_list,
+                                           'RecordMeta'   => [{'TagName' => 'UnitPosition'}],
+  };
+
+  return $data_for_postrun_href;
+}
+
+sub update_unit_position_runmode {
+
+=pod update_unit_position_gadmin_HELP_START
+{
+"OperationName" : "Update unit position",
+"Description": "Update unit position information for a specified id.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 1,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"KDDArTModule": "main",
+"KDDArTTable": "unitposition",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='UnitPosition (1) has been updated successfully.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'UnitPosition (1) has been updated successfully.'}]}",
+"ErrorMessageXML": [{"NameAlreadyExists": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error UnitPositionText='UnitPosition (block01|row1|column1) already exists.' /></DATA>" }],
+"ErrorMessageJSON": [{"NameAlreadyExists": "{'Error' : [{'UnitPositionText' : 'UnitPosition (block01|row1|column1) already exists.'}]}" }],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing UnitPositionId"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self         = shift;
+  my $uposition_id = $self->param('id');
+  my $query        = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  my $group_id = $self->authen->group_id();
+
+  my $dbh_read = connect_kdb_read();
+
+  my $uposition_exist = record_existence($dbh_read, 'unitposition', 'UnitPositionId', $uposition_id);
+
+  if (!$uposition_exist) {
+
+    my $err_msg = "UnitPosition ($uposition_id) not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $position_text        = $query->param('UnitPositionText');
+  
+  my ($missing_err, $missing_href) = check_missing_href( {'UnitPositionText' => $position_text } );
+
+  if ($missing_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $uniq_txt_sql = 'SELECT UnitPositionId FROM unitposition WHERE UnitPositionId<>? AND UnitPositionText=?';
+
+  my ($r_uniq_txt_err, $db_upos_id) = read_cell($dbh_read, $uniq_txt_sql, [$uposition_id, $position_text]);
+
+  if ($r_uniq_txt_err) {
+
+    $self->logger->debug("Check Unique UnitPositionText failed.");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (length($db_upos_id) > 0) {
+
+    my $err_msg = "UnitPosition ($position_text) already exists.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'UnitPositionText' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength ";
+  $sql   .= "FROM factor ";
+  $sql   .= "WHERE TableNameOfFactor='unitpositionfactor'";
+
+  my $vcol_data = $dbh_read->selectall_hashref($sql, 'FactorId');
+
+  my $vcol_param_data = {};
+  my $vcol_len_info   = {};
+  my $vcol_param_data_maxlen = {};
+  for my $vcol_id (keys(%{$vcol_data})) {
+
+    my $vcol_param_name = "VCol_${vcol_id}";
+    my $vcol_value      = $query->param($vcol_param_name);
+    if ($vcol_data->{$vcol_id}->{'CanFactorHaveNull'} != 1) {
+
+      $vcol_param_data->{$vcol_param_name} = $vcol_value;
+    }
+    $vcol_len_info->{$vcol_param_name} = $vcol_data->{$vcol_id}->{'FactorValueMaxLength'};
+    $vcol_param_data_maxlen->{$vcol_param_name} = $vcol_value;
+  }
+
+  my ($vcol_missing_err, $vcol_missing_msg) = check_missing_value( $vcol_param_data );
+
+  if ($vcol_missing_err) {
+
+    $vcol_missing_msg = $vcol_missing_msg . ' missing';
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $vcol_missing_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my ($vcol_maxlen_err, $vcol_maxlen_msg) = check_maxlen($vcol_param_data_maxlen, $vcol_len_info);
+
+  if ($vcol_maxlen_err) {
+
+    $vcol_maxlen_msg = $vcol_maxlen_msg . ' longer than maximum length.';
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $vcol_maxlen_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh_read->disconnect();
+
+  my $dbh_k_write = connect_kdb_write();
+
+  $sql  = 'UPDATE unitposition SET ';
+  $sql .= 'UnitPositionText=? ';
+  $sql .= 'WHERE UnitPositionId=?';
+
+  my $sth = $dbh_k_write->prepare($sql);
+  $sth->execute($position_text, $uposition_id);
+
+  if ($dbh_k_write->err()) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+  $sth->finish();
+
+  for my $vcol_id (keys(%{$vcol_data})) {
+
+    if (defined $query->param('VCol_' . "$vcol_id")) {
+
+      my $factor_value = $query->param('VCol_' . "$vcol_id");
+
+      $sql  = 'SELECT Count(*) ';
+      $sql .= 'FROM unitpositionfactor ';
+      $sql .= 'WHERE UnitPositionId=? AND FactorId=?';
+      
+      my ($read_err, $count) = read_cell($dbh_k_write, $sql, [$uposition_id, $vcol_id]);
+
+      if (length($factor_value) > 0) {
+
+        if ($count > 0) {
+
+          $sql  = 'UPDATE unitpositionfactor SET ';
+          $sql .= 'FactorValue=? ';
+          $sql .= 'WHERE UnitPositionId=? AND FactorId=?';
+          my $factor_sth = $dbh_k_write->prepare($sql);
+          $factor_sth->execute($factor_value, $uposition_id, $vcol_id);
+        
+          if ($dbh_k_write->err()) {
+        
+            $data_for_postrun_href->{'Error'} = 1;
+            $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+            return $data_for_postrun_href;
+          }
+    
+          $factor_sth->finish();
+        }
+        else {
+
+          $sql  = 'INSERT INTO unitpositionfactor SET ';
+          $sql .= 'UnitPositionId=?, ';
+          $sql .= 'FactorId=?, ';
+          $sql .= 'FactorValue=?';
+          my $factor_sth = $dbh_k_write->prepare($sql);
+          $factor_sth->execute($uposition_id, $vcol_id, $factor_value);
+        
+          if ($dbh_k_write->err()) {
+        
+            $data_for_postrun_href->{'Error'} = 1;
+            $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+            return $data_for_postrun_href;
+          }
+    
+          $factor_sth->finish();
+        }
+      }
+      else {
+
+        if ($count > 0) {
+
+          $sql  = 'DELETE FROM unitpositionfactor ';
+          $sql .= 'WHERE UnitPositionId=? AND FactorId=?';
+
+          my $factor_sth = $dbh_k_write->prepare($sql);
+          $factor_sth->execute($uposition_id, $vcol_id);
+      
+          if ($dbh_k_write->err()) {
+        
+            $data_for_postrun_href->{'Error'} = 1;
+            $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+            return $data_for_postrun_href;
+          }
+          $factor_sth->finish();
+        }
+      }
+    }
+  }
+
+  $dbh_k_write->disconnect();
+
+  my $info_msg_aref = [{'Message' => "UnitPosition ($uposition_id) has been updated successfully."}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'       => $info_msg_aref};
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub list_site_advanced_runmode {
+
+=pod list_site_advanced_HELP_START
+{
+"OperationName" : "List sites",
+"Description": "List all the available sites in the system. This listing requires pagination information.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "FILTERING"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Pagination NumOfRecords='15' NumOfPages='15' Page='1' NumPerPage='1' /><Site Longitude='149.10164' CurrentSiteManagerName='Testing User-8788499' SiteId='16' sitelocation='POLYGON((148.99658 -35.48192,149.2067 -35.48192,149.2067 -35.19626,148.99658 -35.19626,148.99658 -35.48192))' CurrentSiteManagerId='18' SiteTypeName='SiteType - 5695208' SiteEndDate='0000-00-00 00:00:00' SiteName='DArT Test Site' Latitude='-35.33909' SiteStartDate='0000-00-00 00:00:00' SiteTypeId='98' SiteAcronym='GH' update='update/site/16' /><RecordMeta TagName='Site' /></DATA>",
+"SuccessMessageJSON": "{'Pagination' : [{'NumOfRecords' : '15','NumOfPages' : 15,'NumPerPage' : '1','Page' : '1'}],'VCol' : [],'Site' : [{'Longitude' : '149.10164','CurrentSiteManagerName' : 'Testing User-8788499','sitelocation' : 'POLYGON((148.99658 -35.48192,149.2067 -35.48192,149.2067 -35.19626,148.99658 -35.19626,148.99658 -35.48192))','SiteId' : '16','CurrentSiteManagerId' : '18','SiteName' : 'DArT Test Site','SiteEndDate' : '0000-00-00 00:00:00','SiteTypeName' : 'SiteType - 5695208','Latitude' : '-35.33909','SiteStartDate' : '0000-00-00 00:00:00','SiteTypeId' : '98','SiteAcronym' : 'GH','update' : 'update/site/16'}],'RecordMeta' : [{'TagName' : 'Site'}]}",
+"ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
+"ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
+"URLParameter": [{"ParameterName": "nperpage", "Description": "Number of records in a page for pagination"}, {"ParameterName": "num", "Description": "The page number of the pagination"}],
+"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database filed name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "FieldList", "Description": "Comma separated value of wanted fields."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases."}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self  = shift;
+  my $query = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  my $pagination  = 0;
+  my $nb_per_page = -1;
+  my $page        = -1;
+
+  if ( (defined $self->param('nperpage')) && (defined $self->param('num')) ) {
+
+    $pagination = 1;
+    $nb_per_page = $self->param('nperpage');
+    $page        = $self->param('num');
+  }
+
+  my $field_list_csv = '';
+
+  if (defined $query->param('FieldList')) {
+
+    $field_list_csv = $query->param('FieldList');
+  }
+
+  my $filtering_csv = '';
+  
+  if (defined $query->param('Filtering')) {
+
+    $filtering_csv = $query->param('Filtering');
+  }
+
+  $self->logger->debug("Filtering csv: $filtering_csv");
+
+  my $sorting = '';
+
+  if (defined $query->param('Sorting')) {
+
+    $sorting = $query->param('Sorting');
+  }
+
+  my $dbh = connect_kdb_read();
+  my $field_list = ['site.*', 'VCol*', 'LCol*'];
+  my $pre_data_other_join = '';
+
+  my ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_sql($dbh, $field_list, 'site',
+                                                                        'SiteId', '');
+
+  if ($vcol_err) {
+
+    my $err_msg = "Problem with virtual column ($trouble_vcol) containing space.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sql   .= " LIMIT 1";
+
+  $self->logger->debug("SQL with VCol: $sql");
+
+  my ($sam_site_err, $sam_site_msg, $sam_site_data) = $self->list_site(0, $field_list, $sql);
+
+  if ($sam_site_err) {
+
+    $self->logger->debug($sam_site_msg);
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $sample_site_aref = $sam_site_data;
+  
+  my @field_list_all = keys(%{$sample_site_aref->[0]});
+
+  # no field return, it means no record. error prevention
+  if (scalar(@field_list_all) == 0) {
+    
+    push(@field_list_all, '*');
+  }
+
+  my $final_field_list = \@field_list_all;
+  my $sql_field_list   = [];
+
+  if (length($field_list_csv) > 0) {
+
+    my ($sel_field_err, $sel_field_msg, $sel_field_list) = parse_selected_field($field_list_csv,
+                                                                                $final_field_list,
+                                                                                'SiteId');
+
+    if ($sel_field_err) {
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $sel_field_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    $final_field_list = $sel_field_list;
+   
+    if ($filtering_csv =~ /SiteId/) {
+
+      push(@{$final_field_list}, 'SiteId');
+    }
+
+    $sql_field_list   = [];
+    for my $fd_name (@{$final_field_list}) {
+
+      # need to remove location field because generate_factor_sql does not understand these field
+      if ( (!($fd_name =~ /Longitude/)) && (!($fd_name =~ /Latitude/)) && (!($fd_name =~ /sitelocation/)) ) {
+
+        push(@{$sql_field_list}, $fd_name);
+      }
+    }
+  }
+  else {
+
+    for my $fd_name (@{$final_field_list}) {
+
+      # need to remove location field because generate_factor_sql does not understand these field
+      if ( (!($fd_name =~ /Longitude/)) && (!($fd_name =~ /Latitude/)) && (!($fd_name =~ /sitelocation/)) ) {
+
+        push(@{$sql_field_list}, $fd_name);
+      }
+    }
+  }
+
+  my $sql_field_lookup = {};
+
+  for my $fd_name (@{$sql_field_list}) {
+
+    $sql_field_lookup->{$fd_name} = 1;
+  }
+
+  my $other_join = '';
+  if ($sql_field_lookup->{'SiteTypeId'}) {
+
+    push(@{$sql_field_list}, 'generaltype.TypeName AS SiteTypeName');
+    $other_join .= ' LEFT JOIN generaltype ON site.SiteTypeId = generaltype.TypeId ';
+  }
+
+  if ($sql_field_lookup->{'CurrentSiteManagerId'}) {
+
+    my $cur_man = "CONCAT(contact.ContactFirstName, concat(' ', contact.ContactLastName)) As CurrentSiteManagerName";
+    push(@{$sql_field_list}, $cur_man);
+    $other_join .= ' LEFT JOIN contact ON site.CurrentSiteManagerId = contact.ContactId ';
+  }
+
+  if ($filtering_csv !~ /Factor/) {
+
+    ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_sql($dbh, $sql_field_list, 'site',
+                                                                       'SiteId', $other_join);
+  }
+  else {
+
+    ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_sql_v2($dbh, $sql_field_list, 'site',
+                                                                          'SiteId', $other_join);
+  }
+
+  if ($vcol_err) {
+
+    my $err_msg = "Problem with virtual column ($trouble_vcol) containing space.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my ($filter_err, $filter_msg,
+      $filter_phrase, $where_arg,
+      $having_phrase, $count_filter_phrase,
+      $nb_filter_factor) = parse_filtering_v2('SiteId',
+                                              'site',
+                                              $filtering_csv,
+                                              $final_field_list,
+                                              $vcol_list);
+
+  $self->logger->debug("Filter phrase: $filter_phrase");
+
+  if ($filter_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $filter_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $filter_where_phrase = '';
+  if (length($filter_phrase) > 0) {
+
+    $filter_where_phrase = " WHERE $filter_phrase ";
+  }
+
+  my $filtering_exp = $filter_where_phrase;
+
+  if (length($having_phrase) > 0) {
+
+    $sql =~ s/FACTORHAVING/ HAVING $having_phrase/;
+
+    $sql .= " $filtering_exp ";
+  }
+  else {
+
+    $sql =~ s/GROUP BY/ $filtering_exp GROUP BY /;
+  }
+
+  my $pagination_aref = [];
+  my $paged_limit_clause = '';
+
+  if ($pagination) {
+
+    my ($int_err, $int_err_msg) = check_integer_value( {'nperpage' => $nb_per_page,
+                                                        'num'      => $page
+                                                       });
+
+    if ($int_err) {
+
+      $int_err_msg .= ' not integer.';
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $int_err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my ($pg_id_err, $pg_id_msg, $nb_records,
+        $nb_pages, $limit_clause, $rcount_time);
+
+    if (length($having_phrase) == 0) {
+
+      $self->logger->debug("COUNT NB RECORD: NO FACTOR IN FILTERING");
+
+      ($pg_id_err, $pg_id_msg, $nb_records,
+       $nb_pages, $limit_clause, $rcount_time) = get_paged_filter($dbh,
+                                                                  $nb_per_page,
+                                                                  $page,
+                                                                  'site',
+                                                                  'SiteId',
+                                                                  $filtering_exp,
+                                                                  $where_arg);
+    }
+    else {
+
+      $self->logger->debug("COUNT NB RECORD: FACTOR IN FILTERING");
+
+      my $count_sql = "SELECT COUNT(site.SiteId) ";
+      $count_sql   .= "FROM site INNER JOIN ";
+      $count_sql   .= " (SELECT SiteId, COUNT(SiteId) ";
+      $count_sql   .= " FROM sitefactor WHERE $count_filter_phrase ";
+      $count_sql   .= " GROUP BY SiteId HAVING COUNT(SiteId)=$nb_filter_factor) AS subq ";
+      $count_sql   .= "ON site.SiteId = subq.SiteId ";
+      $count_sql   .= "$filtering_exp";
+
+      $self->logger->debug("COUNT SQL: $count_sql");
+
+      ($pg_id_err, $pg_id_msg, $nb_records,
+       $nb_pages, $limit_clause, $rcount_time) = get_paged_filter_sql($dbh,
+                                                                      $nb_per_page,
+                                                                      $page,
+                                                                      $count_sql,
+                                                                      $where_arg);
+
+      $self->logger->debug("COUNT WITH Factor TIME: $rcount_time");
+    }
+
+    $self->logger->debug("SQL Count time: $rcount_time");
+
+    if ($pg_id_err == 1) {
+    
+      $self->logger->debug($pg_id_msg);
+    
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    if ($pg_id_err == 2) {
+      
+      $page = 0;
+    }
+
+    $pagination_aref = [{'NumOfRecords' => $nb_records,
+                         'NumOfPages'   => $nb_pages,
+                         'Page'         => $page,
+                         'NumPerPage'   => $nb_per_page,
+                        }];
+
+    $paged_limit_clause = $limit_clause;
+  }
+
+  $dbh->disconnect();
+
+  my ($sort_err, $sort_msg, $sort_sql) = parse_sorting($sorting, $sql_field_list);
+
+  if ($sort_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $sort_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (length($sort_sql) > 0) {
+
+    $sql .= " ORDER BY $sort_sql ";
+  }
+  else {
+
+    $sql .= ' ORDER BY site.SiteId DESC';
+  }
+
+  $sql .= " $paged_limit_clause ";
+
+  $self->logger->debug("SQL with VCol: $sql");
+
+  $self->logger->debug('Where arg: ' . join(',', @{$where_arg}));
+
+  my ($read_site_err, $read_site_msg, $site_data) = $self->list_site(1,
+                                                                     $final_field_list,
+                                                                     $sql,
+                                                                     $where_arg);
+
+  if ($read_site_err) {
+
+    $self->logger->debug($read_site_msg);
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'geojson'}   = 1;
+  $data_for_postrun_href->{'GJSonInfo'} = {'GeometryField' => 'sitelocation',
+                                           'FeatureName'   => 'SiteName [ id: SiteId ]',
+                                           'FeatureId'     => 'SiteId',
+  };
+  $data_for_postrun_href->{'Data'}      = {'Site'       => $site_data,
+                                           'VCol'       => $vcol_list,
+                                           'Pagination' => $pagination_aref,
+                                           'RecordMeta' => [{'TagName' => 'Site'}],
+  };
+
+  return $data_for_postrun_href;
+}
+
+sub list_trial_unit_advanced_runmode {
+
+=pod list_trial_unit_advanced_HELP_START
+{
+"OperationName" : "List trial units",
+"Description": "List trial units (e.g. plots). This listing does require pagination information.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "FILTERING"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Pagination Page='1' NumOfRecords='75' NumOfPages='75' NumPerPage='1' /><RecordMeta TagName='TrialUnit' /><TrialUnit Longitude='149.09269513468' listSpecimen='trialunit/76/list/specimen' UnitPositionId='2' SiteId='16' UnitPositionText='block01|row1|column1' TrialUnitId='76' SampleSupplierId='1' TreatmentId='11' TrialUnitBarcode='4118705' SiteName='DArT Test Site' Latitude='-35.3048528069633' ReplicateNumber='2' TrialUnitNote='Trial unit part of automatic testing' UltimatePermission='Read/Write/Link' TreatmentText='Removing weeds' addSpecimen='trialunit/76/add/specimen' update='update/trialunit/76' TrialId='13' SourceTrialUnitId='0' UltimatePerm='7'><Specimen SpecimenName='Specimen4TrialUnit_1235991' Notes='none' ItemId='' TrialUnitId='76' TrialUnitSpecimenId='105' HarvestDate='2008-08-01' PlantDate='2011-09-01' HasDied='0' SpecimenId='473' /><Specimen SpecimenName='Specimen4TrialUnit_6879865' Notes='none' ItemId='' TrialUnitId='76' TrialUnitSpecimenId='106' HarvestDate='0000-00-00' PlantDate='0000-00-00' HasDied='0' SpecimenId='474' /><Specimen SpecimenName='Specimen4TrialUnit_4240384' Notes='none' ItemId='' TrialUnitId='76' TrialUnitSpecimenId='107' HarvestDate='0000-00-00' PlantDate='2011-09-01' HasDied='0' SpecimenId='475' /><Specimen SpecimenName='Specimen4TrialUnit_6019689' Notes='none' ItemId='' TrialUnitId='76' TrialUnitSpecimenId='108' HarvestDate='0000-00-00' PlantDate='2011-09-01' HasDied='0' SpecimenId='476' /><Specimen SpecimenName='Specimen_0435994' Notes='None' ItemId='0' TrialUnitId='76' TrialUnitSpecimenId='109' HarvestDate='0000-00-00' PlantDate='0000-00-00' HasDied='0' SpecimenId='477' /></TrialUnit></DATA>",
+"SuccessMessageJSON": "{'Pagination' : [{'NumOfRecords' : '75','NumOfPages' : 75,'NumPerPage' : '1','Page' : '1'}],'RecordMeta' : [{'TagName' : 'TrialUnit'}],'TrialUnit' : [{'Longitude' : '149.09269513468','listSpecimen' : 'trialunit/76/list/specimen','UnitPositionId' : '2','SiteId' : '16','TrialUnitId' : '76','UnitPositionText' : 'block01|row1|column1','Specimen' : [{'SpecimenName' : 'Specimen_0435994','Notes' : 'None','ItemId' : '0','TrialUnitId' : '76','TrialUnitSpecimenId' : '109','HarvestDate' : '0000-00-00','PlantDate' : '0000-00-00','HasDied' : '0','SpecimenId' : '477'}],'SampleSupplierId' : '1','TreatmentId' : '11','TrialUnitBarcode' : '4118705','SiteName' : 'DArT Test Site','ReplicateNumber' : '2','Latitude' : '-35.3048528069633','TrialUnitNote' : 'Trial unit part of automatic testing','UltimatePermission' : 'Read/Write/Link','TreatmentText' : 'Removing weeds','addSpecimen' : 'trialunit/76/add/specimen','update' : 'update/trialunit/76','UltimatePerm' : '7','SourceTrialUnitId' : '0','TrialId' : '13'}]}",
+"ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
+"ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
+"URLParameter": [{"ParameterName": "nperpage", "Description": "Number of records in a page for pagination", "Optional": 1}, {"ParameterName": "num", "Description": "The page number of the pagination", "Optional": 1}, {"ParameterName": "trialid", "Description": "Existing TrialId", "Optional": 1}],
+"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database filed name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "FieldList", "Description": "Comma separated value of wanted fields."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases."}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self  = shift;
+  my $query = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  my $pagination  = 0;
+  my $nb_per_page = -1;
+  my $page        = -1;
+
+  if ( (defined $self->param('nperpage')) && (defined $self->param('num')) ) {
+
+    $pagination = 1;
+    $nb_per_page = $self->param('nperpage');
+    $page        = $self->param('num');
+  }
+
+  my $field_list_csv = '';
+
+  if (defined $query->param('FieldList')) {
+
+    $field_list_csv = $query->param('FieldList');
+  }
+
+  my $filtering_csv = '';
+  
+  if (defined $query->param('Filtering')) {
+
+    $filtering_csv = $query->param('Filtering');
+  }
+
+  my $trial_id          = -1;
+  my $trial_id_provided = 0;
+
+  if (defined $self->param('trialid')) {
+
+    $trial_id          = $self->param('trialid');
+    $trial_id_provided = 1;
+
+    if ($filtering_csv =~ /TrialId\s*=\s*(.*),?/) {
+
+      if ( "$trial_id" ne "$1" ) {
+
+        my $err_msg = 'Duplicate filtering condition for TrialId.';
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+        return $data_for_postrun_href;
+      }
+    }
+    else {
+
+      if (length($filtering_csv) > 0) {
+
+        if ($filtering_csv =~ /&$/) {
+
+          $filtering_csv .= "TrialId=$trial_id";
+        }
+        else {
+
+          $filtering_csv .= "&TrialId=$trial_id";
+        }
+      }
+      else {
+
+        $filtering_csv .= "TrialId=$trial_id";
+      }
+    }
+  }
+
+  $self->logger->debug("Filtering csv: $filtering_csv");
+
+  my $sorting = '';
+
+  if (defined $query->param('Sorting')) {
+
+    $sorting = $query->param('Sorting');
+  }
+
+  my $group_id = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+  my $perm_str = permission_phrase($group_id, 0, $gadmin_status, 'trial');
+
+  my $field_list = ['LCol*'];
+
+  my $sql = 'SELECT * FROM trialunit LIMIT 1';
+
+  my ($sample_tu_err, $sample_tu_msg, $sample_tu_data) = $self->list_trial_unit(0, $field_list, $sql);
+
+  if ($sample_tu_err) {
+
+    $self->logger->debug($sample_tu_msg);
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $sample_tu_aref = $sample_tu_data;
+
+  my @field_list_all = keys(%{$sample_tu_aref->[0]});
+
+  $self->logger->debug("Field list from list limit 1: " . join(',',@field_list_all));
+
+  # no field return, it means no record. error prevention
+  my $no_record = 0;
+  if (scalar(@field_list_all) == 0) {
+    
+    push(@field_list_all, '*');
+    $no_record = 1;
+  }
+
+  $self->logger->debug("Field list from list limit 1: " . join(',',@field_list_all));
+
+  my $final_field_list     = \@field_list_all;
+  my $sql_field_list       = [];
+  my $filtering_field_list = [];
+
+  if (length($field_list_csv) > 0) {
+
+    my ($sel_field_err, $sel_field_msg, $sel_field_list) = parse_selected_field($field_list_csv,
+                                                                                $final_field_list,
+                                                                                'TrialUnitId');
+
+    if ($sel_field_err) {
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $sel_field_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    $final_field_list = $sel_field_list;
+
+    if ($filtering_csv =~ /TrialId/) {
+
+      push(@{$final_field_list}, 'TrialId');
+    }
+
+    $sql_field_list       = [];
+    $filtering_field_list = [];
+    for my $fd_name (@{$final_field_list}) {
+
+      # need to remove location field because generate_factor_sql does not understand these field
+      if ( (!($fd_name =~ /Longitude/)) && (!($fd_name =~ /Latitude/)) && (!($fd_name =~ /trialunitlocation/)) ) {
+
+        push(@{$sql_field_list}, "trialunit.$fd_name");
+        push(@{$filtering_field_list}, $fd_name);
+      }
+    }
+  }
+  else {
+
+    for my $fd_name (@{$final_field_list}) {
+
+      # need to remove location field because generate_factor_sql does not understand these field
+      if ( (!($fd_name =~ /Longitude/)) && (!($fd_name =~ /Latitude/)) && (!($fd_name =~ /trialunitlocation/)) ) {
+
+        push(@{$sql_field_list}, "trialunit.$fd_name");
+        push(@{$filtering_field_list}, $fd_name);
+      }
+    }
+  }
+
+  my $field_lookup = {};
+  for my $fd_name (@{$final_field_list}) {
+
+    $field_lookup->{$fd_name} = 1;
+  }
+
+  my $other_join = '';
+
+  if ($field_lookup->{'UnitPositionId'}) {
+
+    push(@{$sql_field_list}, 'unitposition.UnitPositionText');
+    $other_join .= ' LEFT JOIN unitposition ON trialunit.UnitPositionId = unitposition.UnitPositionId ';
+  }
+
+  if ($field_lookup->{'TreatmentId'}) {
+
+    push(@{$sql_field_list}, 'treatment.TreatmentText');
+    $other_join .= ' LEFT JOIN treatment ON trialunit.TreatmentId = treatment.TreatmentId ';
+  }
+
+  push(@{$sql_field_list}, 'site.SiteId');
+  push(@{$sql_field_list}, 'site.SiteName');
+  push(@{$sql_field_list}, "$perm_str AS UltimatePerm ");
+
+  my $field_list_str = join(', ', @{$sql_field_list});
+
+  $sql  = "SELECT $field_list_str ";
+  $sql .= 'FROM trialunit ';
+  $sql .= 'LEFT JOIN trial ON trialunit.TrialId = trial.TrialId ';
+  $sql .= 'LEFT JOIN site ON trial.SiteId = site.SiteId ';
+  $sql .= "$other_join ";
+
+  push(@{$filtering_field_list}, 'SpecimenId');
+  push(@{$filtering_field_list}, 'PlantDate');
+  push(@{$filtering_field_list}, 'HarvestDate');
+  push(@{$filtering_field_list}, 'HasDied');
+  push(@{$filtering_field_list}, 'Notes');
+
+  my $field_name2table_name  = { 'SpecimenId'  => 'trialunitspecimen',
+                                 'PlantDate'   => 'trialunitspecimen',
+                                 'HarvestDate' => 'trialunitspecimen',
+                                 'HasDied'     => 'trialunitspecimen',
+                                 'Notes'       => 'trialunitspecimen',
+  };
+
+  if ($no_record) {
+
+    $filtering_field_list = ['*'];
+  }
+
+  my $validation_func_lookup = { 'TrialId' => sub { return $self->validate_trial_id(@_); } };
+
+  my ($filter_err, $filter_msg, $filter_phrase, $where_arg) = parse_filtering('TrialUnitId',
+                                                                              'trialunit',
+                                                                              $filtering_csv,
+                                                                              $filtering_field_list,
+                                                                              $validation_func_lookup,
+                                                                              $field_name2table_name,
+      );
+
+  $self->logger->debug("Filter phrase: $filter_phrase");
+
+  if ($filter_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $filter_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $filter_where_phrase = '';
+  if (length($filter_phrase) > 0) {
+
+    $filter_where_phrase = " AND $filter_phrase ";
+  }
+
+  my $filtering_exp = "WHERE (($perm_str) & $READ_PERM) = $READ_PERM $filter_where_phrase ";
+
+  my $pagination_aref = [];
+  my $paged_limit_clause = '';
+
+  if ($pagination) {
+
+    my ($int_err, $int_err_msg) = check_integer_value( {'nperpage' => $nb_per_page,
+                                                        'num'      => $page
+                                                       });
+
+    if ($int_err) {
+
+      $int_err_msg .= ' not integer.';
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $int_err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my $page_where_phrase = '';
+    $page_where_phrase   .= ' LEFT JOIN trial ON trialunit.TrialId = trial.TrialId ';
+    $page_where_phrase   .= " $filtering_exp ";
+
+    my $dbh = connect_kdb_read();
+    my ($paged_id_err, $paged_id_msg, $nb_records,
+        $nb_pages, $limit_clause, $rcount_time) = get_paged_filter($dbh,
+                                                                   $nb_per_page,
+                                                                   $page,
+                                                                   'trialunit',
+                                                                   'TrialUnitId',
+                                                                   $page_where_phrase,
+                                                                   $where_arg
+            );
+    $dbh->disconnect();
+
+    $self->logger->debug("SQL Row count time: $rcount_time");
+
+    if ($paged_id_err == 1) {
+    
+      $self->logger->debug($paged_id_msg);
+    
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    if ($paged_id_err == 2) {
+      
+      $page = 0;
+    }
+
+    $pagination_aref = [{'NumOfRecords' => $nb_records,
+                         'NumOfPages'   => $nb_pages,
+                         'Page'         => $page,
+                         'NumPerPage'   => $nb_per_page,
+                        }];
+
+    $paged_limit_clause = $limit_clause;
+  }
+
+  $sql .= " $filtering_exp ";
+
+  my ($sort_err, $sort_msg, $sort_sql) = parse_sorting($sorting, $final_field_list);
+
+  if ($sort_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $sort_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (length($sort_sql) > 0) {
+
+    $sql .= " ORDER BY $sort_sql ";
+  }
+  else {
+
+    $sql .= ' ORDER BY trialunit.TrialUnitId DESC';
+  }
+
+  $sql .= " $paged_limit_clause ";
+
+  $self->logger->debug("Where arg: " . join(',', @{$where_arg}));
+
+  $self->logger->debug("SQL with VCol: $sql");
+
+  my ($read_tu_err, $read_tu_msg, $tu_data) = $self->list_trial_unit(1,
+                                                                     $final_field_list,
+                                                                     $sql,
+                                                                     $where_arg);
+
+  if ($read_tu_err) {
+
+    $self->logger->debug($read_tu_msg);
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $data_for_postrun_href->{'Error'} = 0;
+  $data_for_postrun_href->{'Data'}  = {'TrialUnit'  => $tu_data,
+                                       'Pagination' => $pagination_aref,
+                                       'RecordMeta' => [{'TagName' => 'TrialUnit'}],
+  };
+
+  return $data_for_postrun_href;
+}
+
+sub list_trial_unit_specimen_advanced_runmode {
+
+=pod list_trial_unit_specimen_advanced_HELP_START
+{
+"OperationName" : "List trial unit specimen",
+"Description": "List the whole association of specimenes with trial units. This listing requires pagination information. Use filtering criteria to return subset of interest.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "FILTERING"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Pagination NumOfRecords='103' NumOfPages='103' Page='1' NumPerPage='1' /><RecordMeta TagName='TrialUnitSpecimen' /><TrialUnitSpecimen SpecimenName='Specimen_0435994' Notes='None' remove='remove/trialunitspecimen/109' ItemId='0' TrialUnitId='76' TrialUnitSpecimenId='109' HarvestDate='0000-00-00' UltimatePermission='Read/Write/Link' PlantDate='0000-00-00' HasDied='0' update='update/trialunitspecimen/109' UltimatePerm='7' SpecimenId='477' /></DATA>",
+"SuccessMessageJSON": "{'Pagination' : [{'NumOfRecords' : '103','NumOfPages' : 103,'NumPerPage' : '1','Page' : '1'}],'RecordMeta' : [{'TagName' : 'TrialUnitSpecimen'}],'TrialUnitSpecimen' : [{'SpecimenName' : 'Specimen_0435994','remove' : 'remove/trialunitspecimen/109','Notes' : 'None','ItemId' : '0','TrialUnitId' : '76','TrialUnitSpecimenId' : '109','HarvestDate' : '0000-00-00','UltimatePermission' : 'Read/Write/Link','PlantDate' : '0000-00-00','HasDied' : '0','update' : 'update/trialunitspecimen/109','SpecimenId' : '477','UltimatePerm' : '7'}]}",
+"ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
+"ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
+"URLParameter": [{"ParameterName": "nperpage", "Description": "Number of records in a page for pagination"}, {"ParameterName": "num", "Description": "The page number of the pagination"}],
+"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database filed name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "FieldList", "Description": "Comma separated value of wanted fields."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases."}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self  = shift;
+  my $query = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  my $pagination  = 0;
+  my $nb_per_page = -1;
+  my $page        = -1;
+
+  if ( (defined $self->param('nperpage')) && (defined $self->param('num')) ) {
+
+    $pagination = 1;
+    $nb_per_page = $self->param('nperpage');
+    $page        = $self->param('num');
+  }
+
+  my $field_list_csv = '';
+
+  if (defined $query->param('FieldList')) {
+
+    $field_list_csv = $query->param('FieldList');
+  }
+
+  my $filtering_csv = '';
+  
+  if (defined $query->param('Filtering')) {
+
+    $filtering_csv = $query->param('Filtering');
+  }
+
+  my $trial_unit_id          = -1;
+  my $trial_unit_id_provided = 0;
+
+  if (defined $self->param('id')) {
+
+    $trial_unit_id          = $self->param('id');
+    $trial_unit_id_provided = 1;
+
+    if ($filtering_csv =~ /TrialUnitId\s*=\s*(.*),?/) {
+
+      if ( "$trial_unit_id" ne "$1" ) {
+
+        my $err_msg = 'Duplicate filtering condition for TrialUnitId.';
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+        return $data_for_postrun_href;
+      }
+    }
+    else {
+
+      if (length($filtering_csv) > 0) {
+
+        if ($filtering_csv =~ /&$/) {
+
+          $filtering_csv .= "TrialUnitId=$trial_unit_id";
+        }
+        else {
+
+          $filtering_csv .= "&TrialUnitId=$trial_unit_id";
+        }
+      }
+      else {
+
+        $filtering_csv .= "TrialUnitId=$trial_unit_id";
+      }
+    }
+  }
+
+  $self->logger->debug("Filtering csv: $filtering_csv");
+
+  my $sorting = '';
+
+  if (defined $query->param('Sorting')) {
+
+    $sorting = $query->param('Sorting');
+  }
+
+  my $group_id = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+  my $perm_str = permission_phrase($group_id, 0, $gadmin_status, 'trial');
+
+  my $sql = 'SELECT * FROM trialunitspecimen LIMIT 1';
+
+  my ($sample_tup_err, $sample_tup_msg, $sample_tup_data) = $self->list_trial_unit_specimen(0, $sql);
+
+  if ($sample_tup_err) {
+
+    $self->logger->debug($sample_tup_msg);
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $sample_tup_aref = $sample_tup_data;
+
+  my @field_list_all = keys(%{$sample_tup_aref->[0]});
+
+  # no field return, it means no record. error prevention
+  if (scalar(@field_list_all) == 0) {
+    
+    push(@field_list_all, '*');
+  }
+
+  my $final_field_list = \@field_list_all;
+
+  if (length($field_list_csv) > 0) {
+
+    my ($sel_field_err, $sel_field_msg, $sel_field_list) = parse_selected_field($field_list_csv,
+                                                                                $final_field_list,
+                                                                                'TrialUnitSpecimenId',
+        );
+
+    if ($sel_field_err) {
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $sel_field_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    $final_field_list = $sel_field_list;
+
+    if ($filtering_csv =~ /TrialUnitId/) {
+
+      push(@{$final_field_list}, 'TrialUnitId');
+    }
+  }
+
+  my $field_lookup = {};
+  for my $fd_name (@{$final_field_list}) {
+
+    $field_lookup->{$fd_name} = 1;
+  }
+
+  my $other_join = '';
+
+  if ($field_lookup->{'SpecimenId'}) {
+
+    push(@{$final_field_list}, 'specimen.SpecimenName');
+    $other_join .= ' LEFT JOIN specimen ON trialunitspecimen.SpecimenId = specimen.SpecimenId ';
+  }
+
+  $self->logger->debug("Final field list: " . join(', ', @{$final_field_list}));
+
+  my $sql_field_list = [];
+  for my $field_name (@{$final_field_list}) {
+
+    my $full_field_name = $field_name;
+    if (!($full_field_name =~ /\./)) {
+
+      $full_field_name = 'trialunitspecimen.' . $full_field_name;
+    }
+
+    push(@{$sql_field_list}, $full_field_name);
+  }
+
+  push(@{$sql_field_list}, "$perm_str AS UltimatePerm ");
+
+  my $field_list_str = join(', ', @{$sql_field_list});
+
+  $sql  = "SELECT $field_list_str ";
+  $sql .= 'FROM trialunitspecimen ';
+  $sql .= 'LEFT JOIN trialunit ON trialunitspecimen.TrialUnitId = trialunit.TrialUnitId ';
+  $sql .= 'LEFT JOIN trial ON trialunit.TrialId = trial.TrialId ';
+  $sql .= "$other_join ";
+
+  my $validation_func_lookup = { 'TrialUnitId' => sub { return $self->validate_trial_unit_id(@_); } };
+
+  $self->logger->debug("Final field list: " . join(', ', @{$final_field_list}));
+
+  my ($filter_err, $filter_msg, $filter_phrase, $where_arg) = parse_filtering('TrialUnitSpecimenId',
+                                                                              'trialunitspecimen',
+                                                                              $filtering_csv,
+                                                                              $final_field_list,
+                                                                              $validation_func_lookup,
+      );
+
+  $self->logger->debug("Filter phrase: $filter_phrase");
+
+  if ($filter_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $filter_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $filter_where_phrase = '';
+  if (length($filter_phrase) > 0) {
+
+    $filter_where_phrase = " AND $filter_phrase ";
+  }
+
+  my $filtering_exp = " WHERE (($perm_str) & $READ_PERM) = $READ_PERM $filter_where_phrase ";
+
+  my $pagination_aref = [];
+  my $paged_limit_clause = '';
+
+  if ($pagination) {
+
+    my ($int_err, $int_err_msg) = check_integer_value( {'nperpage' => $nb_per_page,
+                                                        'num'      => $page
+                                                       });
+
+    if ($int_err) {
+
+      $int_err_msg .= ' not integer.';
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $int_err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my $page_where_phrase = '';
+    $page_where_phrase   .= ' LEFT JOIN trialunit ON trialunitspecimen.TrialUnitId = trialunit.TrialUnitId ';
+    $page_where_phrase   .= ' LEFT JOIN trial ON trialunit.TrialId = trial.TrialId ';
+    $page_where_phrase   .= " $filtering_exp ";
+
+    my $dbh = connect_kdb_read();
+    my ($paged_id_err, $paged_id_msg, $nb_records,
+        $nb_pages, $limit_clause, $rcount_time) = get_paged_filter($dbh,
+                                                                   $nb_per_page,
+                                                                   $page,
+                                                                   'trialunitspecimen',
+                                                                   'TrialUnitSpecimenId',
+                                                                   $page_where_phrase,
+                                                                   $where_arg
+            );
+    $dbh->disconnect();
+
+    if ($paged_id_err == 1) {
+    
+      $self->logger->debug($paged_id_msg);
+    
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    if ($paged_id_err == 2) {
+      
+      $page = 0;
+    }
+
+    $pagination_aref = [{'NumOfRecords' => $nb_records,
+                         'NumOfPages'   => $nb_pages,
+                         'Page'         => $page,
+                         'NumPerPage'   => $nb_per_page,
+                        }];
+
+    $paged_limit_clause = $limit_clause;
+  }
+
+  $sql .= " $filtering_exp ";
+
+  my ($sort_err, $sort_msg, $sort_sql) = parse_sorting($sorting, $final_field_list, 'trialunitspecimen');
+
+  if ($sort_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $sort_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (length($sort_sql) > 0) {
+
+    $sql .= " ORDER BY $sort_sql ";
+  }
+  else {
+
+    $sql .= ' ORDER BY trialunitspecimen.TrialunitspecimenId DESC';
+  }
+
+  $sql .= " $paged_limit_clause ";
+
+  $self->logger->debug("Where arg: " . join(',', @{$where_arg}));
+
+  $self->logger->debug("SQL: $sql");
+
+  my ($read_tus_err, $read_tus_msg, $tus_data) = $self->list_trial_unit_specimen(1,
+                                                                                 $sql,
+                                                                                 $where_arg);
+
+  if ($read_tus_err) {
+
+    $self->logger->debug($read_tus_msg);
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $data_for_postrun_href->{'Error'} = 0;
+  $data_for_postrun_href->{'Data'}  = {'TrialUnitSpecimen'  => $tus_data,
+                                       'Pagination'         => $pagination_aref,
+                                       'RecordMeta'         => [{'TagName' => 'TrialUnitSpecimen'}],
+  };
+
+  return $data_for_postrun_href;
+}
+
+sub add_trial_trait_runmode {
+
+=pod add_trial_trait_HELP_START
+{
+"OperationName" : "Add trait to trial",
+"Description": "Attach a trait to the trial definition specified by id.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"KDDArTModule": "main",
+"KDDArTTable": "trialtrait",
+"SkippedField": ["TrialId"],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><ReturnId Value='6' ParaName='TrialTraitId' /><Info Message='Trait (1) has been added to Trial (2) successfully.' /></DATA>",
+"SuccessMessageJSON": "{'ReturnId' : [{'Value' : '5','ParaName' : 'TrialTraitId'}],'Info' : [{'Message' : 'Trait (1) has been added to Trial (1) successfully.'}]}",
+"ErrorMessageXML": [{"MissingParameter": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error TraitId='TraitId is missing.' /></DATA>"}],
+"ErrorMessageJSON": [{"MissingParameter": "{'Error' : [{'TraitId' : 'TraitId is missing.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing TrialId"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self  = shift;
+  my $query = $self->query();
+  
+  my $data_for_postrun_href = {};
+
+  my $trial_id            = $self->param('id');
+  my $trait_id            = $query->param('TraitId');
+  my $compulsory          = $query->param('Compulsory');
+
+  my ($missing_err, $missing_href) = check_missing_href( {'TraitId'         => $trait_id,
+                                                          'Compulsory'      => $compulsory,
+                                                         } );
+
+  if ($missing_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $group_id  = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  my $dbh_k_write = connect_kdb_write();
+
+  my $trial_existence = record_existence($dbh_k_write, 'trial', 'TrialId', $trial_id);
+
+  if (!$trial_existence) {
+
+    my $err_msg = "Trial ($trial_id) does not exist.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'TrialId' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if ( !($compulsory =~ /0|1/) ) {
+
+    my $err_msg = "Compulsory ($compulsory) can be only either 1 or 0.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Compulsory' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my ($is_trial_ok, $trouble_trial_id_aref) = check_permission($dbh_k_write, 'trial', 'TrialId',
+                                                               [$trial_id], $group_id, $gadmin_status,
+                                                               $READ_WRITE_PERM);
+
+  if (!$is_trial_ok) {
+
+    my $trouble_trial_id = $trouble_trial_id_aref->[0];
+    
+    my $err_msg = "Permission denied: Group ($group_id) and Trial ($trouble_trial_id).";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'TrialId' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my ($is_trait_ok, $trouble_trait_id_aref) = check_permission($dbh_k_write, 'trait', 'TraitId',
+                                                               [$trait_id], $group_id, $gadmin_status,
+                                                               $READ_LINK_PERM);
+
+  if (!$is_trait_ok) {
+
+    my $trouble_trait_id = $trouble_trait_id_aref->[0];
+    
+    my $err_msg = "Permission denied: Group ($group_id) and Trait ($trouble_trait_id).";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'TraitId' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $sql = 'SELECT TrialTraitId FROM trialtrait WHERE TrialId=? AND TraitId=?';
+  
+  my $exist_ttrait_id = read_cell($dbh_k_write, $sql, [$trial_id, $trait_id]);
+
+  if (length($exist_ttrait_id) > 0) {
+
+    my $err_msg = "TraitId ($trait_id) already exists.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'TraitId' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sql    = 'INSERT INTO trialtrait SET ';
+  $sql   .= 'TrialId=?, ';
+  $sql   .= 'TraitId=?, ';
+  $sql   .= 'Compulsory=?';
+
+  my $sth = $dbh_k_write->prepare($sql);
+  $sth->execute($trial_id, $trait_id, $compulsory);
+
+  if ($dbh_k_write->err()) {
+
+    $self->logger->debug("SQL Error:" . $dbh_k_write->errstr());
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+  $sth->finish();
+
+  my $trial_trait_id = $dbh_k_write->last_insert_id(undef, undef, 'trialtrait', 'TrialTraitId');
+
+  $dbh_k_write->disconnect();
+
+  my $info_msg_aref  = [{'Message' => "Trait ($trait_id) has been added to Trial ($trial_id) successfully."}];
+  my $return_id_aref = [{'Value' => "$trial_trait_id", 'ParaName' => 'TrialTraitId'}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'     => $info_msg_aref,
+                                           'ReturnId' => $return_id_aref,
+  };
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub list_trial_trait {
+
+  my $self           = shift;
+  my $extra_attr_yes = shift;
+  my $trial_perm     = shift;
+  my $where_clause   = qq{};
+  $where_clause      = shift;
+
+  if (length($where_clause) > 0) {
+
+    my $count = 0;
+    while ($where_clause =~ /\?/g) {
+
+      $count += 1;
+    }
+
+    if ( scalar(@_) != $count ) {
+
+      my $msg = 'Number of arguments does not match with ';
+      $msg   .= 'number of SQL parameter.';
+      return (1, $msg, []);
+    }
+  }
+
+  my $dbh = connect_kdb_read();
+
+  my $sql = 'SELECT trialtrait.*, trait.TraitName, trait.TraitDataType, ';
+  $sql   .= 'trait.TraitValueMaxLength, trait.TraitUnit, trait.TraitValRule ';
+  $sql   .= 'FROM trialtrait ';
+  $sql   .= 'LEFT JOIN trait ON trialtrait.TraitId = trait.TraitId ';
+  $sql   .= $where_clause;
+
+  my ($ttrait_err, $ttrait_msg, $no_perm_ttrait_data) = read_data($dbh, $sql, \@_);
+
+  if ($ttrait_err) {
+
+    return ($ttrait_err, $ttrait_msg, []);
+  }
+
+  my $group_id = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  my $perm_str = permission_phrase($group_id, 0, $gadmin_status, 'trait');
+
+  my $perm_where = '';
+  
+  if (length($where_clause) > 0) {
+
+    $perm_where = ' AND ';
+  }
+  else {
+
+    $perm_where = ' WHERE ';
+  }
+
+  $perm_where .= "((($perm_str) & $READ_PERM) = $READ_PERM)";
+
+  $sql   .= $perm_where;
+  $sql   .= ' ORDER BY TrialTraitId DESC';
+
+  $self->logger->debug("SQL: $sql");
+
+  my ($perm_ttrait_err, $perm_ttrait_msg, $trial_trait_data) = read_data($dbh, $sql, \@_);
+
+  if ($perm_ttrait_err) {
+
+    return ($perm_ttrait_err, $perm_ttrait_msg, []);
+  }
+
+  my $err = 0;
+  my $msg = '';
+
+  my $nb_no_perm_ttrait = scalar(@{$no_perm_ttrait_data});
+
+  if (scalar(@{$trial_trait_data}) != $nb_no_perm_ttrait) {
+
+    $err = 1;
+    $msg = 'Permission denied.';
+
+    return ($err, $msg, []);
+  }
+
+  my $extra_attr_trial_trait_data = [];
+
+  if ($extra_attr_yes) {
+
+    for my $row (@{$trial_trait_data}) {
+      
+      if (($trial_perm & $READ_WRITE_PERM) == $READ_WRITE_PERM) {
+
+        my $trial_trait_id = $row->{'TrialTraitId'};
+        my $trial_id       = $row->{'TrialId'};
+        my $trait_id       = $row->{'TraitId'};
+        $row->{'update'}   = "update/trialtrait/$trial_trait_id";
+        $row->{'delete'}   = "trial/$trial_id/remove/trait/$trait_id";
+      }
+      push(@{$extra_attr_trial_trait_data}, $row);
+    }
+  }
+  else {
+
+    $extra_attr_trial_trait_data = $trial_trait_data;
+  }
+
+  $dbh->disconnect();
+
+  return ($err, $msg, $extra_attr_trial_trait_data);
+}
+
+sub list_trial_trait_runmode {
+
+=pod list_trial_trait_HELP_START
+{
+"OperationName" : "List traits for trial",
+"Description": "List all the triats attached to the trial specified by id.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><TrialTrait TraitValRule='boolex(x &gt; 0 and x &lt; 500)' TraitDataType='INTEGER' TraitValueMaxLength='20' TraitUnit='2' TrialTraitId='5' delete='trial/1/remove/trait/1' TraitName='Trait_4102474' Compulsory='1' TraitId='1' update='update/trialtrait/5' TrialId='1' /><RecordMeta TagName='TrialTrait' /></DATA>",
+"SuccessMessageJSON": "{'TrialTrait' : [{'TraitValRule' : 'boolex(x > 0 and x < 500)','TraitDataType' : 'INTEGER','TraitValueMaxLength' : '20','TraitUnit' : '2','TrialTraitId' : '5','delete' : 'trial/1/remove/trait/1','TraitName' : 'Trait_4102474','Compulsory' : '1','update' : 'update/trialtrait/5','TraitId' : '1','TrialId' : '1'}],'RecordMeta' : [{'TagName' : 'TrialTrait'}]}",
+"ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
+"ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing TrialId"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self    = shift;
+  my $trial_id = $self->param('id');
+
+  my $data_for_postrun_href = {};
+
+  my $dbh = connect_kdb_read();
+
+  my $trial_exist = record_existence($dbh, 'trial', 'TrialId', $trial_id);
+
+  if (!$trial_exist) {
+
+    my $err_msg = "Trial ($trial_id) not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'TrialId' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $group_id = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  my ($is_trial_ok, $trouble_trial_id_aref) = check_permission($dbh, 'trial', 'TrialId',
+                                                             [$trial_id], $group_id, $gadmin_status,
+                                                             $READ_PERM);
+  
+  if (!$is_trial_ok) {
+
+    my $trouble_trial_id = $trouble_trial_id_aref->[0];
+    my $err_msg = "Permission denied: Group ($group_id) and trial ($trial_id).";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'TrialId' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $perm_str = permission_phrase($group_id, 0, $gadmin_status);
+  my $sql = "SELECT $perm_str FROM trial WHERE TrialId=?";
+
+  my ($read_perm_err, $trial_perm) = read_cell($dbh, $sql, [$trial_id]);
+
+  $dbh->disconnect();
+
+  my $where_clause = 'WHERE TrialId=?';
+  my ($trial_trait_err, $trial_trait_msg, $trial_trait_data) = $self->list_trial_trait(1,
+                                                                                       $trial_perm,
+                                                                                       $where_clause,
+                                                                                       $trial_id);
+
+  if ($trial_trait_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $trial_trait_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'TrialTrait' => $trial_trait_data,
+                                           'RecordMeta'    => [{'TagName' => 'TrialTrait'}],
+  };
+
+  return $data_for_postrun_href;
+}
+
+sub get_trial_trait_runmode {
+
+=pod get_trial_trait_HELP_START
+{
+"OperationName" : "Get trial trait",
+"Description": "Get detailed information about trial and trait association specified by id.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><TrialTrait TraitValRule='boolex(x &gt; 0 and x &lt; 500)' TraitDataType='INTEGER' TraitValueMaxLength='20' TraitUnit='2' TrialTraitId='5' delete='trial/1/remove/trait/1' TraitName='Trait_4102474' Compulsory='1' TraitId='1' update='update/trialtrait/5' TrialId='1' /><RecordMeta TagName='TrialTrait' /></DATA>",
+"SuccessMessageJSON": "{'TrialTrait' : [{'TraitValRule' : 'boolex(x > 0 and x < 500)','TraitDataType' : 'INTEGER','TraitValueMaxLength' : '20','TraitUnit' : '2','TrialTraitId' : '5','delete' : 'trial/1/remove/trait/1','TraitName' : 'Trait_4102474','Compulsory' : '1','update' : 'update/trialtrait/5','TraitId' : '1','TrialId' : '1'}],'RecordMeta' : [{'TagName' : 'TrialTrait'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='TrialTraitId (10) not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'TrialTraitId (10) not found.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing TrialTraitId"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self          = shift;
+  my $trial_trait_id = $self->param('id');
+
+  my $data_for_postrun_href = {};
+
+  my $dbh = connect_kdb_read();
+
+  my $group_id = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  my $trial_id = read_cell_value($dbh, 'trialtrait', 'TrialId', 'TrialTraitId', $trial_trait_id);
+
+  if (length($trial_id) == 0) {
+
+    my $err_msg = "TrialTraitId ($trial_trait_id) not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $perm_str = permission_phrase($group_id, 0, $gadmin_status);
+  my $sql      = "SELECT $perm_str FROM trial WHERE TrialId=?";
+
+  my ($read_perm_err, $trial_perm) = read_cell($dbh, $sql, [$trial_id]);
+
+  if ( ($trial_perm & $READ_PERM) != $READ_PERM ) {
+
+    my $err_msg = "Permission denied: Group ($group_id) and trial ($trial_id).";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'TrialTraitId' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh->disconnect();
+
+  my $where_clause = 'WHERE TrialTraitId=?';
+  my ($trial_trait_err, $trial_trait_msg, $trial_trait_data) = $self->list_trial_trait(1,
+                                                                                       $trial_perm,
+                                                                                       $where_clause,
+                                                                                       $trial_trait_id);
+
+  if ($trial_trait_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $trial_trait_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'TrialTrait' => $trial_trait_data,
+                                           'RecordMeta'    => [{'TagName' => 'TrialTrait'}],
+  };
+
+  return $data_for_postrun_href;
+}
+
+sub list_unitposition_field_runmode {
+
+=pod list_unitposition_field_HELP_START
+{
+"OperationName" : "List unit position fields",
+"Description": "List all available unit position field types currently stored in unit position dictionary.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><UnitPositionField FieldName='block' /><UnitPositionField FieldName='row' /><UnitPositionField FieldName='column' /><UnitPositionField FieldName='GlassHouse' /><UnitPositionField FieldName='Bench' /><UnitPositionField FieldName='Row' /><UnitPositionField FieldName='Column' /><UnitPositionField FieldName='Pot' /><UnitPositionField FieldName='Range' /><RecordMeta TagName='UnitPositionField' /></DATA>",
+"SuccessMessageJSON": "{'UnitPositionField' : [{'FieldName' : 'block'},{'FieldName' : 'row'},{'FieldName' : 'column'},{'FieldName' : 'GlassHouse'},{'FieldName' : 'Bench'},{'FieldName' : 'Row'},{'FieldName' : 'Column'},{'FieldName' : 'Pot'},{'FieldName' : 'Range'}],'RecordMeta' : [{'TagName' : 'UnitPositionField'}]}",
+"ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
+"ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self     = shift;
+
+  my $data_for_postrun_href = {};
+
+  my $dbh = connect_kdb_read();
+
+  my $sql = 'SELECT UnitPositionText ';
+  $sql   .= 'FROM unitposition';
+
+  my ($read_err, $read_msg, $unitposition_data) = read_data($dbh, $sql, []);
+
+  if ($read_err) {
+
+    $self->logger->debug($read_msg);
+    my $err_msg = "Unexpected Error.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh->disconnect();
+
+  my $unit_pos_text_splitter = "$UNIT_POSITION_SPLITTER";
+
+  if ($unit_pos_text_splitter =~ /\|/) {
+
+    $unit_pos_text_splitter = "\\$unit_pos_text_splitter";
+  }
+
+  my $unique_field = {};
+  my $unitposition_field_aref = [];
+
+  for my $unitposition_rec (@{$unitposition_data}) {
+
+    my $unitposition_txt = $unitposition_rec->{'UnitPositionText'};
+    my @unitposition_parts = split("$unit_pos_text_splitter", $unitposition_txt);
+
+    for my $unitposition_field (@unitposition_parts) {
+
+      $unitposition_field =~ s/^(\D+)(\d+)$/$1/g;
+      
+      if ($unique_field->{$unitposition_field}) { next; }
+
+      my $up_href = {};
+      $up_href->{'FieldName'} = $unitposition_field;
+      $unique_field->{$unitposition_field} = 1;
+
+      push(@{$unitposition_field_aref}, $up_href);
+    }
+  }
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'UnitPositionField' => $unitposition_field_aref,
+                                           'RecordMeta'        => [{'TagName' => 'UnitPositionField'}],
+  };
+
+  return $data_for_postrun_href;
+}
+
+sub update_trial_trait_runmode {
+
+=pod update_trial_trait_HELP_START
+{
+"OperationName" : "Update trial trait",
+"Description": "Update trial and trait association for specified id.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"KDDArTModule": "main",
+"KDDArTTable": "trialtrait",
+"SkippedField": ["TrialId"],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='TrialTrait (1) has been updated successfully.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'TrialTrait (1) has been updated successfully.'}]}",
+"ErrorMessageXML": [{"MissingParameter": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error TraitId='TraitId is missing.' /></DATA>"}],
+"ErrorMessageJSON": [{"MissingParameter": "{'Error' : [{'TraitId' : 'TraitId is missing.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing TrialTraitId"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self           = shift;
+  my $trial_trait_id = $self->param('id');
+  my $query          = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  my $compulsory   = $query->param('Compulsory');
+
+  my ($missing_err, $missing_href) = check_missing_href( { 'Compulsory' => $compulsory } );
+
+  if ($missing_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $dbh_read = connect_kdb_read();
+
+  my $trial_id = read_cell_value($dbh_read, 'trialtrait', 'TrialId', 'TrialTraitId', $trial_trait_id);
+
+  if ( length($trial_id) == 0 ) {
+
+    my $err_msg = "TrialTraitId ($trial_trait_id) not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $group_id = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+  my $perm_str = permission_phrase($group_id, 0, $gadmin_status);
+
+  my $sql  = "SELECT $perm_str AS UltimatePermission ";
+  $sql    .= 'FROM trial ';
+  $sql    .= 'WHERE TrialId=?';
+
+  my ($read_err, $trial_permission) = read_cell($dbh_read, $sql, [$trial_id]);
+
+  if ( ($trial_permission & $READ_WRITE_PERM) != $READ_WRITE_PERM ) {
+
+    my $err_msg = "Trial ($trial_id): permission denied.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh_read->disconnect();
+
+  my $dbh_write = connect_kdb_write();
+
+  $sql  = 'UPDATE trialtrait SET ';
+  $sql .= 'Compulsory=? ';
+  $sql .= 'WHERE TrialTraitId=?';
+
+  my $sth = $dbh_write->prepare($sql);
+  $sth->execute($compulsory, $trial_trait_id);
+
+  if ($dbh_write->err()) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+  $sth->finish();
+
+  $dbh_write->disconnect();
+
+  my $info_msg_aref = [{'Message' => "TrialTrait ($trial_trait_id) has been updated successfully."}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info' => $info_msg_aref};
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub remove_trial_trait_runmode {
+
+=pod remove_trial_trait_HELP_START
+{
+"OperationName" : "Delete trait for trial",
+"Description": "Delete trait from being associated with the trial. If data for this trait already exists in the trial, this association can not be removed.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='Trait (1) has been removed from trial (1).' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'Trait (1) has been removed from trial (2).'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Trait (2) not part of trial (2).' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Trait (2) not part of trial (2).'}]}"}],
+"URLParameter": [{"ParameterName": "trialid", "Description": "Existing TrialId"}, {"ParameterName": "traitid", "Description": "TraitId which is attached to the trial"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self     = shift;
+  my $trial_id = $self->param('trialid');
+  my $trait_id = $self->param('traitid');
+
+  my $data_for_postrun_href = {};
+
+  my $dbh_read = connect_kdb_read();
+
+  my $trial_exist = record_existence($dbh_read, 'trial', 'TrialId', $trial_id);
+
+  if (!$trial_exist) {
+
+    my $err_msg = "Trial ($trial_id) not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $group_id = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+  my $perm_str = permission_phrase($group_id, 0, $gadmin_status);
+
+  my $sql = "SELECT $perm_str AS UltimatePermission ";
+  $sql   .= 'FROM trial ';
+  $sql   .= 'WHERE TrialId=?';
+
+  my ($read_err, $trial_permission) = read_cell($dbh_read, $sql, [$trial_id]);
+
+  if ( ($trial_permission & $READ_WRITE_PERM) != $READ_WRITE_PERM ) {
+
+    my $err_msg = "TrialId ($trial_id): permission denied.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+  
+  my $trait_exist = record_existence($dbh_read, 'trait', 'TraitId', $trait_id);
+
+  if (!$trait_exist) {
+
+    my $err_msg = "TraitId ($trait_id) not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sql    = 'SELECT TrialTraitId ';
+  $sql   .= 'FROM trialtrait ';
+  $sql   .= 'WHERE TrialId=? AND TraitId=?';
+
+  my $trial_trait_id;
+  ($read_err, $trial_trait_id) = read_cell($dbh_read, $sql, [$trial_id, $trait_id]);
+
+  if (length($trial_trait_id) == 0) {
+
+    my $err_msg = "Trait ($trait_id) not part of trial ($trial_id).";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh_read->disconnect();
+
+  my $dbh_write = connect_kdb_write();
+
+  $sql  = 'DELETE FROM trialtrait ';
+  $sql .= 'WHERE TrialTraitId=?';
+
+  my $sth = $dbh_write->prepare($sql);
+  $sth->execute($trial_trait_id);
+
+  if ($dbh_write->err()) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sth->finish();
+
+  $dbh_write->disconnect();
+
+  my $info_msg_aref = [{'Message' => "Trait ($trait_id) has been removed from trial ($trial_id)."}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info' => $info_msg_aref};
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub del_unit_position_runmode {
+
+=pod del_unit_position_gadmin_HELP_START
+{
+"OperationName" : "Delete unit postion",
+"Description": "Delete unit position specified by id. Unit position can be deleted only if not attached to any lower level related record.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 1,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='UnitPosition (1) has been deleted successfully.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'UnitPosition (1) has been deleted successfully.'}]}",
+"ErrorMessageXML": [{"IdUsed": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='UnitPosition (10) is used in trialunit.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdUsed": "{'Error' : [{'Message' : 'UnitPosition (10) is used in trialunit.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing UnitPositionId."}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self            = shift;
+  my $unitposition_id = $self->param('id');
+
+  my $data_for_postrun_href = {};
+
+  my $dbh_k_read = connect_kdb_read();
+
+  my $unitposition_exist = record_existence($dbh_k_read, 'unitposition', 'UnitPositionId', $unitposition_id);
+
+  if (!$unitposition_exist) {
+
+    my $err_msg = "UnitPosition ($unitposition_id) not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $unitposition_used = record_existence($dbh_k_read, 'trialunit', 'UnitPositionId', $unitposition_id);
+
+  if ($unitposition_used) {
+
+    my $err_msg = "UnitPosition ($unitposition_id) is used in trialunit.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh_k_read->disconnect();
+
+  my $dbh_k_write = connect_kdb_write();
+
+  my $sql = 'DELETE FROM unitpositionfactor WHERE UnitPositionId=?';
+  my $sth = $dbh_k_write->prepare($sql);
+
+  $sth->execute($unitposition_id);
+
+  if ($dbh_k_write->err()) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sth->finish();
+
+  $sql = 'DELETE FROM unitposition WHERE UnitPositionId=?';
+  $sth = $dbh_k_write->prepare($sql);
+
+  $sth->execute($unitposition_id);
+
+  if ($dbh_k_write->err()) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sth->finish();
+
+  $dbh_k_write->disconnect();
+
+  my $info_msg_aref = [{'Message' => "UnitPosition ($unitposition_id) has been deleted successfully."}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'     => $info_msg_aref};
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub del_designtype_runmode {
+
+=pod del_designtype_gadmin_HELP_START
+{
+"OperationName" : "Delete design type",
+"Description": "Delete trial design type specified by id. Design type can be deleted only if not attached to any lower level related record.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 1,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='DesignType (18) has been deleted successfully.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'DesignType (18) has been deleted successfully.'}]}",
+"ErrorMessageXML": [{"IdUsed": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='DesignType (17) is used in trial.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdUsed": "{'Error' : [{'Message' : 'DesignType (17) is used in trial.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing DesignTypeId."}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self       = shift;
+  my $designtype_id = $self->param('id');
+
+  my $data_for_postrun_href = {};
+
+  my $dbh_k_read = connect_kdb_read();
+
+  my $designtype_exist = record_existence($dbh_k_read, 'designtype', 'DesignTypeId', $designtype_id);
+
+  if (!$designtype_exist) {
+
+    my $err_msg = "DesignType ($designtype_id) not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $designtype_used = record_existence($dbh_k_read, 'trial', 'DesignTypeId', $designtype_id);
+
+  if ($designtype_used) {
+
+    my $err_msg = "DesignType ($designtype_id) is used in trial.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh_k_read->disconnect();
+
+  my $dbh_k_write = connect_kdb_write();
+
+  my $sql = 'DELETE FROM designtype WHERE DesignTypeId=?';
+  my $sth = $dbh_k_write->prepare($sql);
+
+  $sth->execute($designtype_id);
+
+  if ($dbh_k_write->err()) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sth->finish();
+
+  $dbh_k_write->disconnect();
+
+  my $info_msg_aref = [{'Message' => "DesignType ($designtype_id) has been deleted successfully."}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'     => $info_msg_aref};
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub del_site_runmode {
+
+=pod del_site_gadmin_HELP_START
+{
+"OperationName" : "Delete site",
+"Description": "Delete site specified by id. Site can be deleted only if not attached to any lower level related record.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 1,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='Site (17) has been deleted successfully.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'Site (18) has been deleted successfully.'}]}",
+"ErrorMessageXML": [{"IdUsed": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Site (1) is used in trial.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdUsed": "{'Error' : [{'Message' : 'Site (1) is used in trial.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing SiteId."}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self       = shift;
+  my $site_id = $self->param('id');
+
+  my $data_for_postrun_href = {};
+
+  my $dbh_k_read = connect_kdb_read();
+
+  my $site_exist = record_existence($dbh_k_read, 'site', 'SiteId', $site_id);
+
+  if (!$site_exist) {
+
+    my $err_msg = "Site ($site_id) not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $site_in_trial = record_existence($dbh_k_read, 'trial', 'SiteId', $site_id);
+
+  if ($site_in_trial) {
+
+    my $err_msg = "Site ($site_id) is used in trial.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh_k_read->disconnect();
+
+  my $dbh_gis_write = connect_gis_write();
+
+  my $sql = 'DELETE FROM siteloc WHERE siteid=?';
+
+  my $sth = $dbh_gis_write->prepare($sql);
+  $sth->execute($site_id);
+
+  if ($dbh_gis_write->err()) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sth->finish();
+
+  $dbh_gis_write->disconnect();
+
+  my $dbh_k_write = connect_kdb_write();
+
+  $sql = 'DELETE FROM sitefactor WHERE SiteId=?';
+  $sth = $dbh_k_write->prepare($sql);
+
+  $sth->execute($site_id);
+
+  if ($dbh_k_write->err()) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sth->finish();
+
+  $sql = 'DELETE FROM site WHERE SiteId=?';
+  $sth = $dbh_k_write->prepare($sql);
+
+  $sth->execute($site_id);
+
+  if ($dbh_k_write->err()) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sth->finish();
+
+  $dbh_k_write->disconnect();
+
+  my $info_msg_aref = [{'Message' => "Site ($site_id) has been deleted successfully."}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'     => $info_msg_aref};
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub del_trial_runmode {
+
+=pod del_trial_gadmin_HELP_START
+{
+"OperationName" : "Delete trial",
+"Description": "Delete trial for a specified id. Trial can be deleted only if not attached to any lower level related record.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 1,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='Trial (14) has been deleted successfully.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'Trial (15) has been deleted successfully.'}]}",
+"ErrorMessageXML": [{"IdUsed": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Trial (1) has trialunit(s).' /></DATA>"}],
+"ErrorMessageJSON": [{"IdUsed": "{'Error' : [{'Message' : 'Trial (1) has trialunit(s).'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing TrialId."}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self       = shift;
+  my $trial_id = $self->param('id');
+
+  my $data_for_postrun_href = {};
+
+  my $dbh_k_read = connect_kdb_read();
+
+  my $trial_owner_id = read_cell_value($dbh_k_read, 'trial', 'OwnGroupId', 'TrialId', $trial_id);
+
+  if (length($trial_owner_id) == 0) {
+
+    my $err_msg = "Trial ($trial_id) not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $group_id = $self->authen->group_id();
+
+  if ($trial_owner_id != $group_id) {
+
+    my $err_msg = "Trial ($trial_id): permission denied.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $trial_trialunit = record_existence($dbh_k_read, 'trialunit', 'TrialId', $trial_id);
+
+  if ($trial_trialunit) {
+
+    my $err_msg = "Trial ($trial_id) has trialunit(s).";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (record_existence($dbh_k_read, 'trialworkflow', 'TrialId', $trial_id)) {
+
+    my $err_msg = "Trial ($trial_id) has a workflow.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh_k_read->disconnect();
+
+  my $dbh_gis_write = connect_gis_write();
+
+  my $sql = 'DELETE FROM trialloc WHERE trialid=?';
+
+  my $sth = $dbh_gis_write->prepare($sql);
+  $sth->execute($trial_id);
+
+  if ($dbh_gis_write->err()) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sth->finish();
+
+  $dbh_gis_write->disconnect();
+
+  my $dbh_k_write = connect_kdb_write();
+
+  $sql = "DELETE FROM trialfactor WHERE TrialId=?";
+  $sth = $dbh_k_write->prepare($sql);
+  
+  $sth->execute($trial_id);
+  
+  if ($dbh_k_write->err()) {
+    
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+  
+  $sth->finish();
+
+  $sql = "DELETE FROM trial WHERE TrialId=?";
+  $sth = $dbh_k_write->prepare($sql);
+  
+  $sth->execute($trial_id);
+  
+  if ($dbh_k_write->err()) {
+    
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+  
+  $sth->finish();
+
+  $dbh_k_write->disconnect();
+
+  my $info_msg_aref = [{'Message' => "Trial ($trial_id) has been deleted successfully."}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'     => $info_msg_aref};
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub del_trial_unit_runmode {
+
+=pod del_trial_unit_gadmin_HELP_START
+{
+"OperationName" : "Delete trial unit",
+"Description": "Delete trial unit from the trial specified by id. If data for this trial unit already exists, than trial unit can not be deleted.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 1,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='TrialUnit (76) has been deleted successfully.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'TrialUnit (75) has been deleted successfully.'}]}",
+"ErrorMessageXML": [{"IdUsed": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='TrialUnit (77) has samplemeasurement record(s).' /></DATA>"}],
+"ErrorMessageJSON": [{"IdUsed": "{'Error' : [{'Message' : 'TrialUnit (77) has samplemeasurement record(s).'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing TrialUnitId."}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self = shift;
+  my $tunit_id = $self->param('id');
+
+  my $data_for_postrun_href = {};
+
+  my $group_id = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+  my $perm_str = permission_phrase($group_id, 0, $gadmin_status);
+
+  my $dbh_k_read = connect_kdb_read();
+
+  my $trial_id = read_cell_value($dbh_k_read, 'trialunit', 'TrialId', 'TrialUnitId', $tunit_id);
+
+  if (length($trial_id) == 0) {
+
+    my $err_msg = "TrialUnit ($tunit_id) not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $sql = "SELECT $perm_str AS UltimatePerm FROM trial WHERE TrialId=?";
+
+  my $trial_perm = read_cell($dbh_k_read, $sql, [$trial_id]);
+
+  if ( ($trial_perm & $READ_WRITE_PERM) != $READ_WRITE_PERM ) {
+
+    my $err_msg = "TrialUnit ($tunit_id): permission denied.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $tunit_measurement = record_existence($dbh_k_read, 'samplemeasurement', 'TrialUnitId', $tunit_id);
+
+  if ($tunit_measurement) {
+
+    my $err_msg = "TrialUnit ($tunit_id) has samplemeasurement record(s).";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh_k_read->disconnect();
+
+  my $dbh_gis_write = connect_gis_write();
+
+  $sql = 'DELETE FROM trialunitloc WHERE trialunitid=?';
+
+  my $sth = $dbh_gis_write->prepare($sql);
+  $sth->execute($tunit_id);
+
+  if ($dbh_gis_write->err()) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sth->finish();
+
+  $dbh_gis_write->disconnect();
+
+  my $dbh_k_write = connect_kdb_write();
+
+  $sql = "DELETE FROM trialunitspecimen WHERE TrialUnitId=?";
+  $sth = $dbh_k_write->prepare($sql);
+  
+  $sth->execute($tunit_id);
+  
+  if ($dbh_k_write->err()) {
+    
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+  
+  $sth->finish();
+
+  $sql = "DELETE FROM trialunit WHERE TrialUnitId=?";
+  $sth = $dbh_k_write->prepare($sql);
+  
+  $sth->execute($tunit_id);
+  
+  if ($dbh_k_write->err()) {
+    
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+  
+  $sth->finish();
+
+  $dbh_k_write->disconnect();
+
+  my $info_msg_aref = [{'Message' => "TrialUnit ($tunit_id) has been deleted successfully."}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'     => $info_msg_aref};
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub add_project_runmode {
+
+=pod add_project_gadmin_HELP_START
+{
+"OperationName" : "Add project",
+"Description": "Add a new project to the system.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 1,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"KDDArTModule": "main",
+"KDDArTTable": "project",
+"KDDArTFactorTable": "projectfactor",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><ReturnId Value='3' ParaName='ProjectId' /><Info Message='Project (3) has been added successfully.' /></DATA>",
+"SuccessMessageJSON": "{'ReturnId' : [{'Value' : '2','ParaName' : 'ProjectId'}],'Info' : [{'Message' : 'Project (2) has been added successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error TypeId='ProjectType (269) does not exist.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'TypeId' : 'TypeId (269) does not exist.'}]}"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self = shift;
+  my $query = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  # Generic required static field checking
+
+  my $dbh_read = connect_kdb_read();
+
+  my $skip_field = {};
+
+  my ($get_scol_err, $get_scol_msg, $scol_data, $pkey_data) = get_static_field($dbh_read, 'project');
+
+  if ($get_scol_err) {
+
+    $self->logger->debug("Get static field info failed: $get_scol_msg");
+    
+    my $err_msg = "Unexpected Error.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $required_field_href = {};
+
+  for my $static_field (@{$scol_data}) {
+
+    my $field_name = $static_field->{'Name'};
+    
+    if ($skip_field->{$field_name}) { next; }
+
+    if ($static_field->{'Required'} == 1) {
+
+      $required_field_href->{$field_name} = $query->param($field_name);
+    }
+  }
+
+  $dbh_read->disconnect();
+
+  my ($missing_err, $missing_href) = check_missing_href( $required_field_href );
+
+  if ($missing_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  # Finish generic required static field checking
+
+  my $project_name          = $query->param('ProjectName');
+  my $projecttype_id        = $query->param('TypeId');
+  my $cur_manager_id        = $query->param('ProjectManagerId');
+
+  my $project_sdate         = q{};
+  if ($query->param('ProjectStartDate')) {
+
+    $project_sdate         = $query->param('ProjectStartDate');
+    my ($sdate_err, $sdate_href) = check_dt_href( {'ProjectStartDate' => $project_sdate} );
+
+    if ($sdate_err) {
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [$sdate_href]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  my $project_edate         = q{};
+  if ($query->param('ProjectEndDate')) {
+
+    $project_edate         = $query->param('ProjectEndDate');
+    my ($edate_err, $edate_href) = check_dt_href( {'ProjectEndDate' => $project_edate} );
+
+    if ($edate_err) {
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [$edate_href]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  my $project_note = '';
+
+  if (defined $query->param('ProjectNote')) {
+
+    $project_note = $query->param('ProjectNote');
+  }
+
+  my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength ";
+  $sql   .= "FROM factor ";
+  $sql   .= "WHERE TableNameOfFactor='projectfactor'";
+
+  my $dbh_k_read = connect_kdb_read();
+  my $vcol_data = $dbh_k_read->selectall_hashref($sql, 'FactorId');
+
+  my $vcol_param_data = {};
+  my $vcol_len_info   = {};
+  my $vcol_param_data_maxlen = {};
+  for my $vcol_id (keys(%{$vcol_data})) {
+
+    my $vcol_param_name = "VCol_${vcol_id}";
+    my $vcol_value      = $query->param($vcol_param_name);
+    if ($vcol_data->{$vcol_id}->{'CanFactorHaveNull'} != 1) {
+
+      $vcol_param_data->{$vcol_param_name} = $vcol_value;
+    }
+    $vcol_len_info->{$vcol_param_name} = $vcol_data->{$vcol_id}->{'FactorValueMaxLength'};
+    $vcol_param_data_maxlen->{$vcol_param_name} = $vcol_value;
+  }
+
+  my ($vcol_missing_err, $vcol_missing_href) = check_missing_href( $vcol_param_data );
+
+  if ($vcol_missing_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$vcol_missing_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  my ($vcol_maxlen_err, $vcol_maxlen_href) = check_maxlen_href($vcol_param_data_maxlen, $vcol_len_info);
+
+  if ($vcol_maxlen_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$vcol_maxlen_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (record_existence($dbh_k_read, 'project', 'ProjectName', $project_name)) {
+
+    my $err_msg = "ProjectName ($project_name) already exists.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'ProjectName' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $projecttype_existence = type_existence($dbh_k_read, 'project', $projecttype_id);
+
+  if (!$projecttype_existence) {
+
+    my $err_msg = "TypeId ($projecttype_id) does not exist.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'TypeId' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $cur_manager_existence = record_existence($dbh_k_read, 'contact', 'ContactId', $cur_manager_id);
+
+  if (!$cur_manager_existence) {
+
+    my $err_msg = "ProjectManagerId ($cur_manager_id) does not exist.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'ProjectManagerId' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh_k_read->disconnect();
+
+  my $dbh_k_write = connect_kdb_write();
+
+  $sql  = 'INSERT INTO project SET ';
+  $sql .= 'ProjectName=?, ';
+  $sql .= 'TypeId=?, ';
+  $sql .= 'ProjectManagerId=?, ';
+  $sql .= 'ProjectStartDate=?, ';
+  $sql .= 'ProjectEndDate=?, ';
+  $sql .= 'ProjectNote=?';
+
+  my $sth = $dbh_k_write->prepare($sql);
+  $sth->execute($project_name, $projecttype_id, $cur_manager_id,
+                $project_sdate, $project_edate, $project_note);
+
+  my $project_id = -1;
+  if (!$dbh_k_write->err()) {
+
+    $project_id = $dbh_k_write->last_insert_id(undef, undef, 'project', 'ProjectId');
+    $self->logger->debug("ProjectId: $project_id");
+  }
+  else {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+  $sth->finish();
+
+  for my $vcol_id (keys(%{$vcol_data})) {
+
+    my $factor_value = $query->param('VCol_' . "$vcol_id");
+
+    if (length($factor_value) > 0) {
+
+      $sql  = 'INSERT INTO projectfactor SET ';
+      $sql .= 'ProjectId=?, ';
+      $sql .= 'FactorId=?, ';
+      $sql .= 'FactorValue=?';
+      my $factor_sth = $dbh_k_write->prepare($sql);
+      $factor_sth->execute($project_id, $vcol_id, $factor_value);
+      
+      if ($dbh_k_write->err()) {
+        
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+        return $data_for_postrun_href;
+      }
+
+      $factor_sth->finish();
+    }
+  }
+
+  $dbh_k_write->disconnect();
+
+  my $info_msg_aref  = [{'Message' => "Project ($project_id) has been added successfully."}];
+  my $return_id_aref = [{'Value' => "$project_id", 'ParaName' => 'ProjectId'}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'     => $info_msg_aref,
+                                           'ReturnId' => $return_id_aref,
+  };
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub update_project_runmode {
+
+=pod update_project_gadmin_HELP_START
+{
+"OperationName" : "Update project",
+"Description": "Update information about a project specified by id.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 1,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"KDDArTModule": "main",
+"KDDArTTable": "project",
+"KDDArTFactorTable": "projectfactor",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='Project (2) has been updated successfully.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'Project (2) has been updated successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error TypeId='TypeId (12) does not exist.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'TypeId' : 'TypeId (12) does not exist.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing ProjectId."}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self = shift;
+  my $query = $self->query();
+
+  my $project_id = $self->param('id');
+
+  my $data_for_postrun_href = {};
+
+  # Generic required static field checking
+
+  my $dbh_read = connect_kdb_read();
+
+  my $skip_field = {};
+
+  my ($get_scol_err, $get_scol_msg, $scol_data, $pkey_data) = get_static_field($dbh_read, 'project');
+
+  if ($get_scol_err) {
+
+    $self->logger->debug("Get static field info failed: $get_scol_msg");
+    
+    my $err_msg = "Unexpected Error.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $required_field_href = {};
+
+  for my $static_field (@{$scol_data}) {
+
+    my $field_name = $static_field->{'Name'};
+    
+    if ($skip_field->{$field_name}) { next; }
+
+    if ($static_field->{'Required'} == 1) {
+
+      $required_field_href->{$field_name} = $query->param($field_name);
+    }
+  }
+
+  $dbh_read->disconnect();
+
+  my ($missing_err, $missing_href) = check_missing_href( $required_field_href );
+
+  if ($missing_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  # Finish generic required static field checking
+
+  my $dbh_k_read = connect_kdb_read();
+
+  if (!record_existence($dbh_k_read, 'project', 'ProjectId', $project_id)) {
+
+    my $err_msg = "ProjectId ($project_id) not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $project_name          = $query->param('ProjectName');
+  my $projecttype_id        = $query->param('TypeId');
+  my $cur_manager_id        = $query->param('ProjectManagerId');
+
+  my $project_name_sql      = "SELECT ProjectId FROM project WHERE ProjectId<>? AND ProjectName=?";
+
+  my ($r_proj_name_err, $db_proj_id) = read_cell($dbh_k_read, $project_name_sql, [$project_id, $project_name]);
+
+  if (length($db_proj_id) > 0) {
+
+    my $err_msg = "ProjectName ($project_name) already exists.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'ProjectName' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $project_sdate         = read_cell_value($dbh_k_read, 'project', 'ProjectStartDate', 'ProjectId', $project_id);
+
+  if (defined $query->param('ProjectStartDate')) {
+
+    if (length($query->param('ProjectStartDate')) > 0) {
+
+      $project_sdate         = $query->param('ProjectStartDate');
+      my ($sdate_err, $sdate_href) = check_dt_href( {'ProjectStartDate' => $project_sdate} );
+
+      if ($sdate_err) {
+
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [$sdate_href]};
+        
+        return $data_for_postrun_href;
+      }
+    }
+  }
+
+  # Unknown Start DateTime value from database 0000-00-00 00:00:00 which should be reset to undef,
+  # and then null in the db
+
+  if ($project_sdate eq '0000-00-00 00:00:00') {
+
+    $project_sdate = undef;
+  }
+
+  my $project_edate         = read_cell_value($dbh_k_read, 'project', 'ProjectEndDate', 'ProjectId', $project_id);
+
+  if (defined $query->param('ProjectEndDate')) {
+
+    if (length($query->param('ProjectEndDate')) > 0) {
+
+      $project_edate         = $query->param('ProjectEndDate');
+      my ($edate_err, $edate_href) = check_dt_href( {'ProjectEndDate' => $project_edate} );
+
+      if ($edate_err) {
+
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [$edate_href]};
+
+        return $data_for_postrun_href;
+      }
+    }
+  }
+
+  # Unknown Start DateTime value from database 0000-00-00 00:00:00 which should be reset to undef,
+  # and then null in the db
+
+  if ($project_edate eq '0000-00-00 00:00:00') {
+
+    $project_edate = undef;
+  }
+
+  my $project_note = read_cell_value($dbh_k_read, 'project', 'ProjectNote', 'ProjectId', $project_id);
+
+  if (defined $query->param('ProjectNote')) {
+
+    $project_note = $query->param('ProjectNote');
+  }
+
+  my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength ";
+  $sql   .= "FROM factor ";
+  $sql   .= "WHERE TableNameOfFactor='projectfactor'";
+
+  my $vcol_data = $dbh_k_read->selectall_hashref($sql, 'FactorId');
+
+  my $vcol_param_data = {};
+  my $vcol_len_info   = {};
+  my $vcol_param_data_maxlen = {};
+  for my $vcol_id (keys(%{$vcol_data})) {
+
+    my $vcol_param_name = "VCol_${vcol_id}";
+    my $vcol_value      = $query->param($vcol_param_name);
+    if ($vcol_data->{$vcol_id}->{'CanFactorHaveNull'} != 1) {
+
+      $vcol_param_data->{$vcol_param_name} = $vcol_value;
+    }
+    $vcol_len_info->{$vcol_param_name} = $vcol_data->{$vcol_id}->{'FactorValueMaxLength'};
+    $vcol_param_data_maxlen->{$vcol_param_name} = $vcol_value;
+  }
+
+  my ($vcol_missing_err, $vcol_missing_href) = check_missing_href( $vcol_param_data );
+
+  if ($vcol_missing_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$vcol_missing_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  my ($vcol_maxlen_err, $vcol_maxlen_href) = check_maxlen_href($vcol_param_data_maxlen, $vcol_len_info);
+
+  if ($vcol_maxlen_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$vcol_maxlen_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $projecttype_existence = type_existence($dbh_k_read, 'project', $projecttype_id);
+
+  if (!$projecttype_existence) {
+
+    my $err_msg = "TypeId ($projecttype_id) does not exist.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'TypeId' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $cur_manager_existence = record_existence($dbh_k_read, 'contact', 'ContactId', $cur_manager_id);
+
+  if (!$cur_manager_existence) {
+
+    my $err_msg = "ProjectManagerId ($cur_manager_id) does not exist.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'ProjectManagerId' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh_k_read->disconnect();
+
+  my $dbh_k_write = connect_kdb_write();
+
+  $sql  = 'UPDATE project SET ';
+  $sql .= 'ProjectName=?, ';
+  $sql .= 'TypeId=?, ';
+  $sql .= 'ProjectManagerId=?, ';
+  $sql .= 'ProjectStartDate=?, ';
+  $sql .= 'ProjectEndDate=?, ';
+  $sql .= 'ProjectNote=? ';
+  $sql .= 'WHERE ProjectId=?';
+
+  my $sth = $dbh_k_write->prepare($sql);
+  $sth->execute($project_name, $projecttype_id, $cur_manager_id,
+                $project_sdate, $project_edate, $project_note, $project_id);
+
+  if ($dbh_k_write->err()) {
+
+    $self->logger->debug("Update project failed");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+  $sth->finish();
+
+  for my $vcol_id (keys(%{$vcol_data})) {
+
+    if (defined $query->param('VCol_' . "$vcol_id")) {
+
+      my $factor_value = $query->param('VCol_' . "$vcol_id");
+
+      $sql  = 'SELECT Count(*) ';
+      $sql .= 'FROM projectfactor ';
+      $sql .= 'WHERE ProjectId=? AND FactorId=?';
+
+      my ($read_err, $count) = read_cell($dbh_k_write, $sql, [$project_id, $vcol_id]);
+
+      if (length($factor_value) > 0) {
+
+        if ($count > 0) {
+
+          $sql  = 'UPDATE projectfactor SET ';
+          $sql .= 'FactorValue=? ';
+          $sql .= 'WHERE ProjectId=? AND FactorId=?';
+
+          my $factor_sth = $dbh_k_write->prepare($sql);
+          $factor_sth->execute($factor_value, $project_id, $vcol_id);
+      
+          if ($dbh_k_write->err()) {
+        
+            $data_for_postrun_href->{'Error'} = 1;
+            $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+            return $data_for_postrun_href;
+          }
+          $factor_sth->finish();
+        }
+        else {
+
+          $sql  = 'INSERT INTO projectfactor SET ';
+          $sql .= 'ProjectId=?, ';
+          $sql .= 'FactorId=?, ';
+          $sql .= 'FactorValue=?';
+          my $factor_sth = $dbh_k_write->prepare($sql);
+          $factor_sth->execute($project_id, $vcol_id, $factor_value);
+          
+          if ($dbh_k_write->err()) {
+        
+            $data_for_postrun_href->{'Error'} = 1;
+            $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+            return $data_for_postrun_href;
+          }
+          $factor_sth->finish();
+        }
+      }
+      else {
+
+        if ($count > 0) {
+
+          $sql  = 'DELETE FROM projectfactor ';
+          $sql .= 'WHERE ProjectId=? AND FactorId=?';
+
+          my $factor_sth = $dbh_k_write->prepare($sql);
+          $factor_sth->execute($project_id, $vcol_id);
+      
+          if ($dbh_k_write->err()) {
+        
+            $data_for_postrun_href->{'Error'} = 1;
+            $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+            return $data_for_postrun_href;
+          }
+          $factor_sth->finish();
+        }
+      }
+    }
+  }
+
+  $dbh_k_write->disconnect();
+
+  my $info_msg_aref  = [{'Message' => "Project ($project_id) has been updated successfully."}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'     => $info_msg_aref};
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub list_project {
+
+  my $self           = $_[0];
+  my $extra_attr_yes = $_[1];
+  my $sql            = $_[2];
+
+  my $where_para_aref = [];
+
+  if (defined $_[3]) {
+
+    $where_para_aref = $_[3];
+  }
+
+  my $count = 0;
+  while ($sql =~ /\?/g) {
+
+    $count += 1;
+  }
+
+  if ( scalar(@{$where_para_aref}) != $count ) {
+    
+    my $msg = 'Number of arguments does not match with ';
+    $msg   .= 'number of SQL parameter.';
+    return (1, $msg, []);
+  }
+
+  my $dbh = connect_kdb_read();
+  my $sth = $dbh->prepare($sql);
+  # parameters provided by the caller
+  # for example, ('WHERE FieldA=?', '1') 
+  $sth->execute(@{$where_para_aref});
+
+  my $err = 0;
+  my $msg = '';
+  my $project_data = [];
+
+  if ( !$dbh->err() ) {
+
+    my $array_ref = $sth->fetchall_arrayref({});
+
+    if ( !$sth->err() ) {
+
+      $project_data = $array_ref;
+    }
+    else {
+
+      $err = 1;
+      $msg = 'Unexpected error';
+      $self->logger->debug('Err: ' . $dbh->errstr());
+    }
+  }
+  else {
+
+    $err = 1;
+    $msg = 'Unexpected error';
+    $self->logger->debug('Err: ' . $dbh->errstr());
+  }
+
+  $sth->finish();
+
+  my $extra_attr_project_data = [];
+
+  if ($extra_attr_yes) {
+
+    my $project_id_aref = [];
+
+    for my $row (@{$project_data}) {
+
+      push(@{$project_id_aref}, $row->{'ProjectId'});
+    }
+
+    my $chk_id_err        = 0;
+    my $chk_id_msg        = '';
+    my $used_id_href      = {};
+    my $not_used_id_href  = {};
+
+    if (scalar(@{$project_id_aref}) > 0) {
+
+      my $chk_table_aref = [{'TableName' => 'trial', 'FieldName' => 'ProjectId'}];
+
+      ($chk_id_err, $chk_id_msg,
+       $used_id_href, $not_used_id_href) = id_existence_bulk($dbh, $chk_table_aref, $project_id_aref);
+
+      if ($chk_id_err) {
+
+        $self->logger->debug("Check id existence error: $chk_id_msg");
+        $err = 1;
+        $msg = $chk_id_msg;
+        
+        return ($err, $msg, []);
+      }
+    }
+
+    my $gadmin_status = $self->authen->gadmin_status();
+
+    for my $row (@{$project_data}) {
+    
+      if ($gadmin_status eq '1') {
+
+        my $project_id = $row->{'ProjectId'};
+        $row->{'update'}   = "update/project/$project_id";
+
+        if ( $not_used_id_href->{$project_id} ) {
+
+          $row->{'delete'}   = "delete/project/$project_id";
+        }
+      }
+      push(@{$extra_attr_project_data}, $row);
+    }
+  }
+  else {
+
+    $extra_attr_project_data = $project_data;
+  }
+
+  $dbh->disconnect();
+
+  return ($err, $msg, $extra_attr_project_data);
+}
+
+sub list_project_advanced_runmode {
+
+=pod list_project_advanced_HELP_START
+{
+"OperationName" : "List projects",
+"Description": "List available projects. This listing requires pagination information.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "FILTERING"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Pagination NumOfRecords='3' NumOfPages='3' Page='1' NumPerPage='1' /><RecordMeta TagName='Project' /><Project ProjectManagerId='1' ProjectManagerName='Diversity Arrays' ProjectStartDate='0000-00-00 00:00:00' ProjectName='Test2' ProjectNote='' TypeId='11' ProjectStatus='' ProjectEndDate='0000-00-00 00:00:00' ProjectId='3' delete='delete/project/3' update='update/project/3' /></DATA>",
+"SuccessMessageJSON": "{'Pagination' : [{'NumOfRecords' : '3','NumOfPages' : 3,'NumPerPage' : '1','Page' : '1'}],'VCol' : [],'RecordMeta' : [{'TagName' : 'Project'}],'Project' : [{'ProjectManagerId' : '1','ProjectManagerName' : 'Diversity Arrays','ProjectStartDate' : '0000-00-00 00:00:00','ProjectName' : 'Test2','ProjectNote' : '','TypeId' : '11','ProjectStatus' : null,'ProjectEndDate' : '0000-00-00 00:00:00','ProjectId' : '3','delete' : 'delete/project/3','update' : 'update/project/3'}]}",
+"ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
+"ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
+"URLParameter": [{"ParameterName": "nperpage", "Description": "Number of records in a page for pagination"}, {"ParameterName": "num", "Description": "The page number of the pagination"}],
+"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database filed name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "FieldList", "Description": "Comma separated value of wanted fields."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases."}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self  = shift;
+  my $query = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  my $pagination  = 0;
+  my $nb_per_page = -1;
+  my $page        = -1;
+
+  if ( (defined $self->param('nperpage')) && (defined $self->param('num')) ) {
+
+    $pagination = 1;
+    $nb_per_page = $self->param('nperpage');
+    $page        = $self->param('num');
+  }
+
+  my $field_list_csv = '';
+
+  if (defined $query->param('FieldList')) {
+
+    $field_list_csv = $query->param('FieldList');
+  }
+
+  my $filtering_csv = '';
+  
+  if (defined $query->param('Filtering')) {
+
+    $filtering_csv = $query->param('Filtering');
+  }
+
+  my $sorting = '';
+
+  if (defined $query->param('Sorting')) {
+
+    $sorting = $query->param('Sorting');
+  }
+
+  my $field_list = ['SCol*', 'VCol*', 'LCol*'];
+
+  my $group_id = $self->authen->group_id();
+
+  my $dbh = connect_kdb_read();
+
+  my ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_sql($dbh, $field_list, 'project',
+                                                                        'ProjectId', '');
+
+  if ($vcol_err) {
+
+    my $err_msg = "Problem with virtual column ($trouble_vcol) containing space.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sql   .= " LIMIT 1";
+
+  $self->logger->debug("SQL with VCol: $sql");
+
+  my ($sam_project_err, $sam_project_msg, $sam_project_data) = $self->list_project(0, $sql);
+
+  if ($sam_project_err) {
+
+    $self->logger->debug($sam_project_msg);
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $sample_project_aref = $sam_project_data;
+
+  my @field_list_all = keys(%{$sample_project_aref->[0]});
+
+  # no field return, it means no record. error prevention
+  if (scalar(@field_list_all) == 0) {
+    
+    push(@field_list_all, '*');
+  }
+
+  my $final_field_list     = \@field_list_all;
+
+  if (length($field_list_csv) > 0) {
+
+    my ($sel_field_err, $sel_field_msg, $sel_field_list) = parse_selected_field($field_list_csv,
+                                                                                $final_field_list,
+                                                                                'ProjectId');
+
+    if ($sel_field_err) {
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $sel_field_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    $final_field_list = $sel_field_list;
+   
+    if ($filtering_csv =~ /ProjectManagerId/) {
+
+      push(@{$final_field_list}, 'ProejectManagerId');
+    }    
+  }
+
+  my $field_lookup = {};
+  for my $fd_name (@{$final_field_list}) {
+
+    $field_lookup->{$fd_name} = 1;
+  }
+
+  my $other_join = '';
+  if ($field_lookup->{'ProjectManagerId'}) {
+
+    push(@{$final_field_list}, "CONCAT(contact.ContactFirstName, ' ', contact.ContactLastName) AS ProjectManagerName ");
+    $other_join   .= ' LEFT JOIN contact ON project.ProjectManagerId = contact.ContactId ';
+  }
+
+  if ($filtering_csv !~ /Factor/) {
+
+    ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_sql($dbh, $final_field_list, 'project',
+                                                                       'ProjectId', $other_join);
+  }
+  else {
+
+    ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_sql_v2($dbh, $final_field_list, 'project',
+                                                                          'ProjectId', $other_join);
+  }
+
+  if ($vcol_err) {
+
+    my $err_msg = "Problem with virtual column ($trouble_vcol) containing space.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my ($filter_err, $filter_msg,
+      $filter_phrase, $where_arg,
+      $having_phrase, $count_filter_phrase,
+      $nb_filter_factor) = parse_filtering_v2('ProjectId',
+                                              'project',
+                                              $filtering_csv,
+                                              $final_field_list,
+                                              $vcol_list);
+
+  $self->logger->debug("Filter phrase: $filter_phrase");
+  $self->logger->debug("Where argument: " . join(',', @{$where_arg}));
+
+  if ($filter_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $filter_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $filter_where_phrase = '';
+  if (length($filter_phrase) > 0) {
+
+    $filter_where_phrase = " WHERE $filter_phrase ";
+  }
+
+  my $filtering_exp = " $filter_where_phrase ";
+
+  if (length($having_phrase) > 0) {
+
+    $sql =~ s/FACTORHAVING/ HAVING $having_phrase/;
+
+    $sql .= " $filtering_exp ";
+  }
+  else {
+
+    $sql =~ s/GROUP BY/ $filtering_exp GROUP BY /;
+  }
+
+  my $pagination_aref    = [];
+  my $paged_limit_clause = '';
+
+  if ($pagination) {
+
+    my ($int_err, $int_err_msg) = check_integer_value( {'nperpage' => $nb_per_page,
+                                                        'num'      => $page
+                                                       });
+
+    if ($int_err) {
+
+      $int_err_msg .= ' not integer.';
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $int_err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my ($pg_id_err, $pg_id_msg, $nb_records,
+        $nb_pages, $limit_clause, $rcount_time);
+
+    if (length($having_phrase) == 0) {
+
+      $self->logger->debug("COUNT NB RECORD: NO FACTOR IN FILTERING");
+
+      ($pg_id_err, $pg_id_msg, $nb_records,
+       $nb_pages, $limit_clause, $rcount_time) = get_paged_filter($dbh,
+                                                                  $nb_per_page,
+                                                                  $page,
+                                                                  'project',
+                                                                  'ProjectId',
+                                                                  $filtering_exp,
+                                                                  $where_arg);
+    }
+    else {
+
+      $self->logger->debug("COUNT NB RECORD: FACTOR IN FILTERING");
+
+      my $count_sql = "SELECT COUNT(project.ProjectId) ";
+      $count_sql   .= "FROM project INNER JOIN ";
+      $count_sql   .= " (SELECT ProjectId, COUNT(ProjectId) ";
+      $count_sql   .= " FROM projectfactor WHERE $count_filter_phrase ";
+      $count_sql   .= " GROUP BY ProjectId HAVING COUNT(ProjectId)=$nb_filter_factor) AS subq ";
+      $count_sql   .= "ON project.ProjectId = subq.ProjectId ";
+      $count_sql   .= "$filtering_exp";
+
+      $self->logger->debug("COUNT SQL: $count_sql");
+
+      ($pg_id_err, $pg_id_msg, $nb_records,
+       $nb_pages, $limit_clause, $rcount_time) = get_paged_filter_sql($dbh,
+                                                                      $nb_per_page,
+                                                                      $page,
+                                                                      $count_sql,
+                                                                      $where_arg);
+
+      $self->logger->debug("COUNT WITH Factor TIME: $rcount_time");
+    }
+
+    $self->logger->debug("SQL Row count time: $rcount_time");
+
+    if ($pg_id_err == 1) {
+    
+      $self->logger->debug($pg_id_msg);
+    
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    if ($pg_id_err == 2) {
+      
+      $page = 0;
+    }
+
+    $pagination_aref = [{'NumOfRecords' => $nb_records,
+                         'NumOfPages'   => $nb_pages,
+                         'Page'         => $page,
+                         'NumPerPage'   => $nb_per_page,
+                        }];
+
+    $paged_limit_clause = $limit_clause;
+  }
+  
+  $dbh->disconnect();
+
+  my ($sort_err, $sort_msg, $sort_sql) = parse_sorting($sorting, $final_field_list);
+
+  if ($sort_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $sort_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (length($sort_sql) > 0) {
+
+    $sql .= " ORDER BY $sort_sql ";
+  }
+  else {
+
+    $sql .= ' ORDER BY project.ProjectId DESC';
+  }
+
+  $sql .= " $paged_limit_clause ";
+
+  $self->logger->debug("SQL with VCol: $sql");
+
+  $self->logger->debug('Where arg: ' . join(',', @{$where_arg}));
+
+  # where_arg here in the list function because of the filtering 
+  my ($read_project_err, $read_project_msg, $project_data) = $self->list_project(1, $sql, $where_arg);
+
+  if ($read_project_err) {
+
+    $self->logger->debug($read_project_msg);
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $data_for_postrun_href->{'Error'} = 0;
+  $data_for_postrun_href->{'Data'}  = {'Project'    => $project_data,
+                                       'VCol'       => $vcol_list,
+                                       'Pagination' => $pagination_aref,
+                                       'RecordMeta' => [{'TagName' => 'Project'}],
+  };
+
+  return $data_for_postrun_href;
+}
+
+sub get_project_runmode {
+
+=pod get_project_HELP_START
+{
+"OperationName" : "Get project",
+"Description": "Get detailed information about the project specified by project id.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><RecordMeta TagName='Project' /><Project ProjectManagerId='1' ProjectManagerName='Diversity Arrays' ProjectStartDate='0000-00-00 00:00:00' ProjectName='Test123' ProjectNote='' ProjectEndDate='0000-00-00 00:00:00' ProjectStatus='' TypeId='11' ProjectId='2' delete='delete/project/2' update='update/project/2' /></DATA>",
+"SuccessMessageJSON": "{'VCol' : [],'RecordMeta' : [{'TagName' : 'Project'}],'Project' : [{'ProjectManagerId' : '1','ProjectManagerName' : 'Diversity Arrays','ProjectStartDate' : '0000-00-00 00:00:00','ProjectName' : 'Test123','ProjectNote' : '','TypeId' : '11','ProjectStatus' : null,'ProjectEndDate' : '0000-00-00 00:00:00','ProjectId' : '2','delete' : 'delete/project/2','update' : 'update/project/2'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='ProjectId (5) not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'ProjectId (5) not found.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing ProjectId"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self       = shift;
+  my $project_id = $self->param('id');
+
+  my $data_for_postrun_href = {};
+
+  my $group_id = $self->authen->group_id();
+
+  my $dbh = connect_kdb_read();
+
+  if (!record_existence($dbh, 'project', 'ProjectId', $project_id)) {
+
+    my $err_msg = "ProjectId ($project_id) not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $field_list = ['project.*',
+                    "CONCAT(contact.ContactFirstName, concat(' ', contact.ContactLastName)) As ProjectManagerName"
+      ];
+  
+  my $other_join = ' LEFT JOIN contact ON project.ProjectManagerId = contact.ContactId ';
+
+  my ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_sql($dbh, $field_list, 'project',
+                                                                        'ProjectId', $other_join);
+  $dbh->disconnect();
+
+  if ($vcol_err) {
+
+    my $err_msg = "Problem with virtual column ($trouble_vcol) containing space.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $where_exp = ' WHERE project.ProjectId=? ';
+
+  $sql =~ s/GROUP BY/ $where_exp GROUP BY /;
+
+  $sql   .= ' ORDER BY project.ProjectId DESC';
+
+  $self->logger->debug("SQL with VCol: $sql");
+
+  my ($read_project_err, $read_project_msg, $project_data) = $self->list_project(1, $sql, [$project_id]);
+
+  if ($read_project_err) {
+
+    $self->logger->debug($read_project_msg);
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $data_for_postrun_href->{'Error'} = 0;
+  $data_for_postrun_href->{'Data'}  = {'Project'      => $project_data,
+                                       'VCol'         => $vcol_list,
+                                       'RecordMeta'   => [{'TagName' => 'Project'}],
+  };
+
+  return $data_for_postrun_href;
+}
+
+sub del_project_runmode {
+
+=pod del_project_gadmin_HELP_START
+{
+"OperationName" : "Delete project",
+"Description": "Delete project from the system specified by id. Project can be deleted only if not attached to any lower level related record.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 1,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='Project (2) has been deleted successfully.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'Project (3) has been deleted successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFOund": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='ProjectId (1) not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'ProjectId (1) not found.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing ProjectId."}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self       = shift;
+  my $project_id = $self->param('id');
+
+  my $data_for_postrun_href = {};
+
+  my $dbh_k_read = connect_kdb_read();
+
+  my $project_exist = record_existence($dbh_k_read, 'project', 'ProjectId', $project_id);
+
+  if (!$project_exist) {
+
+    my $err_msg = "ProjectId ($project_id) not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $project_used = record_existence($dbh_k_read, 'trial', 'ProjectId', $project_id);
+
+  if ($project_used) {
+
+    my $err_msg = "Project ($project_id) is used in trial.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh_k_read->disconnect();
+
+  my $dbh_k_write = connect_kdb_write();
+
+  my $sql = 'DELETE FROM projectfactor WHERE ProjectId=?';
+  my $sth = $dbh_k_write->prepare($sql);
+
+  $sth->execute($project_id);
+
+  if ($dbh_k_write->err()) {
+
+    $self->logger->debug("Delete projectfactor failed");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sth->finish();
+
+  $sql = 'DELETE FROM project WHERE ProjectId=?';
+  $sth = $dbh_k_write->prepare($sql);
+
+  $sth->execute($project_id);
+
+  if ($dbh_k_write->err()) {
+
+    $self->logger->debug("Delete project failed");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sth->finish();
+
+  $dbh_k_write->disconnect();
+
+  my $info_msg_aref = [{'Message' => "Project ($project_id) has been deleted successfully."}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'     => $info_msg_aref};
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub get_trial_unit_specimen_runmode {
+
+=pod get_trial_unit_specimen_HELP_START
+{
+"OperationName" : "Get trial unit specimen",
+"Description": "Get detailed information about association between trial unit and specimen specified by trialunitspecimen id.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><RecordMeta TagName='TrialUnitSpecimen' /><TrialUnitSpecimen ItemBarcode='' SpecimenName='Specimen4TrialUnit_8074320' Notes='none' ItemId='' TrialUnitId='2' TrialUnitSpecimenId='7' HarvestDate='0000-00-00' UltimatePermission='' PlantDate='2011-09-01' HasDied='0' SpecimenId='6' /></DATA>",
+"SuccessMessageJSON": "{'RecordMeta' : [{'TagName' : 'TrialUnitSpecimen'}],'TrialUnitSpecimen' : [{'SpecimenName' : 'Specimen4TrialUnit_8074320','ItemBarcode' : null,'Notes' : 'none','ItemId' : null,'TrialUnitId' : '2','TrialUnitSpecimenId' : '7','HarvestDate' : '0000-00-00','UltimatePermission' : null,'PlantDate' : '2011-09-01','HasDied' : '0','SpecimenId' : '6'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='TrialUnitSpecimenId (3) not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'TrialUnitSpecimenId (3) not found.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing TrialUnitSpecimenId"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self       = $_[0];
+  my $tu_spec_id = $self->param('id');
+
+  my $data_for_postrun_href = {};
+
+  my $dbh = connect_kdb_read();
+
+  my $tu_spec_sql = "SELECT DISTINCT trialunit.TrialId ";
+  $tu_spec_sql   .= "FROM trialunitspecimen LEFT JOIN trialunit ";
+  $tu_spec_sql   .= "ON trialunitspecimen.TrialUnitId = trialunit.TrialUnitId ";
+  $tu_spec_sql   .= "WHERE TrialUnitSpecimenId=?";
+  
+  my ($r_trial_id_err, $trial_id) = read_cell($dbh, $tu_spec_sql, [$tu_spec_id]);
+
+  if ($r_trial_id_err) {
+
+    $self->logger->debug("Read trial id failed");
+    my $err_msg = "Unexpected Error.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (length($trial_id) == 0) {
+
+    my $err_msg = "TrialUnitSpecimenId ($tu_spec_id) not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $group_id = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+  my $perm_str = permission_phrase($group_id, 0, $gadmin_status, 'trial');
+
+  my $sql      = "SELECT $perm_str AS UltimatePermission ";
+  $sql        .= 'FROM trial ';
+  $sql        .= 'WHERE TrialId=?';
+
+  my ($read_err, $permission) = read_cell($dbh, $sql, [$trial_id]);
+  $dbh->disconnect();
+
+  if ( ($permission & $READ_PERM) != $READ_PERM ) {
+
+    my $err_msg = "Trial ($trial_id): permission denied.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sql  = "SELECT trialunitspecimen.*, specimen.SpecimenName, item.ItemBarcode ";
+  $sql .= "FROM trialunitspecimen LEFT JOIN specimen ON trialunitspecimen.SpecimenId = specimen.SpecimenId ";
+  $sql .= "LEFT JOIN item on trialunitspecimen.ItemId = item.ItemId ";
+  $sql .= "WHERE trialunitspecimen.TrialUnitSpecimenId=?";
+
+  my ($read_tus_err, $read_tus_msg, $tus_data) = $self->list_trial_unit_specimen(1, $sql, [$tu_spec_id]);
+
+  if ($read_tus_err) {
+
+    $self->logger->debug($read_tus_msg);
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $data_for_postrun_href->{'Error'} = 0;
+  $data_for_postrun_href->{'Data'}  = {'TrialUnitSpecimen'  => $tus_data,
+                                       'RecordMeta'         => [{'TagName' => 'TrialUnitSpecimen'}],
+  };
+
+  return $data_for_postrun_href;
+}
+
+sub rollback_cleanup {
+
+  # This method takes a hash reference for the records to delete in the following format.
+  # $inserted_id->{'table_name'} = ['Id Field Name', record_id]. So the limitation
+  # of this cleanup function is that it cannot delete multiple records in a table
+  # whoses record id values are different. There is a better version of this
+  # clean up function which can do this. It is called rollback_cleanup_multi which is
+  # part of Common.pm package.
+
+  my $self        = $_[0];
+  my $dbh         = $_[1];
+  my $inserted_id = $_[2];
+
+  my $err     = 0;
+  my $err_msg = q{};
+
+  for my $table_name (keys(%{$inserted_id})) {
+
+    my $field_info = $inserted_id->{$table_name};
+    my $id_field   = $field_info->[0];
+    my $id_val     = $field_info->[1];
+
+    $self->logger->debug("Deleting ($id_field, $id_val) from $table_name");
+
+    my $sql = "DELETE FROM $table_name ";
+    $sql   .= "WHERE $id_field=?";
+
+    my $sth = $dbh->prepare($sql);
+    $sth->execute($id_val);
+
+    if ($dbh->err()) {
+
+      $err_msg = $dbh->errstr();
+      $err = 1;
+      last;
+    }
+
+    $sth->finish();
+  }
+
+  return ($err, $err_msg);
+}
+
+sub validate_trial_id {
+
+  my $self         = $_[0];
+  my $trial_id_str = $_[1];
+
+  my $err = 0;
+  my $msg = '';
+
+  my $trial_id_aref = [];
+
+  if ($trial_id_str =~ /^\(.*\)$/) {
+
+    $trial_id_str =~ s/[\(|\)]//g;
+    my @trial_id_list = split(/,/, $trial_id_str);
+  }
+  else {
+
+    push(@{$trial_id_aref}, $trial_id_str);
+  }
+
+  my $group_id = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+  my $dbh = connect_kdb_read();
+
+  my ($is_ok, $trouble_trial_id_aref) = check_permission($dbh, 'trial', 'TrialId',
+                                                         $trial_id_aref, $group_id, $gadmin_status,
+                                                         $READ_PERM);
+
+  if (!$is_ok) {
+
+    $err = 1;
+    $msg = "Trial (" . join(',', @{$trouble_trial_id_aref}) . "): permission denied.";
+  }
+
+  $dbh->disconnect();
+
+  return ($err, $msg);
+}
+
+sub validate_trial_unit_id {
+
+  my $self              = $_[0];
+  my $trial_unit_id_str = $_[1];
+
+  my $err = 0;
+  my $msg = '';
+
+  my $dbh = connect_kdb_read();
+
+  my $where_phrase = '';
+
+  $self->logger->debug("TrialUnitIdStr: $trial_unit_id_str");
+
+  if ($trial_unit_id_str =~ /^\(.*\)$/) {
+
+    $where_phrase = "TrialUnitId IN $trial_unit_id_str";
+  }
+  else {
+
+    $where_phrase = "TrialUnitId = $trial_unit_id_str";
+  }
+
+  my $sql = "SELECT DISTINCT TrialId FROM trialunit WHERE $where_phrase";
+
+  $self->logger->debug("DISTINCT TrialId SQL: $sql");
+
+  my ($read_tid_err, $read_tid_msg, $trial_id_data) = read_data($dbh, $sql, []);
+
+  if ($read_tid_err) {
+
+    $self->logger->debug("Get DISTINCT TrialId failed: $read_tid_msg");
+    $err = 1;
+    $msg = 'Unexpected Error.';
+
+    return ($err, $msg);
+  }
+
+  my $trial_id_aref = [];
+
+  for my $trial_id_rec (@{$trial_id_data}) {
+
+    push(@{$trial_id_aref}, $trial_id_rec->{'TrialId'});
+  }
+
+  $self->logger->debug("DISTINCT TrialId: " . join(',', @{$trial_id_aref}) );
+
+  my $group_id      = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  my ($is_ok, $trouble_trial_id_aref) = check_permission($dbh, 'trial', 'TrialId',
+                                                         $trial_id_aref, $group_id, $gadmin_status,
+                                                         $READ_PERM);
+
+  if (!$is_ok) {
+
+    $err = 1;
+    $msg = "Trial (" . join(',', @{$trouble_trial_id_aref}) . "): permission denied";
+  }
+
+  $dbh->disconnect();
+
+  return ($err, $msg);
+}
+
+sub get_siteloc_dtd_file {
+
+  my $dtd_path = $DTD_PATH;
+
+  return "${dtd_path}/siteloc.dtd";
+}
+
+sub get_trialloc_dtd_file {
+
+  my $dtd_path = $DTD_PATH;
+
+  return "${dtd_path}/trialloc.dtd";
+}
+
+sub get_trialunit_loc_dtd_file {
+
+  my $dtd_path = $DTD_PATH;
+
+  return "${dtd_path}/trialunitloc.dtd";
+}
+
+sub get_addtrialunit_dtd_file {
+
+  my $dtd_path = $DTD_PATH;
+
+  return "${dtd_path}/addtrialunit_upload.dtd";
+}
+
+sub get_addtrialunit_bulk_dtd_file {
+
+  my $dtd_path = $DTD_PATH;
+
+  return "${dtd_path}/addtrialunitbulk_upload.dtd";
+}
+
+sub logger {
+
+  my $self = shift;
+  return $self->{logger};
+}
+
+sub _set_error {
+
+  my ( $self, $error_message ) = @_;
+  return {
+    'Error' => 1,
+    'Data'  => { 'Error' => [ { 'Message' => $error_message || 'Unexpected error.' } ] }
+  };
+}
+
+
+1;

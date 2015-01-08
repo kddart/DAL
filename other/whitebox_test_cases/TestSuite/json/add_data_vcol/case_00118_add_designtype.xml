@@ -1,0 +1,15 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Add Design Type" OutputFormat="JSON" TargetURL="add/designtype?ctype=json" Type="BLOCKING" />
+  <Delete TargetURL="delete/designtype/:DesignTypeId?ctype=json" />
+  <INPUT ParaName="DesignTypeName" Value="Traditional" />
+  <INPUT ParaName="DesignSoftware" Value="Optimal Trial Design" />
+  <INPUT ParaName="DesignTemplateFile" Value="none" />
+  <INPUT ParaName="DesignGenotypeFormat" Value="normal" />
+  <INPUT ParaName="DesignFactorAliasPrefix" Value="DiG" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Match Attr="ParaName" Tag="ReturnId" Value="DesignTypeId" />
+  <Parent CaseFile="json/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="json/login_testuser/case_00203_switch4testu.xml" Order="2" />
+  
+</TestCase>

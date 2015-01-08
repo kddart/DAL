@@ -1,0 +1,4 @@
+<!ELEMENT DATA ( itemgroupentry+ ) >
+
+<!ELEMENT itemgroupentry EMPTY >
+<!ATTLIST itemgroupentry ItemId NMTOKEN #REQUIRED >

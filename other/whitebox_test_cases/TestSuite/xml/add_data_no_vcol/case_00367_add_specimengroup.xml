@@ -1,0 +1,17 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record_upload" Description="Add Specimen Group" TargetURL="add/specimengroup" Type="BLOCKING" />
+  <Delete TargetURL="delete/specimengroup/:SpecimenGroupId" />
+  <INPUT ParaName="SpecimenGroupName" PrefixVal="SpecimenGroup_" Random="1" />
+  <INPUT ParaName="SpecimenGroupTypeId" SrcValue="xml/add_data_no_vcol/case_00368_add_specimengroup_type.xml" />
+  <INPUT ParaName="specimengroupentry" Process="1" SrcFile="xml/add_data_no_vcol/specimengroup.xml" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Match Attr="ParaName" Tag="ReturnId" Value="SpecimenGroupId" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00368_add_specimengroup_type.xml" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00114_add_specimen1.xml" Order="4" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00115_add_specimen2.xml" Order="5" />
+  <ReturnId ParaName="SpecimenGroupId" Value="1" />
+  <RunInfo Success="1" Time="1409792240" />
+</TestCase>

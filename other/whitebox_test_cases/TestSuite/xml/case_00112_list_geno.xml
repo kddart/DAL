@@ -1,0 +1,8 @@
+<TestCase>
+  <CaseInfo Description="List genotype with zero permission" TargetURL="list/genotype/200/page/1" Type="BLOCKING" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="COUNT" Tag="Genotype" TargetDataType="MULTI" Value="boolex(x&gt;1)" />
+  <Parent CaseFile="./xml/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="./xml/case_00203_switch4testu.xml" Order="2" />
+  
+</TestCase>

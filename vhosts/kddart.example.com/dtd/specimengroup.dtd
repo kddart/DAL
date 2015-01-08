@@ -1,0 +1,5 @@
+<!ELEMENT DATA ( specimengroupentry* ) >
+
+<!ELEMENT specimengroupentry EMPTY >
+<!ATTLIST specimengroupentry SpecimenId NMTOKEN #REQUIRED >
+<!ATTLIST specimengroupentry SpecimenNote CDATA #IMPLIED >

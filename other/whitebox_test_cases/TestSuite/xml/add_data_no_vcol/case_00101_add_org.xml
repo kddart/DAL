@@ -1,0 +1,12 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Add Organisation" TargetURL="add/organisation" Type="BLOCKING" />
+  <Delete TargetURL="delete/organisation/:OrganisationId" />
+  <INPUT ParaName="OrganisationName" PrefixVal="DArT Testing " Random="1" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Match Attr="ParaName" Tag="ReturnId" Value="OrganisationId" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <ReturnId ParaName="OrganisationId" Value="12" />
+  <RunInfo Success="1" Time="1409792409" />
+</TestCase>

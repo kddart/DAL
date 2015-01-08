@@ -1,0 +1,23 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Update Layer" TargetURL="update/layer/:LayerId" Type="BLOCKING" />
+  <INPUT ParaName="LayerId" SrcValue="xml/add_data_no_vcol/case_00345_add_layer.xml" />
+  <INPUT ParaName="name" PrefixVal="Layer - " Random="1" />
+  <INPUT ParaName="alias" Value="" />
+  <INPUT ParaName="parent" Value="0" />
+  <INPUT ParaName="layertype" Value="NORMAL" />
+  <INPUT ParaName="iseditable" Value="1" />
+  <INPUT ParaName="layermetadata" Value="Created from the test framework" />
+  <INPUT ParaName="geometrytype" Value="POINT" />
+  <INPUT ParaName="description" Value="Created by the automatic test." />
+  <INPUT ParaName="owngroupperm" Value="7" />
+  <INPUT ParaName="accessgroupid" Value="0" />
+  <INPUT ParaName="accessgroupperm" Value="5" />
+  <INPUT ParaName="otherperm" Value="5" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00345_add_layer.xml" Order="3" />
+  <ReturnId ParaName="id" Value="2" />
+  <RunInfo Success="1" Time="1407135933" />
+</TestCase>

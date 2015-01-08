@@ -1,0 +1,12 @@
+<TestCase>
+  <CaseInfo Description="Specimen Group List Extract" TargetURL="specimengroup/:SpecimenGroupId/list/extract" Type="BLOCKING" />
+  <Delete TargetURL="delete/specimengroup/:SpecimenGroupId" />
+  <INPUT ParaName="SpecimenGroupId" SrcValue="xml/add_data_no_vcol/case_10084_add_specimen_group.xml" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="COUNT" Tag="SpecimenGroup" TargetDataType="MULTI" Value="boolex(x&gt;0)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_10084_add_specimen_group.xml" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00302_add_extract.xml" Order="4" />
+  
+</TestCase>

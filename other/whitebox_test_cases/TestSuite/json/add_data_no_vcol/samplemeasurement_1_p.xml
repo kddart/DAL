@@ -1,0 +1,18 @@
+<DATA>
+  <ROW>
+    <InstanceNumber Value="5" />
+    <MeasurementDateTime Value="2011-01-15 14:28:37" />
+    <SampleTypeId Value="10" />
+    <TraitId Value="9" />
+    <TraitValue Value="11" />
+    <TrialUnitId Value="16" />
+  </ROW>
+  <ROW>
+    <InstanceNumber Value="6" />
+    <MeasurementDateTime Value="2011-01-15 14:28:37" />
+    <SampleTypeId Value="10" />
+    <TraitId Value="9" />
+    <TraitValue Value="40" />
+    <TrialUnitId Value="16" />
+  </ROW>
+</DATA>

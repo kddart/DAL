@@ -1,0 +1,5 @@
+<!ELEMENT DATA ( trialunitloc ) >
+
+<!ELEMENT trialunitloc EMPTY >
+<!ATTLIST trialunitloc lat NMTOKEN #REQUIRED >
+<!ATTLIST trialunitloc lng NMTOKEN #REQUIRED >

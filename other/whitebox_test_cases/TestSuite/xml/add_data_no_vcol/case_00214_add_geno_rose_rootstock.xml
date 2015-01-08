@@ -1,0 +1,23 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Add Genotype" TargetURL="add/genotype" Type="BLOCKING" />
+  <Delete TargetURL="delete/genotype/:GenotypeId" />
+  <INPUT ParaName="GenotypeName" Value="Multiflora" />
+  <INPUT ParaName="GenusId" Value="1" />
+  <INPUT ParaName="SpeciesName" Value="Unknown" />
+  <INPUT ParaName="GenotypeAcronym" Value="kiwi" />
+  <INPUT ParaName="OriginId" Value="0" />
+  <INPUT ParaName="CanPublishGenotype" Value="0" />
+  <INPUT ParaName="GenotypeColor" Value="Unknown" />
+  <INPUT ParaName="GenotypeNote" Value="Multiflora (kiwi) - Which was introduced into Australia as a virus resistant stock for Australian rose growers. It is a popular choice for those soils which are not sandy, because it has no where near the number of thick thorns that Dr. Huey has. A Multiflora (kiwi) bush can produce thick, straight and long canes perfect for budding standards. It does have small thorns and single, white, extremely sweet smelling flower" />
+  <INPUT ParaName="AccessGroupId" Value="0" />
+  <INPUT ParaName="OwnGroupPerm" Value="7" />
+  <INPUT ParaName="AccessGroupPerm" Value="5" />
+  <INPUT ParaName="OtherPerm" Value="0" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Match Attr="ParaName" Tag="ReturnId" Value="GenotypeId" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <ReturnId ParaName="GenotypeId" Value="846651" />
+  
+</TestCase>

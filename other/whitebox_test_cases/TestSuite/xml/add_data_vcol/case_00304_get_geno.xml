@@ -1,0 +1,11 @@
+<TestCase>
+  <CaseInfo Description="Get Genotype" TargetURL="get/genotype/:GenotypeId" Type="BLOCKING" />
+  <INPUT ParaName="GenotypeId" SrcValue="xml/add_data_vcol/case_00104_add_geno.xml" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Tag="Genotype" Value="Extra data" VirAttr="xml/add_data_vcol/case_00104_add_geno.xml" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Order="2" />
+  <Parent CaseFile="xml/add_data_vcol/case_00103_add_vcol_geno.xml" Order="3" />
+  <Parent CaseFile="xml/add_data_vcol/case_00104_add_geno.xml" Order="4" />
+  
+</TestCase>

@@ -1,0 +1,8 @@
+<TestCase>
+  <CaseInfo Description="Switch Group" TargetURL="switch/group/:GroupId" Type="BLOCKING" />
+  <INPUT ParaName="GroupId" Value="0" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Parent CaseFile="./xml/case_00201_login_testuser.xml" Order="1" />
+  
+</TestCase>

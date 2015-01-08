@@ -1,0 +1,11 @@
+<TestCase>
+  <CaseInfo Description="Get Contact" TargetURL="get/contact/:ContactId" Type="BLOCKING" />
+  <INPUT ParaName="ContactId" SrcValue="xml/add_data_vcol/case_00102_add_con.xml" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Tag="Contact" Value="Extra data" VirAttr="xml/add_data_vcol/case_01001_add_vcol_contact.xml" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Order="2" />
+  <Parent CaseFile="xml/add_data_vcol/case_01001_add_vcol_contact.xml" Order="3" />
+  <Parent CaseFile="xml/add_data_vcol/case_00102_add_con.xml" Order="4" />
+  
+</TestCase>

@@ -1,0 +1,10 @@
+<TestCase>
+  <CaseInfo Description="Get Genotype with zero permission" TargetURL="get/genotype/:GenotypeId" Type="BLOCKING" />
+  <INPUT ParaName="GenotypeId" SrcValue="./xml/case_00110_add_geno_zero_perm.xml" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="COUNT" Tag="Genotype" TargetDataType="MULTI" Value="boolex(x&gt;0)" />
+  <Parent CaseFile="./xml/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="./xml/case_00203_switch4testu.xml" Order="2" />
+  <Parent CaseFile="./xml/case_00110_add_geno_zero_perm.xml" Order="3" />
+  
+</TestCase>

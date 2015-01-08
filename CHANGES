@@ -1,0 +1,85 @@
+Version 2.2.5
+
+Major:
+
++ DAL HTTP error is changed from 401 to 420 for all errors, except for login required error, group selection required error, group administration required error and the errors in login/_username/_rememberme.
+
+Minor:
+
++ Enable adding an empty plate without any extract.
+
++ List/field now returns field descriptions as well.
+
++ First release of online help for every interface.
+
++ login/_username/_rememberme is put back in the list of operations.
+
+Version 2.2.4
+
+Major:
+
++ Online help is available for some operations.
+
++ update/layer/:id is available.
+
++ Add SpecimenNote to specimengroupentry affecting list/specimengroup/:nperpage/page/:num, get/specimengroup/:id, add/specimengroup, specimengroup/:specgrpid/add/specimen.
+
++ Prior to version 2.2.4, add/specimengroup and specimengroup/:specgrpid/add/specimen used to take duplicate SpecimenId. Duplicate checking is in place in DAL v2.2.4.
+
+Minor:
+
++ Fix download datakapture template link when the trial has no trial unit.
+
++ list/layer provides lastrecorddate for all the layer attributes which has data.
+
+
+Version 2.2.3
+
+Major:
+
++ Fix slowness in list small tables like list/breedingmethod. list/breedingmethod was slow in version 2.2.2 because for every breedingmethod DAL checks if this breeding method is used in specimen table or not. If it is not used, DAL will give a delete link. The fix for all list interface is that DAL checks if the record is used in other tables for the delete link in bulk. This improveslist/breedingmethod from 25 seconds to 400 milliseconds. Bulk checking for delete link and other related database record lookup is introduced in this version.
+
++ Add the filtering feature to list/sepcimengroup and list/itemgroup. This means that list/specimengroup and list/itemgroup are replaced with list/specimengroup/:nperpage/page/:num and list/itemgroup/:nperpage/page/:num.
+
++ Introduce list/pedigree/:nperpage/page/:num and list/genpedigree/:nperpage/page/:num.
+
+Minor:
+
++ Make add/specimengroup to accept the situation when specimen is not provided. This is done by modifying specimengroup.dtd.
+
+Version 2.2.2
+
+Major:
+
++ Genotype alias has type, status and language fields. 
++ Introduction of genotype pedigree in addition to specimen pedigree. Genotype pedigree or gen pedigree is seen as the breeding history (pedigree) while specimen pedigress is seen as selection history.
++ Add/list multimedia files for genotype, specimen and site.
++ Being able to filter on factor columns in organisation, contact, site, trial and project.
+
+Minor:
+
++ Listing genotype alias supports advanced features including filtering.
++ List genotype ancestor and descendant are available.
++ List specimen ancestor and descendant are available.
++ Add, list and get barcodeconf are available.
++ list/factor returns all fields in the factor table.
++ 'factor/table/:tname/add/vcolumn' becomes 'factortable/:tname/add/vcolumn'.
+
+----------------------------------------------------------------------------------------
+
+Version 2.2.1
+
+This is a minor release to enable uploading large marker data files of more than several hundreds megabytes.
+
+Major:
+
++ Changes in marker module schema in order to store marker data in the csv file
++ Import marker data is now based on a csv file storage system.
++ Export marker data is also based on the csv file storage system.
++ Export marker data supports filtering and field selection. Field selection is controlled by two optional parameters (MarkerMetaFieldList and MarkerDataFieldList).
+
+Minor:
+
++ Analysisgroup has an interface to list the meta data fields.
++ Due to circular foreign key references between item and trialunitspecimen and other tables and time constraint, the foreign key references are not available in the database schemas embedded with this release.
+

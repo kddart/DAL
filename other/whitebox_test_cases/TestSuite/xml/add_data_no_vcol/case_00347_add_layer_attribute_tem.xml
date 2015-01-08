@@ -1,0 +1,18 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Add Layer Attribute" TargetURL="layer/:LayerId/add/attribute" Type="BLOCKING" />
+  <INPUT ParaName="LayerId" SrcValue="xml/add_data_no_vcol/case_00345_add_layer.xml" />
+  <INPUT ParaName="colname" PrefixVal="Temperature_" Random="1" />
+  <INPUT ParaName="coltype" Value="Temperature" />
+  <INPUT ParaName="colsize" Value="20" />
+  <INPUT ParaName="colunits" Value="degree c" />
+  <INPUT ParaName="valuetype" SrcValue="xml/add_data_no_vcol/case_00346_add_valuetype.xml" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Match Attr="ParaName" Tag="ReturnId" Value="id" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00345_add_layer.xml" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00346_add_valuetype.xml" Order="4" />
+  <ReturnId ParaName="id" Value="3" />
+  <RunInfo Success="1" Time="1409792219" />
+</TestCase>

@@ -1,0 +1,8 @@
+<TestCase>
+  <CaseInfo OutputFormat="JSON" Description="Testing failed list operation: need to switch group" TargetURL="list/operation?ctype=json" Type="BLOCKING" />
+  <Match Attr="StatusCode" Value="401" />
+  <Match Attr="Message" Tag="Error" Value="regex(You need to)" />
+  <Parent CaseFile="./json/case_01004.xml" Force="1" Order="2" />
+  <Parent CaseFile="./json/case_00201_login_testuser.xml" Order="1" />
+  
+</TestCase>

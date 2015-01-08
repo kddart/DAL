@@ -1,0 +1,4 @@
+<!ELEMENT DATA ( extract* ) >
+
+<!ELEMENT extract EMPTY >
+<!ATTLIST extract ExtractId NMTOKEN #REQUIRED >

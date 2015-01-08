@@ -1,0 +1,11 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Add Genus" OutputFormat="JSON" TargetURL="add/genus?ctype=json" Type="BLOCKING" />
+  <Delete TargetURL="delete/genus/:GenusId?ctype=json" />
+  <INPUT ParaName="GenusName" PrefixVal="Genus_" Random="1" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Match Attr="ParaName" Tag="ReturnId" Value="GenusId" />
+  <Parent CaseFile="./json/case_00201_login_testuser.xml" Force="1" Order="1" />
+  <Parent CaseFile="./json/case_00203_switch4testu.xml" Force="1" Order="2" />
+  
+</TestCase>

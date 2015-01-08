@@ -1,0 +1,15 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Add a user" TargetURL="add/user" Type="BLOCKING" />
+  <INPUT ParaName="UserName" Value="utest" />
+  <INPUT ParaName="UserPassword" Value="5aaac9c46dd7f1fb24c71f7c13d66027f15bc4ce" />
+  <INPUT ParaName="ContactId" SrcValue="./xml/case_00102_add_con.xml" />
+  <INPUT ParaName="UserType" Value="human" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Match Attr="COUNT" Tag="ReturnId" TargetDataType="MULTI" Value="boolex(x=1)" />
+  <Parent CaseFile="./xml/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="./xml/case_00203_switch4testu.xml" Order="2" />
+  <Parent CaseFile="./xml/case_00102_add_con.xml" Order="3" />
+  <ReturnId ParaName="Username" Value="utest" />
+  
+</TestCase>

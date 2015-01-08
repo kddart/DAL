@@ -1,0 +1,10 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Add Unit Position" OutputFormat="JSON" TargetURL="add/unitposition?ctype=json" Type="BLOCKING" />
+  <Delete TargetURL="delete/unitposition/:UnitPositionId?ctype=json" />
+  <INPUT ParaName="UnitPositionText" Value="block01|row1|column1                " />
+  <Match Attr="StatusCode" Value="401" />
+  <Match Attr="Message" Tag="Error" Value="Control character not allowed." />
+  <Parent CaseFile="json/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="json/login_testuser/case_00203_switch4testu.xml" Order="2" />
+  
+</TestCase>

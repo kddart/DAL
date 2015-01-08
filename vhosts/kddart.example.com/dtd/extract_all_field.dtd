@@ -1,0 +1,11 @@
+<!ELEMENT DATA ( extract+ ) >
+
+<!ELEMENT extract EMPTY >
+<!ATTLIST extract ItemGroupId NMTOKEN #REQUIRED >
+<!ATTLIST extract GenotypeId NMTOKEN #IMPLIED >
+<!ATTLIST extract ParentExtractId NMTOKEN #IMPLIED >
+<!ATTLIST extract Quality CDATA #IMPLIED >
+<!ATTLIST extract Status CDATA #IMPLIED >
+<!ATTLIST extract Tissue NMTOKEN #IMPLIED >
+<!ATTLIST extract WellCol CDATA #IMPLIED >
+<!ATTLIST extract WellRow CDATA #IMPLIED >

@@ -1,0 +1,6 @@
+json/failed_expected/add_unitposition_ctrl_char01.xml
+json/failed_expected/add_unitposition_ctrl_char02.xml
+json/failed_expected/add_unitposition_ctrl_char03.xml
+json/failed_expected/add_unitposition_ctrl_char04.xml
+json/failed_expected/add_unitposition_ctrl_char05.xml
+json/failed_expected/add_unitposition_ctrl_char06.xml

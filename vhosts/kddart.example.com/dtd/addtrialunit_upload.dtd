@@ -1,0 +1,9 @@
+<!ELEMENT DATA ( trialunitspecimen+ ) >
+
+<!ELEMENT trialunitspecimen EMPTY >
+<!ATTLIST trialunitspecimen HarvestDate NMTOKEN #IMPLIED >
+<!ATTLIST trialunitspecimen Notes NMTOKEN #IMPLIED >
+<!ATTLIST trialunitspecimen HasDied NMTOKEN #IMPLIED >
+<!ATTLIST trialunitspecimen PlantDate NMTOKEN #IMPLIED >
+<!ATTLIST trialunitspecimen SpecimenId NMTOKEN #REQUIRED >
+<!ATTLIST trialunitspecimen ItemId NMTOKEN #IMPLIED >

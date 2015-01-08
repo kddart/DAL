@@ -1,0 +1,11 @@
+<TestCase>
+  <CaseInfo OutputFormat="JSON" CustomMethod="claim_grp_ownership" Description="Claim group ownership" TargetURL="group/:GroupId?ctype=json" Type="BLOCKING" />
+  <INPUT ParaName="GroupName" Value="testc_g" />
+  <INPUT ParaName="GroupPassword" Value="123456" />
+  <INPUT ParaName="GroupId" SrcValue="./json/case_00011_add_grp.xml" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(of group)" />
+  <Parent CaseFile="./json/case_00201_login_testuser.xml" Force="1" Order="1" />
+  <Parent CaseFile="./json/case_00202_switch_nogrp.xml" Force="1" Order="2" />
+  
+</TestCase>

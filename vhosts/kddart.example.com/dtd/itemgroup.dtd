@@ -1,0 +1,22 @@
+<!ELEMENT DATA ( ItemGroup+ ) >
+
+<!ELEMENT ItemGroup ( Item+ ) >
+<!ATTLIST ItemGroup ItemGroupName CDATA #REQUIRED >
+<!ATTLIST ItemGroup ItemGroupNote CDATA #IMPLIED >
+<!ATTLIST ItemGroup ItemSourceId NMTOKEN #IMPLIED >
+<!ATTLIST ItemGroup ContainerTypeId NMTOKEN #IMPLIED >
+<!ATTLIST ItemGroup ScaleId NMTOKEN #IMPLIED >
+<!ATTLIST ItemGroup ItemStateId NMTOKEN #IMPLIED >
+<!ATTLIST ItemGroup ItemUnitId NMTOKEN #IMPLIED >
+<!ATTLIST ItemGroup StorageId NMTOKEN #IMPLIED >
+
+<!ELEMENT Item EMPTY >
+<!ATTLIST Item SpecimenId NMTOKEN #REQUIRED >
+<!ATTLIST Item ItemBarcode CDATA #REQUIRED >
+<!ATTLIST Item ItemTypeId NMTOKEN #REQUIRED >
+<!ATTLIST Item ItemStateId NMTOKEN #IMPLIED >
+<!ATTLIST Item ItemUnitId NMTOKEN #IMPLIED >
+<!ATTLIST Item StorageId NMTOKEN #IMPLIED >
+<!ATTLIST Item Amount NMTOKEN #IMPLIED >
+<!ATTLIST Item ItemOperation CDATA #IMPLIED >
+<!ATTLIST Item ItemNote CDATA #IMPLIED >

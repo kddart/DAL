@@ -1,0 +1,94 @@
+Installation instructions
+
+! The easiest way to get DAL working is to get a preconfigured virtual machine from DArT. !
+
+If you want to try on your own, the very general instructions are provided below.
+You have to be very familiar with Linux system administration, Apache configuration,
+Perl environment and MySQL, PostgreSQL database configurations. Installation described below
+has been tested on openSuSE installation (with Apache 2.2 - 2.4 will have some differences).
+
+Works on openSuSE 12.2 and 12.3
+
+Instructions are assuming that base folder for installation is '/srv/www/'
+
+Instructions cover installation on insecure http connection. If you want to secure your
+installation you have to obtain a valid domain name and SSL certificate for it and configure
+Apache to handle https connections to this domain. Than the only change in the following
+configuration will be to use https rather than http url's and 443 port in Apache configuration
+rather than 80.
+
+It is also assumed that your installation url will be http://kddart.example.com/dal/
+
+* Application files location
+
+All *.pm files under perl-lib directory and index.pl file in cgi-bin/kddart directory
+are the application files running DAL
+
+All the *.sql files in other/db_files are database dump files for database component
+
+* Database configuration and creation
+
+ - Install both MySQL and PostgreSQL (tested on mysql 5.5 and postgres 9.1)
+ - secure access to both databases with passwords of both root and postgres users respecitvely
+ - install PostGIS (tested on version 1.5)
+ - create 'kddart_dal' users in both systems, secured by passwords
+ - in the base foler create subfolder named 'secure'
+ - create two files inside this folder: mysql_user.txt and postgres_user.txt
+ - both files should then be filled with user name and password for both databases in the format:
+
+username = kddart_dal
+password = yourSecurePassword
+
+ - look into create_dbs.sh script for database access configuration close to the top of the file
+ - run run_create_dbs_example.sh script
+
+* Perl dependencies and application
+
+ - create 'kddart' subfolder in '/srv/www/cgi-bin'
+ - copy index.pl file there
+ - create 'perl-lib' subfolder in '/srv/www/'
+ - copy content of perl-lib installation into created folder
+ - make sure you have a sufficient access privilegs to both folders and contents to be run 
+   by wwwrun user and www group
+ - inside 'perl-lib' folder issue a command - find . -name '*.pm' -exec perl -c {} ";"
+ - perl will report missing dependencies. Install them and re-issue above command until it does not
+   report any errors
+ - you may need to install Crypt::Random from source as CPAN installation not always works
+
+* DAL configuration
+
+ - At this stage DAL configuration is contained in Common.pm file. Future releases will switch
+   from Perl based configuration into file based
+ - Read the Common.pm until above the line: 'our $UNIT_POSITION_SPLITTER = '|';'
+ - Adjust configuration parameters for database connections, folders and file locations and other
+   parameters
+ - You will have to create manually the directory '/tmp/kddart/' and give it full access privilegs
+   to the apache user (wwwrun on openSuSE)
+ - watch out for the variable '$GENOTYPE2SPECIMEN_CFG' - this will set the type of relations between
+   genotype and specimen entities. You have to configure it carefully knowing what type of needs
+   DAL users have in your organisation. 'M-TO-M' is a safe bet, as it allows for all kinds of possibilites,
+   but it may not be a desirable behaviour
+
+* Apache configuration
+
+ - copy kddart.example.com subfolder from vhosts directory into '/srv/www/vhosts/' folder on the server
+ - copy http-kddart.example.com.conf apache configuration file into /etc/apache2/vhosts.d/ folder (or
+   equivalent location) and change settings according to your requiremens and server setup
+ - make sure configuration is correct, restart apache
+ - now DAL should be available under the base url: http://kddart.example.com/dal/
+ - in your browser you may put address: 'http://kddart.example.com/dal/get/login/status' and you should
+   see tiny xml output informing you that you are not yet logged in
+
+* Test your installation
+
+ - Perl script other/dal_access_test.pl is a good example of how to use DAL programmatically. Initial DAL
+   installation is done with user named 'admin' and password 'kddartadmin' and this user belongs to
+   the group with id '0' (zero). To test your installation go to folder 'other' and issue a command:
+   perl -w dal_access_test.pl 'http://kddart.example.com/dal' 'admin' 'kddartadmin' 0
+   
+ - Full test suite of KDDart is located at other/whitebox_text_cases folder
+ - TBD
+
+* Further actions
+
+ - Please, refer to the http://www.kddart.org for documentaion how to use DAL and other information

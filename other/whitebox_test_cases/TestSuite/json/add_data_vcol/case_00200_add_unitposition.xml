@@ -1,0 +1,12 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Add Unit Position" OutputFormat="JSON" TargetURL="add/unitposition?ctype=json" Type="BLOCKING" />
+  <Delete TargetURL="delete/unitposition/:UnitPositionId?ctype=json" />
+  <INPUT ParaName="UnitPositionText" Value="block01|row1|column1" />
+  <INPUT SrcName="json/add_data_vcol/case_01003_add_vcol_unitposition.xml" Value="Extra data" Virtual="1" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Match Attr="ParaName" Tag="ReturnId" Value="UnitPositionId" />
+  <Parent CaseFile="json/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="json/login_testuser/case_00203_switch4testu.xml" Order="2" />
+  
+</TestCase>

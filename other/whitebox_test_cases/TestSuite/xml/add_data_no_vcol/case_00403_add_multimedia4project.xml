@@ -1,0 +1,16 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record_upload" Description="Add Multimedia for Project" TargetURL="project/:ProjectId/add/multimedia" Type="BLOCKING" />
+  <INPUT ParaName="ProjectId" SrcValue="xml/add_data_no_vcol/case_00394_add_project.xml" />
+  <INPUT ParaName="FileType" SrcValue="xml/add_data_no_vcol/case_00402_add_filetype1.xml" />
+  <INPUT ParaName="FileExtension" Value="txt" />
+  <INPUT ParaName="uploadfile" SrcFile="xml/add_data_no_vcol/project_file.txt" />
+  <INPUT ParaName="Force" Value="1" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successful)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00394_add_project.xml" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00402_add_filetype1.xml" Order="4" />
+  <ReturnId ParaName="MultimediaId" Value="2" />
+  <RunInfo Success="1" Time="1409792247" />
+</TestCase>

@@ -1,0 +1,9 @@
+<TestCase>
+  <CaseInfo Description="Get User" TargetURL="get/user/:UserId" Type="BLOCKING" />
+  <INPUT ParaName="UserId" SrcValue="xml/case_00010_add_user.xml" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="COUNT" Tag="User" TargetDataType="MULTI" Value="boolex(x&gt;0)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Order="2" />
+  
+</TestCase>

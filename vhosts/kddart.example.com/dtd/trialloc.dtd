@@ -1,0 +1,10 @@
+<!ELEMENT DATA ( trialloc ) >
+
+<!ELEMENT Point EMPTY >
+<!ATTLIST Point lat NMTOKEN #REQUIRED >
+<!ATTLIST Point lng NMTOKEN #REQUIRED >
+
+<!ELEMENT Ring ( Point+ ) >
+<!ATTLIST Ring Type NMTOKEN #REQUIRED >
+
+<!ELEMENT trialloc ( Ring+ ) >

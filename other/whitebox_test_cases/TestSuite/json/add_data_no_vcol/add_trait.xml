@@ -1,0 +1,23 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Add a trait" OutputFormat="JSON" TargetURL="add/trait?ctype=json" Type="BLOCKING" />
+  <Delete TargetURL="delete/trait/:TraitId?ctype=json" />
+  <INPUT ParaName="TraitName" PrefixVal="Trait_" Random="1" />
+  <INPUT ParaName="TraitCaption" Value="Automatic testing trait" />
+  <INPUT ParaName="TraitDescription" Value="Trait used for automatic testing" />
+  <INPUT ParaName="TraitDataType" Value="INTEGER" />
+  <INPUT ParaName="TraitValueMaxLength" Value="20" />
+  <INPUT ParaName="TraitUnit" Value="sth" />
+  <INPUT ParaName="IsTraitUsedForAnalysis" Value="0" />
+  <INPUT ParaName="TraitValRule" Value="boolex(x &gt; 0 and x &lt; 500)" />
+  <INPUT ParaName="TraitValRuleErrMsg" Value="invalid value" />
+  <INPUT ParaName="AccessGroupId" SrcValue="json/add_data_no_vcol/owngroup.xml" />
+  <INPUT ParaName="OwnGroupPerm" Value="7" />
+  <INPUT ParaName="AccessGroupPerm" Value="5" />
+  <INPUT ParaName="OtherPerm" Value="0" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Match Attr="ParaName" Tag="ReturnId" Value="TraitId" />
+  <Parent CaseFile="json/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="json/login_testuser/case_00203_switch4testu.xml" Order="2" />
+  
+</TestCase>

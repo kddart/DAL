@@ -1,0 +1,12 @@
+<TestCase>
+  <CaseInfo OutputFormat="JSON" CustomMethod="add_record" Description="Add a group" TargetURL="add/group?ctype=json" Type="BLOCKING" />
+  <INPUT ParaName="SystemGroupName" Value="testc_g" />
+  <INPUT ParaName="SystemGroupDescription" Value="Testing Group" />
+  <INPUT ParaName="SystemGroupPassword" Value="e9c9aa91a3e053ab9fd9c58344a2b800e0929f16" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Parent CaseFile="./case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="./case_00203_switch4testu.xml" Order="2" />
+  <ReturnId ParaName="GroupId" Value="8" />
+  
+</TestCase>

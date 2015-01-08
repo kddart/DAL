@@ -1,0 +1,3 @@
+#SpecimenName,BreedingMethod,SpecimenBarcode,IsActive,Pedigree,SelectionHistory,FilialGeneration,GenotypeId1,GenotypeId2
+Import_specimen1_|:RandomNum:|,|:BMethodRealValue:|,|:Barcode1:|,1,Unknown,Unknown,0,|:Genotype1:|,|:Genotype2:|
+Import_specimen2_|:RandomNum:|,|:BMethodRealValue:|,|:Barcode2:|,1,Unknown,Unknown,0,|:Genotype3:|,|:Genotype4:|

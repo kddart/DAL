@@ -1,0 +1,10 @@
+<!ELEMENT DATA ( EnviroData+ ) >
+
+<!ELEMENT EnviroData EMPTY >
+<!ATTLIST EnviroData deviceid CDATA #REQUIRED >
+<!ATTLIST EnviroData dt CDATA #REQUIRED >
+<!ATTLIST EnviroData lat NMTOKEN #REQUIRED >
+<!ATTLIST EnviroData lng NMTOKEN #REQUIRED >
+<!ATTLIST EnviroData param_name NMTOKEN #REQUIRED >
+<!ATTLIST EnviroData param_value CDATA #REQUIRED >
+

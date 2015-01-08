@@ -1,0 +1,11 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Add Treatment" OutputFormat="JSON" TargetURL="add/treatment?ctype=json" Type="BLOCKING" />
+  <Delete TargetURL="delete/treatment/:TreatmentId?ctype=json" />
+  <INPUT ParaName="TreatmentText" Value="Removing weeds" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Match Attr="ParaName" Tag="ReturnId" Value="TreatmentId" />
+  <Parent CaseFile="json/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="json/login_testuser/case_00203_switch4testu.xml" Order="2" />
+  
+</TestCase>

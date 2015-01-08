@@ -1,0 +1,15 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record_upload" Description="Add Plant" OutputFormat="JSON" TargetURL="add/plant?ctype=json" Type="BLOCKING" />
+  <Delete TargetURL="delete/plant/:PlantId?ctype=json" />
+  <INPUT ParaName="PlantName" PrefixVal="Plant_" Random="1" />
+  <INPUT ParaName="genotypeplant" Process="1" SrcFile="./json/genotype.xml" />
+  <INPUT SrcName="./json/case_00109_add_vcol_plant.xml" Value="Extra Data" Virtual="1" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Match Attr="ParaName" Tag="ReturnId" Value="PlantId" />
+  <Parent CaseFile="./json/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="./json/case_00203_switch4testu.xml" Order="2" />
+  <Parent CaseFile="./json/case_00106_add_geno1_4_plant.xml" Order="3" />
+  <Parent CaseFile="./json/case_00107_add_geno2_4_plant.xml" Order="4" />
+  
+</TestCase>

@@ -1,0 +1,7 @@
+<TestCase>
+  <CaseInfo Description="Testing failed list operation: need login first" TargetURL="list/operation" Type="BLOCKING" />
+  <Match Attr="StatusCode" Value="401" />
+  <Match Attr="Message" Tag="Error" Value="You need to login first." />
+  <Parent CaseFile="./xml/case_01004_logout.xml" Force="1" />
+  
+</TestCase>

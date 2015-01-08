@@ -1,0 +1,26 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record_upload" Description="Add a trial" OutputFormat="JSON" TargetURL="add/trial?ctype=json" Type="BLOCKING" />
+  <Delete TargetURL="delete/trial/:TrialId?ctype=json" />
+  <INPUT ParaName="SiteId" SrcValue="json/add_data_vcol/case_00006_add_site.xml" />
+  <INPUT ParaName="TrialTypeId" SrcValue="json/add_data_vcol/add_trialtype.xml" />
+  <INPUT ParaName="TrialNumber" Value="1" />
+  <INPUT ParaName="TrialAcronym" Value="TEST" />
+  <INPUT ParaName="DesignTypeId" SrcValue="json/add_data_vcol/case_00118_add_designtype.xml" />
+  <INPUT ParaName="TrialManagerId" SrcValue="json/add_data_vcol/case_00102_add_con.xml" />
+  <INPUT ParaName="TrialStartDate" Value="2010-10-15" />
+  <INPUT ParaName="TrialEndDate" Value="2011-03-31" />
+  <INPUT ParaName="TrialNote" Value="none" />
+  <INPUT ParaName="OwnGroupPerm" Value="7" />
+  <INPUT ParaName="AccessGroupId" SrcValue="json/add_data_vcol/owngroup.xml" />
+  <INPUT ParaName="AccessGroupPerm" Value="5" />
+  <INPUT ParaName="OtherPerm" Value="5" />
+  <INPUT ParaName="uploadfile" SrcFile="json/add_data_vcol/trialloc.xml" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Match Attr="ParaName" Tag="ReturnId" Value="TrialId" />
+  <Parent CaseFile="json/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="json/login_testuser/case_00203_switch4testu.xml" Order="2" />
+  <Parent CaseFile="json/add_data_vcol/case_00006_add_site.xml" Order="3" />
+  <Parent CaseFile="json/add_data_vcol/add_trialtype.xml" Order="4" />
+  
+</TestCase>

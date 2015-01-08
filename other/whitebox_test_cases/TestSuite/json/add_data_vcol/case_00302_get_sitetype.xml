@@ -1,0 +1,10 @@
+<TestCase>
+  <CaseInfo OutputFormat="JSON" Description="Get SiteType" TargetURL="get/sitetype/:SiteTypeId?ctype=json" Type="BLOCKING" />
+  <INPUT ParaName="SiteTypeId" SrcValue="json/add_data_vcol/case_00005_add_sitetype.xml" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="SiteTypeId" Tag="SiteType" Value="regex(\d+)" />
+  <Parent CaseFile="json/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="json/login_testuser/case_00203_switch4testu.xml" Order="2" />
+  <Parent CaseFile="json/add_data_vcol/case_00005_add_sitetype.xml" Order="3" />
+  
+</TestCase>

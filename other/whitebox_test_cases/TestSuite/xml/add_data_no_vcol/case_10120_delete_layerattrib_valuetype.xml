@@ -1,0 +1,9 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Delete Layerattribute Valuetype" TargetURL="delete/layerattrib/valuetype/:id" Type="BLOCKING" />
+  <INPUT ParaName="id" SrcValue="xml/add_data_no_vcol/case_00346_add_valuetype.xml" />
+  <Match Attr="StatusCode" Value="200" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00346_add_valuetype.xml" Order="3" />
+  <RunInfo Success="1" Time="1409792396" />
+</TestCase>

@@ -1,0 +1,10 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Add Unit Position" TargetURL="add/unitposition" Type="BLOCKING" />
+  <Delete TargetURL="delete/unitposition/:UnitPositionId" />
+  <INPUT ParaName="UnitPositionText" Value="block01|row1|column1                " />
+  <Match Attr="StatusCode" Value="401" />
+  <Match Attr="Message" Tag="Error" Value="Control character not allowed." />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Order="2" />
+  
+</TestCase>

@@ -1,0 +1,12 @@
+<TestCase>
+  <CaseInfo Description="List Trait Alias" TargetURL="trait/:TraitId/list/alias" Type="BLOCKING" />
+  <Delete TargetURL="delete/trait/:TraitId" />
+  <INPUT ParaName="TraitId" SrcValue="xml/add_data_no_vcol/case_00359_add_trait.xml" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="COUNT" Tag="TraitAlias" TargetDataType="MULTI" Value="boolex(x&gt;0)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00359_add_trait.xml" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_10130_add_traitalias.xml" Order="4" />
+  <RunInfo Success="1" Time="1409792263" />
+</TestCase>

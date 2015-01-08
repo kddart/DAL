@@ -1,0 +1,2 @@
+SpecimenId,ParentSpecimenId,ParentType,SelectionReason,NumberOfSpecimens
+|:SpecimenIdVal:|,|:ParentSpecimenIdVal:|,|:ParentTypeVal:|,'Testing DAL',2

@@ -1,0 +1,7 @@
+<TestCase>
+  <CaseInfo OutputFormat="JSON" CustomMethod="logout" Description="Logout" TargetURL="logout?ctype=json" Type="NON-BLOCKING" />
+  <INPUT ParaName="LoginCase" Value="./json/case_00201_login_testuser.xml" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  
+</TestCase>

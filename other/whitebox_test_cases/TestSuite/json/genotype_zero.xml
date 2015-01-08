@@ -1,0 +1,4 @@
+<DATA>
+<genotypeplant GenotypeId="" ParaName="GenotypeId" SrcValue="./json/case_00110_add_geno_zero_perm.xml"  />
+<genotypeplant GenotypeId="" ParaName="GenotypeId" SrcValue="./json/case_00107_add_geno2_4_plant.xml" />
+</DATA>

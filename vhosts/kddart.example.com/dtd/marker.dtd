@@ -1,0 +1,23 @@
+<!ELEMENT DATA ( markerdefinition+ ) >
+
+<!ELEMENT markerdefinition ( factordata*, markerdata* ) >
+<!-- <!ATTLIST markerdefinition AnalysisGroupId NMTOKEN #REQUIRED >
+#Don't include, specified as part of REST Action -->
+<!ATTLIST markerdefinition MarkerName NMTOKEN #REQUIRED >
+<!ATTLIST markerdefinition MarkerType NMTOKEN #REQUIRED >
+<!ATTLIST markerdefinition MarkerSequence NMTOKEN >
+<!ATTLIST markerdefinition MarkerReference NMTOKEN >
+<!ATTLIST markerdefinition Q NMTOKEN >
+
+<!ELEMENT factordata EMPTY >
+<!ATTLIST factordata FactorId NMTOKEN #REQUIRED>
+<!ATTLIST factordata FactorValue NMTOKEN #REQUIRED>
+
+<!-- <!ELEMENT markerdata ( factordata* ) >
+# Not allowing VCols in markerdata this iteration. 
+# They make the API too hairy. -->
+<!ELEMENT markerdata EMPTY >
+<!-- <!ATTLIST markerdata AnalysisGroupMarkerId NMTOKEN #REQUIRED > -->
+<!ATTLIST markerdata AnalGroupPlantExtId NMTOKEN #REQUIRED >
+<!ATTLIST markerdata State NMTOKEN #REQUIRED >
+<!ATTLIST markerdata Quality NMTOKEN >

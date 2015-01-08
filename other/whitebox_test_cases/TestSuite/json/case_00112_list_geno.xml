@@ -1,0 +1,8 @@
+<TestCase>
+  <CaseInfo OutputFormat="JSON" Description="List genotype with zero permission" TargetURL="list/genotype?ctype=json" Type="BLOCKING" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="COUNT" Tag="Genotype" TargetDataType="MULTI" Value="boolex(x&gt;1)" />
+  <Parent CaseFile="./json/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="./json/case_00203_switch4testu.xml" Order="2" />
+  
+</TestCase>

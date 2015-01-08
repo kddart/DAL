@@ -1,0 +1,7 @@
+<TestCase>
+  <CaseInfo CustomMethod="logout" Description="Logout" TargetURL="logout" Type="NON-BLOCKING" />
+  <INPUT ParaName="LoginCase" Value="./xml/case_00201_login_testuser.xml" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  
+</TestCase>

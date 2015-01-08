@@ -1,0 +1,12 @@
+<TestCase>
+  <CaseInfo Description="List Treatment" TargetURL="list/treatment/:nperpage/page/:num" Type="BLOCKING" />
+  <INPUT ParaName="num" Value="1" />
+  <INPUT ParaName="nperpage" Value="50" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="COUNT" Tag="Treatment" TargetDataType="MULTI" Value="boolex(x&gt;0)" />
+  <Match Attr="TagName" Tag="RecordMeta" Value="Treatment" />
+  <Match Attr="Page" Tag="Pagination" Value="1" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <RunInfo Success="1" Time="1409792086" />
+</TestCase>

@@ -1,0 +1,16 @@
+<TestCase>
+  <CaseInfo OutputFormat="JSON" CustomMethod="add_record" Description="Add a virtual column to genotype" TargetURL="factor/table/genotypefactor/add/vcolumn?ctype=json" Type="BLOCKING" />
+  <INPUT ParaName="FactorName" PrefixVal="GenoExtraCol_" Random="1" />
+  <INPUT ParaName="FactorCaption" PrefixVal="GenoExtraCol_" Random="1" />
+  <INPUT ParaName="FactorDescription" Value="Extra Column" />
+  <INPUT ParaName="FactorDataType" Value="STRING" />
+  <INPUT ParaName="CanFactorHaveNull" Value="0" />
+  <INPUT ParaName="FactorValueMaxLength" Value="50" />
+  <INPUT ParaName="Public" Value="0" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Parent CaseFile="./json/case_00201_login_testuser.xml" Force="1" Order="1" />
+  <Parent CaseFile="./json/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <ReturnId ParaName="FactorId" Value="1978" />
+  
+</TestCase>

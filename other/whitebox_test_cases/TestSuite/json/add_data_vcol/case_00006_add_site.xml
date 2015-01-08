@@ -1,0 +1,18 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record_upload" Description="Add a site" OutputFormat="JSON" TargetURL="add/site?ctype=json" Type="BLOCKING" />
+  <Delete TargetURL="delete/site/:SiteId?ctype=json" />
+  <INPUT ParaName="SiteName" Value="DArT Test Site" />
+  <INPUT ParaName="SiteTypeId" SrcValue="json/add_data_vcol/case_00005_add_sitetype.xml" />
+  <INPUT ParaName="TrialAcronymSuffix" Value="GH" />
+  <INPUT ParaName="CurrentSiteManagerId" SrcValue="json/add_data_vcol/case_00102_add_con.xml" />
+  <INPUT ParaName="CurrentMetStationId" Value="0" />
+  <INPUT SrcName="json/add_data_vcol/case_01002_add_vcol_site.xml" Value="Extra data" Virtual="1" />
+  <INPUT ParaName="SiteLocation" Value="POLYGON((148.99658 -35.48192,149.2067 -35.48192,149.2067
+-35.19626,148.99658 -35.19626,148.99658 -35.48192))" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Match Attr="ParaName" Tag="ReturnId" Value="SiteId" />
+  <Parent CaseFile="json/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="json/login_testuser/case_00203_switch4testu.xml" Order="2" />
+  
+</TestCase>
