@@ -13,6 +13,7 @@
 MYSQL_UNAME='root'
 PG_UNAME='postgres'
 DB_UNAME='kddart_dal'
+DB_HOST='localhost'
 # set your own postgres password as configured on your server
 DB_PASS=''
 
@@ -38,13 +39,14 @@ handle_mysql() {
 
     mysql -u $MYSQL_UNAME --password=$PASS -e "CREATE DATABASE \`$DB\`;"
 
-    QUOTED_DB_UNAME="'"$DB_UNAME"'"
+    #QUOTED_DB_UNAME="'"$DB_UNAME"'"
 
-    echo "Quoted Db Uname: $QUOTED_DB_UNAME"
+    #echo "Quoted Db Uname: $QUOTED_DB_UNAME"
+    echo "DB: $DB | Username: $DB_UNAME | Host: $DB_HOST"
 
     mysql $DB -u $MYSQL_UNAME --password=$PASS < $SQL_FILE
 
-    mysql -u $MYSQL_UNAME --password=$PASS -e "grant SELECT, INSERT, UPDATE, DELETE, CREATE ON *.* TO $QUOTED_DB_UNAME@'%';"
+    mysql -u $MYSQL_UNAME --password=$PASS -e "grant SELECT, INSERT, UPDATE, DELETE, CREATE ON $DB.* TO '$DB_UNAME'@'$DB_HOST';"
 
 }
 
@@ -80,7 +82,7 @@ stty echo
 
 echo
 
-POSTGRES_DB_EXIST=`psql -l -U $PG_UNAME | gawk '{print $1}' | grep "^$PG_DBNAME\$"`
+POSTGRES_DB_EXIST=`psql -h $DB_HOST -l -U $PG_UNAME | gawk '{print $1}' | grep "^$PG_DBNAME\$"`
 
 if [ ${#POSTGRES_DB_EXIST} -gt 0 ]
 then
@@ -124,28 +126,28 @@ echo "Finish checking"
 if [ ${#POSTGRES_DB_EXIST} -gt 0 ]
 then
     echo "Drop $PG_DBNAME"
-    dropdb -U $PG_UNAME  $PG_DBNAME
+    dropdb -h $DB_HOST -U $PG_UNAME  $PG_DBNAME
 fi
 
 echo "Create $PG_DBNAME"
-createdb $PG_DBNAME -U $PG_UNAME
+createdb -h $DB_HOST $PG_DBNAME -U $PG_UNAME
 
-DB_USER_EXIST=`psql -U $PG_UNAME -d $PG_DBNAME -c "\du" | gawk '{print $1}' | grep "^$DB_UNAME\$"`
+DB_USER_EXIST=`psql -h $DB_HOST -U $PG_UNAME -d $PG_DBNAME -c "\du" | gawk '{print $1}' | grep "^$DB_UNAME\$"`
 
 if [ ${#DB_USER_EXIST} -gt 0 ]
 then
     echo "Delete user $DB_UNAME"
-    psql -U $PG_UNAME -c "reassign owned by $DB_UNAME to $PG_UNAME"
-    psql -U $PG_UNAME -c "revoke all on database $PG_DBNAME from $DB_UNAME"
-    psql -U $PG_UNAME -c "drop user $DB_UNAME"
+    psql -h $DB_HOST -U $PG_UNAME -c "reassign owned by $DB_UNAME to $PG_UNAME"
+    psql -h $DB_HOST -U $PG_UNAME -c "revoke all on database $PG_DBNAME from $DB_UNAME"
+    psql -h $DB_HOST -U $PG_UNAME -c "drop user $DB_UNAME"
 fi
 
 QUOTED_DB_PASS="'"$DB_PASS"'"
 
 echo "Create user $DB_NAME"
-psql -U $PG_UNAME -c "create user $DB_UNAME createdb password $QUOTED_DB_PASS"
+psql -h $DB_HOST -U $PG_UNAME -c "create user $DB_UNAME createdb password $QUOTED_DB_PASS"
 
-psql -U $PG_UNAME -d $PG_DBNAME -f $PG_SQL
+psql -h $DB_HOST -U $PG_UNAME -d $PG_DBNAME -f $PG_SQL
 
 QUOTED_DB_UNAME="'"$DB_UNAME"'"
 
@@ -154,13 +156,13 @@ MYSQL_DB_EXIST=`mysql -u $MYSQL_UNAME --password=$MYSQL_PASS -e "select User fro
 if [ ${#MYSQL_DB_EXIST} -gt 0 ]
 then
     echo "Drop $DB_UNAME from MySQL"
-    mysql -u $MYSQL_UNAME --password=$MYSQL_PASS -e "drop user $DB_UNAME;"
+    mysql -u $MYSQL_UNAME --password=$MYSQL_PASS -e "drop user '$DB_UNAME'@'$DB_HOST';"
 fi
 
 echo "Create $DB_UNAME in MySQL"
-mysql -u $MYSQL_UNAME --password=$MYSQL_PASS -e "grant usage on *.* to $QUOTED_DB_UNAME@'%' IDENTIFIED BY PASSWORD '*CDAF15538B1EC8CB7DE0226C16D66CE208512C7B';"
+mysql -u $MYSQL_UNAME --password=$MYSQL_PASS -e "grant usage on *.* to '$DB_UNAME'@'$DB_HOST' IDENTIFIED BY '$DB_PASS';"
 
 handle_mysql $MYSQL_UNAME $MYSQL_PASS $MAIN_DBNAME $MAIN_SQL $DB_UNAME
 handle_mysql $MYSQL_UNAME $MYSQL_PASS $MARKER_DBNAME $MARKER_SQL $DB_UNAME
 
-#echo "Completed successfully!"
+echo "Completed successfully!"

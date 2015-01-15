@@ -28,19 +28,22 @@ All the *.sql files in other/db_files are database dump files for database compo
 
 * Database configuration and creation
 
- - Install both MySQL and PostgreSQL (tested on mysql 5.5 and postgres 9.1)
- - secure access to both databases with passwords of both root and postgres users respecitvely
- - install PostGIS (tested on version 1.5)
- - create 'kddart_dal' users in both systems, secured by passwords
- - in the base foler create subfolder named 'secure'
+ - Install both MySQL and PostgreSQL (tested on mysql 5.5 and postgres 9.1 or 9.2)
+ - Do not yet use MariaDB!
+ - install PostGIS (tested on version 1.5) - would not work with PostGIS 2.x but in the future
+   we will be moving to version 2.x or higher.
+ - secure access to both database systems with passwords of both root and postgres users respecitvely
+ - look into create_dbs.sh script for database access configuration close to the top of the file
+   and specify the credential that DAL will be using to access databases
+ - run run_create_dbs_example.sh script
+ - in the base folder create subfolder named 'secure'
  - create two files inside this folder: mysql_user.txt and postgres_user.txt
  - both files should then be filled with user name and password for both databases in the format:
 
 username = kddart_dal
 password = yourSecurePassword
 
- - look into create_dbs.sh script for database access configuration close to the top of the file
- - run run_create_dbs_example.sh script
+ - change the owner of these files to wwwrun and change the permission to 640
 
 * Perl dependencies and application
 
@@ -53,7 +56,7 @@ password = yourSecurePassword
  - inside 'perl-lib' folder issue a command - find . -name '*.pm' -exec perl -c {} ";"
  - perl will report missing dependencies. Install them and re-issue above command until it does not
    report any errors
- - you may need to install Crypt::Random from source as CPAN installation not always works
+ - you may need to install XML::Checker::Parser from source as CPAN installation does not always work
 
 * DAL configuration
 
@@ -62,8 +65,8 @@ password = yourSecurePassword
  - Read the Common.pm until above the line: 'our $UNIT_POSITION_SPLITTER = '|';'
  - Adjust configuration parameters for database connections, folders and file locations and other
    parameters
- - You will have to create manually the directory '/tmp/kddart/' and give it full access privilegs
-   to the apache user (wwwrun on openSuSE)
+ - You will have to create manually the directories '/tmp/kddart/' and '/srv/www/session'
+   and give it full access privilegs to the apache user (wwwrun on openSuSE)
  - watch out for the variable '$GENOTYPE2SPECIMEN_CFG' - this will set the type of relations between
    genotype and specimen entities. You have to configure it carefully knowing what type of needs
    DAL users have in your organisation. 'M-TO-M' is a safe bet, as it allows for all kinds of possibilites,
@@ -72,8 +75,11 @@ password = yourSecurePassword
 * Apache configuration
 
  - copy kddart.example.com subfolder from vhosts directory into '/srv/www/vhosts/' folder on the server
+ - change the owner user and group for kddart.example.com folder to wwwrun and www respectively
+   and permission to 755 for all folders and files
  - copy http-kddart.example.com.conf apache configuration file into /etc/apache2/vhosts.d/ folder (or
    equivalent location) and change settings according to your requiremens and server setup
+ - make sure that Apache perl and headers modules are enabled
  - make sure configuration is correct, restart apache
  - now DAL should be available under the base url: http://kddart.example.com/dal/
  - in your browser you may put address: 'http://kddart.example.com/dal/get/login/status' and you should

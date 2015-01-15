@@ -91,14 +91,6 @@ sub dal_base_url {
   return $url;
 }
 
-sub make_dal_url {
-  my $action_path = shift;
-
-  $action_path =~ s/^\///;#remove leading '/'
-
-  return dal_base_url() . $action_path;
-}
-
 sub login {
 
   my $parameter     = $_[0];
