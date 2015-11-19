@@ -1,5 +1,7 @@
-#$Id: ModIndex.pm 643 2014-02-04 06:16:08Z puthick $
+#$Id: ModIndex.pm 930 2015-06-23 06:04:26Z puthick $
 #$Author: puthick $
+
+# Copyright (c) 2015, Diversity Arrays Technology, All rights reserved.
 
 # COPYRIGHT AND LICENSE
 # 
@@ -16,8 +18,7 @@
 # GNU General Public License for more details.
 
 # Author    : Puthick Hok
-# Version   : 2.2.5 build 795
-# Created   : 02/06/2010
+# Version   : 2.3.0 build 1040
 
 package KDDArT::DAL::ModIndex;
 
@@ -29,7 +30,8 @@ BEGIN {
 
   my ($volume, $current_dir, $file) = File::Spec->splitpath(__FILE__);
 
-  $main::kddart_base_dir = "${current_dir}../../..";
+  my @current_dir_part = split('/perl-lib/KDDArT/DAL/', $current_dir);
+  $main::kddart_base_dir = $current_dir_part[0];
 }
 
 

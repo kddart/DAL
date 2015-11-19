@@ -15,6 +15,6 @@
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Order="2" />
   <Parent CaseFile="xml/add_data_vcol/case_00005_add_sitetype.xml" Order="3" />
   <Parent CaseFile="xml/add_data_vcol/case_00102_add_con.xml" Order="4" />
-  <ReturnId ParaName="SiteId" Value="8" />
+  
   
 </TestCase>

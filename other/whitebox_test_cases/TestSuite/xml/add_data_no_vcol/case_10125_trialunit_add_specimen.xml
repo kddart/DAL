@@ -2,6 +2,7 @@
   <CaseInfo CustomMethod="add_record" Description="Trialunit Add Specimen" TargetURL="trialunit/:TrialUnitId/add/specimen" Type="BLOCKING" />
   <INPUT ParaName="TrialUnitId" SrcValue="xml/add_data_no_vcol/case_00358_add_trialunit.xml" />
   <INPUT ParaName="SpecimenId" SrcValue="xml/add_data_no_vcol/case_00108_add_specimen.xml" />
+  <INPUT ParaName="Notes" Value="Note" />
   <Match Attr="StatusCode" Value="200" />
   <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
   <Match Attr="ParaName" Tag="ReturnId" Value="TrialUnitSpecimenId" />
@@ -9,6 +10,6 @@
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00358_add_trialunit.xml" Order="3" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00108_add_specimen.xml" Order="4" />
-  <ReturnId ParaName="TrialUnitSpecimenId" Value="17" />
-  <RunInfo Success="1" Time="1409792295" />
+  <ReturnId ParaName="TrialUnitSpecimenId" Value="203" />
+  <RunInfo Success="1" Time="1443160626" />
 </TestCase>

@@ -1,5 +1,7 @@
-#$Id: Extract.pm 785 2014-09-02 06:23:12Z puthick $
+#$Id: Extract.pm 1035 2015-11-02 04:37:51Z puthick $
 #$Author: puthick $
+
+# Copyright (c) 2015, Diversity Arrays Technology, All rights reserved.
 
 # COPYRIGHT AND LICENSE
 # 
@@ -16,8 +18,7 @@
 # GNU General Public License for more details.
 
 # Author    : Puthick Hok
-# Version   : 2.2.5 build 795
-# Created   : 02/09/2013
+# Version   : 2.3.0 build 1040
 
 package KDDArT::DAL::Extract;
 
@@ -58,11 +59,11 @@ sub setup {
                                            'add_extract_gadmin',
                                            'update_extract_gadmin',
                                            'del_extract_gadmin',
-                                           'add_analysisgroup_gadmin',
+                                           'add_analysisgroup',
                                            'add_plate_n_extract_gadmin',
       );
   __PACKAGE__->authen->count_session_request_runmodes(':all');
-  
+
   __PACKAGE__->authen->check_signature_runmodes('update_plate_gadmin',
                                                 'del_plate_gadmin',
                                                 'add_extract_gadmin',
@@ -99,7 +100,7 @@ sub setup {
     'list_analysisgroup_advanced'   => 'list_analysisgroup_advanced_runmode',
     'get_analysisgroup'             => 'get_analysisgroup_runmode',
     'add_plate_n_extract_gadmin'    => 'add_plate_n_extract_runmode',
-    'add_plate_gadmin'              => 'add_plate_runmode',
+    'list_dataset'                  => 'list_dataset_runmode',
       );
 
   my $logger = get_logger();
@@ -144,7 +145,7 @@ sub list_plate_advanced_runmode {
 "ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
 "ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
 "URLParameter": [{"ParameterName": "nperpage", "Description": "Number of records in a page for pagination"}, {"ParameterName": "num", "Description": "The page number of the pagination"}],
-"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database filed name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "FieldList", "Description": "Comma separated value of wanted fields."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases."}],
+"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database field name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "FieldList", "Description": "Comma separated value of wanted fields."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases."}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
@@ -173,7 +174,7 @@ sub list_plate_advanced_runmode {
   }
 
   my $filtering_csv = '';
-  
+
   if (defined $query->param('Filtering')) {
 
     $filtering_csv = $query->param('Filtering');
@@ -187,11 +188,11 @@ sub list_plate_advanced_runmode {
 
     $sorting = $query->param('Sorting');
   }
-  
+
   my $dbh_k = connect_kdb_read();
   my $dbh_m = connect_mdb_read();
 
-  my $field_list = ['plate.*', 'VCol*'];
+  my $field_list = ['*'];
 
   my $other_join = '';
 
@@ -222,12 +223,37 @@ sub list_plate_advanced_runmode {
     return $data_for_postrun_href;
   }
 
-  my @field_list_all = keys(%{$sam_plate_list_aref->[0]});
+  my $sample_data_aref = $sam_plate_list_aref;
 
-  # no field return, it means no record. error prevention
-  if (scalar(@field_list_all) == 0) {
-    
-    push(@field_list_all, '*');
+  my @field_list_all;
+
+  if (scalar(@{$sample_data_aref}) == 1) {
+
+    @field_list_all = keys(%{$sample_data_aref->[0]});
+  }
+  else {
+
+    my ($sfield_err, $sfield_msg, $sfield_data, $pkey_data) = get_static_field($dbh_m, 'plate');
+
+    if ($sfield_err) {
+
+      $self->logger->debug("Get static field failed: $sfield_msg");
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    for my $sfield_rec (@{$sfield_data}) {
+
+      push(@field_list_all, $sfield_rec->{'Name'});
+    }
+
+    for my $pkey_field (@{$pkey_data}) {
+
+      push(@field_list_all, $pkey_field);
+    }
   }
 
   my $final_field_list = \@field_list_all;
@@ -253,7 +279,7 @@ sub list_plate_advanced_runmode {
 
   $other_join = '';
 
-  ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_mfactor_sql($dbh_m, $dbh_k, 
+  ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_mfactor_sql($dbh_m, $dbh_k,
                                                                       $final_field_list, 'plate',
                                                                      'PlateId', $other_join);
 
@@ -266,8 +292,8 @@ sub list_plate_advanced_runmode {
     return $data_for_postrun_href;
   }
 
-  my ($filter_err, $filter_msg, $filter_phrase, $where_arg) = parse_filtering('PlateId',
-                                                                              'plate',
+  my ($filter_err, $filter_msg, $filter_phrase, $where_arg) = parse_filtering('"PlateId"',
+                                                                              '"plate"',
                                                                               $filtering_csv,
                                                                               $final_field_list);
 
@@ -309,13 +335,13 @@ sub list_plate_advanced_runmode {
     $self->logger->debug("Filtering expression: $filtering_exp");
 
     my $paged_limit_start_time = [gettimeofday()];
-   
+
     my ($pg_id_err, $pg_id_msg, $nb_records,
         $nb_pages, $limit_clause, $rcount_time) = get_paged_filter($dbh_m,
                                                                    $nb_per_page,
                                                                    $page,
-                                                                   'plate',
-                                                                   'PlateId',
+                                                                   '"plate"',
+                                                                   '"PlateId"',
                                                                    $filtering_exp,
                                                                    $where_arg
             );
@@ -325,9 +351,9 @@ sub list_plate_advanced_runmode {
     $self->logger->debug("SQL Row count time: $rcount_time");
 
     if ($pg_id_err == 1) {
-    
+
       $self->logger->debug($pg_id_msg);
-    
+
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
@@ -335,7 +361,7 @@ sub list_plate_advanced_runmode {
     }
 
     if ($pg_id_err == 2) {
-      
+
       $page = 0;
     }
 
@@ -353,7 +379,7 @@ sub list_plate_advanced_runmode {
 
   $sql  =~ s/GROUP BY/ $filtering_exp GROUP BY /;
 
-  my ($sort_err, $sort_msg, $sort_sql) = parse_sorting($sorting, $final_field_list);
+  my ($sort_err, $sort_msg, $sort_sql) = parse_sorting($sorting, $final_field_list, '"plate"');
 
   if ($sort_err) {
 
@@ -369,7 +395,7 @@ sub list_plate_advanced_runmode {
   }
   else {
 
-    $sql .= ' ORDER BY plate.PlateId DESC';
+    $sql .= ' ORDER BY "plate"."PlateId" DESC';
   }
 
   $sql .= " $paged_limit_clause ";
@@ -377,7 +403,7 @@ sub list_plate_advanced_runmode {
   $self->logger->debug("SQL with VCol: $sql");
 
   my $data_start_time = [gettimeofday()];
-  
+
   # where_arg here in the list function because of the filtering 
   my ($read_plate_err, $read_plate_msg, $plate_data) = $self->list_plate(1,
                                                                          $sql,
@@ -443,7 +469,7 @@ sub list_plate {
   if ($extra_attr_yes) {
 
     for my $plate_row (@{$data_aref}) {
-      
+
       push(@{$plate_id_aref}, $plate_row->{'PlateId'});
 
       if (defined $plate_row->{'OperatorId'}) {
@@ -468,10 +494,10 @@ sub list_plate {
         return ($err, $msg, []);
       }
 
-      my $extract_sql = 'SELECT PlateId, ExtractId, ItemGroupId, GenotypeId,';
-      $extract_sql   .= 'WellRow, WellCol ';
-      $extract_sql   .= 'FROM extract ';
-      $extract_sql   .= 'WHERE PlateId IN (' . join(',', @{$plate_id_aref}) . ')';
+      my $extract_sql = 'SELECT "PlateId", "ExtractId", "ItemGroupId", "GenotypeId",';
+      $extract_sql   .= '"WellRow", "WellCol" ';
+      $extract_sql   .= 'FROM "extract" ';
+      $extract_sql   .= 'WHERE "PlateId" IN (' . join(',', @{$plate_id_aref}) . ')';
 
       $self->logger->debug("EXTRACT_SQL: $extract_sql");
 
@@ -605,7 +631,7 @@ sub del_plate_runmode {
 
   my $dbh_m_write = connect_mdb_write();
 
-  my $sql = 'DELETE FROM platefactor WHERE PlateId=?';
+  my $sql = 'DELETE FROM "platefactor" WHERE "PlateId"=?';
   my $sth = $dbh_m_write->prepare($sql);
 
   $sth->execute($plate_id);
@@ -621,7 +647,7 @@ sub del_plate_runmode {
 
   $sth->finish();
 
-  $sql = 'DELETE FROM plate WHERE PlateId=?';
+  $sql = 'DELETE FROM "plate" WHERE "PlateId"=?';
   $sth = $dbh_m_write->prepare($sql);
 
   $sth->execute($plate_id);
@@ -683,44 +709,21 @@ sub update_plate_runmode {
 
   my $skip_field = {'DateCreated' => 1};
 
-  my ($get_scol_err, $get_scol_msg, $scol_data, $pkey_data) = get_static_field($dbh_read, 'plate');
+  my $field_name_translation = {};
 
-  if ($get_scol_err) {
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'plate', $skip_field,
+                                                                                $field_name_translation,
+                                                                               );
 
-    $self->logger->debug("Get static field info failed: $get_scol_msg");
-    
-    my $err_msg = "Unexpected Error.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+  if ($chk_sfield_err) {
 
-    return $data_for_postrun_href;
-  }
+    $self->logger->debug($chk_sfield_msg);
 
-  my $required_field_href = {};
-
-  for my $static_field (@{$scol_data}) {
-
-    my $field_name = $static_field->{'Name'};
-    
-    if ($skip_field->{$field_name}) { next; }
-
-    if ($static_field->{'Required'} == 1) {
-
-      $required_field_href->{$field_name} = $query->param($field_name);
-    }
+    return $for_postrun_href;
   }
 
   $dbh_read->disconnect();
-
-  my ($missing_err, $missing_href) = check_missing_href( $required_field_href );
-
-  if ($missing_err) {
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
-
-    return $data_for_postrun_href;
-  }
 
   # Finish generic required static field checking
 
@@ -755,7 +758,7 @@ sub update_plate_runmode {
 
     $PlateType = '0';
   }
-  
+
   my $PlateDescription = read_cell_value($dbh_m_read, 'plate', 'PlateDescription', 'PlateId', $plate_id);
 
   if (defined($query->param('PlateDescription'))) {
@@ -782,7 +785,10 @@ sub update_plate_runmode {
 
   if (defined($query->param('PlateWells'))) {
 
-    $PlateWells = $query->param('PlateWells');
+    if (legnth($query->param('PlateWells')) > 0) {
+
+      $PlateWells = $query->param('PlateWells');
+    }
   }
 
   my $PlateStatus = read_cell_value($dbh_m_read, 'plate', 'PlateStatus', 'PlateId', $plate_id);
@@ -800,9 +806,13 @@ sub update_plate_runmode {
 
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [$int_href]};
-      
+
       return $data_for_postrun_href;
     }
+  }
+  else {
+
+    $PlateWells = undef;
   }
 
   my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength ";
@@ -854,7 +864,7 @@ sub update_plate_runmode {
     my $err_msg = "OperatorId ($OperatorId) not found.";
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-    
+
     return $data_for_postrun_href;
   }
 
@@ -882,7 +892,7 @@ sub update_plate_runmode {
     }
   }
 
-  my $plate_sql = 'SELECT PlateId FROM plate WHERE PlateId <> ? AND PlateName=?';
+  my $plate_sql = 'SELECT "PlateId" FROM "plate" WHERE "PlateId" <> ? AND "PlateName"=?';
 
   my ($read_plate_err, $exist_plate_id) = read_cell($dbh_m_read, $plate_sql, [$plate_id, $PlateName]);
 
@@ -900,15 +910,15 @@ sub update_plate_runmode {
 
   my $dbh_m_write = connect_mdb_write();
 
-  $sql  = 'UPDATE plate SET ';
-  $sql .= 'PlateName=?, ';
-  $sql .= 'OperatorId=?, ';
-  $sql .= 'PlateType=?, ';
-  $sql .= 'PlateDescription=?, ';
-  $sql .= 'StorageId=?, ';
-  $sql .= 'PlateWells=?, ';
-  $sql .= 'PlateStatus=? ';
-  $sql .= 'WHERE PlateId=?';
+  $sql  = 'UPDATE "plate" SET ';
+  $sql .= '"PlateName"=?, ';
+  $sql .= '"OperatorId"=?, ';
+  $sql .= '"PlateType"=?, ';
+  $sql .= '"PlateDescription"=?, ';
+  $sql .= '"StorageId"=?, ';
+  $sql .= '"PlateWells"=?, ';
+  $sql .= '"PlateStatus"=? ';
+  $sql .= 'WHERE "PlateId"=?';
 
   my $sth = $dbh_m_write->prepare($sql);
   $sth->execute($PlateName, $OperatorId, $PlateType,
@@ -929,8 +939,8 @@ sub update_plate_runmode {
     my $factor_value = $query->param('VCol_' . "$vcol_id");
 
     $sql  = 'SELECT Count(*) ';
-    $sql .= 'FROM platefactor ';
-    $sql .= 'WHERE PlateId=? AND FactorId=?';
+    $sql .= 'FROM "platefactor" ';
+    $sql .= 'WHERE "PlateId"=? AND "FactorId"=?';
 
     my ($read_err, $count) = read_cell($dbh_m_write, $sql, [$plate_id, $vcol_id]);
 
@@ -938,43 +948,44 @@ sub update_plate_runmode {
 
       if ($count > 0) {
 
-        $sql  = 'UPDATE platefactor SET ';
-        $sql .= 'FactorValue=? ';
-        $sql .= 'WHERE PlateId=? AND FactorId=?';
-      
+        $sql  = 'UPDATE "platefactor" SET ';
+        $sql .= '"FactorValue"=? ';
+        $sql .= 'WHERE "PlateId"=? AND "FactorId"=?';
+
         my $factor_sth = $dbh_m_write->prepare($sql);
         $factor_sth->execute($factor_value, $plate_id, $vcol_id);
-      
+
         if ($dbh_m_write->err()) {
-        
+
           $self->logger->debug("Update platefactor failed");
           $data_for_postrun_href->{'Error'} = 1;
           $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
           return $data_for_postrun_href;
         }
-    
+
         $factor_sth->finish();
       }
       else {
 
-        $sql  = 'INSERT INTO platefactor SET ';
-        $sql .= 'PlateId=?, ';
-        $sql .= 'FactorId=?, ';
-        $sql .= 'FactorValue=?';
-      
+        $sql  = 'INSERT INTO "platefactor"(';
+        $sql .= '"PlateId", ';
+        $sql .= '"FactorId", ';
+        $sql .= '"FactorValue") ';
+        $sql .= 'VALUES(?, ?, ?)';
+
         my $factor_sth = $dbh_m_write->prepare($sql);
         $factor_sth->execute($plate_id, $vcol_id, $factor_value);
-      
+
         if ($dbh_m_write->err()) {
-        
+
           $self->logger->debug("Insert into platefactor failed");
           $data_for_postrun_href->{'Error'} = 1;
           $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
           return $data_for_postrun_href;
         }
-    
+
         $factor_sth->finish();
       }
     }
@@ -982,14 +993,14 @@ sub update_plate_runmode {
 
       if ($count > 0) {
 
-        $sql  = 'DELETE FROM platefactor ';
-        $sql .= 'WHERE PlateId=? AND FactorId=?';
+        $sql  = 'DELETE FROM "platefactor" ';
+        $sql .= 'WHERE "PlateId"=? AND "FactorId"=?';
 
         my $factor_sth = $dbh_m_write->prepare($sql);
         $factor_sth->execute($plate_id, $vcol_id);
-      
+
         if ($dbh_m_write->err()) {
-        
+
           $self->logger->debug("Delete platefactor failed");
           $data_for_postrun_href->{'Error'} = 1;
           $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
@@ -1071,7 +1082,7 @@ sub get_plate_runmode {
     return $data_for_postrun_href;
   }
 
-  my $where_clause = " WHERE plate.PlateId=? ";
+  my $where_clause = qq| WHERE "plate"."PlateId"=? |;
   $sql =~ s/GROUP BY/ $where_clause GROUP BY /;
 
   my ($plate_err, $plate_msg, $plate_list_aref) = $self->list_plate(1, $sql, [$plate_id]);
@@ -1168,17 +1179,17 @@ sub list_extract {
         $self->logger->debug("Check id existence error: $chk_id_msg");
         $err = 1;
         $msg = $chk_id_msg;
-        
+
         return ($err, $msg, []);
       }
 
-      my $perm_str = permission_phrase($group_id, 0, 'analysisgroup');
+      my $perm_str = permission_phrase($group_id, 2, 'analysisgroup');
 
-      my $analysis_grp_sql = 'SELECT analgroupextract.ExtractId, analysisgroup.AnalysisGroupId, ';
-      $analysis_grp_sql   .= 'analysisgroup.AnalysisGroupName ';
-      $analysis_grp_sql   .= 'FROM analysisgroup LEFT JOIN analgroupextract ON ';
-      $analysis_grp_sql   .= 'analysisgroup.AnalysisGroupId = analgroupextract.AnalysisGroupId ';
-      $analysis_grp_sql   .= 'WHERE analgroupextract.ExtractId IN (' . join(',', @{$extract_id_aref}) . ') ';
+      my $analysis_grp_sql = 'SELECT "analgroupextract"."ExtractId", "analysisgroup"."AnalysisGroupId", ';
+      $analysis_grp_sql   .= '"analysisgroup"."AnalysisGroupName" ';
+      $analysis_grp_sql   .= 'FROM "analysisgroup" LEFT JOIN "analgroupextract" ON ';
+      $analysis_grp_sql   .= '"analysisgroup"."AnalysisGroupId" = "analgroupextract"."AnalysisGroupId" ';
+      $analysis_grp_sql   .= 'WHERE "analgroupextract"."ExtractId" IN (' . join(',', @{$extract_id_aref}) . ') ';
       $analysis_grp_sql   .= " AND ((($perm_str) & $READ_PERM) = $READ_PERM)";
 
       $self->logger->debug("AnalysisGroup permission SQL: $analysis_grp_sql");
@@ -1311,7 +1322,7 @@ sub list_extract_runmode {
 
   my $dbh_k = connect_kdb_read();
   my $dbh_m = connect_mdb_read();
-  my $field_list = ['*', 'plate.PlateName'];
+  my $field_list = ['*', '"plate"."PlateName"'];
 
   my $anal_id = '';
 
@@ -1339,6 +1350,7 @@ sub list_extract_runmode {
     if (!$is_anal_grp_ok) {
 
       my $err_msg = "AnalsysiGroup ($anal_id): permission denied.";
+      $self->logger->debug($err_msg);
 
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
@@ -1347,8 +1359,8 @@ sub list_extract_runmode {
     }
   }
 
-  my $other_join = ' LEFT JOIN plate ON extract.PlateId = plate.PlateId ';
-  $other_join   .= ' LEFT JOIN analgroupextract ON analgroupextract.ExtractId = extract.ExtractId ';
+  my $other_join = ' LEFT JOIN "plate" ON "extract"."PlateId" = "plate"."PlateId" ';
+  $other_join   .= ' LEFT JOIN "analgroupextract" ON "analgroupextract"."ExtractId" = "extract"."ExtractId" ';
 
   my ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_mfactor_sql($dbh_m,
                                                                          $dbh_k,
@@ -1362,7 +1374,7 @@ sub list_extract_runmode {
 
   if (length($anal_id) > 0) {
 
-    my $filter_by_analysis_group = " WHERE AnalysisGroupId = $anal_id ";
+    my $filter_by_analysis_group = qq| WHERE "AnalysisGroupId" = $anal_id |;
     $sql  =~ s/GROUP BY/ $filter_by_analysis_group GROUP BY /;
   }
 
@@ -1375,7 +1387,7 @@ sub list_extract_runmode {
     return $data_for_postrun_href;
   }
 
-  $sql   .= ' ORDER BY extract.ExtractId DESC';
+  $sql   .= ' ORDER BY "extract"."ExtractId" DESC';
 
   $self->logger->debug("SQL with VCol: $sql");
 
@@ -1389,7 +1401,7 @@ sub list_extract_runmode {
 
     return $data_for_postrun_href;
   }
-  
+
   $data_for_postrun_href->{'Error'}     = 0;
   $data_for_postrun_href->{'Data'}      = {'Extract' => $extract_data,
                                            'VCol'         => $vcol_list,
@@ -1426,20 +1438,46 @@ sub add_extract_runmode {
 
   my $data_for_postrun_href = {};
 
+  # Generic required static field checking
+
+  my $dbh_read = connect_mdb_read();
+
+  my $skip_field = {'ParentExtractId' => 1,
+                    'Tissue'          => 1,
+                   };
+
+  my $field_name_translation = {};
+
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'extract', $skip_field,
+                                                                                $field_name_translation,
+                                                                               );
+
+  if ($chk_sfield_err) {
+
+    $self->logger->debug($chk_sfield_msg);
+
+    return $for_postrun_href;
+  }
+
+  $dbh_read->disconnect();
+
+  # Finish generic required static field checking
+
   my $ItemGroupId = $query->param('ItemGroupId');
 
-  my $ParentExtractId = '0';
+  my $ParentExtractId = undef;
 
   if (defined($query->param('ParentExtractId'))) {
 
-    if ($query->param('ParentExtractId') ne '0') {
+    if (length($query->param('ParentExtractId')) > 0) {
 
       $ParentExtractId = $query->param('ParentExtractId');
     }
   }
 
-  my $PlateId = '0';
- 
+  my $PlateId = undef;
+
   if (defined($query->param('PlateId'))) {
 
     if (length($query->param('PlateId')) > 0) {
@@ -1448,7 +1486,7 @@ sub add_extract_runmode {
     }
   }
 
-  my $GenotypeId = '0';
+  my $GenotypeId = undef;
 
   if (defined($query->param('GenotypeId'))) {
 
@@ -1472,51 +1510,53 @@ sub add_extract_runmode {
 
   if (defined($query->param('WellRow'))) {
 
-    $WellRow = $query->param('WellRow');
+    if (length($query->param('WellRow')) > 0) {
+
+      $WellRow = $query->param('WellRow');
+    }
   }
 
   my $WellCol = '';
 
   if (defined($query->param('WellCol'))) {
 
-    $WellCol = $query->param('WellCol');
+    if (length($query->param('WellCol')) > 0) {
+
+      $WellCol = $query->param('WellCol');
+    }
   }
 
   my $Quality = '';
 
   if (defined($query->param('Quality'))) {
 
-    $Quality = $query->param('Quality');
+    if (length($query->param('Quality')) > 0) {
+
+      $Quality = $query->param('Quality');
+    }
   }
 
   my $Status = '';
 
   if (defined($query->param('Status'))) {
 
-    $Status = $query->param('Status');
-  }
+    if (length($query->param('Status')) > 0) {
 
-  my ($missing_err, $missing_href) = check_missing_href( {'ItemGroupId' => $ItemGroupId} );
-
-  if ($missing_err) {
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
-
-    return $data_for_postrun_href;
+      $Status = $query->param('Status');
+    }
   }
 
   my $dbh_k_read = connect_kdb_read();
   my $dbh_m_read = connect_mdb_read();
 
-  if ($ParentExtractId ne '0') {
+  if (defined $ParentExtractId) {
 
     if (!record_existence($dbh_m_read, 'extract', 'ExtractId', $ParentExtractId)) {
 
       my $err_msg = "ParentExtractId ($ParentExtractId) not found.";
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'ParentExtractId' => $err_msg}]};
-      
+
       return $data_for_postrun_href;
     }
   }
@@ -1526,13 +1566,13 @@ sub add_extract_runmode {
     my $err_msg = "ItemGroupId ($ItemGroupId) not found.";
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'ItemGroupId' => $err_msg}]};
-    
+
     return $data_for_postrun_href;
   }
 
   my $get_geno_sql;
 
-  if ($GenotypeId ne '0') {
+  if (defined $GenotypeId) {
 
     $get_geno_sql    = 'SELECT genotypespecimen.GenotypeId ';
     $get_geno_sql   .= 'FROM itemgroupentry LEFT JOIN item ON itemgroupentry.ItemId = item.ItemId ';
@@ -1546,7 +1586,7 @@ sub add_extract_runmode {
       my $err_msg = "Genotype ($GenotypeId) not found.";
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'GenotypeId' => $err_msg}]};
-    
+
       return $data_for_postrun_href;
     }
   }
@@ -1573,10 +1613,10 @@ sub add_extract_runmode {
   }
 
   for my $geno_rec (@{$geno_data}) {
-    
+
     my $geno_id = $geno_rec->{'GenotypeId'};
     $seen_geno_id->{$geno_id} = 1;
-    
+
     $geno2itemgroup->{$geno_id} = $ItemGroupId;
   }
 
@@ -1591,7 +1631,7 @@ sub add_extract_runmode {
                                                         \@geno_id_list, $group_id, $gadmin_status,
                                                         $LINK_PERM);
   if (!$is_ok) {
-    
+
     # Because a specimen can have more than one genotype, trouble item group id variable needs to be a hash
     # instead of an array so that there is no duplicate in the itemgroup id that DAL reports back to the user.
     my %trouble_itemgroup_id_list;
@@ -1601,24 +1641,24 @@ sub add_extract_runmode {
       my $trouble_ig_id = $geno2itemgroup->{$trouble_geno_id};
       $trouble_itemgroup_id_list{$trouble_ig_id} = 1;
     }
-    
+
     my $trouble_itemgroup_id_str = join(',', keys(%trouble_itemgroup_id_list));
 
     my $err_msg = 'Permission denied: ItemGroupId (' . $trouble_itemgroup_id_str . ')';
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-    
+
     return $data_for_postrun_href;
   }
-  
-  if ($PlateId ne '0') {
+
+  if (defined $PlateId) {
 
     if (!record_existence($dbh_m_read, 'plate', 'PlateId', $PlateId)) {
 
       my $err_msg = "Plate ($PlateId) not found.";
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'PlateId' => $err_msg}]};
-    
+
       return $data_for_postrun_href;
     }
 
@@ -1627,7 +1667,7 @@ sub add_extract_runmode {
       my $err_msg = "WellRow is missing.";
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'WellRow' => $err_msg}]};
-    
+
       return $data_for_postrun_href;
     }
 
@@ -1636,11 +1676,11 @@ sub add_extract_runmode {
       my $err_msg = "WellCol is missing.";
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'WellCol' => $err_msg}]};
-    
+
       return $data_for_postrun_href;
     }
 
-    my $well_pos_sql = 'SELECT CONCAT(WellRow,WellCol) AS Well FROM extract WHERE PlateId=?';
+    my $well_pos_sql = 'SELECT CONCAT("WellRow","WellCol") AS "Well" FROM "extract" WHERE "PlateId"=?';
     my ($r_well_pos_err, $well_pos) = read_cell($dbh_m_read, $well_pos_sql, [$PlateId]);
 
     my $user_well_pos = $WellRow . $WellCol;
@@ -1650,7 +1690,7 @@ sub add_extract_runmode {
       my $err_msg = "Plate ($PlateId) already has $well_pos assigned.";
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-    
+
       return $data_for_postrun_href;
     }
   }
@@ -1662,7 +1702,7 @@ sub add_extract_runmode {
       my $err_msg = "Tissue ($Tissue) not found.";
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'Tissue' => $err_msg}]};
-    
+
       return $data_for_postrun_href;
     }
   }
@@ -1682,10 +1722,10 @@ sub add_extract_runmode {
     my $vcol_param_name = "VCol_${vcol_id}";
     my $vcol_value      = $query->param($vcol_param_name);
     if ($vcol_data->{$vcol_id}->{'CanFactorHaveNull'} != 1) {
-      
+
       $vcol_param_data->{$vcol_param_name} = $vcol_value;
     }
-    
+
     $vcol_len_info->{$vcol_param_name} = $vcol_data->{$vcol_id}->{'FactorValueMaxLength'};
     $vcol_param_data_maxlen->{$vcol_param_name} = $vcol_value;
   }
@@ -1715,26 +1755,40 @@ sub add_extract_runmode {
 
   my $dbh_m_write = connect_mdb_write();
 
+  my ($next_val_err, $next_val_msg, $extract_id) = get_next_value_for($dbh_m_write, 'extract', 'ExtractId');
+
+  if ($next_val_err) {
+
+    $self->logger->debug($next_val_msg);
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
   #insert into main table
-  $sql    = 'INSERT INTO extract SET ';
-  $sql   .= 'ParentExtractId=?, ';
-  $sql   .= 'PlateId=?, ';
-  $sql   .= 'ItemGroupId=?, ';
-  $sql   .= 'GenotypeId=?, ';
-  $sql   .= 'Tissue=?, ';
-  $sql   .= 'WellRow=?, ';
-  $sql   .= 'WellCol=?, ';
-  $sql   .= 'Quality=?, ';
-  $sql   .= 'Status=?';
+  $sql    = 'INSERT INTO "extract"(';
+  $sql   .= '"ExtractId", ';
+  $sql   .= '"ParentExtractId", ';
+  $sql   .= '"PlateId", ';
+  $sql   .= '"ItemGroupId", ';
+  $sql   .= '"GenotypeId", ';
+  $sql   .= '"Tissue", ';
+  $sql   .= '"WellRow", ';
+  $sql   .= '"WellCol", ';
+  $sql   .= '"Quality", ';
+  $sql   .= '"Status") ';
+  $sql   .= 'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
 
   my $sth = $dbh_m_write->prepare($sql);
-  $sth->execute( $ParentExtractId, $PlateId, $ItemGroupId, $GenotypeId,
+  $sth->execute( $extract_id, $ParentExtractId, $PlateId, $ItemGroupId, $GenotypeId,
                  $Tissue, $WellRow, $WellCol, $Quality, $Status );
 
   my $ExtractId = -1;
   if (!$dbh_m_write->err()) {
 
-    $ExtractId = $dbh_m_write->last_insert_id(undef, undef, 'extract', 'ExtractId');
+    $ExtractId = $extract_id;
     $self->logger->debug("ExtractId: $ExtractId");
   }
   else {
@@ -1753,10 +1807,11 @@ sub add_extract_runmode {
 
     if (length($factor_value) > 0) {
 
-      $sql  = 'INSERT INTO extractfactor SET ';
-      $sql .= 'ExtractId=?, ';
-      $sql .= 'FactorId=?, ';
-      $sql .= 'FactorValue=?';
+      $sql  = 'INSERT INTO "extractfactor"( ';
+      $sql .= '"ExtractId", ';
+      $sql .= '"FactorId", ';
+      $sql .= '"FactorValue) ';
+      $sql .= 'VALUES(?, ?, ?)';
       my $factor_sth = $dbh_m_write->prepare($sql);
       $factor_sth->execute($ExtractId, $vcol_id, $factor_value);
 
@@ -1825,8 +1880,7 @@ sub del_extract_runmode {
     return $data_for_postrun_href;
   }
 
-  my $extract_in_analysisgroup = record_existence($dbh_m_read, 'analgroupextract',
-                                                       'ExtractId', $ExtractId);
+  my $extract_in_analysisgroup = record_existence($dbh_m_read, 'analgroupextract', 'ExtractId', $ExtractId);
 
   if ($extract_in_analysisgroup) {
 
@@ -1842,7 +1896,7 @@ sub del_extract_runmode {
 
   my $dbh_m_write = connect_mdb_write();
 
-  my $sql = 'DELETE FROM extractfactor WHERE ExtractId=?';
+  my $sql = 'DELETE FROM "extractfactor" WHERE "ExtractId"=?';
   my $sth = $dbh_m_write->prepare($sql);
 
   $sth->execute($ExtractId);
@@ -1857,7 +1911,7 @@ sub del_extract_runmode {
 
   $sth->finish();
 
-  $sql = 'DELETE FROM extract WHERE ExtractId=?';
+  $sql = 'DELETE FROM "extract" WHERE "ExtractId"=?';
   $sth = $dbh_m_write->prepare($sql);
 
   $sth->execute($ExtractId);
@@ -1913,6 +1967,32 @@ sub update_extract_runmode {
 
   my $data_for_postrun_href = {};
 
+  # Generic required static field checking
+
+  my $dbh_read = connect_mdb_read();
+
+  my $skip_field = {'ParentExtractId' => 1,
+                    'Tissue'          => 1,
+                   };
+
+  my $field_name_translation = {};
+
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'extract', $skip_field,
+                                                                                $field_name_translation,
+                                                                               );
+
+  if ($chk_sfield_err) {
+
+    $self->logger->debug($chk_sfield_msg);
+
+    return $for_postrun_href;
+  }
+
+  $dbh_read->disconnect();
+
+  # Finish generic required static field checking
+
   my $dbh_k_read = connect_kdb_read();
   my $dbh_m_read = connect_mdb_read();
 
@@ -1921,7 +2001,7 @@ sub update_extract_runmode {
     my $err_msg = "Extract ($ExtractId) not found.";
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-      
+
     return $data_for_postrun_href;
   }
 
@@ -2015,16 +2095,6 @@ sub update_extract_runmode {
     $Status = $query->param('Status');
   }
 
-  my ($missing_err, $missing_href) = check_missing_href( {'ItemGroupId' => $ItemGroupId} );
-
-  if ($missing_err) {
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
-
-    return $data_for_postrun_href;
-  }
-
   if ($ParentExtractId ne '0') {
 
     if (!record_existence($dbh_m_read, 'extract', 'ExtractId', $ParentExtractId)) {
@@ -2032,7 +2102,7 @@ sub update_extract_runmode {
       my $err_msg = "ParentExtractId ($ParentExtractId) not found.";
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'ParentExtractId' => $err_msg}]};
-      
+
       return $data_for_postrun_href;
     }
   }
@@ -2042,7 +2112,7 @@ sub update_extract_runmode {
     my $err_msg = "ItemGroupId ($ItemGroupId) not found.";
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'ItemGroupId' => $err_msg}]};
-    
+
     return $data_for_postrun_href;
   }
 
@@ -2062,7 +2132,7 @@ sub update_extract_runmode {
       my $err_msg = "GenotypeId ($GenotypeId) not found.";
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'GenotypeId' => $err_msg}]};
-    
+
       return $data_for_postrun_href;
     }
   }
@@ -2089,10 +2159,10 @@ sub update_extract_runmode {
   }
 
   for my $geno_rec (@{$geno_data}) {
-    
+
     my $geno_id = $geno_rec->{'GenotypeId'};
     $seen_geno_id->{$geno_id} = 1;
-    
+
     $geno2itemgroup->{$geno_id} = $ItemGroupId;
   }
 
@@ -2107,7 +2177,7 @@ sub update_extract_runmode {
                                                         \@geno_id_list, $group_id, $gadmin_status,
                                                         $LINK_PERM);
   if (!$is_ok) {
-    
+
     # Because a specimen can have more than one genotype, trouble item group id variable needs to be a hash
     # instead of an array so that there is no duplicate in the itemgroup id that DAL reports back to the user.
     my %trouble_itemgroup_id_list;
@@ -2117,16 +2187,16 @@ sub update_extract_runmode {
       my $trouble_ig_id = $geno2itemgroup->{$trouble_geno_id};
       $trouble_itemgroup_id_list{$trouble_ig_id} = 1;
     }
-    
+
     my $trouble_itemgroup_id_str = join(',', keys(%trouble_itemgroup_id_list));
 
     my $err_msg = 'Permission denied: ItemGroupId (' . $trouble_itemgroup_id_str . ')';
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-    
+
     return $data_for_postrun_href;
   }
-  
+
   if ($PlateId ne '0') {
 
     if (!record_existence($dbh_m_read, 'plate', 'PlateId', $PlateId)) {
@@ -2134,7 +2204,7 @@ sub update_extract_runmode {
       my $err_msg = "Plate ($PlateId) not found.";
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'PlateId' => $err_msg}]};
-    
+
       return $data_for_postrun_href;
     }
 
@@ -2143,7 +2213,7 @@ sub update_extract_runmode {
       my $err_msg = "WellRow is missing.";
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'WellRow' => $err_msg}]};
-    
+
       return $data_for_postrun_href;
     }
 
@@ -2152,11 +2222,11 @@ sub update_extract_runmode {
       my $err_msg = "WellCol is missing.";
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'WellCol' => $err_msg}]};
-    
+
       return $data_for_postrun_href;
     }
 
-    my $well_pos_sql = 'SELECT CONCAT(WellRow,WellCol) AS Well FROM extract WHERE PlateId=? AND ExtractId <>?';
+    my $well_pos_sql = 'SELECT CONCAT("WellRow","WellCol") AS "Well" FROM "extract" WHERE "PlateId"=? AND "ExtractId" <>?';
     my ($r_well_pos_err, $well_pos) = read_cell($dbh_m_read, $well_pos_sql, [$PlateId, $ExtractId]);
 
     my $user_well_pos = $WellRow . $WellCol;
@@ -2166,7 +2236,7 @@ sub update_extract_runmode {
       my $err_msg = "Plate ($PlateId) already has $well_pos assigned.";
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-    
+
       return $data_for_postrun_href;
     }
   }
@@ -2177,7 +2247,7 @@ sub update_extract_runmode {
       my $err_msg = "WellRow cannot be accepted while Plate is not provided.";
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'WellRow' => $err_msg}]};
-    
+
       return $data_for_postrun_href;
     }
 
@@ -2186,7 +2256,7 @@ sub update_extract_runmode {
       my $err_msg = "WellCol cannot be accepted while Plate is not provided.";
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'WellCol' => $err_msg}]};
-    
+
       return $data_for_postrun_href;
     }
   }
@@ -2198,7 +2268,7 @@ sub update_extract_runmode {
       my $err_msg = "Tissue ($Tissue) not found.";
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'Tissue' => $err_msg}]};
-    
+
       return $data_for_postrun_href;
     }
   }
@@ -2218,10 +2288,10 @@ sub update_extract_runmode {
     my $vcol_param_name = "VCol_${vcol_id}";
     my $vcol_value      = $query->param($vcol_param_name);
     if ($vcol_data->{$vcol_id}->{'CanFactorHaveNull'} != 1) {
-      
+
       $vcol_param_data->{$vcol_param_name} = $vcol_value;
     }
-    
+
     $vcol_len_info->{$vcol_param_name} = $vcol_data->{$vcol_id}->{'FactorValueMaxLength'};
     $vcol_param_data_maxlen->{$vcol_param_name} = $vcol_value;
   }
@@ -2251,18 +2321,18 @@ sub update_extract_runmode {
 
   my $dbh_m_write = connect_mdb_write();
 
-  #insert into main table
-  $sql    = 'UPDATE extract SET ';
-  $sql   .= 'ParentExtractId=?, ';
-  $sql   .= 'PlateId=?, ';
-  $sql   .= 'ItemGroupId=?, ';
-  $sql   .= 'GenotypeId=?, ';
-  $sql   .= 'Tissue=?, ';
-  $sql   .= 'WellRow=?, ';
-  $sql   .= 'WellCol=?, ';
-  $sql   .= 'Quality=?, ';
-  $sql   .= 'Status=?';
-  $sql   .= 'WHERE ExtractId=?';
+  #update main table
+  $sql    = 'UPDATE "extract" SET ';
+  $sql   .= '"ParentExtractId"=?, ';
+  $sql   .= '"PlateId"=?, ';
+  $sql   .= '"ItemGroupId"=?, ';
+  $sql   .= '"GenotypeId"=?, ';
+  $sql   .= '"Tissue"=?, ';
+  $sql   .= '"WellRow"=?, ';
+  $sql   .= '"WellCol"=?, ';
+  $sql   .= '"Quality"=?, ';
+  $sql   .= '"Status"=?';
+  $sql   .= 'WHERE "ExtractId"=?';
 
   my $sth = $dbh_m_write->prepare($sql);
   $sth->execute( $ParentExtractId, $PlateId, $ItemGroupId, $GenotypeId, $Tissue, $WellRow, $WellCol,
@@ -2282,8 +2352,8 @@ sub update_extract_runmode {
     my $factor_value = $query->param('VCol_' . "$vcol_id");
 
     $sql  = 'SELECT Count(*) ';
-    $sql .= 'FROM extractfactor ';
-    $sql .= 'WHERE ExtractId=? AND FactorId=?';
+    $sql .= 'FROM "extractfactor" ';
+    $sql .= 'WHERE "ExtractId"=? AND "FactorId"=?';
 
     my ($read_err, $count) = read_cell($dbh_m_write, $sql, [$ExtractId, $vcol_id]);
 
@@ -2291,9 +2361,9 @@ sub update_extract_runmode {
 
       if ($count > 0) {
 
-        $sql  = 'UPDATE extractfactor SET ';
-        $sql .= 'FactorValue=? ';
-        $sql .= 'WHERE ExtractId=? AND FactorId=?';
+        $sql  = 'UPDATE "extractfactor" SET ';
+        $sql .= '"FactorValue"=? ';
+        $sql .= 'WHERE "ExtractId"=? AND "FactorId"=?';
 
         my $factor_sth = $dbh_m_write->prepare($sql);
         $factor_sth->execute($factor_value, $ExtractId, $vcol_id);
@@ -2310,10 +2380,11 @@ sub update_extract_runmode {
       }
       else {
 
-        $sql  = 'INSERT INTO extractfactor SET ';
-        $sql .= 'ExtractId=?, ';
-        $sql .= 'FactorId=?, ';
-        $sql .= 'FactorValue=?';
+        $sql  = 'INSERT INTO "extractfactor"(';
+        $sql .= '"ExtractId", ';
+        $sql .= '"FactorId", ';
+        $sql .= '"FactorValue") ';
+        $sql .= 'VALUES(?, ?, ?)';
 
         my $factor_sth = $dbh_m_write->prepare($sql);
         $factor_sth->execute($ExtractId, $vcol_id, $factor_value);
@@ -2333,14 +2404,14 @@ sub update_extract_runmode {
 
       if ($count > 0) {
 
-        $sql  = 'DELETE FROM extractfactor ';
-        $sql .= 'WHERE ExtractId=? AND FactorId=?';
+        $sql  = 'DELETE FROM "extractfactor" ';
+        $sql .= 'WHERE "ExtractId"=? AND "FactorId"=?';
 
         my $factor_sth = $dbh_m_write->prepare($sql);
         $factor_sth->execute($ExtractId, $vcol_id);
-      
+
         if ($dbh_m_write->err()) {
-        
+
           $self->logger->debug("Delete extractfactor failed");
           $data_for_postrun_href->{'Error'} = 1;
           $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
@@ -2425,12 +2496,12 @@ sub get_extract_runmode {
     return $data_for_postrun_href;
   }
 
-  my $where_clause = " WHERE extract.ExtractId=? ";
+  my $where_clause = qq| WHERE "extract"."ExtractId"=? |;
 
   $sql =~ s/GROUP BY/ $where_clause GROUP BY /;
 
   my ($err, $msg, $extract_data) = $self->list_extract(1, $sql, [$ExtractId]);
-  
+
   if ($err) {
 
     $data_for_postrun_href->{'Error'} = 1;
@@ -2479,16 +2550,12 @@ sub list_analysisgroup {
     return ($err, $msg, []);
   }
 
-  my $type_sql       = "SELECT TypeId, TypeName FROM generaltype WHERE Class IN ('markerstate','markerquality')";
-
   my $anal_grp_id_aref    = [];
   my $contact_id_href     = {};
   my $sys_grp_id_href     = {};
-  
+
   my $group_lookup   = {};
-  my $type_lookup    = {};
   my $contact_lookup = {};
-  my $extract_lookup = {};
 
   my $chk_id_err        = 0;
   my $chk_id_msg        = '';
@@ -2497,8 +2564,6 @@ sub list_analysisgroup {
 
   if ($extra_attr_yes) {
 
-    $type_lookup  = $dbh_k->selectall_hashref($type_sql, 'TypeId');
-
     for my $analysisgroup_row (@{$data_aref}) {
 
       push(@{$anal_grp_id_aref}, $analysisgroup_row->{'AnalysisGroupId'});
@@ -2506,7 +2571,7 @@ sub list_analysisgroup {
       $sys_grp_id_href->{$analysisgroup_row->{'AccessGroupId'}} = 1;
 
       if (defined $analysisgroup_row->{'ContactId'}) {
-        
+
         $contact_id_href->{$analysisgroup_row->{'ContactId'}} = 1;
       }
     }
@@ -2537,42 +2602,7 @@ sub list_analysisgroup {
 
     if (scalar(@{$anal_grp_id_aref}) > 0) {
 
-      my $extract_sql = 'SELECT analgroupextract.AnalysisGroupId, extract.ExtractId, ItemGroupId, ';
-      $extract_sql   .= 'GenotypeId, extract.PlateId, plate.PlateName, ';
-      $extract_sql   .= 'WellRow, WellCol ';
-      $extract_sql   .= 'FROM analgroupextract LEFT JOIN extract ON ';
-      $extract_sql   .= 'analgroupextract.ExtractId = extract.ExtractId ';
-      $extract_sql   .= 'LEFT JOIN plate on extract.PlateId = plate.PlateId ';
-      $extract_sql   .= 'WHERE analgroupextract.AnalysisGroupId IN (' . join(',', @{$anal_grp_id_aref}) . ')';
-
-      $self->logger->debug("Extract SQL: $extract_sql");
-
-      my ($extract_err, $extract_msg, $extract_data) = read_data($dbh_m, $extract_sql, []);
-    
-      if ($extract_err) {
-
-        return ($extract_err, $extract_msg, []);
-      }
-
-      for my $extract_row (@{$extract_data}) {
-
-        my $anal_id = $extract_row->{'AnalysisGroupId'};
-
-        if (defined $extract_lookup->{$anal_id}) {
-          
-          my $extract_aref = $extract_lookup->{$anal_id};
-          delete($extract_row->{'AnalysisGroupId'});
-          push(@{$extract_aref}, $extract_row);
-          $extract_lookup->{$anal_id} = $extract_aref;
-        }
-        else {
-
-          delete($extract_row->{'AnalysisGroupId'});
-          $extract_lookup->{$anal_id} = [$extract_row];
-        }
-      }
-
-      my $chk_table_aref = [{'TableName' => 'analysisgroupmarker', 'FieldName' => 'AnalysisGroupId'}];
+      my $chk_table_aref = [{'TableName' => 'dataset', 'FieldName' => 'AnalysisGroupId'}];
 
       ($chk_id_err, $chk_id_msg,
        $used_id_href, $not_used_id_href) = id_existence_bulk($dbh_m, $chk_table_aref, $anal_grp_id_aref);
@@ -2587,7 +2617,7 @@ sub list_analysisgroup {
       }
     }
   }
-  
+
   my $perm_lookup  = {'0' => 'None',
                       '1' => 'Link',
                       '2' => 'Write',
@@ -2618,13 +2648,6 @@ sub list_analysisgroup {
     #do we want extra info?
     if ($extra_attr_yes) {
 
-      if (defined $extract_lookup->{$analysisgroup_id}) {
-
-        $analysisgroup_row->{'Extract'} = $extract_lookup->{$analysisgroup_id};
-      }
-
-      $analysisgroup_row->{'MarkerStateTypeName'}   = $type_lookup->{$marker_state_type}->{'TypeName'};
-      $analysisgroup_row->{'MarkerQualityTypeName'} = $type_lookup->{$marker_quality_type}->{'TypeName'};
       $analysisgroup_row->{'OwnGroupName'}          = $group_lookup->{$own_grp_id}->{'SystemGroupName'};
       $analysisgroup_row->{'AccessGroupName'}       = $group_lookup->{$acc_grp_id}->{'SystemGroupName'};
       $analysisgroup_row->{'OwnGroupPermission'}    = $perm_lookup->{$own_perm};
@@ -2642,6 +2665,11 @@ sub list_analysisgroup {
       if (($ulti_perm & $WRITE_PERM) == $WRITE_PERM) {
 
         $analysisgroup_row->{'update'} = "update/analysisgroup/$analysisgroup_id";
+      }
+
+      if ($used_id_href->{$analysisgroup_id}) {
+
+        $analysisgroup_row->{'listDataSet'} = "analysisgroup/$analysisgroup_id/list/dataset";
       }
 
       if ($own_grp_id == $group_id) {
@@ -2684,7 +2712,7 @@ sub list_analysisgroup_advanced_runmode {
 "ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
 "ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
 "URLParameter": [{"ParameterName": "nperpage", "Description": "Number of records in a page for pagination"}, {"ParameterName": "num", "Description": "The page number of the pagination"}],
-"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database filed name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "FieldList", "Description": "Comma separated value of wanted fields."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases."}],
+"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database field name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "FieldList", "Description": "Comma separated value of wanted fields."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases."}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
@@ -2715,7 +2743,7 @@ sub list_analysisgroup_advanced_runmode {
   }
 
   my $filtering_csv = '';
-  
+
   if (defined $query->param('Filtering')) {
 
     $filtering_csv = $query->param('Filtering');
@@ -2736,9 +2764,9 @@ sub list_analysisgroup_advanced_runmode {
 
   my $group_id      = $self->authen->group_id();
   my $gadmin_status = $self->authen->gadmin_status();
-  my $perm_str      = permission_phrase($group_id, 0, $gadmin_status, 'analysisgroup');
+  my $perm_str      = permission_phrase($group_id, 2, $gadmin_status, 'analysisgroup');
 
-  my $field_list = ['analysisgroup.*', 'VCol*'];
+  my $field_list = ['*'];
 
   my $other_join = '';
 
@@ -2762,10 +2790,8 @@ sub list_analysisgroup_advanced_runmode {
 
   my $where_perm = " WHERE ((($perm_str) & $READ_PERM) = $READ_PERM) ";
 
-  $sql =~ s/GROUP BY/ $where_perm GROUP BY /;
-
-  $sql   .= ' ORDER BY analysisgroup.AnalysisGroupId DESC ';
-  $sql   .= ' LIMIT 1';
+  $sql  =~ s/GROUP BY/ $where_perm GROUP BY /;
+  $sql .= ' LIMIT 1';
 
   $self->logger->debug("SQL with VCol: $sql");
 
@@ -2780,12 +2806,35 @@ sub list_analysisgroup_advanced_runmode {
     return $data_for_postrun_href;
   }
 
-  my @field_list_all = keys(%{$sam_ana_grp_data->[0]});
+  my @field_list_all;
 
-  # no field return, it means no record. error prevention
-  if (scalar(@field_list_all) == 0) {
-    
-    push(@field_list_all, '*');
+  if (scalar(@{$sam_ana_grp_data}) == 1) {
+
+    @field_list_all = keys(%{$sam_ana_grp_data->[0]});
+  }
+  else {
+
+    my ($sfield_err, $sfield_msg, $sfield_data, $pkey_data) = get_static_field($dbh_m, 'analysisgroup');
+
+    if ($sfield_err) {
+
+      $self->logger->debug("Get static field failed: $sfield_msg");
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    for my $sfield_rec (@{$sfield_data}) {
+
+      push(@field_list_all, $sfield_rec->{'Name'});
+    }
+
+    for my $pkey_field (@{$pkey_data}) {
+
+      push(@field_list_all, $pkey_field);
+    }
   }
 
   my $final_field_list = \@field_list_all;
@@ -2807,11 +2856,6 @@ sub list_analysisgroup_advanced_runmode {
     }
 
     $final_field_list = $sel_field_list;
-
-    if ($filtering_csv =~ /GenusId/) {
-
-      push(@{$final_field_list}, 'GenusId');
-    }
   }
 
   $other_join = '';
@@ -2837,9 +2881,9 @@ sub list_analysisgroup_advanced_runmode {
     }
   }
 
-  push(@{$final_field_list}, "$perm_str AS UltimatePerm");
+  push(@{$final_field_list}, qq|$perm_str AS "UltimatePerm"|);
 
-  ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_mfactor_sql($dbh_m, $dbh_k, 
+  ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_mfactor_sql($dbh_m, $dbh_k,
                                                                       $final_field_list, 'analysisgroup',
                                                                      'AnalysisGroupId', $other_join);
 
@@ -2852,8 +2896,8 @@ sub list_analysisgroup_advanced_runmode {
     return $data_for_postrun_href;
   }
 
-  my ($filter_err, $filter_msg, $filter_phrase, $where_arg) = parse_filtering('AnalysisGroupId',
-                                                                              'analysisgroup',
+  my ($filter_err, $filter_msg, $filter_phrase, $where_arg) = parse_filtering('"AnalysisGroupId"',
+                                                                              '"analysisgroup"',
                                                                               $filtering_csv,
                                                                               $final_field_list);
 
@@ -2897,13 +2941,13 @@ sub list_analysisgroup_advanced_runmode {
     $self->logger->debug("Filtering expression: $filtering_exp");
 
     my $paged_limit_start_time = [gettimeofday()];
-   
+
     my ($pg_id_err, $pg_id_msg, $nb_records,
         $nb_pages, $limit_clause, $rcount_time) = get_paged_filter($dbh_m,
                                                                    $nb_per_page,
                                                                    $page,
-                                                                   'analysisgroup',
-                                                                   'AnalysisGroupId',
+                                                                   '"analysisgroup"',
+                                                                   '"AnalysisGroupId"',
                                                                    $filtering_exp,
                                                                    $where_arg
             );
@@ -2913,9 +2957,9 @@ sub list_analysisgroup_advanced_runmode {
     $self->logger->debug("SQL Row count time: $rcount_time");
 
     if ($pg_id_err == 1) {
-    
+
       $self->logger->debug($pg_id_msg);
-    
+
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
@@ -2923,7 +2967,7 @@ sub list_analysisgroup_advanced_runmode {
     }
 
     if ($pg_id_err == 2) {
-      
+
       $page = 0;
     }
 
@@ -2941,7 +2985,7 @@ sub list_analysisgroup_advanced_runmode {
 
   $sql  =~ s/GROUP BY/ $filtering_exp GROUP BY /;
 
-  my ($sort_err, $sort_msg, $sort_sql) = parse_sorting($sorting, $final_field_list);
+  my ($sort_err, $sort_msg, $sort_sql) = parse_sorting($sorting, $final_field_list, '"analysisgroup"');
 
   if ($sort_err) {
 
@@ -2957,7 +3001,7 @@ sub list_analysisgroup_advanced_runmode {
   }
   else {
 
-    $sql .= ' ORDER BY analysisgroup.AnalysisGroupId DESC';
+    $sql .= ' ORDER BY "analysisgroup"."AnalysisGroupId" DESC';
   }
 
   $sql .= " $paged_limit_clause ";
@@ -3024,9 +3068,9 @@ sub get_analysisgroup_runmode {
 
   my $group_id      = $self->authen->group_id();
   my $gadmin_status = $self->authen->gadmin_status();
-  my $perm_str      = permission_phrase($group_id, 0, $gadmin_status, 'analysisgroup');
+  my $perm_str      = permission_phrase($group_id, 2, $gadmin_status, 'analysisgroup');
 
-  my $field_list = ['*', "$perm_str AS UltimatePerm"];
+  my $field_list = ['*', qq|$perm_str AS "UltimatePerm"|];
 
   my $other_join = '';
 
@@ -3050,11 +3094,9 @@ sub get_analysisgroup_runmode {
     return $data_for_postrun_href;
   }
 
-  my $where_clause = " WHERE ((($perm_str) & $READ_PERM) = $READ_PERM) AND analysisgroup.AnalysisGroupId=? ";
-  
-  $sql   =~ s/GROUP BY/ $where_clause GROUP BY /;
+  my $where_clause = qq| WHERE ((($perm_str) & $READ_PERM) = $READ_PERM) AND "analysisgroup"."AnalysisGroupId"=? |;
 
-  $sql   .= ' ORDER BY analysisgroup.AnalysisGroupId DESC';
+  $sql   =~ s/GROUP BY/ $where_clause GROUP BY /;
 
   $self->logger->debug("SQL with VCol: $sql");
 
@@ -3111,54 +3153,27 @@ sub add_analysisgroup_runmode {
 
   my $dbh_read = connect_mdb_read();
 
-  my $skip_field = { 'GenotypeMarkerStateX' => 1,
-                     'OwnGroupId'           => 1,
-  };
+  my $skip_field = {'OwnGroupId' => 1};
 
-  my ($get_scol_err, $get_scol_msg, $scol_data, $pkey_data) = get_static_field($dbh_read, 'analysisgroup');
+  my $field_name_translation = {};
 
-  if ($get_scol_err) {
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'analysisgroup', $skip_field,
+                                                                                $field_name_translation,
+                                                                               );
 
-    $self->logger->debug("Get static field info failed: $get_scol_msg");
-    
-    my $err_msg = "Unexpected Error.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+  if ($chk_sfield_err) {
 
-    return $data_for_postrun_href;
-  }
+    $self->logger->debug($chk_sfield_msg);
 
-  my $required_field_href = {};
-
-  for my $static_field (@{$scol_data}) {
-
-    my $field_name = $static_field->{'Name'};
-    
-    if ($skip_field->{$field_name}) { next; }
-
-    if ($static_field->{'Required'} == 1) {
-
-      $required_field_href->{$field_name} = $query->param($field_name);
-    }
+    return $for_postrun_href;
   }
 
   $dbh_read->disconnect();
 
-  my ($missing_err, $missing_href) = check_missing_href( $required_field_href );
-
-  if ($missing_err) {
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
-
-    return $data_for_postrun_href;
-  }
-
   # Finish generic required static field checking
 
   my $AnalysisGroupName         = $query->param('AnalysisGroupName');
-  my $MarkerStateType           = $query->param('MarkerStateType');
-  my $MarkerQualityType         = $query->param('MarkerQualityType');
   my $AccessGroupId             = $query->param('AccessGroupId');
   my $OwnGroupPerm              = $query->param('OwnGroupPerm');
   my $AccessGroupPerm           = $query->param('AccessGroupPerm');
@@ -3170,7 +3185,7 @@ sub add_analysisgroup_runmode {
 
     $AnalysisGroupDescription = $query->param('AnalysisGroupDescription');
   }
-  
+
   my $ContactId                 = '0';
 
   if (defined($query->param('ContactId'))) {
@@ -3228,6 +3243,8 @@ sub add_analysisgroup_runmode {
     return $data_for_postrun_href;
   }
 
+  $self->logger->debug("Checking AnalysisGroupName: $AnalysisGroupName");
+
   if (record_existence($dbh_m_read, 'analysisgroup', 'AnalysisGroupName', $AnalysisGroupName)) {
 
     my $err_msg = "AnalysisGroupName ($AnalysisGroupName) already exists.";
@@ -3237,7 +3254,7 @@ sub add_analysisgroup_runmode {
 
     return $data_for_postrun_href;
   }
-  
+
   #check that supplied access group exists
   my $access_grp_existence = record_existence($dbh_k_read, 'systemgroup', 'SystemGroupId', $AccessGroupId);
 
@@ -3252,8 +3269,8 @@ sub add_analysisgroup_runmode {
   }
 
   #check that permission values fall within accepted constraints
-  if ( $OwnGroupPerm > 7 || $OwnGroupPerm < 0 || 
-        (($OwnGroupPerm & $READ_PERM) != $READ_PERM) ) {
+  if ( $OwnGroupPerm > 7 || $OwnGroupPerm < 0 ||
+       (($OwnGroupPerm & $READ_PERM) != $READ_PERM) ) {
 
     my $err_msg = "OwnGroupPerm ($OwnGroupPerm) is invalid.";
     $data_for_postrun_href->{'Error'} = 1;
@@ -3280,26 +3297,6 @@ sub add_analysisgroup_runmode {
     return $data_for_postrun_href;
   }
 
-  if (!type_existence($dbh_k_read, 'markerstate', $MarkerStateType)) {
-
-    my $err_msg = "MarkerStateType ($MarkerStateType) not found.";
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'MarkerStateType' => $err_msg}]};
-
-    return $data_for_postrun_href;
-  }
-
-  if (!type_existence($dbh_k_read, 'markerquality', $MarkerQualityType)) {
-
-    my $err_msg = "MarkerQualityType ($MarkerQualityType) not found.";
-
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'MarkerQualityType' => $err_msg}]};
-
-      return $data_for_postrun_href;
-  }
-
   if ($ContactId ne '0') {
 
     if (!record_existence($dbh_k_read, 'contact', 'ContactId', $ContactId)) {
@@ -3324,7 +3321,7 @@ sub add_analysisgroup_runmode {
   eval {
 
     local $XML::Checker::FAIL = sub {
-      
+
       my $code = shift;
       my $err_str = XML::Checker::error_string ($code, @_);
       $self->logger->debug("XML Parsing ERR: $code : $err_str");
@@ -3400,26 +3397,30 @@ sub add_analysisgroup_runmode {
   my $group_id = $self->authen->group_id();
   my $gadmin_status = $self->authen->gadmin_status();
 
-  my ($is_ok, $trouble_geno_id_aref) = check_permission($dbh_k_read, 'genotype', 'GenotypeId',
-                                                        \@geno_id_list, $group_id, $gadmin_status, 
-                                                        $LINK_PERM);
-  if (!$is_ok) {
-    
-    my @trouble_ext_id_list;
+  if (scalar(@geno_id_list) > 0) {
 
-    for my $trouble_geno_id (@{$trouble_geno_id_aref}) {
+    my ($is_ok, $trouble_geno_id_aref) = check_permission($dbh_k_read, 'genotype', 'GenotypeId',
+                                                          \@geno_id_list, $group_id, $gadmin_status,
+                                                          $LINK_PERM);
 
-      my $trouble_ext_id = $geno2extract->{$trouble_geno_id};
-      push(@trouble_ext_id_list, $trouble_ext_id);
+    if (!$is_ok) {
+
+      my @trouble_ext_id_list;
+
+      for my $trouble_geno_id (@{$trouble_geno_id_aref}) {
+
+        my $trouble_ext_id = $geno2extract->{$trouble_geno_id};
+        push(@trouble_ext_id_list, $trouble_ext_id);
+      }
+
+      my $trouble_ext_id_str = join(',', @trouble_ext_id_list);
+
+      my $err_msg = 'Permission denied: ExtractIds (' . $trouble_ext_id_str . ')';
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
     }
-
-    my $trouble_ext_id_str = join(',', @trouble_ext_id_list);
-
-    my $err_msg = 'Permission denied: ExtractIds (' . $trouble_ext_id_str . ')';
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-    
-    return $data_for_postrun_href;
   }
 
   $dbh_k_read->disconnect();
@@ -3427,29 +3428,36 @@ sub add_analysisgroup_runmode {
 
   my $dbh_m_write = connect_mdb_write();
 
-  my $default_genotype_marker_state_x = 0;    # let the importation of marker data to decide
+  my ($next_val_err, $next_val_msg, $anal_id) = get_next_value_for($dbh_m_write, 'analysisgroup', 'AnalysisGroupId');
+
+  if ($next_val_err) {
+
+    $self->logger->debug($next_val_msg);
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
 
   #insert into main table
-  $sql    = 'INSERT INTO analysisgroup SET ';
-  $sql   .= 'AnalysisGroupName=?, ';
-  $sql   .= 'AnalysisGroupDescription=?, ';
-  $sql   .= 'GenotypeMarkerStateX=?, ';
-  $sql   .= 'MarkerStateType=?, ';
-  $sql   .= 'MarkerQualityType=?, ';
-  $sql   .= 'ContactId=?, ';
-  $sql   .= 'OwnGroupId=?, ';
-  $sql   .= 'AccessGroupId=?, ';
-  $sql   .= 'OwnGroupPerm=?, ';
-  $sql   .= 'AccessGroupPerm=?, ';
-  $sql   .= 'OtherPerm=?';
+  $sql    = 'INSERT INTO "analysisgroup"(';
+  $sql   .= '"AnalysisGroupId", ';
+  $sql   .= '"AnalysisGroupName", ';
+  $sql   .= '"AnalysisGroupDescription", ';
+  $sql   .= '"ContactId", ';
+  $sql   .= '"OwnGroupId", ';
+  $sql   .= '"AccessGroupId", ';
+  $sql   .= '"OwnGroupPerm", ';
+  $sql   .= '"AccessGroupPerm", ';
+  $sql   .= '"OtherPerm") ';
+  $sql   .= 'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)';
 
   my $sth = $dbh_m_write->prepare($sql);
   $sth->execute(
+                $anal_id,
                 $AnalysisGroupName,
                 $AnalysisGroupDescription,
-                $default_genotype_marker_state_x,
-                $MarkerStateType,
-                $MarkerQualityType,
                 $ContactId,
                 $group_id,
                 $AccessGroupId,
@@ -3464,7 +3472,7 @@ sub add_analysisgroup_runmode {
 
   if (!$dbh_m_write->err()) {
 
-    $AnalysisGroupId = $dbh_m_write->last_insert_id(undef, undef, 'analysisgroup', 'AnalysisGroupId');
+    $AnalysisGroupId = $anal_id;
     $self->logger->debug("AnalysisGroupId: $AnalysisGroupId");
 
     if ( !(defined($inserted_id->{'analysisgroup'})) ) {
@@ -3508,7 +3516,7 @@ sub add_analysisgroup_runmode {
 
           $data_for_postrun_href->{'Error'} = 1;
           $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-      
+
           return $data_for_postrun_href;
         }
 
@@ -3516,7 +3524,7 @@ sub add_analysisgroup_runmode {
 
         $data_for_postrun_href->{'Error'} = 1;
         $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-      
+
         return $data_for_postrun_href;
       }
 
@@ -3530,8 +3538,8 @@ sub add_analysisgroup_runmode {
     }
   }
 
-  $sql  = 'INSERT INTO analgroupextract ';
-  $sql .= '(AnalysisGroupId,ExtractId) ';
+  $sql  = 'INSERT INTO "analgroupextract" ';
+  $sql .= '("AnalysisGroupId", "ExtractId") ';
   $sql .= 'VALUES ';
 
   my @sql_row;
@@ -3561,7 +3569,7 @@ sub add_analysisgroup_runmode {
 
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-      
+
       return $data_for_postrun_href;
     }
 
@@ -3569,7 +3577,7 @@ sub add_analysisgroup_runmode {
 
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-    
+
     return $data_for_postrun_href;
   }
 
@@ -3624,49 +3632,26 @@ sub add_plate_n_extract_runmode {
 
   my $skip_field = {'DateCreated' => 1};
 
-  my ($get_scol_err, $get_scol_msg, $scol_data, $pkey_data) = get_static_field($dbh_read, 'plate');
+  my $field_name_translation = {};
 
-  if ($get_scol_err) {
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'plate', $skip_field,
+                                                                                $field_name_translation,
+                                                                               );
 
-    $self->logger->debug("Get static field info failed: $get_scol_msg");
-    
-    my $err_msg = "Unexpected Error.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+  if ($chk_sfield_err) {
 
-    return $data_for_postrun_href;
-  }
+    $self->logger->debug($chk_sfield_msg);
 
-  my $required_field_href = {};
-
-  for my $static_field (@{$scol_data}) {
-
-    my $field_name = $static_field->{'Name'};
-    
-    if ($skip_field->{$field_name}) { next; }
-
-    if ($static_field->{'Required'} == 1) {
-
-      $required_field_href->{$field_name} = $query->param($field_name);
-    }
+    return $for_postrun_href;
   }
 
   $dbh_read->disconnect();
 
-  my ($missing_err, $missing_href) = check_missing_href( $required_field_href );
-
-  if ($missing_err) {
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
-
-    return $data_for_postrun_href;
-  }
-
   # Finish generic required static field checking
 
   my $PlateName        = $query->param('PlateName');
- 
+
   my $OperatorId       = $query->param('OperatorId');
 
   my $PlateType        = '0';
@@ -3678,7 +3663,7 @@ sub add_plate_n_extract_runmode {
       $PlateType = $query->param('PlateType');
     }
   }
-  
+
   my $PlateDescription = '';
 
   if (defined($query->param('PlateDescription'))) {
@@ -3693,11 +3678,14 @@ sub add_plate_n_extract_runmode {
     $StorageId = $query->param('StorageId');
   }
 
-  my $PlateWells       = '';
+  my $PlateWells       = undef;
 
   if (defined($query->param('PlateWells'))) {
 
-    $PlateWells = $query->param('PlateWells');
+    if (length($query->param('PlateWells')) > 0) {
+
+      $PlateWells = $query->param('PlateWells');
+    }
   }
 
   my $PlateStatus      = '';
@@ -3848,6 +3836,18 @@ sub add_plate_n_extract_runmode {
     return $data_for_postrun_href;
   }
 
+  my ($get_scol_err, $get_scol_msg, $scol_data, $pkey_data) = get_static_field($dbh_m_read, 'extract');
+
+  if ($get_scol_err) {
+
+    $self->logger->debug("Get static field info failed: $get_scol_msg");
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
   my $extract_xml  = read_file($extract_xml_file);
   my $extract_aref = xml2arrayref($extract_xml, 'extract');
 
@@ -3857,6 +3857,33 @@ sub add_plate_n_extract_runmode {
   my $uniq_well       = {};
 
   for my $extract_rec (@{$extract_aref}) {
+
+    my $colsize_info          = {};
+    my $chk_maxlen_field_href = {};
+
+    for my $static_field (@{$scol_data}) {
+
+      my $field_name  = $static_field->{'Name'};
+      my $field_dtype = $static_field->{'DataType'};
+
+      if (lc($field_dtype) eq 'varchar') {
+
+        $colsize_info->{$field_name}           = $static_field->{'ColSize'};
+        $chk_maxlen_field_href->{$field_name}  = $extract_rec->{$field_name};
+      }
+    }
+
+    my ($maxlen_err, $maxlen_msg) = check_maxlen($chk_maxlen_field_href, $colsize_info);
+
+    if ($maxlen_err) {
+
+      $maxlen_msg .= 'longer than its maximum length';
+
+      $data_for_postrun_href->{'Error'}       = 1;
+      $data_for_postrun_href->{'Data'}        = {'Error' => [{'Message' => $maxlen_msg}]};
+
+      return $data_for_postrun_href;
+    }
 
     my $ItemGroupId = $extract_rec->{'ItemGroupId'};
 
@@ -3870,53 +3897,74 @@ sub add_plate_n_extract_runmode {
       }
     }
 
-    my $PlateId = '';
+    my $PlateId = '0';
 
     if (defined($extract_rec->{'PlateId'})) {
 
-      $PlateId = $extract_rec->{'PlateId'};
+      if (length($extract_rec->{'PlateId'}) > 0) {
+
+        $PlateId = $extract_rec->{'PlateId'};
+      }
     }
 
-    my $GenotypeId = '';
+    my $GenotypeId = '0';
 
     if (defined($extract_rec->{'GenotypeId'})) {
 
-      $GenotypeId = $extract_rec->{'GenotypeId'};
+      if (length($extract_rec->{'GenotypeId'}) > 0) {
+
+        $GenotypeId = $extract_rec->{'GenotypeId'};
+      }
     }
 
-    my $Tissue = '';
+    my $Tissue = '0';
 
     if (defined($extract_rec->{'Tissue'})) {
 
-      $Tissue = $extract_rec->{'Tissue'};
+      if (length($extract_rec->{'Tissue'}) > 0) {
+
+        $Tissue = $extract_rec->{'Tissue'};
+      }
     }
 
     my $WellRow = '';
 
     if (defined($extract_rec->{'WellRow'})) {
 
-      $WellRow = $extract_rec->{'WellRow'};
+      if (length($extract_rec->{'WellRow'}) > 0) {
+
+        $WellRow = $extract_rec->{'WellRow'};
+      }
     }
 
     my $WellCol = '';
 
     if (defined($extract_rec->{'WellCol'})) {
 
-      $WellCol = $extract_rec->{'WellCol'};
+      if (length($extract_rec->{'WellCol'}) > 0) {
+
+        $WellCol = $extract_rec->{'WellCol'};
+      }
     }
 
     my $Quality = '';
 
     if (defined($extract_rec->{'Quality'})) {
 
-      $Quality = $extract_rec->{'Quality'};
+      if (length($extract_rec->{'Quality'}) > 0) {
+
+        $Quality = $extract_rec->{'Quality'};
+      }
     }
 
     my $Status = '';
 
     if (defined($extract_rec->{'Status'})) {
 
-      $Status = $extract_rec->{'Status'};
+      if (length($extract_rec->{'Status'}) > 0) {
+
+        $Status = $extract_rec->{'Status'};
+      }
     }
 
     my ($missing_err, $missing_msg) = check_missing_value( {'ItemGroupId' => $ItemGroupId} );
@@ -3937,7 +3985,7 @@ sub add_plate_n_extract_runmode {
         my $err_msg = "ParentExtractId ($ParentExtractId) not found.";
         $data_for_postrun_href->{'Error'} = 1;
         $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-        
+
         return $data_for_postrun_href;
       }
     }
@@ -3947,27 +3995,27 @@ sub add_plate_n_extract_runmode {
       my $err_msg = "ItemGroupId ($ItemGroupId) not found.";
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-      
+
       return $data_for_postrun_href;
     }
 
     my $get_geno_sql = '';
 
-    if (length($GenotypeId) > 0) {
-      
+    if ($GenotypeId ne '0') {
+
       $get_geno_sql    = 'SELECT genotypespecimen.GenotypeId ';
       $get_geno_sql   .= 'FROM itemgroupentry LEFT JOIN item ON itemgroupentry.ItemId = item.ItemId ';
       $get_geno_sql   .= 'LEFT JOIN genotypespecimen ON item.SpecimenId = genotypespecimen.SpecimenId ';
       $get_geno_sql   .= 'WHERE itemgroupentry.ItemGroupId=? AND genotypespecimen.GenotypeId=?';
-      
+
       my ($verify_geno_err, $verified_geno_id) = read_cell($dbh_k_read, $get_geno_sql, [$ItemGroupId, $GenotypeId]);
-      
+
       if (length($verified_geno_id) == 0) {
-        
+
         my $err_msg = "GenotypeId ($GenotypeId) invalid.";
         $data_for_postrun_href->{'Error'} = 1;
         $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-        
+
         return $data_for_postrun_href;
       }
     }
@@ -3997,32 +4045,32 @@ sub add_plate_n_extract_runmode {
 
       $geno2itemgroup->{$geno_id} = $ItemGroupId;
     }
-      
+
     if (length($WellRow) == 0) {
-      
+
       my $err_msg = "WellRow is missing.";
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-      
+
       return $data_for_postrun_href;
     }
-    
+
     if (length($WellCol) == 0) {
-      
+
       my $err_msg = "WellCol is missing.";
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-      
+
       return $data_for_postrun_href;
     }
-    
+
     my $well = $WellRow . $WellCol;
     if (defined($uniq_well->{$well})) {
 
       my $err_msg = "Well ($well) has been used in more than one extract.";
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-      
+
       return $data_for_postrun_href;
     }
     else {
@@ -4040,7 +4088,7 @@ sub add_plate_n_extract_runmode {
                                                         \@geno_id_list, $group_id, $gadmin_status,
                                                         $LINK_PERM);
   if (!$is_ok) {
-    
+
     my %trouble_itemgroup_id;
 
     for my $trouble_geno_id (@{$trouble_geno_id_aref}) {
@@ -4058,39 +4106,55 @@ sub add_plate_n_extract_runmode {
     my $err_msg = 'Permission denied: ItemGroupId (' . $trouble_itemgroup_id_str . ')';
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-    
+
     return $data_for_postrun_href;
   }
 
   $dbh_m_read->disconnect();
   $dbh_k_read->disconnect();
 
-  my @sql_set_field;
-
   my $dbh_m_write = connect_mdb_write();
+
+  my ($next_val_err, $next_val_msg, $plt_id) = get_next_value_for($dbh_m_write, 'plate', 'PlateId');
+
+  if ($next_val_err) {
+
+    $self->logger->debug($next_val_msg);
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $self->logger->debug("Next plate id: $plt_id");
 
   my $inserted_id = {};
 
-  $sql  = 'INSERT INTO plate SET ';
-  $sql .= 'PlateName=?, ';
-  $sql .= 'DateCreated=?, ';
-  $sql .= 'OperatorId=?, ';
-  $sql .= 'PlateType=?, ';
-  $sql .= 'PlateDescription=?, ';
-  $sql .= 'StorageId=?, ';
-  $sql .= 'PlateWells=?, ';
-  $sql .= 'PlateStatus=?';
+  $sql  = 'INSERT INTO "plate"( ';
+  $sql .= '"PlateId", ';
+  $sql .= '"PlateName", ';
+  $sql .= '"DateCreated", ';
+  $sql .= '"OperatorId", ';
+  $sql .= '"PlateType", ';
+  $sql .= '"PlateDescription", ';
+  $sql .= '"StorageId", ';
+  $sql .= '"PlateWells", ';
+  $sql .= '"PlateStatus") ';
+  $sql .= 'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)';
 
   my $sth = $dbh_m_write->prepare($sql);
-  $sth->execute($PlateName, $DateCreated, $OperatorId, $PlateType,
+  $sth->execute($plt_id, $PlateName, $DateCreated, $OperatorId, $PlateType,
                 $PlateDescription, $StorageId, $PlateWells, $PlateStatus);
+
+  $self->logger->debug("Add Plate SQL: $sql");
 
   my $plate_id = -1;
   if (!$dbh_m_write->err()) {
 
-    $plate_id = $dbh_m_write->last_insert_id(undef, undef, 'plate', 'PlateId');
+    $plate_id = $plt_id;
     $self->logger->debug("PlateId: $plate_id");
-    
+
     if ( !(defined($inserted_id->{'plate'})) ) {
 
       $inserted_id->{'plate'} = { 'IdField' => 'PlateId',
@@ -4112,15 +4176,17 @@ sub add_plate_n_extract_runmode {
 
     if (length($factor_value) > 0) {
 
-      $sql  = 'INSERT INTO platefactor SET ';
-      $sql .= 'PlateId=?, ';
-      $sql .= 'FactorId=?, ';
-      $sql .= 'FactorValue=?';
+      $sql  = 'INSERT INTO "platefactor"(';
+      $sql .= '"PlateId", ';
+      $sql .= '"FactorId", ';
+      $sql .= '"FactorValue") ';
+      $sql .= 'VALUES (?, ?, ?)';
+
       my $factor_sth = $dbh_m_write->prepare($sql);
       $factor_sth->execute($plate_id, $vcol_id, $factor_value);
-      
+
       if ($dbh_m_write->err()) {
-        
+
         my ($rollback_err, $rollback_msg) = rollback_cleanup_multi($self->logger(), $dbh_m_write, $inserted_id);
 
         if ($rollback_err) {
@@ -4131,7 +4197,7 @@ sub add_plate_n_extract_runmode {
 
           $data_for_postrun_href->{'Error'} = 1;
           $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-          
+
           return $data_for_postrun_href;
         }
 
@@ -4139,7 +4205,7 @@ sub add_plate_n_extract_runmode {
 
         $data_for_postrun_href->{'Error'} = 1;
         $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-      
+
         return $data_for_postrun_href;
       }
 
@@ -4148,10 +4214,10 @@ sub add_plate_n_extract_runmode {
         $inserted_id->{'platefactor'} = { 'IdField' => 'PlateId',
                                           'IdValue' => [$plate_id] };
       }
-    
+
       $factor_sth->finish();
     }
-  } 
+  }
 
   for my $extract_rec (@{$extract_aref}) {
 
@@ -4167,76 +4233,101 @@ sub add_plate_n_extract_runmode {
       }
     }
 
-    my $PlateId = '';
- 
-    if (defined($extract_rec->{'PlateId'})) {
-
-      $PlateId = $extract_rec->{'PlateId'};
-    }
-
-    my $GenotypeId = '';
+    my $GenotypeId = '0';
 
     if (defined($extract_rec->{'GenotypeId'})) {
 
-      $GenotypeId = $extract_rec->{'GenotypeId'};
+      if (length($extract_rec->{'GenotypeId'}) > 0) {
+
+        $GenotypeId = $extract_rec->{'GenotypeId'};
+      }
     }
 
-    my $Tissue = '';
+    my $Tissue = '0';
 
     if (defined($extract_rec->{'Tissue'})) {
 
-      $Tissue = $extract_rec->{'Tissue'};
+      if (length($extract_rec->{'Tissue'}) > 0) {
+
+        $Tissue = $extract_rec->{'Tissue'};
+      }
     }
 
     my $WellRow = '';
 
     if (defined($extract_rec->{'WellRow'})) {
-    
-      $WellRow = $extract_rec->{'WellRow'};
+
+      if (length($extract_rec->{'WellRow'}) > 0) {
+
+        $WellRow = $extract_rec->{'WellRow'};
+      }
     }
 
     my $WellCol = '';
-    
+
     if (defined($extract_rec->{'WellCol'})) {
-      
-      $WellCol = $extract_rec->{'WellCol'};
+
+      if (length($extract_rec->{'WellCol'}) > 0) {
+
+        $WellCol = $extract_rec->{'WellCol'};
+      }
     }
-    
+
     my $Quality = '';
-    
+
     if (defined($extract_rec->{'Quality'})) {
-    
-      $Quality = $extract_rec->{'Quality'};
+
+      if (length($extract_rec->{'Quality'}) > 0) {
+
+        $Quality = $extract_rec->{'Quality'};
+      }
     }
 
     my $Status = '';
 
     if (defined($extract_rec->{'Status'})) {
 
-      $Status = $extract_rec->{'Status'};
+      if (length($extract_rec->{'Status'}) > 0) {
+
+        $Status = $extract_rec->{'Status'};
+      }
     }
 
-    $sql  = 'INSERT INTO extract SET ';
-    $sql .= 'ParentExtractId=?, ';
-    $sql .= 'PlateId=?, ';
-    $sql .= 'ItemGroupId=?, ';
-    $sql .= 'GenotypeId=?, ';
-    $sql .= 'Tissue=?, ';
-    $sql .= 'WellRow=?, ';
-    $sql .= 'WellCol=?, ';
-    $sql .= 'Quality=?, ';
-    $sql .= 'Status=?';
+    my ($next_val_err, $next_val_msg, $ext_id) = get_next_value_for($dbh_m_write, 'extract', 'ExtractId');
+
+    if ($next_val_err) {
+
+      $self->logger->debug($next_val_msg);
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    $sql  = 'INSERT INTO "extract"(';
+    $sql .= '"ExtractId", ';
+    $sql .= '"ParentExtractId", ';
+    $sql .= '"PlateId", ';
+    $sql .= '"ItemGroupId", ';
+    $sql .= '"GenotypeId", ';
+    $sql .= '"Tissue", ';
+    $sql .= '"WellRow", ';
+    $sql .= '"WellCol", ';
+    $sql .= '"Quality", ';
+    $sql .= '"Status") ';
+    $sql .= 'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
 
     $sth = $dbh_m_write->prepare($sql);
-    $sth->execute($ParentExtractId, $plate_id, $ItemGroupId, $GenotypeId,
+    $sth->execute($ext_id, $ParentExtractId, $plate_id, $ItemGroupId, $GenotypeId,
                   $Tissue, $WellRow, $WellCol, $Quality, $Status);
 
     my $extract_id = -1;
     if (!$dbh_m_write->err()) {
 
-      $extract_id = $dbh_m_write->last_insert_id(undef, undef, 'extract', 'ExtractId');
+      $extract_id = $ext_id;
       $self->logger->debug("ExtractId: $extract_id");
-      
+
       if ( !(defined($inserted_id->{'extract'})) ) {
 
         $inserted_id->{'extract'} = { 'IdField' => 'ExtractId',
@@ -4263,7 +4354,7 @@ sub add_plate_n_extract_runmode {
 
         $data_for_postrun_href->{'Error'} = 1;
         $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-          
+
         return $data_for_postrun_href;
       }
 
@@ -4271,7 +4362,7 @@ sub add_plate_n_extract_runmode {
 
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-      
+
       return $data_for_postrun_href;
     }
     $sth->finish();
@@ -4324,44 +4415,21 @@ sub add_plate_runmode {
 
   my $skip_field = {'DateCreated' => 1};
 
-  my ($get_scol_err, $get_scol_msg, $scol_data, $pkey_data) = get_static_field($dbh_read, 'plate');
+  my $field_name_translation = {};
 
-  if ($get_scol_err) {
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'plate', $skip_field,
+                                                                                $field_name_translation,
+                                                                               );
 
-    $self->logger->debug("Get static field info failed: $get_scol_msg");
-    
-    my $err_msg = "Unexpected Error.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+  if ($chk_sfield_err) {
 
-    return $data_for_postrun_href;
-  }
+    $self->logger->debug($chk_sfield_msg);
 
-  my $required_field_href = {};
-
-  for my $static_field (@{$scol_data}) {
-
-    my $field_name = $static_field->{'Name'};
-    
-    if ($skip_field->{$field_name}) { next; }
-
-    if ($static_field->{'Required'} == 1) {
-
-      $required_field_href->{$field_name} = $query->param($field_name);
-    }
+    return $for_postrun_href;
   }
 
   $dbh_read->disconnect();
-
-  my ($missing_err, $missing_href) = check_missing_href( $required_field_href );
-
-  if ($missing_err) {
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
-
-    return $data_for_postrun_href;
-  }
 
   # Finish generic required static field checking
 
@@ -4377,7 +4445,7 @@ sub add_plate_runmode {
       $PlateType = $query->param('PlateType');
     }
   }
-  
+
   my $PlateDescription = '';
 
   if (defined($query->param('PlateDescription'))) {
@@ -4395,7 +4463,7 @@ sub add_plate_runmode {
     }
   }
 
-  my $PlateWells       = '';
+  my $PlateWells       = undef;
 
   if (defined($query->param('PlateWells'))) {
 
@@ -4419,11 +4487,11 @@ sub add_plate_runmode {
 
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [$int_href]};
-      
+
       return $data_for_postrun_href;
     }
   }
-    
+
   $self->logger->debug("Plate name: $PlateName");
 
   my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength ";
@@ -4473,7 +4541,7 @@ sub add_plate_runmode {
     my $err_msg = "OperatorId ($OperatorId) not found.";
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-    
+
     return $data_for_postrun_href;
   }
 
@@ -4529,7 +4597,7 @@ sub add_plate_runmode {
   eval {
 
     local $XML::Checker::FAIL = sub {
-      
+
       my $code = shift;
       my $err_str = XML::Checker::error_string ($code, @_);
       $self->logger->debug("XML Parsing ERR: $code : $err_str");
@@ -4584,10 +4652,10 @@ sub add_plate_runmode {
       }
     }
 
-    $sql = 'SELECT CONCAT(WellRow,WellCol) AS Well FROM extract WHERE ExtractId=?';
+    $sql = 'SELECT CONCAT("WellRow","WellCol") AS "Well" FROM "extract" WHERE "ExtractId"=?';
 
     my ($read_well_err, $well) = read_cell($dbh_m_read, $sql, [$extract_id]);
-    
+
     if (defined($uniq_well_href->{$well})) {
 
       my $dup_well_extract_id = $uniq_well_href->{$well};
@@ -4604,7 +4672,7 @@ sub add_plate_runmode {
     }
 
     if (defined($uniq_extract_id->{$extract_id})) {
-      
+
       my $err_msg = "Extract ($extract_id): duplicate.";
       $data_for_postrun_href->{'Error'}       = 1;
       $data_for_postrun_href->{'Data'}        = {'Error' => [{'Message' => $err_msg}]};
@@ -4620,32 +4688,46 @@ sub add_plate_runmode {
   $dbh_m_read->disconnect();
   $dbh_k_read->disconnect();
 
-  my @sql_set_field;
-
   my $dbh_m_write = connect_mdb_write();
+
+  my ($next_val_err, $next_val_msg, $plt_id) = get_next_value_for($dbh_m_write, 'plate', 'PlateId');
+
+  if ($next_val_err) {
+
+    $self->logger->debug($next_val_msg);
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $self->logger->debug("Plate ID: $plt_id");
 
   my $inserted_id = {};
 
-  $sql  = 'INSERT INTO plate SET ';
-  $sql .= 'PlateName=?, ';
-  $sql .= 'DateCreated=?, ';
-  $sql .= 'OperatorId=?, ';
-  $sql .= 'PlateType=?, ';
-  $sql .= 'PlateDescription=?, ';
-  $sql .= 'StorageId=?, ';
-  $sql .= 'PlateWells=?, ';
-  $sql .= 'PlateStatus=?';
+  $sql  = 'INSERT INTO "plate"( ';
+  $sql .= '"PlateId", ';
+  $sql .= '"PlateName", ';
+  $sql .= '"DateCreated", ';
+  $sql .= '"OperatorId", ';
+  $sql .= '"PlateType", ';
+  $sql .= '"PlateDescription", ';
+  $sql .= '"StorageId", ';
+  $sql .= '"PlateWells", ';
+  $sql .= '"PlateStatus") ';
+  $sql .= 'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)';
 
   my $sth = $dbh_m_write->prepare($sql);
-  $sth->execute($PlateName, $DateCreated, $OperatorId, $PlateType,
+  $sth->execute($plt_id, $PlateName, $DateCreated, $OperatorId, $PlateType,
                 $PlateDescription, $StorageId, $PlateWells, $PlateStatus);
 
   my $plate_id = -1;
   if (!$dbh_m_write->err()) {
 
-    $plate_id = $dbh_m_write->last_insert_id(undef, undef, 'plate', 'PlateId');
+    $plate_id = $plt_id;
     $self->logger->debug("PlateId: $plate_id");
-    
+
     if ( !(defined($inserted_id->{'plate'})) ) {
 
       $inserted_id->{'plate'} = { 'IdField' => 'PlateId',
@@ -4668,15 +4750,16 @@ sub add_plate_runmode {
 
     if (length($factor_value) > 0) {
 
-      $sql  = 'INSERT INTO platefactor SET ';
-      $sql .= 'PlateId=?, ';
-      $sql .= 'FactorId=?, ';
-      $sql .= 'FactorValue=?';
+      $sql  = 'INSERT INTO "platefactor"( ';
+      $sql .= '"PlateId", ';
+      $sql .= '"FactorId", ';
+      $sql .= '"FactorValue) ';
+      $sql .= 'VALUES (?, ?, ?)';
       my $factor_sth = $dbh_m_write->prepare($sql);
       $factor_sth->execute($plate_id, $vcol_id, $factor_value);
-      
+
       if ($dbh_m_write->err()) {
-        
+
         my ($rollback_err, $rollback_msg) = rollback_cleanup_multi($self->logger(), $dbh_m_write, $inserted_id);
 
         if ($rollback_err) {
@@ -4687,7 +4770,7 @@ sub add_plate_runmode {
 
           $data_for_postrun_href->{'Error'} = 1;
           $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-          
+
           return $data_for_postrun_href;
         }
 
@@ -4696,7 +4779,7 @@ sub add_plate_runmode {
 
         $data_for_postrun_href->{'Error'} = 1;
         $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-      
+
         return $data_for_postrun_href;
       }
 
@@ -4705,7 +4788,7 @@ sub add_plate_runmode {
         $inserted_id->{'platefactor'} = { 'IdField' => 'PlateId',
                                           'IdValue' => [$plate_id] };
       }
-    
+
       $factor_sth->finish();
     }
   }
@@ -4714,9 +4797,9 @@ sub add_plate_runmode {
 
     my $extract_id_csv = join(',', keys(%{$uniq_extract_id}));
 
-    $sql  = 'UPDATE extract SET ';
-    $sql .= 'PlateId=? ';
-    $sql .= "WHERE ExtractId IN ($extract_id_csv)";
+    $sql  = 'UPDATE "extract" SET ';
+    $sql .= '"PlateId"=? ';
+    $sql .= qq|WHERE "ExtractId" IN ($extract_id_csv)|;
 
     $sth = $dbh_m_write->prepare($sql);
     $sth->execute($plate_id);
@@ -4762,23 +4845,174 @@ sub add_plate_runmode {
   return $data_for_postrun_href;
 }
 
+sub list_dataset_runmode {
+
+=pod list_dataset_HELP_START
+{
+"OperationName" : "List datasets",
+"Description": "List datasets for a specified analysis group",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><DataSet MarkerNameFieldName='markerName' DataSetType='95' DataSetId='2' ParentDataSetId='' AnalysisGroupId='2' export='dataset/2/export/markerdata/csv' MarkerSequenceFieldName='TrimmedSequence' DataSetTypeName='DataSetType - 2971568' Description='' /><RecordMeta TagName='DataSet' /></DATA>",
+"SuccessMessageJSON": "{  'DataSet' : [ { 'DataSetType' : '95', 'MarkerNameFieldName' : 'markerName', 'AnalysisGroupId' : '2', 'export' : 'dataset/2/export/markerdata/csv', 'DataSetId' : '2', 'MarkerSequenceFieldName' : 'TrimmedSequence', 'DataSetTypeName' : 'DataSetType - 2971568', 'ParentDataSetId' : null, 'Description' : ''}], 'RecordMeta' : [{'TagName' : 'DataSet'}]}",
+"ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
+"ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing AnalysisGroupId"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self  = shift;
+
+  my $data_for_postrun_href = {};
+
+  my $anal_id = $self->param('id');
+
+  my $dbh_m = connect_mdb_read();
+
+  if (!record_existence($dbh_m, 'analysisgroup', 'AnalysisGroupId', $anal_id)) {
+
+    my $err_msg = "AnalsysiGroup ($anal_id): not found.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $group_id  = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  my ($is_anal_grp_ok, $trouble_anal_id_aref) = check_permission($dbh_m, 'analysisgroup', 'AnalysisGroupId',
+                                                                 [$anal_id], $group_id, $gadmin_status,
+                                                                 $READ_PERM);
+
+  if (!$is_anal_grp_ok) {
+
+    my $err_msg = "AnalsysiGroup ($anal_id): permission denied.";
+    $self->logger->debug($err_msg);
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh_m->disconnect();
+
+  my $sql = 'SELECT * from "dataset" WHERE "dataset"."AnalysisGroupId"=? ORDER BY "dataset"."DataSetId" DESC';
+
+  $self->logger->debug("SQL: $sql");
+
+  my ($read_dataset_err, $read_dataset_msg, $dataset_data) = $self->list_dataset(1, $sql, [$anal_id]);
+
+  if ($read_dataset_err) {
+
+    $self->logger->debug($read_dataset_msg);
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'DataSet'      => $dataset_data,
+                                           'RecordMeta'   => [{'TagName' => 'DataSet'}],
+  };
+
+  return $data_for_postrun_href;
+}
+
+sub list_dataset {
+
+  my $self              = $_[0];
+  my $extra_attr_yes    = $_[1];
+  my $sql               = $_[2];
+  my $where_para_aref   = $_[3];
+
+  #initialise variables
+  my $err = 0;
+  my $msg = '';
+  my $data_aref = [];
+
+  #get marker db handle
+  my $dbh_m = connect_mdb_read();
+  my $dbh_k = connect_kdb_read();
+
+  ($err, $msg, $data_aref) = read_data($dbh_m, $sql, $where_para_aref);
+
+  if ($err) {
+
+    return ($err, $msg, []);
+  }
+
+  my $dataset_id_aref     = [];
+
+  my $dataset_type_href   = {};
+
+  my $dataset_type_lookup = {};
+
+  if ($extra_attr_yes) {
+
+    for my $dataset_row (@{$data_aref}) {
+
+      push(@{$dataset_id_aref}, $dataset_row->{'DataSetId'});
+
+      $dataset_type_href->{$dataset_row->{'DataSetType'}} = 1;
+    }
+
+    if (scalar(keys(%{$dataset_type_href})) > 0) {
+
+      my $ds_type_sql      = 'SELECT TypeId, TypeName FROM generaltype ';
+      $ds_type_sql        .= 'WHERE TypeId IN (' . join(',', keys(%{$dataset_type_href})) . ')';
+
+      $self->logger->debug("DS_TYPE_SQL: $ds_type_sql");
+
+      $dataset_type_lookup = $dbh_k->selectall_hashref($ds_type_sql, 'TypeId');
+    }
+  }
+
+  my @extra_attr_dataset_data;
+
+  for my $dataset_row (@{$data_aref}) {
+
+    my $dataset_id = $dataset_row->{'DataSetId'};
+    my $ds_type    = $dataset_row->{'DataSetType'};
+
+    if ($extra_attr_yes) {
+
+      $dataset_row->{'DataSetTypeName'} = $dataset_type_lookup->{$ds_type}->{'TypeName'};
+      $dataset_row->{'export'}          = "dataset/${dataset_id}/export/markerdata/csv";
+    }
+    push(@extra_attr_dataset_data, $dataset_row);
+  }
+
+  $dbh_m->disconnect();
+  $dbh_k->disconnect();
+
+  return ($err, $msg, \@extra_attr_dataset_data);
+}
+
 sub get_extract_dtd_file {
 
-  my $dtd_path = $DTD_PATH;
+  my $dtd_path = $ENV{DOCUMENT_ROOT} . '/' . $DTD_PATH;
 
   return "${dtd_path}/extract.dtd";
 }
 
 sub get_extract_all_field_dtd_file {
 
-  my $dtd_path = $DTD_PATH;
+  my $dtd_path = $ENV{DOCUMENT_ROOT} . '/' . $DTD_PATH;
 
   return "${dtd_path}/extract_all_field.dtd";
 }
 
 sub get_analysisgroup_dtd_file {
 
-  my $dtd_path = $DTD_PATH;
+  my $dtd_path = $ENV{DOCUMENT_ROOT} . '/' . $DTD_PATH;
 
   return "${dtd_path}/analysisgroup.dtd";
 }

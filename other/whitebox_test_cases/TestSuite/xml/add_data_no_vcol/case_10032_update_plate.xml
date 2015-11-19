@@ -3,7 +3,7 @@
   <Delete TargetURL="delete/plate/:PlateId" />
   <INPUT ParaName="PlateId" SrcValue="xml/add_data_no_vcol/case_00301_add_plate.xml" />
   <INPUT ParaName="PlateDescription" Value="Plate Testing" />
-  <INPUT ParaName="PlateName" PrefixVal="Plate_" Random="1" />
+  <INPUT ParaName="PlateName" PrefixVal="Update Plate_" Random="1" />
   <INPUT ParaName="PlateType" SrcValue="xml/add_data_no_vcol/case_00373_add_platetype1.xml" />
   <INPUT ParaName="OperatorId" Value="0" />
   <Match Attr="StatusCode" Value="200" />
@@ -12,6 +12,5 @@
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00301_add_plate.xml" Order="3" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00373_add_platetype1.xml" Order="4" />
-  <ReturnId ParaName="PlateId" Value="3" />
-  <RunInfo Success="1" Time="1409792322" />
+  <RunInfo Success="1" Time="1443160651" />
 </TestCase>

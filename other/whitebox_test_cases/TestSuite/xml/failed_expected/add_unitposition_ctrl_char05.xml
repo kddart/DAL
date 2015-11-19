@@ -6,6 +6,6 @@
   <Match Attr="Message" Tag="Error" Value="Control character not allowed." />
   <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Order="2" />
-  <ReturnId ParaName="UnitPositionId" Value="11" />
+  
   
 </TestCase>

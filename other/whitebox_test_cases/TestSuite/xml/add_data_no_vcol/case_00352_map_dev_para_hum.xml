@@ -10,6 +10,8 @@
   <Match Attr="deviceid" Order="4" Tag="Info" Value="autotest-wst01" />
   <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
-  <Parent CaseFile="xml/add_data_no_vcol/case_00348_add_layer_attribute_hum.xml" Force="1" Order="3" />
-  <RunInfo Success="1" Time="1409792244" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00345_add_layer.xml" Force="1" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00348_add_layer_attribute_hum.xml" Force="1" Order="4" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00371_register_device_fix.xml" Force="1" Order="4" />
+  <RunInfo Success="1" Time="1443160580" />
 </TestCase>

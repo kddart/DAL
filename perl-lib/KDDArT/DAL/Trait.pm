@@ -1,5 +1,7 @@
-#$Id: Trait.pm 795 2014-09-15 05:55:39Z puthick $
+#$Id: Trait.pm 1016 2015-10-08 06:06:28Z puthick $
 #$Author: puthick $
+
+# Copyright (c) 2015, Diversity Arrays Technology, All rights reserved.
 
 # COPYRIGHT AND LICENSE
 # 
@@ -16,8 +18,7 @@
 # GNU General Public License for more details.
 
 # Author    : Puthick Hok
-# Version   : 2.2.5 build 795
-# Created   : 02/06/2010
+# Version   : 2.3.0 build 1040
 
 package KDDArT::DAL::Trait;
 
@@ -168,44 +169,17 @@ sub add_treatment_runmode {
 
   my $skip_field = {};
 
-  my ($get_scol_err, $get_scol_msg, $scol_data, $pkey_data) = get_static_field($dbh_read, 'treatment');
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'treatment', $skip_field);
 
-  if ($get_scol_err) {
+  if ($chk_sfield_err) {
 
-    $self->logger->debug("Get static field info failed: $get_scol_msg");
-    
-    my $err_msg = "Unexpected Error.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+    $self->logger->debug($chk_sfield_msg);
 
-    return $data_for_postrun_href;
-  }
-
-  my $required_field_href = {};
-
-  for my $static_field (@{$scol_data}) {
-
-    my $field_name = $static_field->{'Name'};
-    
-    if ($skip_field->{$field_name}) { next; }
-
-    if ($static_field->{'Required'} == 1) {
-
-      $required_field_href->{$field_name} = $query->param($field_name);
-    }
+    return $for_postrun_href;
   }
 
   $dbh_read->disconnect();
-
-  my ($missing_err, $missing_href) = check_missing_href( $required_field_href );
-
-  if ($missing_err) {
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
-
-    return $data_for_postrun_href;
-  }
 
   # Finish generic required static field checking
 
@@ -251,6 +225,15 @@ sub add_treatment_runmode {
     $vcol_maxlen_msg = $vcol_maxlen_msg . ' longer than maximum length.';
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $vcol_maxlen_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (record_existence($dbh_k_read, 'treatment', 'TreatmentText', $treatment_text)) {
+
+    my $err_msg = "TreatmentText ($treatment_text): already exists.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'TreatmentText' => $err_msg}]};
 
     return $data_for_postrun_href;
   }
@@ -354,43 +337,14 @@ sub update_treatment_runmode {
 
   my $skip_field = {};
 
-  my ($get_scol_err, $get_scol_msg, $scol_data, $pkey_data) = get_static_field($dbh_read, 'treatment');
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'treatment', $skip_field);
 
-  if ($get_scol_err) {
+  if ($chk_sfield_err) {
 
-    $self->logger->debug("Get static field info failed: $get_scol_msg");
-    
-    my $err_msg = "Unexpected Error.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+    $self->logger->debug($chk_sfield_msg);
 
-    return $data_for_postrun_href;
-  }
-
-  my $required_field_href = {};
-
-  for my $static_field (@{$scol_data}) {
-
-    my $field_name = $static_field->{'Name'};
-    
-    if ($skip_field->{$field_name}) { next; }
-
-    if ($static_field->{'Required'} == 1) {
-
-      $required_field_href->{$field_name} = $query->param($field_name);
-    }
-  }
-
-  $dbh_read->disconnect();
-
-  my ($missing_err, $missing_href) = check_missing_href( $required_field_href );
-
-  if ($missing_err) {
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
-
-    return $data_for_postrun_href;
+    return $for_postrun_href;
   }
 
   # Finish generic required static field checking
@@ -408,7 +362,7 @@ sub update_treatment_runmode {
   }
 
   my $treatment_text        = $query->param('TreatmentText');
-  
+
   my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength ";
   $sql   .= "FROM factor ";
   $sql   .= "WHERE TableNameOfFactor='treatmentfactor'";
@@ -452,6 +406,28 @@ sub update_treatment_runmode {
     return $data_for_postrun_href;
   }
 
+  $sql = 'SELECT TreatmentId FROM treatment WHERE TreatmentText=? AND TreatmentId<>?';
+
+  my ($r_treatment_err, $db_treatment_id) = read_cell($dbh_k_read, $sql, [$treatment_text, $treatment_id]);
+
+  if ($r_treatment_err) {
+
+    $self->logger->debug("Read treatment id from db failed");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (length($db_treatment_id) > 0) {
+
+    my $err_msg = "TreatmentText ($treatment_text): already exists.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'TreatmentText' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
   $dbh_k_read->disconnect();
 
   my $dbh_k_write = connect_kdb_write();
@@ -481,7 +457,7 @@ sub update_treatment_runmode {
       $sql  = 'SELECT Count(*) ';
       $sql .= 'FROM treatmentfactor ';
       $sql .= 'WHERE TreatmentId=? AND FactorId=?';
-      
+
       my ($read_err, $count) = read_cell($dbh_k_write, $sql, [$treatment_id, $vcol_id]);
 
       if (length($factor_value) > 0) {
@@ -581,7 +557,7 @@ sub add_trait_runmode {
 
   my $self  = shift;
   my $query = $self->query();
-  
+
   my $data_for_postrun_href = {};
 
   # Generic required static field checking
@@ -590,44 +566,17 @@ sub add_trait_runmode {
 
   my $skip_field = {'OwnGroupId' => 1};
 
-  my ($get_scol_err, $get_scol_msg, $scol_data, $pkey_data) = get_static_field($dbh_read, 'trait');
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'trait', $skip_field);
 
-  if ($get_scol_err) {
+  if ($chk_sfield_err) {
 
-    $self->logger->debug("Get static field info failed: $get_scol_msg");
-    
-    my $err_msg = "Unexpected Error.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+    $self->logger->debug($chk_sfield_msg);
 
-    return $data_for_postrun_href;
-  }
-
-  my $required_field_href = {};
-
-  for my $static_field (@{$scol_data}) {
-
-    my $field_name = $static_field->{'Name'};
-    
-    if ($skip_field->{$field_name}) { next; }
-
-    if ($static_field->{'Required'} == 1) {
-
-      $required_field_href->{$field_name} = $query->param($field_name);
-    }
+    return $for_postrun_href;
   }
 
   $dbh_read->disconnect();
-
-  my ($missing_err, $missing_href) = check_missing_href( $required_field_href );
-
-  if ($missing_err) {
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
-
-    return $data_for_postrun_href;
-  }
 
   # Finish generic required static field checking
 
@@ -636,7 +585,7 @@ sub add_trait_runmode {
   my $trait_description      = $query->param('TraitDescription');
   my $trait_data_type        = $query->param('TraitDataType');
   my $trait_val_maxlen       = $query->param('TraitValueMaxLength');
-  my $trait_unit             = $query->param('TraitUnit');
+  my $trait_unit             = $query->param('UnitId');
   my $trait_used_in_analysis = $query->param('IsTraitUsedForAnalysis');
   my $trait_val_rule         = $query->param('TraitValRule');
   my $trait_invalid_msg      = $query->param('TraitValRuleErrMsg');
@@ -649,7 +598,7 @@ sub add_trait_runmode {
 
   if (!$correct_validation_rule) {
 
-    my $err_msg = " $val_msg";
+    my $err_msg = "$val_msg";
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'TraitValRule' => $err_msg}]};
 
@@ -669,7 +618,7 @@ sub add_trait_runmode {
   my $dbh_k_read = connect_kdb_read();
 
   if (length($trait_group_type) > 0) {
-    
+
     if (!type_existence($dbh_k_read, 'traitgroup', $trait_group_type)) {
 
       my $err_msg = "TraitGroupType ($trait_group_type) does not exist.";
@@ -695,12 +644,12 @@ sub add_trait_runmode {
     return $data_for_postrun_href;
   }
 
-  if (!record_existence($dbh_k_read, 'itemunit', 'ItemUnitId', $trait_unit)) {
+  if (!record_existence($dbh_k_read, 'generalunit', 'UnitId', $trait_unit)) {
 
     my $err_msg = "TraitUnit ($trait_unit): not found.";
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'TraitUnit' => $err_msg}]};
-      
+
     return $data_for_postrun_href;
   }
 
@@ -743,7 +692,7 @@ sub add_trait_runmode {
   }
 
   $dbh_k_read->disconnect();
-  
+
   my $dbh_k_write = connect_kdb_write();
 
   my $group_id = $self->authen->group_id();
@@ -757,7 +706,7 @@ sub add_trait_runmode {
   $sql   .= 'TraitDescription=?, ';
   $sql   .= 'TraitDataType=?, ';
   $sql   .= 'TraitValueMaxLength=?, ';
-  $sql   .= 'TraitUnit=?, ';
+  $sql   .= 'UnitId=?, ';
   $sql   .= 'IsTraitUsedForAnalysis=?, ';
   $sql   .= 'TraitValRule=?, ';
   $sql   .= 'TraitValRuleErrMsg=?, ';
@@ -888,7 +837,7 @@ sub import_samplemeasurement_csv_runmode {
   }
 
   my @fieldname_list;
-  
+
   for (my $i = 0; $i < $num_of_col; $i++) {
 
     if ($matched_col->{$i}) {
@@ -1004,10 +953,7 @@ sub list_treatment {
 
     if (scalar(@{$treatment_id_aref}) > 0) {
 
-      my $chk_table_aref = [{'TableName' => 'trialunit', 'FieldName' => 'TreatmentId'},
-                            {'TableName' => 'trialmean', 'FieldName' => 'TreatmentId'},
-                            {'TableName' => 'metgroupegv', 'FieldName' => 'TreatmentId'}
-          ];
+      my $chk_table_aref = [{'TableName' => 'trialunit', 'FieldName' => 'TreatmentId'}];
 
       ($chk_id_err, $chk_id_msg,
        $used_id_href, $not_used_id_href) = id_existence_bulk($dbh, $chk_table_aref, $treatment_id_aref);
@@ -1017,7 +963,7 @@ sub list_treatment {
         $self->logger->debug("Check id existence error: $chk_id_msg");
         $err = 1;
         $msg = $chk_id_msg;
-        
+
         return ($err, $msg, []);
       }
     }
@@ -1025,7 +971,7 @@ sub list_treatment {
     my $gadmin_status = $self->authen->gadmin_status();
 
     for my $row (@{$treatment_data}) {
-    
+
       if ($gadmin_status eq '1') {
 
         my $treatment_id = $row->{'TreatmentId'};
@@ -1222,8 +1168,7 @@ sub list_trait {
 
       my $chk_table_aref = [{'TableName' => 'samplemeasurement', 'FieldName' => 'TraitId'},
                             {'TableName' => 'trialtrait', 'FieldName' => 'Traitid'},
-                            {'TableName' => 'genotypetrait', 'FieldName' => 'TraitId'},
-                            {'TableName' => 'metgroup', 'FieldName' => 'TraitId'}
+                            {'TableName' => 'genotypetrait', 'FieldName' => 'TraitId'}
           ];
 
       ($chk_id_err, $chk_id_msg,
@@ -1234,7 +1179,7 @@ sub list_trait {
         $self->logger->debug("Check id existence error: $chk_id_msg");
         $err = 1;
         $msg = $chk_id_msg;
-        
+
         return ($err, $msg, []);
       }
     }
@@ -1390,9 +1335,9 @@ sub get_trait_runmode {
     return $data_for_postrun_href;
   }
 
-  my $sql = "SELECT *, itemunit.ItemUnitName AS TraitUnitName, $perm_str AS UltimatePerm ";
+  my $sql = "SELECT *, generalunit.UnitName AS UnitName, $perm_str AS UltimatePerm ";
   $sql   .= 'FROM trait ';
-  $sql   .= 'LEFT JOIN itemunit ON trait.TraitUnit = itemunit.ItemUnitId ';
+  $sql   .= 'LEFT JOIN generalunit ON trait.UnitId = generalunit.UnitId ';
   $sql   .= "WHERE trait.TraitId=? AND (($perm_str) & $READ_PERM) = $READ_PERM ";
   $sql   .= 'ORDER BY trait.TraitId DESC';
 
@@ -1458,44 +1403,17 @@ sub update_trait_runmode {
                      'OtherPerm'       => 1,
   };
 
-  my ($get_scol_err, $get_scol_msg, $scol_data, $pkey_data) = get_static_field($dbh_read, 'trait');
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'trait', $skip_field);
 
-  if ($get_scol_err) {
+  if ($chk_sfield_err) {
 
-    $self->logger->debug("Get static field info failed: $get_scol_msg");
-    
-    my $err_msg = "Unexpected Error.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+    $self->logger->debug($chk_sfield_msg);
 
-    return $data_for_postrun_href;
-  }
-
-  my $required_field_href = {};
-
-  for my $static_field (@{$scol_data}) {
-
-    my $field_name = $static_field->{'Name'};
-    
-    if ($skip_field->{$field_name}) { next; }
-
-    if ($static_field->{'Required'} == 1) {
-
-      $required_field_href->{$field_name} = $query->param($field_name);
-    }
+    return $for_postrun_href;
   }
 
   $dbh_read->disconnect();
-
-  my ($missing_err, $missing_href) = check_missing_href( $required_field_href );
-
-  if ($missing_err) {
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
-
-    return $data_for_postrun_href;
-  }
 
   # Finish generic required static field checking
 
@@ -1531,7 +1449,7 @@ sub update_trait_runmode {
   my $trait_description      = $query->param('TraitDescription');
   my $trait_data_type        = $query->param('TraitDataType');
   my $trait_val_maxlen       = $query->param('TraitValueMaxLength');
-  my $trait_unit             = $query->param('TraitUnit');
+  my $trait_unit             = $query->param('UnitId');
   my $trait_used_in_analysis = $query->param('IsTraitUsedForAnalysis');
   my $trait_val_rule         = $query->param('TraitValRule');
   my $trait_invalid_msg      = $query->param('TraitValRuleErrMsg');
@@ -1548,8 +1466,11 @@ sub update_trait_runmode {
   }
 
   my $db_trait_name = read_cell_value($dbh_k_read, 'trait', 'TraitName', 'TraitId', $trait_id);
-  
+
   if ($trait_name ne $db_trait_name) {
+
+    # Because the new name is different from the old one and the name is unique,
+    # this record_existence works. It won't return false error because of checking the old name.
 
     my $trait_existence = record_existence($dbh_k_read, 'trait', 'TraitName', $trait_name);
 
@@ -1558,18 +1479,42 @@ sub update_trait_runmode {
       my $err_msg = "Trait ($trait_name): already exists.";
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'TraitName' => $err_msg}]};
-      
+
       return $data_for_postrun_href;
     }
   }
 
-  if (!record_existence($dbh_k_read, 'itemunit', 'ItemUnitId', $trait_unit)) {
+  if (!record_existence($dbh_k_read, 'generalunit', 'UnitId', $trait_unit)) {
 
     my $err_msg = "TraitUnit ($trait_unit): not found.";
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'TraitUnit' => $err_msg}]};
-      
+
     return $data_for_postrun_href;
+  }
+
+  my $trait_group_type_id = read_cell_value($dbh_k_read, 'trait', 'TraitGroupTypeId', 'TraitId', $trait_id);
+
+  if (defined $query->param('TraitGroupTypeId')) {
+
+    if (length($query->param('TraitGroupTypeId')) > 0) {
+
+      $trait_group_type_id = $query->param('TraitGroupTypeId');
+
+      if (!type_existence($dbh_k_read, 'traitgroup', $trait_group_type_id)) {
+
+        my $err_msg = "TraitGroupType ($trait_group_type_id) does not exist.";
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'TraitGroupTypeId' => $err_msg}]};
+
+        return $data_for_postrun_href;
+      }
+    }
+  }
+
+  if (length($trait_group_type_id) == 0) {
+
+    $trait_group_type_id = undef;
   }
 
   $dbh_k_read->disconnect();
@@ -1580,19 +1525,20 @@ sub update_trait_runmode {
 
   $sql    = 'UPDATE trait SET ';
   $sql   .= 'TraitName=?, ';
+  $sql   .= 'TraitGroupTypeId=?, ';
   $sql   .= 'TraitCaption=?, ';
   $sql   .= 'TraitDescription=?, ';
   $sql   .= 'TraitDataType=?, ';
   $sql   .= 'TraitValueMaxLength=?, ';
-  $sql   .= 'TraitUnit=?, ';
+  $sql   .= 'UnitId=?, ';
   $sql   .= 'IsTraitUsedForAnalysis=?, ';
   $sql   .= 'TraitValRule=?, ';
   $sql   .= 'TraitValRuleErrMsg=? ';
   $sql   .= 'WHERE TraitId=?';
 
   my $sth = $dbh_k_write->prepare($sql);
-  $sth->execute($trait_name, $trait_caption, $trait_description, $trait_data_type, $trait_val_maxlen,
-                $trait_unit, $trait_used_in_analysis, $trait_val_rule, $trait_invalid_msg,
+  $sth->execute($trait_name, $trait_group_type_id, $trait_caption, $trait_description, $trait_data_type,
+                $trait_val_maxlen, $trait_unit, $trait_used_in_analysis, $trait_val_rule, $trait_invalid_msg,
                 $trait_id);
 
   if ($dbh_k_write->err()) {
@@ -1650,44 +1596,17 @@ sub add_trait_alias_runmode {
 
   my $skip_field = { 'TraitId'    => 1 };
 
-  my ($get_scol_err, $get_scol_msg, $scol_data, $pkey_data) = get_static_field($dbh_read, 'traitalias');
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'traitalias', $skip_field);
 
-  if ($get_scol_err) {
+  if ($chk_sfield_err) {
 
-    $self->logger->debug("Get static field info failed: $get_scol_msg");
-    
-    my $err_msg = "Unexpected Error.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+    $self->logger->debug($chk_sfield_msg);
 
-    return $data_for_postrun_href;
-  }
-
-  my $required_field_href = {};
-
-  for my $static_field (@{$scol_data}) {
-
-    my $field_name = $static_field->{'Name'};
-    
-    if ($skip_field->{$field_name}) { next; }
-
-    if ($static_field->{'Required'} == 1) {
-
-      $required_field_href->{$field_name} = $query->param($field_name);
-    }
+    return $for_postrun_href;
   }
 
   $dbh_read->disconnect();
-
-  my ($missing_err, $missing_href) = check_missing_href( $required_field_href );
-
-  if ($missing_err) {
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
-
-    return $data_for_postrun_href;
-  }
 
   # Finish generic required static field checking
 
@@ -1907,44 +1826,17 @@ sub update_trait_alias_runmode {
 
   my $skip_field = { 'TraitId'    => 1 };
 
-  my ($get_scol_err, $get_scol_msg, $scol_data, $pkey_data) = get_static_field($dbh_read, 'traitalias');
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'traitalias', $skip_field);
 
-  if ($get_scol_err) {
+  if ($chk_sfield_err) {
 
-    $self->logger->debug("Get static field info failed: $get_scol_msg");
-    
-    my $err_msg = "Unexpected Error.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+    $self->logger->debug($chk_sfield_msg);
 
-    return $data_for_postrun_href;
-  }
-
-  my $required_field_href = {};
-
-  for my $static_field (@{$scol_data}) {
-
-    my $field_name = $static_field->{'Name'};
-    
-    if ($skip_field->{$field_name}) { next; }
-
-    if ($static_field->{'Required'} == 1) {
-
-      $required_field_href->{$field_name} = $query->param($field_name);
-    }
+    return $for_postrun_href;
   }
 
   $dbh_read->disconnect();
-
-  my ($missing_err, $missing_href) = check_missing_href( $required_field_href );
-
-  if ($missing_err) {
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
-
-    return $data_for_postrun_href;
-  }
 
   # Finish generic required static field checking
 
@@ -2207,11 +2099,11 @@ sub export_samplemeasurement_csv_runmode {
 "GroupAdminRequired": 0,
 "SignatureRequired": 0,
 "AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><OutputFile csv='http://kddart.example.com/data/admin/export_samplemeasurement_fc77a5593427a35b804a07150dccb942.csv' /></DATA>",
-"SuccessMessageJSON": "{'OutputFile' : [{'csv' : 'http://kddart.example.com/data/admin/export_samplemeasurement_fc77a5593427a35b804a07150dccb942.csv'}]}",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><OutputFile csv='http://kddart-d.diversityarrays.com/data/admin/export_samplemeasurement_fc77a5593427a35b804a07150dccb942.csv' /></DATA>",
+"SuccessMessageJSON": "{'OutputFile' : [{'csv' : 'http://kddart-d.diversityarrays.com/data/admin/export_samplemeasurement_fc77a5593427a35b804a07150dccb942.csv'}]}",
 "ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
 "ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
-"HTTPParameter": [{"Required": 0, "Name": "TrialUnitIdCSV", "Description": "Filtering parameter for TrialUnitId. The value is comma separated value of TrialUnitId."}, {"Required": 0, "Name": "SampleTypeIdCSV", "Description": "Filtering parameter for SampleTypeId. The value is comma separated value of SampleTypeId."}, {"Required": 0, "Name": "TraitIdCSV", "Description": "Filtering parameter for TraitId. The value is comma separated value of TraitId."}, {"Required": 0, "Name": "OperatorIdCSV", "Description": "Filtering parameter for OperatorId. The value is comma separated value of OperatorId."}, {"Required": 0, "Name": "MeasureDateTimeFrom", "Description": "Filtering parameter for MeasureDateTime. The value is correctly formatted date/time from which the sample measurement was recorded."}, {"Required": 0, "Name": "MeasureDateTimeTo", "Description": "Filtering parameter for MeasureDateTime. The value is correctly formatted date/time to which the sample measurement was recorded."}],
+"HTTPParameter": [{"Required": 0, "Name": "TrialUnitIdCSV", "Description": "Filtering parameter for TrialUnitId. The value is comma separated value of TrialUnitId."}, {"Required": 0, "Name": "SampleTypeIdCSV", "Description": "Filtering parameter for SampleTypeId. The value is comma separated value of SampleTypeId."}, {"Required": 0, "Name": "TraitIdCSV", "Description": "Filtering parameter for TraitId. The value is comma separated value of TraitId."}, {"Required": 0, "Name": "OperatorIdCSV", "Description": "Filtering parameter for OperatorId. The value is comma separated value of OperatorId."}, {"Required": 0, "Name": "MeasureDateTimeFrom", "Description": "Filtering parameter for MeasureDateTime. The value is correctly formatted date/time from which the sample measurement was recorded."}, {"Required": 0, "Name": "MeasureDateTimeTo", "Description": "Filtering parameter for MeasureDateTime. The value is correctly formatted date/time to which the sample measurement was recorded."}, {"Required": 0, "Name": "TrialIdCSV", "Description": "Filtering parameter for TrialId. The value is comma separated value of TrialId. This filtering parameter could be overridden by TrialUnitIdCSV if it is provided because filtering on TrialUnitId is at a lower level."}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
@@ -2220,6 +2112,13 @@ sub export_samplemeasurement_csv_runmode {
   my $query = $self->query();
 
   my $data_for_postrun_href = {};
+
+  my $trial_id_csv = '';
+
+  if (defined $query->param('TrialIdCSV')) {
+
+    $trial_id_csv = $query->param('TrialIdCSV');
+  }
 
   my $tunit_id_csv = '';
 
@@ -2268,11 +2167,28 @@ sub export_samplemeasurement_csv_runmode {
   $self->logger->debug("TrialUnitIdCSV: $tunit_id_csv");
 
   my @where_phrases;
-  my $where_tunit = '';
+
+  if (length($trial_id_csv) > 0) {
+
+    my ($trial_exist_err, $trial_rec_str) = record_exist_csv($dbh, 'trial', 'TrialId', $trial_id_csv);
+
+    if ($trial_exist_err) {
+
+      my $err_msg = "Trial ($trial_rec_str) not found.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my $where_trial = " TrialId IN ($trial_rec_str) ";
+    push(@where_phrases, $where_trial);
+  }
+
   if (length($tunit_id_csv) > 0) {
 
     my ($tunit_exist_err, $tunit_rec_str) = record_exist_csv($dbh, 'trialunit', 'TrialUnitId', $tunit_id_csv);
-  
+
     if ($tunit_exist_err) {
 
       my $err_msg = "TrialUnit ($tunit_rec_str) not found.";
@@ -2281,11 +2197,11 @@ sub export_samplemeasurement_csv_runmode {
 
       return $data_for_postrun_href;
     }
-    $where_tunit = " TrialUnitId IN ($tunit_rec_str) ";
+
+    my $where_tunit = " samplemeasurement.TrialUnitId IN ($tunit_rec_str) ";
     push(@where_phrases, $where_tunit);
   }
 
-  my $where_stype = '';
   if (length($stype_id_csv) > 0) {
 
     my ($stype_exist_err, $stype_rec_str) = type_existence_csv($dbh, 'sample', $stype_id_csv);
@@ -2298,11 +2214,11 @@ sub export_samplemeasurement_csv_runmode {
 
       return $data_for_postrun_href;
     }
-    $where_stype = " SampleTypeId IN ($stype_rec_str) ";
+
+    my $where_stype = " SampleTypeId IN ($stype_rec_str) ";
     push(@where_phrases, $where_stype);
   }
 
-  my $where_trait = '';
   if (length($trait_id_csv) > 0) {
 
     my ($trait_exist_err, $trait_rec_str) = record_exist_csv($dbh, 'trait', 'TraitId', $trait_id_csv);
@@ -2315,11 +2231,11 @@ sub export_samplemeasurement_csv_runmode {
 
       return $data_for_postrun_href;
     }
-    $where_trait = " TraitId IN ($trait_rec_str) ";
+
+    my $where_trait = " TraitId IN ($trait_rec_str) ";
     push(@where_phrases, $where_trait);
   }
 
-  my $where_operator = '';
   if (length($operator_id_csv) > 0) {
 
     my ($oper_exist_err, $oper_rec_str) = record_exist_csv($dbh, 'systemuser', 'UserId', $operator_id_csv);
@@ -2332,7 +2248,8 @@ sub export_samplemeasurement_csv_runmode {
 
       return $data_for_postrun_href;
     }
-    $where_operator = " OperatorId IN ($oper_rec_str) ";
+
+    my $where_operator = " OperatorId IN ($oper_rec_str) ";
     push(@where_phrases, $where_operator);
   }
 
@@ -2341,7 +2258,7 @@ sub export_samplemeasurement_csv_runmode {
   if (length($measure_dt_from) > 0) {
 
     my ($mdt_from_err, $mdt_from_msg) = check_dt_value( { 'MeasureDateTimeFrom' => $measure_dt_from } );
-    
+
     if ($mdt_from_err) {
 
       my $err_msg = "$mdt_from_msg not date/time.";
@@ -2379,7 +2296,9 @@ sub export_samplemeasurement_csv_runmode {
 
   push(@where_phrases, $where_measure_time);
 
-  my $sql = 'SELECT * FROM samplemeasurement ';
+  my $sql = 'SELECT samplemeasurement.* ';
+  $sql   .= 'FROM samplemeasurement LEFT JOIN trialunit ';
+  $sql   .= 'ON samplemeasurement.TrialUnitId = trialunit.TrialUnitId ';
 
   my $where_clause = '';
   for my $phrase (@where_phrases) {
@@ -2391,7 +2310,7 @@ sub export_samplemeasurement_csv_runmode {
         $where_clause .= "AND $phrase";
       }
       else {
-        
+
         $where_clause .= "$phrase";
       }
     }
@@ -2505,7 +2424,7 @@ sub list_trait_advanced_runmode {
 "ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
 "ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
 "URLParameter": [{"ParameterName": "nperpage", "Description": "Number of records in a page for pagination"}, {"ParameterName": "num", "Description": "The page number of the pagination"}],
-"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database filed name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "FieldList", "Description": "Comma separated value of wanted fields."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases."}],
+"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database field name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "FieldList", "Description": "Comma separated value of wanted fields."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases."}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
@@ -2534,7 +2453,7 @@ sub list_trait_advanced_runmode {
   }
 
   my $filtering_csv = '';
-  
+
   if (defined $query->param('Filtering')) {
 
     $filtering_csv = $query->param('Filtering');
@@ -2567,15 +2486,39 @@ sub list_trait_advanced_runmode {
     return $data_for_postrun_href;
   }
 
-  my $sample_trait_aref = $sam_trait_data;
+  my $dbh = connect_kdb_read();
 
-  my @field_list_all = keys(%{$sample_trait_aref->[0]});
+  my $sample_data_aref = $sam_trait_data;
 
-  # no field return, it means no record. error prevention
-  if (scalar(@field_list_all) == 0) {
-    
-    push(@field_list_all, '*');
+  my @field_list_all;
+
+  if (scalar(@{$sample_data_aref}) == 1) {
+
+    @field_list_all = keys(%{$sample_data_aref->[0]});
   }
+  else {
+
+    $self->logger->debug("It reaches here");
+    my ($sfield_err, $sfield_msg, $sfield_data, $pkey_data) = get_static_field($dbh, 'trait');
+
+    if ($sfield_err) {
+
+      $self->logger->debug("Get static field failed: $sfield_msg");
+      return $self->_set_error();
+    }
+
+    for my $sfield_rec (@{$sfield_data}) {
+
+      push(@field_list_all, $sfield_rec->{'Name'});
+    }
+
+    for my $pkey_field (@{$pkey_data}) {
+
+      push(@field_list_all, $pkey_field);
+    }
+  }
+
+  $self->logger->debug("Field list all: " . join(',', @field_list_all));
 
   my $final_field_list = \@field_list_all;
 
@@ -2664,7 +2607,6 @@ sub list_trait_advanced_runmode {
       return $data_for_postrun_href;
     }
 
-    my $dbh = connect_kdb_read();
     my ($paged_id_err, $paged_id_msg, $nb_records,
         $nb_pages, $limit_clause, $rcount_time) = get_paged_filter($dbh,
                                                                    $nb_per_page,
@@ -2674,14 +2616,13 @@ sub list_trait_advanced_runmode {
                                                                    $filtering_exp,
                                                                    $where_arg
         );
-    $dbh->disconnect();
 
     $self->logger->debug("SQL Row count time: $rcount_time");
 
     if ($paged_id_err == 1) {
-    
+
       $self->logger->debug($paged_id_msg);
-    
+
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
@@ -2689,7 +2630,7 @@ sub list_trait_advanced_runmode {
     }
 
     if ($paged_id_err == 2) {
-      
+
       $page = 0;
     }
 
@@ -2701,6 +2642,8 @@ sub list_trait_advanced_runmode {
 
     $paged_limit_clause = $limit_clause;
   }
+
+  $dbh->disconnect();
 
   my ($sort_err, $sort_msg, $sort_sql) = parse_sorting($sorting, $final_field_list);
 
@@ -2763,7 +2706,7 @@ sub list_treatment_advanced_runmode {
 "ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
 "ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
 "URLParameter": [{"ParameterName": "nperpage", "Description": "Number of records in a page for pagination"}, {"ParameterName": "num", "Description": "The page number of the pagination"}],
-"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database filed name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "FieldList", "Description": "Comma separated value of wanted fields."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases."}],
+"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database field name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "FieldList", "Description": "Comma separated value of wanted fields."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases."}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
@@ -2792,7 +2735,7 @@ sub list_treatment_advanced_runmode {
   }
 
   my $filtering_csv = '';
-  
+
   if (defined $query->param('Filtering')) {
 
     $filtering_csv = $query->param('Filtering');
@@ -2836,19 +2779,37 @@ sub list_treatment_advanced_runmode {
     return $data_for_postrun_href;
   }
 
-  my $rec_treatment_aref = $pre_list_treatment;
+  my $sample_data_aref = $pre_list_treatment;
 
-  my @field_list_all = keys(%{$rec_treatment_aref->[0]});
+  my @field_list_all;
 
-  $self->logger->debug("Field list from list limit 1: " . join(',',@field_list_all));
+  if (scalar(@{$sample_data_aref}) == 1) {
 
-  # no field return, it means no record. error prevention
-  if (scalar(@field_list_all) == 0) {
-    
-    push(@field_list_all, '*');
+    @field_list_all = keys(%{$sample_data_aref->[0]});
+  }
+  else {
+
+    $self->logger->debug("It reaches here");
+    my ($sfield_err, $sfield_msg, $sfield_data, $pkey_data) = get_static_field($dbh, 'treatment');
+
+    if ($sfield_err) {
+
+      $self->logger->debug("Get static field failed: $sfield_msg");
+      return $self->_set_error();
+    }
+
+    for my $sfield_rec (@{$sfield_data}) {
+
+      push(@field_list_all, $sfield_rec->{'Name'});
+    }
+
+    for my $pkey_field (@{$pkey_data}) {
+
+      push(@field_list_all, $pkey_field);
+    }
   }
 
-  $self->logger->debug("Field list from list limit 1: " . join(',',@field_list_all));
+  $self->logger->debug("Field list all: " . join(',', @field_list_all));
 
   my $final_field_list = \@field_list_all;
 
@@ -3233,8 +3194,8 @@ sub export_datakapture_template_runmode {
 "GroupAdminRequired": 0,
 "SignatureRequired": 0,
 "AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info NumOfTraitColumn='2' NumOfTrialUnit='64' /><OutputFile csv='http://kddart.example.com/data/admin/export_kdsmart_template_trial7_trait8_9.csv' FileType='csv' FileDescription='Template file for KDSmart' FileIdentifier='TemplateFile' /><OutputFile csv='http://kddart.example.com/data/admin/export_kdsmart_traitfile_trial7_trait8_9.csv' FileType='csv' FileDescription='Trait file for KDSmart' FileIdentifier='TraitFile' /></DATA>",
-"SuccessMessageJSON": "{'Info' : [{'NumOfTrialUnit' : 64, 'NumOfTraitColumn' : 2}], 'OutputFile' : [{'FileDescription' : 'Template file for KDSmart', 'csv' : 'http://kddart.example.com/data/admin/export_kdsmart_template_trial7_trait8_9.csv', 'FileType' : 'csv', 'FileIdentifier' : 'TemplateFile'},{'FileDescription' : 'Trait file for KDSmart', 'csv' : 'http://kddart.example.com/data/admin/export_kdsmart_traitfile_trial7_trait8_9.csv', 'FileType' : 'csv', 'FileIdentifier' : 'TraitFile'}]}",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info NumOfTraitColumn='2' NumOfTrialUnit='64' /><OutputFile csv='http://kddart-d.diversityarrays.com/data/admin/export_kdsmart_template_trial7_trait8_9.csv' FileType='csv' FileDescription='Template file for KDSmart' FileIdentifier='TemplateFile' /><OutputFile csv='http://kddart-d.diversityarrays.com/data/admin/export_kdsmart_traitfile_trial7_trait8_9.csv' FileType='csv' FileDescription='Trait file for KDSmart' FileIdentifier='TraitFile' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'NumOfTrialUnit' : 64, 'NumOfTraitColumn' : 2}], 'OutputFile' : [{'FileDescription' : 'Template file for KDSmart', 'csv' : 'http://kddart-d.diversityarrays.com/data/admin/export_kdsmart_template_trial7_trait8_9.csv', 'FileType' : 'csv', 'FileIdentifier' : 'TemplateFile'},{'FileDescription' : 'Trait file for KDSmart', 'csv' : 'http://kddart-d.diversityarrays.com/data/admin/export_kdsmart_traitfile_trial7_trait8_9.csv', 'FileType' : 'csv', 'FileIdentifier' : 'TraitFile'}]}",
 "ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
 "ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
 "HTTPParameter": [{"Required": 0, "Name": "BlockColName", "Description": "Prefix text for Block in the UnitPosition used in the trial specified in the URLParameter"}, {"Required": 1, "Name": "ColumnColName", "Description": "Prefix text for Column in the UnitPosition used in the trial specified in the URLParameter"}, {"Required": 1, "Name": "RowColName", "Description": "Prefix text for Row in the UnitPosition used in the trial specified in the URLParameter"}],
@@ -3273,6 +3234,28 @@ sub export_datakapture_template_runmode {
     return $data_for_postrun_href;
   }
 
+  my $acceptable_dimension_fieldname_lookup = {'TrialUnitEntryId' => 1,
+                                               'TrialUnitX'       => 1,
+                                               'TrialUnitY'       => 1,
+                                               'TrialUnitZ'       => 1,
+                                              };
+
+  my $chk_dimension_fieldname_href = {
+                                      'ColumnColName' => $unitposition_column,
+                                      'RowColName'    => $unitposition_row,
+                                      'BlockColName'  => $unitposition_block
+                                     };
+
+  my ($di_val_err, $di_val_href) = check_value_href( $chk_dimension_fieldname_href, $acceptable_dimension_fieldname_lookup );
+
+  if ($di_val_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$di_val_href]};
+
+    return $data_for_postrun_href;
+  }
+
   my $dbh = connect_kdb_read();
 
   my $trial_exist = record_existence($dbh, 'trial', 'TrialId', $trial_id);
@@ -3286,13 +3269,15 @@ sub export_datakapture_template_runmode {
     return $data_for_postrun_href;
   }
 
+  my $trial_name = read_cell_value($dbh, 'trial', 'TrialName', 'TrialId', $trial_id);
+
   my $group_id = $self->authen->group_id();
   my $gadmin_status = $self->authen->gadmin_status();
 
   my ($is_trial_ok, $trouble_trial_id_aref) = check_permission($dbh, 'trial', 'TrialId',
                                                                [$trial_id], $group_id, $gadmin_status,
                                                                $READ_PERM);
-  
+
   if (!$is_trial_ok) {
 
     my $trouble_trial_id = $trouble_trial_id_aref->[0];
@@ -3364,7 +3349,7 @@ sub export_datakapture_template_runmode {
       my $err_msg = "Trait ($sel_trait_id): not found.";
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'TraitList' => $err_msg}]};
-      
+
       return $data_for_postrun_href;
     }
 
@@ -3388,22 +3373,26 @@ sub export_datakapture_template_runmode {
       }
     }
 
-    if ($num_of_rep != 0) {
+    if ($num_of_rep > 0) {
 
       $trait2nb_replicate->{$sel_trait_id} = $num_of_rep;
     }
   }
 
-  my $trait_id_txt = join('_', @selected_trait_list);
+  my @filter_trait_list = keys(%{$trait2nb_replicate});
+
+  my $trait_id_txt = join('_', @filter_trait_list);
+
+  $trial_name =~ s/\W/_/g;
 
   my $username          = $self->authen->username();
   my $doc_root          = $ENV{'DOCUMENT_ROOT'};
   my $export_data_path  = "${doc_root}/data/$username";
   my $current_runmode   = $self->get_current_runmode();
-  my $filename          = "export_kdsmart_template_trial${trial_id}_trait$trait_id_txt";
+  my $filename          = "csv_template_trial${trial_id}_${trial_name}_$trait_id_txt";
   my $csv_file          = "${export_data_path}/${filename}.csv";
 
-  my $trait_filename    = "export_kdsmart_traitfile_trial${trial_id}_trait$trait_id_txt";
+  my $trait_filename    = "kdsmart_traitfile_trial${trial_id}__${trial_name}_$trait_id_txt";
   my $trait_csv_file    = "${export_data_path}/${trait_filename}.csv";
 
   if ( !(-e $export_data_path) ) {
@@ -3412,13 +3401,13 @@ sub export_datakapture_template_runmode {
   }
 
   $sql    = 'SELECT site.SiteName, site.SiteStartDate, generaltype.TypeName as TrialTypeName, ';
-  $sql   .= 'trial.TrialNumber, trial.TrialAcronym, trial.TrialStartDate, unitposition.UnitPositionText, ';
+  $sql   .= 'trial.TrialNumber, trial.TrialAcronym, trial.TrialStartDate, trialunit.TrialUnitPosition, ';
   $sql   .= 'trialunit.TrialUnitNote, trialunit.TrialUnitId, trialunit.ReplicateNumber, ';
+  $sql   .= 'trialunit.TrialUnitEntryId, trialunit.TrialUnitX, trialunit.TrialUnitY, trialunit.TrialUnitZ, ';
   $sql   .= 'trialunit.TrialUnitBarcode ';
   $sql   .= 'FROM (((trialunit LEFT JOIN trial ON trialunit.TrialId = trial.TrialId) ';
   $sql   .= 'LEFT JOIN site ON trial.SiteId = site.SiteId) ';
   $sql   .= 'LEFT JOIN generaltype ON trial.TrialTypeId = generaltype.TypeId) ';
-  $sql   .= 'LEFT JOIN unitposition ON trialunit.UnitPositionId = unitposition.UnitPositionId ';
   $sql   .= 'WHERE trial.TrialId=? ';
   $sql   .= 'ORDER BY trialunit.TrialUnitId ASC ';
 
@@ -3441,7 +3430,6 @@ sub export_datakapture_template_runmode {
     return $data_for_postrun_href;
   }
 
-  my @filter_trait_list = keys(%{$trait2nb_replicate});
   my $trait_sql_where   = '';
 
   if (scalar(@filter_trait_list) > 0) {
@@ -3454,10 +3442,14 @@ sub export_datakapture_template_runmode {
   $sql .= 'FROM trialtrait LEFT JOIN trait on trialtrait.TraitId = trait.TraitId ';
   $sql .= "WHERE trialtrait.TrialId=? $trait_sql_where";
 
-  if (scalar(@trait_id_list) > 0) {
+  if (scalar(@filter_trait_list) > 0) {
 
-    my $official_trait_id_csv = join(',', @trait_id_list);
+    my $official_trait_id_csv = join(',', @filter_trait_list);
     $sql .= " AND trialtrait.TraitId IN ($official_trait_id_csv) ";
+  }
+  else {
+
+    $sql .= " AND False ";
   }
 
   $sql .= 'ORDER BY TraitName ASC';
@@ -3474,17 +3466,17 @@ sub export_datakapture_template_runmode {
 
   if (scalar(@{$trait_data}) == 0) {
 
-    my $err_msg = "Trial ($trial_id): no trait defined.";
+    my $err_msg = "No trait selected.";
     $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'TrialId' => $err_msg}]};
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
     return $data_for_postrun_href;
   }
 
-  $sql  = 'SELECT trialunit.TrialUnitId, specimen.SpecimenName, specimen.SelectionHistory ';
+  $sql  = 'SELECT trialunit.TrialUnitId, specimen.SpecimenName, specimen.SelectionHistory, specimen.Pedigree ';
   $sql .= 'FROM (trialunit LEFT JOIN trialunitspecimen ON trialunit.TrialUnitId = trialunitspecimen.TrialUnitId) ';
   $sql .= 'LEFT JOIN specimen ON trialunitspecimen.SpecimenId = specimen.SpecimenId ';
-  $sql .= 'WHERE trialunit.TrialId=? AND trialunitspecimen.HasDied=0 ';
+  $sql .= 'WHERE trialunit.TrialId=? AND (trialunitspecimen.HasDied=0 OR trialunitspecimen.HasDied IS NULL ) ';
   $sql .= 'ORDER BY trialunit.TrialUnitId ASC';
 
   my ($read_specimen_err, $read_specimen_msg, $specimen_data) = read_data($dbh, $sql, [$trial_id]);
@@ -3503,7 +3495,7 @@ sub export_datakapture_template_runmode {
 
     my $err_msg = "Trial ($trial_id): no specimen found.";
     $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'TrialId' => $err_msg}]};
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
     return $data_for_postrun_href;
   }
@@ -3513,29 +3505,17 @@ sub export_datakapture_template_runmode {
   for my $specimen_rec (@{$specimen_data}) {
 
     my $trial_unit_id = $specimen_rec->{'TrialUnitId'};
-    
+
     if ( !(defined $trialunit2specimen_lookup->{$trial_unit_id}) ) {
 
       my $spec_name   = $specimen_rec->{'SpecimenName'};
       my $sel_history = $specimen_rec->{'SelectionHistory'};
-      $trialunit2specimen_lookup->{$trial_unit_id} = [$spec_name, $sel_history];
+      my $pedigree    = $specimen_rec->{'Pedigree'};
+      $trialunit2specimen_lookup->{$trial_unit_id} = [$spec_name, $sel_history, $pedigree];
     }
   }
 
   my $template_data = [];
-  my $unit_pos_text_splitter = "$UNIT_POSITION_SPLITTER";
-
-  if ($unit_pos_text_splitter =~ /\|/) {
-
-    $unit_pos_text_splitter = "\\$unit_pos_text_splitter";
-  }
-
-  my $dk_unitposition_field_lookup = {};
-  $dk_unitposition_field_lookup->{'Block'}    = 'BlockColName';
-  $dk_unitposition_field_lookup->{'Column'}   = 'ColumnColName';
-  $dk_unitposition_field_lookup->{'Row'}      = 'RowColName';
-
-  $self->logger->debug("Unit Position Text Splitter: $unit_pos_text_splitter");
 
   my $nb_trait_col        = 0;
   my $record_nb_trait_col = 1;
@@ -3547,80 +3527,49 @@ sub export_datakapture_template_runmode {
     if ( !(defined $trialunit2specimen_lookup->{$trialunit_id}) ) { next; }
 
     my $template_row   = {};
-    my $trial_start_dt = DateTime::Format::MySQL->parse_datetime($trial_unit_rec->{'TrialStartDate'});
-    my $site_year      = $trial_start_dt->year();
-    my $trial_start_d  = $trial_start_dt->strftime('%d %m %Y');
 
-    $template_row->{'SiteName'}         = $trial_unit_rec->{'SiteName'};
-    $template_row->{'SiteYear'}         = $site_year;
-    $template_row->{'TrialTypeName'}    = $trial_unit_rec->{'TrialTypeName'};
-    $template_row->{'TrialNumber'}      = $trial_unit_rec->{'TrialNumber'};
-    $template_row->{'TrialAcronym'}     = $trial_unit_rec->{'TrialAcronym'};
-    $template_row->{'TrialStartDate'}   = $trial_start_d;
-    $template_row->{'GenotypeName'}     = $trialunit2specimen_lookup->{$trialunit_id}->[0];
-    $template_row->{'SelectionHistory'} = $trialunit2specimen_lookup->{$trialunit_id}->[1];
-    $template_row->{'TrialUnitComment'} = $trial_unit_rec->{'TrialUnitNote'};
-    $template_row->{'ReplicateNumber'}  = $trial_unit_rec->{'ReplicateNumber'};
+    my $site_year      = 0;
+    my $trial_start_d  = '00 00 0000';
 
-    my $unitposition_txt  = $trial_unit_rec->{'UnitPositionText'};
+    # Although TrialStartDate is a required field, data loaded through mysql scripts may not have
+    # any data for this field. This is to prevent DateTime from throwing exception.
+    if (defined $trial_unit_rec->{'TrialStartDate'}) {
 
-    $self->logger->debug("Unit Position Text: $unitposition_txt");
+      if (length($trial_unit_rec->{'TrialStartDate'}) > 0) {
 
-    my @unitposition_cols = split("$unit_pos_text_splitter", $unitposition_txt);
+        $self->logger->debug("TrialStartDate for TrialUnit ($trialunit_id) is NULL in database");
 
-    my $unitposition_lookup = {};
-
-    for my $up_field (@unitposition_cols) {
-
-      $self->logger->debug("Unit Position Text: $up_field");
-      if ($up_field =~ /^(\D+)(\d+)$/) {
-
-        my $up_fieldname = $1;
-        my $up_fieldval  = $2;
-
-        $self->logger->debug("Unit Position Field: $up_fieldname");
-        $self->logger->debug("Unit Position Value: $up_fieldval");
-
-        $unitposition_lookup->{$up_fieldname} = $up_fieldval;
-      }
-      else {
-
-        $self->logger->debug("Unit position text ($up_field) is incorrect.");
-        $data_for_postrun_href->{'Error'} = 1;
-        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error.'}]};
-
-        return $data_for_postrun_href;
+        my $trial_start_dt = DateTime::Format::MySQL->parse_datetime($trial_unit_rec->{'TrialStartDate'});
+        $site_year      = $trial_start_dt->year();
+        $trial_start_d  = $trial_start_dt->strftime('%d %m %Y');
       }
     }
 
-    for my $dk_up_field (keys(%{$dk_unitposition_field_lookup})) {
-        
-      my $db_up_para_name = $dk_unitposition_field_lookup->{$dk_up_field};
+    $template_row->{'SiteName'}          = $trial_unit_rec->{'SiteName'};
+    $template_row->{'SiteYear'}          = $site_year;
+    $template_row->{'TrialTypeName'}     = $trial_unit_rec->{'TrialTypeName'};
+    $template_row->{'TrialNumber'}       = $trial_unit_rec->{'TrialNumber'};
+    $template_row->{'TrialAcronym'}      = $trial_unit_rec->{'TrialAcronym'};
+    $template_row->{'TrialStartDate'}    = $trial_start_d;
+    $template_row->{'GenotypeName'}      = $trialunit2specimen_lookup->{$trialunit_id}->[0];
+    $template_row->{'SelectionHistory'}  = $trialunit2specimen_lookup->{$trialunit_id}->[1];
+    $template_row->{'Pedigree'}          = $trialunit2specimen_lookup->{$trialunit_id}->[2];
+    $template_row->{'TrialUnitComment'}  = $trial_unit_rec->{'TrialUnitNote'};
+    $template_row->{'ReplicateNumber'}   = $trial_unit_rec->{'ReplicateNumber'};
+    $template_row->{'TrialUnitPosition'} = $trial_unit_rec->{'TrialUnitPosition'};
+    $template_row->{'Barcode'}           = $trial_unit_rec->{'TrialUnitBarcode'};
 
-      if (length($query->param($db_up_para_name)) > 0) {
-      
-        my $db_up_field     = $query->param($db_up_para_name);
-        
-        if ( !(defined $unitposition_lookup->{$db_up_field}) ) {
-          
-          my $err_msg = "$db_up_field not found in database." ;
-          $data_for_postrun_href->{'Error'} = 1;
-          $data_for_postrun_href->{'Data'}  = {'Error' => [{$db_up_para_name => $err_msg}]};
-          
-          return $data_for_postrun_href;
-        }
+    $template_row->{'Row'}               = $trial_unit_rec->{$unitposition_row};
+    $template_row->{'Column'}            = $trial_unit_rec->{$unitposition_column};
 
-        $template_row->{$dk_up_field} = $unitposition_lookup->{$db_up_field};
-      }
-      else {
+    if (length($unitposition_block) > 0) {
 
-        # Translation for this unit position field is not provided.
-        # This is for Block which is optional.
-        $template_row->{$dk_up_field} = '';
-      }
+      $template_row->{'Block'} = $trial_unit_rec->{$unitposition_block};
     }
+    else {
 
-    $template_row->{'Barcode'} = $trial_unit_rec->{'TrialUnitBarcode'};
+      $template_row->{'Block'} = '';
+    }
 
     for my $trait_rec (@{$trait_data}) {
 
@@ -3679,6 +3628,8 @@ sub export_datakapture_template_runmode {
   $field_order_href->{'Column'}             = 11;
   $field_order_href->{'Row'}                = 12;
   $field_order_href->{'Barcode'}            = 13;
+  $field_order_href->{'Pedigree'}           = 14;
+  $field_order_href->{'TrialUnitPosition'}  = 15;
 
   my $other_field_order_counter = 9000;
   for my $other_field (sort(keys(%{$template_data->[0]}))) {
@@ -3724,7 +3675,7 @@ sub export_datakapture_template_runmode {
                             'FileIdentifier' => 'TraitFile',
                             'csv' => "$url/data/$username/${trait_filename}.csv" },
       ];
-  
+
   my $info_aref = [{'NumOfTrialUnit' => $nb_trialunit, 'NumOfTraitColumn' => $nb_trait_col}];
 
   $data_for_postrun_href->{'Error'}     = 0;
@@ -3858,7 +3809,29 @@ sub import_datakapture_data_csv_runmode {
     my $last_col_num = $num_of_col - 1;
     $trait_data_end_col = "$last_col_num";
   }
-  
+
+  my $acceptable_dimension_fieldname_lookup = {'TrialUnitEntryId' => 1,
+                                               'TrialUnitX'       => 1,
+                                               'TrialUnitY'       => 1,
+                                               'TrialUnitZ'       => 1,
+                                              };
+
+  my $chk_dimension_fieldname_href = {
+                                      'ColumnColName' => $column_colname,
+                                      'RowColName'    => $row_colname,
+                                      'BlockColName'  => $block_colname
+                                     };
+
+  my ($di_val_err, $di_val_href) = check_value_href( $chk_dimension_fieldname_href, $acceptable_dimension_fieldname_lookup );
+
+  if ($di_val_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$di_val_href]};
+
+    return $data_for_postrun_href;
+  }
+
   my $matched_col = {};
 
   $matched_col->{$sitename_col}         = 'SiteName';
@@ -3880,7 +3853,7 @@ sub import_datakapture_data_csv_runmode {
   }
 
   my $fieldname_list_aref = [];
-  
+
   for (my $i = 0; $i < $num_of_col; $i++) {
 
     if ($matched_col->{$i}) {
@@ -3931,7 +3904,7 @@ sub import_datakapture_data_csv_runmode {
   }
 
   $fieldname_list_aref = [];
-  
+
   for (my $i = 0; $i < $num_of_col; $i++) {
 
     if ($matched_col->{$i}) {
@@ -3956,9 +3929,7 @@ sub import_datakapture_data_csv_runmode {
 
   my $dbh_write = connect_kdb_write();
 
-  my $sampletype_exist = record_existence($dbh_write, 'generaltype', 'TypeId', $sampletype_value);
-
-  if (!$sampletype_exist) {
+  if (! (type_existence($dbh_write, 'sample', $sampletype_value)) ) {
 
     my $err_msg = "SampleType ($sampletype_value): not found.";
     $data_for_postrun_href->{'Error'} = 1;
@@ -4193,12 +4164,14 @@ sub import_datakapture_data_csv_runmode {
       }
 
       $sql  = 'SELECT trialunit.TrialUnitId, specimen.SpecimenName, trialunit.ReplicateNumber, ';
-      $sql .= 'trialunit.TrialUnitBarcode, unitposition.UnitPositionText ';
-      $sql .= 'FROM ((trialunit LEFT JOIN trialunitspecimen ';
-      $sql .= 'ON trialunit.TrialUnitId = trialunitspecimen.TrialUnitId) ';
-      $sql .= 'LEFT JOIN specimen ON trialunitspecimen.SpecimenId = specimen.SpecimenId) ';
-      $sql .= 'LEFT JOIN unitposition ON trialunit.UnitPositionId = unitposition.UnitPositionId ';
-      $sql .= 'WHERE trialunit.TrialId=? AND trialunitspecimen.HasDied=0 ';
+      $sql .= 'trialunit.TrialUnitBarcode, trialunit.TrialUnitEntryId, trialunit.TrialUnitX, trialunit.TrialUnitY, ';
+      $sql .= 'trialunit.TrialUnitZ ';
+      $sql .= 'FROM trialunit LEFT JOIN trialunitspecimen ';
+      $sql .= 'ON trialunit.TrialUnitId = trialunitspecimen.TrialUnitId ';
+      $sql .= 'LEFT JOIN specimen ON trialunitspecimen.SpecimenId = specimen.SpecimenId ';
+      $sql .= 'WHERE trialunit.TrialId=? AND (ISNULL(trialunitspecimen.HasDied) = 1 OR trialunitspecimen.HasDied = 0) ';
+
+      $self->logger->debug("SQL: $sql");
 
       my ($read_tu_err, $read_tu_err_msg, $trial_unit_data) = read_data($dbh_write, $sql, [$final_trial_id]);
 
@@ -4214,65 +4187,45 @@ sub import_datakapture_data_csv_runmode {
 
       my $nb_trial_unit = scalar(@{$trial_unit_data});
 
-      $self->logger->debug("Number of trial units: $nb_trial_unit");
-      my $unit_pos_text_splitter = "$UNIT_POSITION_SPLITTER";
+      if ($nb_trial_unit == 0) {
 
-      if ($unit_pos_text_splitter =~ /\|/) {
+        my $err_msg = "No trial unit from database.";
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
-        $unit_pos_text_splitter = "\\$unit_pos_text_splitter";
+        return $data_for_postrun_href;
       }
 
-      my $dk_unitposition_field_lookup = {};
-      $dk_unitposition_field_lookup->{$block_colname}    = 'Block';
-      $dk_unitposition_field_lookup->{$column_colname}   = 'Column';
-      $dk_unitposition_field_lookup->{$row_colname}      = 'Row';
+      $self->logger->debug("Number of trial units: $nb_trial_unit");
 
       for my $trial_unit_rec (@{$trial_unit_data}) {
-
-        my $unitposition_txt = $trial_unit_rec->{'UnitPositionText'};
-
-        $self->logger->debug("Unitposition Text: $unitposition_txt");
-
-        my @unitposition_cols = split("$unit_pos_text_splitter", $unitposition_txt);
-
-        my @dk_unitposition_cols;
-
-        for my $up_field (@unitposition_cols) {
-
-          #$self->logger->debug("Unit Position Text: $up_field");
-          if ($up_field =~ /^(\D+)(\d+)$/) {
-
-            my $up_fieldname = $1;
-            my $up_fieldval  = $2;
-
-            if (defined($dk_unitposition_field_lookup->{$up_fieldname})) {
-
-              my $dk_up_fieldname = $dk_unitposition_field_lookup->{$up_fieldname};
-              push(@dk_unitposition_cols, "${dk_up_fieldname}$up_fieldval");
-            }
-          }
-          else {
-
-            $self->logger->debug("Unit position text ($up_field) is incorrect.");
-            $data_for_postrun_href->{'Error'} = 1;
-            $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error.'}]};
-
-            return $data_for_postrun_href;
-          }
-        }
-
-        my @sorted_dk_unitposition_cols = sort(@dk_unitposition_cols);
 
         my $specimen_name = trim($trial_unit_rec->{'SpecimenName'});
         my $rep_num       = trim($trial_unit_rec->{'ReplicateNumber'});
         my $tu_barcode    = trim($trial_unit_rec->{'TrialUnitBarcode'});
 
-        my $dk_unitposition_txt = join('', @sorted_dk_unitposition_cols);
+        my $column_val    = $trial_unit_rec->{$column_colname};
+        my $row_val       = $trial_unit_rec->{$row_colname};
+        my $block_val     = $trial_unit_rec->{$block_colname};
+
+        my $dk_unitposition_txt = "ROW${row_val} __ COL${column_val} __ BLOCK${block_val}";
         $dk_unitposition_txt   .= "$specimen_name" . "REP$rep_num" . "BCODE$tu_barcode";
 
         $self->logger->debug("Recalc DK UnitPosition Text: $dk_unitposition_txt");
 
-        $trialunit_lookup->{$dk_unitposition_txt} = $trial_unit_rec;
+        if ( !(defined $trialunit_lookup->{$dk_unitposition_txt}) ) {
+
+          $trialunit_lookup->{$dk_unitposition_txt} = $trial_unit_rec;
+        }
+        else {
+
+          $self->logger->debug("Completely duplicate trial unit $dk_unitposition_txt");
+
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error.'}]};
+
+          return $data_for_postrun_href;
+        }
       }
 
       $sql  = 'SELECT trialtrait.TraitId, trait.TraitName ';
@@ -4306,18 +4259,9 @@ sub import_datakapture_data_csv_runmode {
     my $file_genotype_name    = trim($csv_row->{'GenotypeName'});
     my $file_barcode          = trim($csv_row->{'Barcode'});
 
-    my $dk_file_unitposition_txt = '';
+    my $dk_file_unitposition_txt = "ROW${row_val} __ COL${column_val} __ BLOCK${block_val}";
 
-    if (length($block_val) > 0) {
-
-      $dk_file_unitposition_txt = "Block${block_val}Column${column_val}Row${row_val}";
-    }
-    else {
-
-      $dk_file_unitposition_txt = "Column${column_val}Row${row_val}";
-    }
-
-    $dk_file_unitposition_txt .= "$file_genotype_name" . "REP$file_replicate_number" . "BCODE$file_barcode";
+    $dk_file_unitposition_txt   .= "$file_genotype_name" . "REP$file_replicate_number" . "BCODE$file_barcode";
 
     $self->logger->debug("DK file UnitPosition Text: $dk_file_unitposition_txt");
 
@@ -4474,7 +4418,7 @@ sub import_datakapture_data_csv_runmode {
 
           $data_for_postrun_href->{'Error'} = 1;
           $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-          
+
           return $data_for_postrun_href;
         }
 
@@ -4502,14 +4446,14 @@ sub import_datakapture_data_csv_runmode {
           my $err_msg = "Trait ($trait_name): not found.";
           $data_for_postrun_href->{'Error'} = 1;
           $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-          
+
           return $data_for_postrun_href;
         }
 
         my $trait_id = $trait_lookup->{$trait_name};
 
-        my $ins_num_key1 = "$colname";
-        my $ins_num_key2 = "TraitId${trait_id}";
+        my $ins_num_key1 = "TrialId${final_trial_id}$colname";
+        my $ins_num_key2 = "TrialId${final_trial_id}TraitId${trait_id}";
 
         my $instance_num = 0;
 
@@ -4523,19 +4467,20 @@ sub import_datakapture_data_csv_runmode {
 
             $instance_num = $instance_number_lookup->{$ins_num_key2};
             $instance_number_lookup->{$ins_num_key1} = $instance_num;
-            
+
             # The instance for the trait has been used. So the instance number must be increment
             $instance_number_lookup->{$ins_num_key2} += 1;
           }
           else {
-          
+
             $sql  = 'SELECT InstanceNumber ';
-            $sql .= 'FROM samplemeasurement ';
-            $sql .= 'WHERE TraitId=? ';
+            $sql .= 'FROM samplemeasurement LEFT JOIN trialunit ';
+            $sql .= 'ON samplemeasurement.TrialUnitId = trialunit.TrialUnitId ';
+            $sql .= 'WHERE TraitId=? AND TrialId=? ';
             $sql .= 'ORDER BY InstanceNumber DESC ';
             $sql .= 'LIMIT 1';
-        
-            my ($read_err, $db_instance_num) = read_cell($dbh_write, $sql, [$trait_id]);
+
+            my ($read_err, $db_instance_num) = read_cell($dbh_write, $sql, [$trait_id, $final_trial_id]);
 
             if ($read_err) {
 
@@ -4543,10 +4488,10 @@ sub import_datakapture_data_csv_runmode {
               my $err_msg = "Unexpected Error.";
               $data_for_postrun_href->{'Error'} = 1;
               $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-          
+
               return $data_for_postrun_href;
             }
-        
+
             if (length($db_instance_num) == 0) {
 
               $db_instance_num = 0;
@@ -4557,7 +4502,15 @@ sub import_datakapture_data_csv_runmode {
             }
 
             $instance_num = $db_instance_num;
+
+            # Instance number for the column name which includes the file instance number.
+            # All trait value under the same column name would use this instance nubmer straight.
             $instance_number_lookup->{$ins_num_key1} = $db_instance_num;
+
+            # The next instance number for the trait in this trial (final_trial_id) which is available
+            # for use. When the instance number of a new column name is not found from ins_num_key1
+            # lookup, the code will lookup the instance number using ins_num_key2. If the instance number
+            # is not found, it will lookup from the database using TrialId and TraitId.
             $instance_number_lookup->{$ins_num_key2} = $db_instance_num + 1;
           }
         }
@@ -4565,7 +4518,7 @@ sub import_datakapture_data_csv_runmode {
         if ( !(defined $csv_row->{$colname}) ) {
 
           $self->logger->debug("$row_counter: empty cell");
-          
+
           $no_data_cell_counter += 1;
           next;
         }
@@ -4608,7 +4561,7 @@ sub import_datakapture_data_csv_runmode {
 
       push(@{$samplemeasurement_aref}, $samplemeasurement_rec);
     }
-      
+
     $row_counter += 1;
   }
 
@@ -4618,7 +4571,7 @@ sub import_datakapture_data_csv_runmode {
     my $err_msg = "Unexpected Error: no matched data";
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-          
+
     return $data_for_postrun_href;
   }
 
@@ -4633,7 +4586,7 @@ sub import_datakapture_data_csv_runmode {
   $dbh_write->disconnect();
 
   if ($data_for_postrun_href->{'Error'}) {
-  
+
     return $data_for_postrun_href;
   }
   else {
@@ -4641,7 +4594,7 @@ sub import_datakapture_data_csv_runmode {
     my $info_href = $data_for_postrun_href->{'Data'}->{'Info'}->[0];
     $info_href->{'NumOfEmptyCell'} = $no_data_cell_counter;
     $info_href->{'NumOfNACell'}    = $na_cell_counter;
-    
+
     $data_for_postrun_href->{'Data'} = {'Info' => [$info_href]};
 
     return $data_for_postrun_href;
@@ -4694,16 +4647,16 @@ sub insert_samplemeasurement_data {
                                                              'TraitId'        => $data_row->{'TraitId'},
                                                              'InstanceNumber' => $data_row->{'InstanceNumber'},
                                                            });
-      
+
       if ($int_id_err) {
-        
+
         $int_id_msg = "Row ($row_counter): " . $int_id_msg . ' not integer.';
         $data_for_postrun_href->{'Error'} = 1;
         $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $int_id_msg}]};
-        
+
         return $data_for_postrun_href;
       }
-      
+
       if (length($data_row->{'OperatorId'}) > 0) {
 
         my $operator_id = $data_row->{'OperatorId'};
@@ -4715,14 +4668,14 @@ sub insert_samplemeasurement_data {
           $int_msg = "Row ($row_counter): " . $int_msg . ' not an integer.';
           $data_for_postrun_href->{'Error'} = 1;
           $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $int_msg}]};
-          
+
           return $data_for_postrun_href;
         }
-        
+
         my $operator_exist = record_existence($dbh_write, 'systemuser', 'UserId', $operator_id);
-        
+
         if (!$operator_exist) {
-          
+
           my $err_msg = "Row ($row_counter): Operator ($operator_id) not a valid user ID.";
           $data_for_postrun_href->{'Error'} = 1;
           $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
@@ -4732,7 +4685,7 @@ sub insert_samplemeasurement_data {
 
         $effective_user_id = $operator_id;
       }
-    
+
       $sql = 'SELECT TrialId FROM trialunit WHERE TrialUnitId=?';
       $sth = $dbh_write->prepare($sql);
       $sth->execute($trialunit_id);
@@ -4749,7 +4702,24 @@ sub insert_samplemeasurement_data {
 
         return $data_for_postrun_href;
       }
-      
+
+      $sql = 'SELECT TrialTraitId FROM trialtrait WHERE TrialId=? AND TraitId=?';
+      $sth = $dbh_write->prepare($sql);
+      $sth->execute($trial_id, $trait_id);
+
+      my $trial_trait_id = -1;
+      $sth->bind_col(1, \$trial_trait_id);
+      $sth->fetch();
+
+      if ($trial_trait_id == -1) {
+
+        my $err_msg = "Row ($row_counter): Trait ($trait_id) is not attached to Trial ($trial_id).";
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+        return $data_for_postrun_href;
+      }
+
       my ($is_trial_perm_ok, $trouble_trial_id_aref) = check_permission($dbh_write, 'trial', 'TrialId',
                                                                         [$trial_id], $group_id, $gadmin_status,
                                                                         $LINK_PERM);
@@ -4759,49 +4729,49 @@ sub insert_samplemeasurement_data {
         my $perm_err_msg = "Row ($row_counter): Permission denied, Group ($group_id) and Trial ($trial_id).";
         $data_for_postrun_href->{'Error'} = 1;
         $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $perm_err_msg}]};
-        
+
         return $data_for_postrun_href;
       }
-      
+
       my $samp_type_exist = type_existence($dbh_write, 'sample', $samp_type_id);
-      
+
       if (!$samp_type_exist) {
-        
+
         my $err_msg = "Row ($row_counter): SampleType ($samp_type_id) does not exist.";
         $data_for_postrun_href->{'Error'} = 1;
         $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-        
+
         return $data_for_postrun_href;
       }
 
       $sql = "SELECT TraitValRule, $perm_str As UltimatePerm FROM trait where TraitId=?";
       $sth = $dbh_write->prepare($sql);
       $sth->execute($trait_id);
-      
+
       my $trait_val_rule = '';
       my $trait_perm     = 0;
-      
+
       $sth->bind_col(1, \$trait_val_rule);
       $sth->bind_col(2, \$trait_perm);
       $sth->fetch();
       $sth->finish();
-      
+
       if (length($trait_val_rule) == 0) {
-        
+
         my $err_msg = "Row ($row_counter): Trait ($trait_id) not found.";
         $data_for_postrun_href->{'Error'} = 1;
         $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-        
+
         return $data_for_postrun_href;
       }
       else {
-        
+
         if ( ($trait_perm & $LINK_PERM) != $LINK_PERM ) {
-          
+
           my $perm_err_msg = "Row ($row_counter): Permission denied, Group ($group_id) and Trait ($trait_id).";
           $data_for_postrun_href->{'Error'} = 1;
           $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $perm_err_msg}]};
-          
+
           return $data_for_postrun_href;
         }
       }
@@ -4811,11 +4781,11 @@ sub insert_samplemeasurement_data {
 
       $effective_user_id = $data_row->{'OperatorId'};
     }
-     
+
     my $trait_val = $data_row->{'TraitValue'};
 
     if ($validate_trait) {
-      
+
       my ($validate_trait_val_err, $validation_msg) = validate_trait_db($dbh_write, $trait_id, $trait_val);
 
       if ($validate_trait_val_err) {
@@ -4824,12 +4794,28 @@ sub insert_samplemeasurement_data {
         my $err_msg = "Row ($row_counter): trait value ($trait_val) not valid for trait ($trait_id).";
         $data_for_postrun_href->{'Error'} = 1;
         $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-        
+
         return $data_for_postrun_href;
       }
     }
 
     my $measure_dt   = $data_row->{'MeasureDateTime'};
+
+    # Check measure date/time
+
+    my ($measure_dt_err, $measure_dt_msg) = check_dt_value( {'MeasureDateTime' => $measure_dt} );
+
+    if ($measure_dt_err) {
+
+      my $err_msg = "Row ($row_counter): $measure_dt not valid date/time.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    # End check measure date/time
+
     my $instance_num = $data_row->{'InstanceNumber'};
 
     $bulk_sql .= "($trialunit_id,$samp_type_id,$trait_id,$effective_user_id,";
@@ -4930,8 +4916,8 @@ sub export_datakapture_data_runmode {
 "GroupAdminRequired": 0,
 "SignatureRequired": 0,
 "AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info MaxInstanceNumber='3' NumOfTrialUnit='64' /><OutputFile csv='http://kddart.example.com/data/admin/export_dkdata_7_9b96633c51925e8c74f2b87bdc10c785.csv' /></DATA>",
-"SuccessMessageJSON": "{'Info' : [{'MaxInstanceNumber' : 3, 'NumOfTrialUnit' : 64}], 'OutputFile' : [{'csv' : 'http://kddart.example.com/data/admin/export_dkdata_7_9b96633c51925e8c74f2b87bdc10c785.csv'}]}",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info MaxInstanceNumber='3' NumOfTrialUnit='64' /><OutputFile csv='http://kddart-d.diversityarrays.com/data/admin/export_dkdata_7_9b96633c51925e8c74f2b87bdc10c785.csv' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'MaxInstanceNumber' : 3, 'NumOfTrialUnit' : 64}], 'OutputFile' : [{'csv' : 'http://kddart-d.diversityarrays.com/data/admin/export_dkdata_7_9b96633c51925e8c74f2b87bdc10c785.csv'}]}",
 "ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='SampleType (143) invalid.' /></DATA>"}],
 "ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'SampleType (143) invalid.'}]}"}],
 "HTTPParameter": [{"Required": 0, "Name": "BlockColName", "Description": "Prefix text for Block in the UnitPosition used in the trial specified in the URLParameter"}, {"Required": 1, "Name": "ColumnColName", "Description": "Prefix text for Column in the UnitPosition used in the trial specified in the URLParameter"}, {"Required": 1, "Name": "RowColName", "Description": "Prefix text for Row in the UnitPosition used in the trial specified in the URLParameter"}, {"Required": 1, "Name": "SampleTypeId", "Description": "Value for SampleTypeId. This value is needed to restrict the data in 2-dimensional."}, {"Required": 0, "Name": "TraitIdCSV", "Description": "Filtering parameter for TraitId. This parameter takes a comma separated value of valid TraitId"}, {"Required": 0, "Name": "InstanceNumberCSV", "Description": "Filtering parameter for InstanceNumber. This parameter takes a comma separated value of valid InstanceNumber"}],
@@ -5004,13 +4990,35 @@ sub export_datakapture_data_runmode {
     return $data_for_postrun_href;
   }
 
-  my $group_id = $self->authen->group_id();
+  my $acceptable_dimension_fieldname_lookup = {'TrialUnitEntryId' => 1,
+                                               'TrialUnitX'       => 1,
+                                               'TrialUnitY'       => 1,
+                                               'TrialUnitZ'       => 1,
+                                              };
+
+  my $chk_dimension_fieldname_href = {
+                                      'ColumnColName' => $unitposition_column,
+                                      'RowColName'    => $unitposition_row,
+                                      'BlockColName'  => $unitposition_block
+                                     };
+
+  my ($di_val_err, $di_val_href) = check_value_href( $chk_dimension_fieldname_href, $acceptable_dimension_fieldname_lookup );
+
+  if ($di_val_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$di_val_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $group_id      = $self->authen->group_id();
   my $gadmin_status = $self->authen->gadmin_status();
 
   my ($is_trial_ok, $trouble_trial_id_aref) = check_permission($dbh, 'trial', 'TrialId',
                                                                [$trial_id], $group_id, $gadmin_status,
                                                                $READ_PERM);
-  
+
   if (!$is_trial_ok) {
 
     my $trouble_trial_id = $trouble_trial_id_aref->[0];
@@ -5229,13 +5237,13 @@ sub export_datakapture_data_runmode {
   }
 
   $sql    = 'SELECT trial.TrialId, site.SiteName, site.SiteStartDate, generaltype.TypeName as TrialTypeName, ';
-  $sql   .= 'trial.TrialNumber, trial.TrialAcronym, trial.TrialStartDate, unitposition.UnitPositionText, ';
+  $sql   .= 'trial.TrialNumber, trial.TrialAcronym, trial.TrialStartDate, trialunit.TrialUnitPosition, ';
+  $sql   .= 'trialunit.TrialUnitEntryId, trialunit.TrialUnitX, trialunit.TrialUnitY, trialunit.TrialUnitZ, ';
   $sql   .= 'trialunit.TrialUnitNote, trialunit.TrialUnitId, trialunit.ReplicateNumber, ';
   $sql   .= 'trialunit.TrialUnitBarcode ';
   $sql   .= 'FROM (((trialunit LEFT JOIN trial ON trialunit.TrialId = trial.TrialId) ';
   $sql   .= 'LEFT JOIN site ON trial.SiteId = site.SiteId) ';
   $sql   .= 'LEFT JOIN generaltype ON trial.TrialTypeId = generaltype.TypeId) ';
-  $sql   .= 'LEFT JOIN unitposition ON trialunit.UnitPositionId = unitposition.UnitPositionId ';
   $sql   .= 'WHERE trial.TrialId=? ';
   $sql   .= 'ORDER BY trialunit.TrialUnitId ASC ';
 
@@ -5249,10 +5257,10 @@ sub export_datakapture_data_runmode {
     return $data_for_postrun_href;
   }
 
-  $sql  = 'SELECT trialunit.TrialUnitId, specimen.SpecimenName, specimen.SelectionHistory ';
+  $sql  = 'SELECT trialunit.TrialUnitId, specimen.SpecimenName, specimen.SelectionHistory, specimen.Pedigree ';
   $sql .= 'FROM (trialunit LEFT JOIN trialunitspecimen ON trialunit.TrialUnitId = trialunitspecimen.TrialUnitId) ';
   $sql .= 'LEFT JOIN specimen ON trialunitspecimen.SpecimenId = specimen.SpecimenId ';
-  $sql .= 'WHERE trialunit.TrialId=? AND trialunitspecimen.HasDied=0 ';
+  $sql .= 'WHERE trialunit.TrialId=? AND (ISNULL(trialunitspecimen.HasDied) = 1 OR trialunitspecimen.HasDied = 0) ';
   $sql .= 'ORDER BY trialunit.TrialUnitId ASC';
 
   my ($read_specimen_err, $read_specimen_msg, $specimen_data) = read_data($dbh, $sql, [$trial_id]);
@@ -5281,29 +5289,18 @@ sub export_datakapture_data_runmode {
   for my $specimen_rec (@{$specimen_data}) {
 
     my $trial_unit_id = $specimen_rec->{'TrialUnitId'};
-    
+
     if ( !(defined $trialunit2specimen_lookup->{$trial_unit_id}) ) {
 
       my $spec_name   = $specimen_rec->{'SpecimenName'};
       my $sel_history = $specimen_rec->{'SelectionHistory'};
-      $trialunit2specimen_lookup->{$trial_unit_id} = [$spec_name, $sel_history];
+      my $pedigree    = $specimen_rec->{'Pedigree'};
+
+      $trialunit2specimen_lookup->{$trial_unit_id} = [$spec_name, $sel_history, $pedigree];
     }
   }
 
   my $output_data_aref = [];
-  my $unit_pos_text_splitter = "$UNIT_POSITION_SPLITTER";
-
-  if ($unit_pos_text_splitter =~ /\|/) {
-
-    $unit_pos_text_splitter = "\\$unit_pos_text_splitter";
-  }
-
-  my $dk_unitposition_field_lookup = {};
-  $dk_unitposition_field_lookup->{'Block'}    = 'BlockColName';
-  $dk_unitposition_field_lookup->{'Column'}   = 'ColumnColName';
-  $dk_unitposition_field_lookup->{'Row'}      = 'RowColName';
-
-  $self->logger->debug("Unit Position Text Splitter: $unit_pos_text_splitter");
 
   for my $trial_unit_rec (@{$trial_info_aref}) {
 
@@ -5315,75 +5312,32 @@ sub export_datakapture_data_runmode {
     my $trial_start_dt   = DateTime::Format::MySQL->parse_datetime($trial_unit_rec->{'TrialStartDate'});
     my $site_year        = $trial_start_dt->year();
     my $trial_start_d    = $trial_start_dt->strftime('%d %m %Y');
-    my $unitposition_txt = $trial_unit_rec->{'UnitPositionText'};
+    my $unitposition_txt = $trial_unit_rec->{'TrialUnitPosition'};
 
-    $output_data_row->{'SiteName'}         = $trial_unit_rec->{'SiteName'};
-    $output_data_row->{'TrialId'}          = $trial_unit_rec->{'TrialId'};
-    $output_data_row->{'SiteYear'}         = $site_year;
-    $output_data_row->{'TrialTypeName'}    = $trial_unit_rec->{'TrialTypeName'};
-    $output_data_row->{'TrialNumber'}      = $trial_unit_rec->{'TrialNumber'};
-    $output_data_row->{'TrialAcronym'}     = $trial_unit_rec->{'TrialAcronym'};
-    $output_data_row->{'TrialStartDate'}   = $trial_start_d;
-    $output_data_row->{'GenotypeName'}     = $trialunit2specimen_lookup->{$trialunit_id}->[0];
-    $output_data_row->{'SelectionHistory'} = $trialunit2specimen_lookup->{$trialunit_id}->[1];
-    $output_data_row->{'TrialUnitComment'} = $trial_unit_rec->{'TrialUnitNote'};
-    $output_data_row->{'ReplicateNumber'}  = $trial_unit_rec->{'ReplicateNumber'};
-    $output_data_row->{'UnitPositionText'} = $unitposition_txt;
-    
-    $self->logger->debug("Unit Position Text: $unitposition_txt");
+    $output_data_row->{'SiteName'}          = $trial_unit_rec->{'SiteName'};
+    $output_data_row->{'TrialId'}           = $trial_unit_rec->{'TrialId'};
+    $output_data_row->{'SiteYear'}          = $site_year;
+    $output_data_row->{'TrialTypeName'}     = $trial_unit_rec->{'TrialTypeName'};
+    $output_data_row->{'TrialNumber'}       = $trial_unit_rec->{'TrialNumber'};
+    $output_data_row->{'TrialAcronym'}      = $trial_unit_rec->{'TrialAcronym'};
+    $output_data_row->{'TrialStartDate'}    = $trial_start_d;
+    $output_data_row->{'GenotypeName'}      = $trialunit2specimen_lookup->{$trialunit_id}->[0];
+    $output_data_row->{'SelectionHistory'}  = $trialunit2specimen_lookup->{$trialunit_id}->[1];
+    $output_data_row->{'Pedigree'}          = $trialunit2specimen_lookup->{$trialunit_id}->[2];
+    $output_data_row->{'TrialUnitComment'}  = $trial_unit_rec->{'TrialUnitNote'};
+    $output_data_row->{'ReplicateNumber'}   = $trial_unit_rec->{'ReplicateNumber'};
+    $output_data_row->{'TrialUnitPosition'} = $unitposition_txt;
 
-    my @unitposition_cols = split("$unit_pos_text_splitter", $unitposition_txt);
+    $output_data_row->{'Row'}              = $trial_unit_rec->{$unitposition_row};
+    $output_data_row->{'Column'}           = $trial_unit_rec->{$unitposition_column};
 
-    my $unitposition_lookup = {};
+    if (length($unitposition_block) > 0) {
 
-    for my $up_field (@unitposition_cols) {
-
-      $self->logger->debug("Unit Position Text: $up_field");
-      if ($up_field =~ /^(\D+)(\d+)$/) {
-
-        my $up_fieldname = $1;
-        my $up_fieldval  = $2;
-
-        $self->logger->debug("Unit Position Field: $up_fieldname");
-        $self->logger->debug("Unit Position Value: $up_fieldval");
-
-        $unitposition_lookup->{$up_fieldname} = $up_fieldval;
-      }
-      else {
-
-        $self->logger->debug("Unit position text ($up_field) is incorrect.");
-        $data_for_postrun_href->{'Error'} = 1;
-        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error.'}]};
-
-        return $data_for_postrun_href;
-      }
+      $output_data_row->{'Block'} = $trial_unit_rec->{$unitposition_block};
     }
+    else {
 
-    for my $dk_up_field (keys(%{$dk_unitposition_field_lookup})) {
-        
-      my $db_up_para_name = $dk_unitposition_field_lookup->{$dk_up_field};
-
-      if (length($query->param($db_up_para_name)) > 0) {
-      
-        my $db_up_field     = $query->param($db_up_para_name);
-        
-        if ( !(defined $unitposition_lookup->{$db_up_field}) ) {
-          
-          my $err_msg = "$db_up_field not found in database." ;
-          $data_for_postrun_href->{'Error'} = 1;
-          $data_for_postrun_href->{'Data'}  = {'Error' => [{$db_up_para_name => $err_msg}]};
-          
-          return $data_for_postrun_href;
-        }
-
-        $output_data_row->{$dk_up_field} = $unitposition_lookup->{$db_up_field};
-      }
-      else {
-
-        # Translation for this unit position field is not provided.
-        # This is for Block which is optional.
-        $output_data_row->{$dk_up_field} = '';
-      }
+      $output_data_row->{'Block'} = '';
     }
 
     $output_data_row->{'Barcode'} = $trial_unit_rec->{'TrialUnitBarcode'};
@@ -5419,11 +5373,11 @@ sub export_datakapture_data_runmode {
   $field_order_href->{'TrialStartDate'}     = 6;
   $field_order_href->{'GenotypeName'}       = 7;
   $field_order_href->{'SelectionHistory'}   = 8;
-  $field_order_href->{'TrialUnitComment'}   = 9;
-  $field_order_href->{'ReplicateNumber'}    = 10;
-  $field_order_href->{'TrialUnitId'}        = 11;
-  $field_order_href->{'UnitPositionId'}     = 12;
-  $field_order_href->{'UnitPositionText'}   = 13;
+  $field_order_href->{'Pedigree'}           = 9;
+  $field_order_href->{'TrialUnitComment'}   = 10;
+  $field_order_href->{'ReplicateNumber'}    = 11;
+  $field_order_href->{'TrialUnitId'}        = 12;
+  $field_order_href->{'TrialUnitPosition'}  = 13;
   $field_order_href->{'Block'}              = 14;
   $field_order_href->{'Column'}             = 15;
   $field_order_href->{'Row'}                = 16;
@@ -5455,7 +5409,7 @@ sub export_datakapture_data_runmode {
   my $url = reconstruct_server_url();
 
   my $output_file_aref = [{ 'csv' => "$url/data/$username/${filename}.csv" }];
-  
+
   my $info_aref = [{'NumOfTrialUnit' => $nb_trialunit, 'MaxInstanceNumber' => $max_instance_number}];
 
   $data_for_postrun_href->{'Error'}     = 0;

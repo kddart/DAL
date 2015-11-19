@@ -2,12 +2,13 @@
   <CaseInfo CustomMethod="add_record" Description="Add Genotype Alias Status Type" TargetURL="add/type/genotypealiasstatus" Type="BLOCKING" />
   <Delete TargetURL="delete/type/genotypealiasstatus/:TypeId" />
   <INPUT ParaName="TypeName" PrefixVal="GenoAliasStatusType - " Random="1" />
-  <INPUT ParaName="IsTypeActive" Value="1" />
+  <INPUT ParaName="IsTypeActive" Value="1" /> 
+  <INPUT ParaName="IsFixed" Value="0" />
   <Match Attr="StatusCode" Value="200" />
   <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
   <Match Attr="ParaName" Tag="ReturnId" Value="TypeId" />
   <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
-  <ReturnId ParaName="TypeId" Value="142" />
+  
   
 </TestCase>

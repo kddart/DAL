@@ -1,6 +1,6 @@
 <TestCase>
   <CaseInfo CustomMethod="add_record" Description="Add Trial Trait1" TargetURL="trial/:TrialId/add/trait" Type="BLOCKING" />
-  <Delete TargetURL="delete/trialtrait/:TrialTraitId" />
+  <Delete TargetURL="trial/:TrialId/remove/trait/:TraitId" />
   <INPUT ParaName="TrialId" SrcValue="xml/add_data_no_vcol/case_00007_add_trial.xml" />
   <INPUT ParaName="TraitId" SrcValue="xml/add_data_no_vcol/case_00363_add_trait4trial1.xml" />
   <INPUT ParaName="Compulsory" Value="1" />
@@ -11,6 +11,6 @@
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00007_add_trial.xml" Order="3" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00363_add_trait4trial1.xml" Order="4" />
-  <ReturnId ParaName="TrialTraitId" Value="1" />
-  <RunInfo Success="1" Time="1409792256" />
+  <ReturnId ParaName="TrialTraitId" Value="35" />
+  <RunInfo Success="1" Time="1443160591" />
 </TestCase>

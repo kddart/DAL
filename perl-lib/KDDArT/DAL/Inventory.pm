@@ -1,5 +1,7 @@
-#$Id: Inventory.pm 785 2014-09-02 06:23:12Z puthick $
+#$Id: Inventory.pm 1020 2015-10-15 06:25:02Z puthick $
 #$Author: puthick $
+
+# Copyright (c) 2015, Diversity Arrays Technology, All rights reserved.
 
 # COPYRIGHT AND LICENSE
 # 
@@ -16,8 +18,7 @@
 # GNU General Public License for more details.
 
 # Author    : Puthick Hok
-# Version   : 2.2.5 build 795
-# Created   : 19/04/2012
+# Version   : 2.3.0 build 1040
 
 package KDDArT::DAL::Inventory;
 
@@ -50,7 +51,6 @@ sub setup {
   CGI::Session->name("KDDArT_DAL_SESSID");
 
   __PACKAGE__->authen->init_config_parameters();
-  
   __PACKAGE__->authen->init_config_parameters();
   __PACKAGE__->authen->check_login_runmodes(':all');
   __PACKAGE__->authen->check_content_type_runmodes(':all');
@@ -67,12 +67,18 @@ sub setup {
                                            'del_itemgroup_gadmin',
                                            'add_item_to_group_gadmin',
                                            'remove_item_from_group_gadmin',
-                                           'import_item_csv',
+                                           'import_item_csv_gadmin',
                                            'import_itemgroup_xml_gadmin',
                                            'add_item_log',
+                                           'add_generalunit_gadmin',
+                                           'update_generalunit_gadmin',
+                                           'del_generalunit_gadmin',
+                                           'add_conversionrule_gadmin',
+                                           'del_conversionrule_gadmin',
+                                           'update_conversionrule_gadmin',
       );
   __PACKAGE__->authen->count_session_request_runmodes(':all');
-  
+
   __PACKAGE__->authen->check_signature_runmodes('add_storage_gadmin',
                                                 'update_storage_gadmin',
                                                 'del_storage_gadmin',
@@ -86,6 +92,12 @@ sub setup {
                                                 'add_item_to_group_gadmin',
                                                 'remove_item_from_group_gadmin',
                                                 'add_item_log',
+                                                'add_generalunit_gadmin',
+                                                'update_generalunit_gadmin',
+                                                'del_generalunit_gadmin',
+                                                'add_conversionrule_gadmin',
+                                                'del_conversionrule_gadmin',
+                                                'update_conversionrule_gadmin',
       );
   __PACKAGE__->authen->check_gadmin_runmodes('add_storage_gadmin',
                                              'update_storage_gadmin',
@@ -99,56 +111,69 @@ sub setup {
                                              'add_item_to_group_gadmin',
                                              'remove_item_from_group_gadmin',
                                              'import_itemgroup_xml_gadmin',
+                                             'import_item_csv_gadmin',
+                                             'update_generalunit_gadmin',
+                                             'del_generalunit_gadmin',
+                                             'add_generalunit_gadmin',
+                                             'add_conversionrule_gadmin',
+                                             'del_conversionrule_gadmin',
+                                             'update_conversionrule_gadmin',
       );
   __PACKAGE__->authen->check_sign_upload_runmodes('add_itemgroup_gadmin',
-                                                  'import_item_csv',
+                                                  'import_item_csv_gadmin',
                                                   'import_itemgroup_xml_gadmin',
       );
-  
+
   $self->run_modes(
 
     # Storage
-    'add_storage_gadmin'           => 'add_storage_runmode',
-    'update_storage_gadmin'        => 'update_storage_runmode',
-    'del_storage_gadmin'           => 'del_storage_runmode',
-    'list_storage'                 => 'list_storage_runmode',
-    'get_storage'                  => 'get_storage_runmode',
+    'add_storage_gadmin'            => 'add_storage_runmode',
+    'update_storage_gadmin'         => 'update_storage_runmode',
+    'del_storage_gadmin'            => 'del_storage_runmode',
+    'list_storage'                  => 'list_storage_runmode',
+    'get_storage'                   => 'get_storage_runmode',
 
     # Item
-    'add_item'           => 'add_item_runmode',
-    'update_item_gadmin' => 'update_item_runmode',
-    'del_item_gadmin'    => 'del_item_runmode',
-    'get_item'           => 'get_item_runmode',
-    'list_item_advanced' => 'list_item_advanced_runmode',
-    'import_item_csv'    => 'import_item_csv_runmode',
+    'add_item'                      => 'add_item_runmode',
+    'update_item_gadmin'            => 'update_item_runmode',
+    'del_item_gadmin'               => 'del_item_runmode',
+    'get_item'                      => 'get_item_runmode',
+    'list_item_advanced'            => 'list_item_advanced_runmode',
+    'import_item_csv_gadmin'        => 'import_item_csv_runmode',
 
-    # Item Unit
-    'add_itemunit_gadmin'    => 'add_item_unit_runmode',
-    'del_itemunit_gadmin'    => 'del_item_unit_runmode',
-    'update_itemunit_gadmin' => 'update_item_unit_runmode',
-    'get_itemunit'           => 'get_item_unit_runmode',
-    'list_itemunit'          => 'list_item_unit_runmode',
-    
+    # Unit
+    'add_generalunit_gadmin'        => 'add_general_unit_runmode',
+    'del_generalunit_gadmin'        => 'del_general_unit_runmode',
+    'update_generalunit_gadmin'     => 'update_general_unit_runmode',
+    'get_generalunit'               => 'get_general_unit_runmode',
+    'list_generalunit_advanced'     => 'list_general_unit_advanced_runmode',
+
     # Item Group
-    'add_itemgroup_gadmin'         => 'add_itemgroup_runmode',
-    'update_itemgroup_gadmin'      => 'update_itemgroup_runmode',
-    'del_itemgroup_gadmin'         => 'del_itemgroup_runmode',
-    'get_itemgroup'                => 'get_itemgroup_runmode',
-    'list_itemgroup_advanced'      => 'list_itemgroup_advanced_runmode',
-    'import_itemgroup_xml_gadmin'  => 'import_itemgroup_xml_runmode',
-    
+    'add_itemgroup_gadmin'          => 'add_itemgroup_runmode',
+    'update_itemgroup_gadmin'       => 'update_itemgroup_runmode',
+    'del_itemgroup_gadmin'          => 'del_itemgroup_runmode',
+    'get_itemgroup'                 => 'get_itemgroup_runmode',
+    'list_itemgroup_advanced'       => 'list_itemgroup_advanced_runmode',
+    'import_itemgroup_xml_gadmin'   => 'import_itemgroup_xml_runmode',
+
     # Group Item
     'add_item_to_group_gadmin'      => 'add_item_to_group_runmode',
     'remove_item_from_group_gadmin' => 'remove_item_from_group_runmode',
-    
-    # Item Parent
-    'add_itemparent_gadmin'    => 'add_itemparent_runmode',
-    'del_itemparent_gadmin'    => 'del_itemparent_runmode',
-    'list_itemparent'          => 'list_itemparent_runmode',
-    'get_itemparent'           => 'get_itemparent_runmode',
 
-    'add_item_log'             => 'add_item_log_runmode',
-    'show_item_log'            => 'show_item_log_runmode',
+    # Item Parent
+    'add_itemparent_gadmin'         => 'add_itemparent_runmode',
+    'del_itemparent_gadmin'         => 'del_itemparent_runmode',
+    'list_itemparent'               => 'list_itemparent_runmode',
+    'get_itemparent'                => 'get_itemparent_runmode',
+
+    'add_item_log'                  => 'add_item_log_runmode',
+    'show_item_log'                 => 'show_item_log_runmode',
+
+    'add_conversionrule_gadmin'     => 'add_conversionrule_runmode',
+    'del_conversionrule_gadmin'     => 'del_conversionrule_runmode',
+    'update_conversionrule_gadmin'  => 'update_conversionrule_runmode',
+    'list_conversionrule'           => 'list_conversionrule_runmode',
+    'get_conversionrule'            => 'get_conversionrule_runmode',
       );
 
   my $logger = get_logger();
@@ -157,7 +182,7 @@ sub setup {
   if ( !$logger->has_appenders() ) {
 
     my $app = Log::Log4perl::Appender->new( "Log::Log4perl::Appender::Screen", utf8 => undef );
-    
+
     my $layout = Log::Log4perl::Layout::PatternLayout->new("[%d] [%H] [%X{client_ip}] [%p] [%F{1}:%L] [%M] [%m]%n");
 
     $app->layout($layout);
@@ -166,7 +191,7 @@ sub setup {
 
   $logger->level($DEBUG);
   $self->{logger} = $logger;
-  
+
   $self->authen->config( LOGIN_URL => '' );
   $self->session_config( CGI_SESSION_OPTIONS => [ "driver:File", $self->query, { Directory => $SESSION_STORAGE_PATH } ], );
 }
@@ -264,44 +289,17 @@ sub add_itemparent_runmode {
 
   my $skip_field = {'ItemId' => 1};
 
-  my ($get_scol_err, $get_scol_msg, $scol_data, $pkey_data) = get_static_field($dbh_read, 'itemparent');
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'itemparent', $skip_field);
 
-  if ($get_scol_err) {
+  if ($chk_sfield_err) {
 
-    $self->logger->debug("Get static field info failed: $get_scol_msg");
-    
-    my $err_msg = "Unexpected Error.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+    $self->logger->debug($chk_sfield_msg);
 
-    return $data_for_postrun_href;
-  }
-
-  my $required_field_href = {};
-
-  for my $static_field (@{$scol_data}) {
-
-    my $field_name = $static_field->{'Name'};
-    
-    if ($skip_field->{$field_name}) { next; }
-
-    if ($static_field->{'Required'} == 1) {
-
-      $required_field_href->{$field_name} = $query->param($field_name);
-    }
+    return $for_postrun_href;
   }
 
   $dbh_read->disconnect();
-
-  my ($missing_err, $missing_href) = check_missing_href( $required_field_href );
-
-  if ($missing_err) {
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
-
-    return $data_for_postrun_href;
-  }
 
   # Finish generic required static field checking
 
@@ -368,7 +366,7 @@ sub add_itemparent_runmode {
   $sth->execute( $item_id, $parent_item_id, $parent_item_type );
 
   if ( $dbh_k_write->err() ) {
-    
+
     return $self->_set_error( $sth->err() );
   }
 
@@ -578,12 +576,12 @@ sub list_itemgroup_advanced_runmode {
 "GroupAdminRequired": 0,
 "SignatureRequired": 0,
 "AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "FILTERING"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Pagination Page='1' NumOfRecords='8' NumOfPages='8' NumPerPage='1' /><ItemGroup DateAdded='2012-08-08 00:00:00' ItemGroupNote='Testing' UserName='admin' ItemGroupName='ITM_GRP0221890' AddedByUser='0' Active='1' update='update/itemgroup/8' ItemGroupId='8'><Item DateAdded='2014-08-06 12:39:45' ItemId='18' removeItem='itemgroup/8/remove/item/18' AddedByUserId='0' ItemTypeId='138' TrialUnitSpecimenId='0' ContainerTypeId='136' ItemNote='' ItemStateId='139' ScaleId='14' SpecimenId='486' ItemOperation='group' LastMeasuredUserId='0' ItemBarcode='I_7183475' ItemUnitId='16' StorageId='8' Amount='5.000' LastMeasuredDate='2012-08-01 00:00:00' ItemSourceId='30' /><Item DateAdded='2014-08-06 12:39:45' ItemId='19' removeItem='itemgroup/8/remove/item/19' AddedByUserId='0' ItemTypeId='138' TrialUnitSpecimenId='0' ContainerTypeId='136' ItemStateId='139' ItemNote='' ScaleId='14' SpecimenId='486' ItemBarcode='I_8241179' LastMeasuredUserId='0' ItemOperation='group' ItemUnitId='16' StorageId='8' Amount='5.000' LastMeasuredDate='2012-08-01 00:00:00' ItemSourceId='30' /></ItemGroup><RecordMeta TagName='ItemGroup' /></DATA>",
-"SuccessMessageJSON": "{'Pagination' : [{'NumOfRecords' : '8','NumOfPages' : 8,'NumPerPage' : '1','Page' : '1'}],'ItemGroup' : [{'DateAdded' : '2012-08-08 00:00:00','Item' : [{'DateAdded' : '2014-08-06 12:39:45','ItemId' : '18','removeItem' : 'itemgroup/8/remove/item/18','AddedByUserId' : '0','TrialUnitSpecimenId' : '0','ItemTypeId' : '138','ContainerTypeId' : '136','ItemNote' : '','ItemStateId' : '139','SpecimenId' : '486','ScaleId' : '14','ItemOperation' : 'group','LastMeasuredUserId' : '0','ItemBarcode' : 'I_7183475','ItemUnitId' : '16','StorageId' : '8','Amount' : '5.000','LastMeasuredDate' : '2012-08-01 00:00:00','ItemSourceId' : '30'},{'DateAdded' : '2014-08-06 12:39:45','ItemId' : '19','removeItem' : 'itemgroup/8/remove/item/19','AddedByUserId' : '0','TrialUnitSpecimenId' : '0','ItemTypeId' : '138','ContainerTypeId' : '136','ItemNote' : '','ItemStateId' : '139','SpecimenId' : '486','ScaleId' : '14','ItemOperation' : 'group','LastMeasuredUserId' : '0','ItemBarcode' : 'I_8241179','ItemUnitId' : '16','StorageId' : '8','Amount' : '5.000','LastMeasuredDate' : '2012-08-01 00:00:00','ItemSourceId' : '30'}],'UserName' : 'admin','ItemGroupNote' : 'Testing','ItemGroupName' : 'ITM_GRP0221890','Active' : '1','AddedByUser' : '0','ItemGroupId' : '8','update' : 'update/itemgroup/8'}],'RecordMeta' : [{'TagName' : 'ItemGroup'}]}",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Pagination Page='1' NumOfRecords='8' NumOfPages='8' NumPerPage='1' /><ItemGroup DateAdded='2012-08-08 00:00:00' ItemGroupNote='Testing' UserName='admin' ItemGroupName='ITM_GRP0221890' AddedByUser='0' Active='1' update='update/itemgroup/8' ItemGroupId='8'><Item DateAdded='2014-08-06 12:39:45' ItemId='18' removeItem='itemgroup/8/remove/item/18' AddedByUserId='0' ItemTypeId='138' TrialUnitSpecimenId='0' ContainerTypeId='136' ItemNote='' ItemStateId='139' ScaleId='14' SpecimenId='486' ItemOperation='group' LastMeasuredUserId='0' ItemBarcode='I_7183475' UnitId='16' StorageId='8' Amount='5.000' LastMeasuredDate='2012-08-01 00:00:00' ItemSourceId='30' /><Item DateAdded='2014-08-06 12:39:45' ItemId='19' removeItem='itemgroup/8/remove/item/19' AddedByUserId='0' ItemTypeId='138' TrialUnitSpecimenId='0' ContainerTypeId='136' ItemStateId='139' ItemNote='' ScaleId='14' SpecimenId='486' ItemBarcode='I_8241179' LastMeasuredUserId='0' ItemOperation='group' UnitId='16' StorageId='8' Amount='5.000' LastMeasuredDate='2012-08-01 00:00:00' ItemSourceId='30' /></ItemGroup><RecordMeta TagName='ItemGroup' /></DATA>",
+"SuccessMessageJSON": "{'Pagination' : [{'NumOfRecords' : '8','NumOfPages' : 8,'NumPerPage' : '1','Page' : '1'}],'ItemGroup' : [{'DateAdded' : '2012-08-08 00:00:00','Item' : [{'DateAdded' : '2014-08-06 12:39:45','ItemId' : '18','removeItem' : 'itemgroup/8/remove/item/18','AddedByUserId' : '0','TrialUnitSpecimenId' : '0','ItemTypeId' : '138','ContainerTypeId' : '136','ItemNote' : '','ItemStateId' : '139','SpecimenId' : '486','ScaleId' : '14','ItemOperation' : 'group','LastMeasuredUserId' : '0','ItemBarcode' : 'I_7183475','UnitId' : '16','StorageId' : '8','Amount' : '5.000','LastMeasuredDate' : '2012-08-01 00:00:00','ItemSourceId' : '30'},{'DateAdded' : '2014-08-06 12:39:45','ItemId' : '19','removeItem' : 'itemgroup/8/remove/item/19','AddedByUserId' : '0','TrialUnitSpecimenId' : '0','ItemTypeId' : '138','ContainerTypeId' : '136','ItemNote' : '','ItemStateId' : '139','SpecimenId' : '486','ScaleId' : '14','ItemOperation' : 'group','LastMeasuredUserId' : '0','ItemBarcode' : 'I_8241179','UnitId' : '16','StorageId' : '8','Amount' : '5.000','LastMeasuredDate' : '2012-08-01 00:00:00','ItemSourceId' : '30'}],'UserName' : 'admin','ItemGroupNote' : 'Testing','ItemGroupName' : 'ITM_GRP0221890','Active' : '1','AddedByUser' : '0','ItemGroupId' : '8','update' : 'update/itemgroup/8'}],'RecordMeta' : [{'TagName' : 'ItemGroup'}]}",
 "ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
 "ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
 "URLParameter": [{"ParameterName": "nperpage", "Description": "Number of records in a page for pagination"}, {"ParameterName": "num", "Description": "The page number of the pagination"}],
-"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database filed name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "FieldList", "Description": "Comma separated value of wanted fields."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases."}],
+"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database field name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "FieldList", "Description": "Comma separated value of wanted fields."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases."}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
@@ -604,10 +602,12 @@ sub list_itemgroup_advanced_runmode {
   }
 
   $self->logger->debug("Page number: $page");
-  
+
   my $field_list_csv = $query->param('FieldList') ? $query->param('FieldList') : '';
   my $filtering_csv  = $query->param('Filtering') ? $query->param('Filtering') : '';
   my $sorting        = $query->param('Sorting')   ? $query->param('Sorting')   : '';
+
+  $self->logger->debug("Filtering: $filtering_csv");
 
   my $data_for_postrun_href = {};
 
@@ -618,25 +618,55 @@ sub list_itemgroup_advanced_runmode {
   if ($samp_itmgrp_err) {
 
     $self->logger->debug($samp_itmgrp_msg);
-    
+
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
     return $data_for_postrun_href;
   }
 
-  my @field_list_all = keys( %{$samp_itmgrp_data->[0]} );
+  my $dbh = connect_kdb_read();
 
-  # no field return, it means no record. error prevention
-  if (scalar(@field_list_all) == 0) {
+  my $sample_data_aref = $samp_itmgrp_data;
 
-    push(@field_list_all, '*');
+  my @field_list_all;
+
+  if (scalar(@{$sample_data_aref}) == 1) {
+
+    @field_list_all = keys(%{$sample_data_aref->[0]});
   }
+  else {
+
+    $self->logger->debug("It reaches here");
+    my ($sfield_err, $sfield_msg, $sfield_data, $pkey_data) = get_static_field($dbh, 'itemgroup');
+
+    if ($sfield_err) {
+
+      $self->logger->debug("Get static field failed: $sfield_msg");
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    for my $sfield_rec (@{$sfield_data}) {
+
+      push(@field_list_all, $sfield_rec->{'Name'});
+    }
+
+    for my $pkey_field (@{$pkey_data}) {
+
+      push(@field_list_all, $pkey_field);
+    }
+  }
+
+  $self->logger->debug("Field list all: " . join(',', @field_list_all));
 
   my $final_field_list = \@field_list_all;
 
   $self->logger->debug("Final field list: " . join(',', @{$final_field_list}));
-  
+
   if ( length($field_list_csv) > 0 ) {
 
     my ( $sel_field_err, $sel_field_msg, $sel_field_list ) = parse_selected_field( $field_list_csv,
@@ -661,15 +691,13 @@ sub list_itemgroup_advanced_runmode {
 
       push(@{$final_field_list}, 'systemuser.UserName');
       $join = ' LEFT JOIN systemuser ON itemgroup.AddedByUser = systemuser.UserId ';
-    } 
+    }
   }
 
   $self->logger->debug("Final field list: " . join(',', @{$final_field_list}));
 
   $sql  = 'SELECT ' . join(',', @{$final_field_list}) . ' ';
   $sql .= "FROM itemgroup $join ";
-
-  my $dbh = connect_kdb_read();
 
   my ( $filter_err, $filter_msg, $filter_phrase, $where_arg ) = parse_filtering('ItemGroupId', 'itemgroup',
                                                                                 $filtering_csv, $final_field_list );
@@ -705,7 +733,7 @@ sub list_itemgroup_advanced_runmode {
     if ($int_err) {
 
       $int_err_msg .= ' not integer.';
-      
+
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $int_err_msg}]};
 
@@ -808,8 +836,8 @@ sub get_itemgroup_runmode {
 "GroupAdminRequired": 0,
 "SignatureRequired": 0,
 "AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><ItemGroup DateAdded='2012-08-08 00:00:00' UserName='admin' ItemGroupNote='Testing1234' ItemGroupName='ITM_GRP6300825' Active='1' AddedByUser='0' ItemGroupId='1' update='update/itemgroup/1'><Item DateAdded='2014-07-01 13:16:19' ItemId='4' removeItem='itemgroup/1/remove/item/4' AddedByUserId='0' ItemTypeId='34' TrialUnitSpecimenId='0' ContainerTypeId='32' ItemNote='' ItemStateId='35' ScaleId='2' SpecimenId='13' ItemOperation='group' LastMeasuredUserId='0' ItemBarcode='I_1904016' ItemUnitId='3' StorageId='1' Amount='5.000' ItemSourceId='7' LastMeasuredDate='2012-08-01 00:00:00' /><Item DateAdded='2014-07-01 13:16:19' ItemId='5' removeItem='itemgroup/1/remove/item/5' AddedByUserId='0' ItemTypeId='34' TrialUnitSpecimenId='0' ContainerTypeId='32' ItemStateId='35' ItemNote='' ScaleId='2' SpecimenId='13' ItemBarcode='I_2173480' LastMeasuredUserId='0' ItemOperation='group' ItemUnitId='3' StorageId='1' Amount='5.000' ItemSourceId='7' LastMeasuredDate='2012-08-01 00:00:00' /><Item DateAdded='2014-07-01 13:16:25' ItemId='6' removeItem='itemgroup/1/remove/item/6' AddedByUserId='0' ItemTypeId='34' TrialUnitSpecimenId='0' ContainerTypeId='32' ItemStateId='35' ItemNote='' ScaleId='2' SpecimenId='13' ItemBarcode='I_5274114' LastMeasuredUserId='0' ItemOperation='group' ItemUnitId='3' StorageId='1' Amount='5.000' ItemSourceId='7' LastMeasuredDate='2012-08-01 00:00:00' /><Item DateAdded='2014-07-01 13:16:29' ItemId='8' removeItem='itemgroup/1/remove/item/8' AddedByUserId='0' ItemTypeId='40' TrialUnitSpecimenId='0' ContainerTypeId='38' ItemStateId='41' ItemNote='' ScaleId='3' SpecimenId='13' ItemBarcode='I_1803002' LastMeasuredUserId='0' ItemOperation='group' ItemUnitId='3' StorageId='1' Amount='5.000' ItemSourceId='7' LastMeasuredDate='2012-08-01 00:00:00' /></ItemGroup><RecordMeta TagName='ItemGroup' /></DATA>",
-"SuccessMessageJSON": "{'ItemGroup' : [{'DateAdded' : '2012-08-08 00:00:00','Item' : [{'DateAdded' : '2014-07-01 13:16:19','ItemId' : '4','removeItem' : 'itemgroup/1/remove/item/4','AddedByUserId' : '0','TrialUnitSpecimenId' : '0','ItemTypeId' : '34','ContainerTypeId' : '32','ItemNote' : '','ItemStateId' : '35','SpecimenId' : '13','ScaleId' : '2','ItemOperation' : 'group','LastMeasuredUserId' : '0','ItemBarcode' : 'I_1904016','ItemUnitId' : '3','StorageId' : '1','Amount' : '5.000','LastMeasuredDate' : '2012-08-01 00:00:00','ItemSourceId' : '7'},{'DateAdded' : '2014-07-01 13:16:19','ItemId' : '5','removeItem' : 'itemgroup/1/remove/item/5','AddedByUserId' : '0','TrialUnitSpecimenId' : '0','ItemTypeId' : '34','ContainerTypeId' : '32','ItemNote' : '','ItemStateId' : '35','SpecimenId' : '13','ScaleId' : '2','ItemOperation' : 'group','LastMeasuredUserId' : '0','ItemBarcode' : 'I_2173480','ItemUnitId' : '3','StorageId' : '1','Amount' : '5.000','LastMeasuredDate' : '2012-08-01 00:00:00','ItemSourceId' : '7'},{'DateAdded' : '2014-07-01 13:16:25','ItemId' : '6','removeItem' : 'itemgroup/1/remove/item/6','AddedByUserId' : '0','TrialUnitSpecimenId' : '0','ItemTypeId' : '34','ContainerTypeId' : '32','ItemNote' : '','ItemStateId' : '35','SpecimenId' : '13','ScaleId' : '2','ItemOperation' : 'group','LastMeasuredUserId' : '0','ItemBarcode' : 'I_5274114','ItemUnitId' : '3','StorageId' : '1','Amount' : '5.000','LastMeasuredDate' : '2012-08-01 00:00:00','ItemSourceId' : '7'},{'DateAdded' : '2014-07-01 13:16:29','ItemId' : '8','removeItem' : 'itemgroup/1/remove/item/8','AddedByUserId' : '0','TrialUnitSpecimenId' : '0','ItemTypeId' : '40','ContainerTypeId' : '38','ItemNote' : '','ItemStateId' : '41','SpecimenId' : '13','ScaleId' : '3','ItemOperation' : 'group','LastMeasuredUserId' : '0','ItemBarcode' : 'I_1803002','ItemUnitId' : '3','StorageId' : '1','Amount' : '5.000','LastMeasuredDate' : '2012-08-01 00:00:00','ItemSourceId' : '7'}],'UserName' : 'admin','ItemGroupNote' : 'Testing1234','ItemGroupName' : 'ITM_GRP6300825','Active' : '1','AddedByUser' : '0','ItemGroupId' : '1','update' : 'update/itemgroup/1'}],'RecordMeta' : [{'TagName' : 'ItemGroup'}]}",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><ItemGroup DateAdded='2012-08-08 00:00:00' UserName='admin' ItemGroupNote='Testing1234' ItemGroupName='ITM_GRP6300825' Active='1' AddedByUser='0' ItemGroupId='1' update='update/itemgroup/1'><Item DateAdded='2014-07-01 13:16:19' ItemId='4' removeItem='itemgroup/1/remove/item/4' AddedByUserId='0' ItemTypeId='34' TrialUnitSpecimenId='0' ContainerTypeId='32' ItemNote='' ItemStateId='35' ScaleId='2' SpecimenId='13' ItemOperation='group' LastMeasuredUserId='0' ItemBarcode='I_1904016' UnitId='3' StorageId='1' Amount='5.000' ItemSourceId='7' LastMeasuredDate='2012-08-01 00:00:00' /><Item DateAdded='2014-07-01 13:16:19' ItemId='5' removeItem='itemgroup/1/remove/item/5' AddedByUserId='0' ItemTypeId='34' TrialUnitSpecimenId='0' ContainerTypeId='32' ItemStateId='35' ItemNote='' ScaleId='2' SpecimenId='13' ItemBarcode='I_2173480' LastMeasuredUserId='0' ItemOperation='group' UnitId='3' StorageId='1' Amount='5.000' ItemSourceId='7' LastMeasuredDate='2012-08-01 00:00:00' /><Item DateAdded='2014-07-01 13:16:25' ItemId='6' removeItem='itemgroup/1/remove/item/6' AddedByUserId='0' ItemTypeId='34' TrialUnitSpecimenId='0' ContainerTypeId='32' ItemStateId='35' ItemNote='' ScaleId='2' SpecimenId='13' ItemBarcode='I_5274114' LastMeasuredUserId='0' ItemOperation='group' UnitId='3' StorageId='1' Amount='5.000' ItemSourceId='7' LastMeasuredDate='2012-08-01 00:00:00' /><Item DateAdded='2014-07-01 13:16:29' ItemId='8' removeItem='itemgroup/1/remove/item/8' AddedByUserId='0' ItemTypeId='40' TrialUnitSpecimenId='0' ContainerTypeId='38' ItemStateId='41' ItemNote='' ScaleId='3' SpecimenId='13' ItemBarcode='I_1803002' LastMeasuredUserId='0' ItemOperation='group' UnitId='3' StorageId='1' Amount='5.000' ItemSourceId='7' LastMeasuredDate='2012-08-01 00:00:00' /></ItemGroup><RecordMeta TagName='ItemGroup' /></DATA>",
+"SuccessMessageJSON": "{'ItemGroup' : [{'DateAdded' : '2012-08-08 00:00:00','Item' : [{'DateAdded' : '2014-07-01 13:16:19','ItemId' : '4','removeItem' : 'itemgroup/1/remove/item/4','AddedByUserId' : '0','TrialUnitSpecimenId' : '0','ItemTypeId' : '34','ContainerTypeId' : '32','ItemNote' : '','ItemStateId' : '35','SpecimenId' : '13','ScaleId' : '2','ItemOperation' : 'group','LastMeasuredUserId' : '0','ItemBarcode' : 'I_1904016','UnitId' : '3','StorageId' : '1','Amount' : '5.000','LastMeasuredDate' : '2012-08-01 00:00:00','ItemSourceId' : '7'},{'DateAdded' : '2014-07-01 13:16:19','ItemId' : '5','removeItem' : 'itemgroup/1/remove/item/5','AddedByUserId' : '0','TrialUnitSpecimenId' : '0','ItemTypeId' : '34','ContainerTypeId' : '32','ItemNote' : '','ItemStateId' : '35','SpecimenId' : '13','ScaleId' : '2','ItemOperation' : 'group','LastMeasuredUserId' : '0','ItemBarcode' : 'I_2173480','UnitId' : '3','StorageId' : '1','Amount' : '5.000','LastMeasuredDate' : '2012-08-01 00:00:00','ItemSourceId' : '7'},{'DateAdded' : '2014-07-01 13:16:25','ItemId' : '6','removeItem' : 'itemgroup/1/remove/item/6','AddedByUserId' : '0','TrialUnitSpecimenId' : '0','ItemTypeId' : '34','ContainerTypeId' : '32','ItemNote' : '','ItemStateId' : '35','SpecimenId' : '13','ScaleId' : '2','ItemOperation' : 'group','LastMeasuredUserId' : '0','ItemBarcode' : 'I_5274114','UnitId' : '3','StorageId' : '1','Amount' : '5.000','LastMeasuredDate' : '2012-08-01 00:00:00','ItemSourceId' : '7'},{'DateAdded' : '2014-07-01 13:16:29','ItemId' : '8','removeItem' : 'itemgroup/1/remove/item/8','AddedByUserId' : '0','TrialUnitSpecimenId' : '0','ItemTypeId' : '40','ContainerTypeId' : '38','ItemNote' : '','ItemStateId' : '41','SpecimenId' : '13','ScaleId' : '3','ItemOperation' : 'group','LastMeasuredUserId' : '0','ItemBarcode' : 'I_1803002','UnitId' : '3','StorageId' : '1','Amount' : '5.000','LastMeasuredDate' : '2012-08-01 00:00:00','ItemSourceId' : '7'}],'UserName' : 'admin','ItemGroupNote' : 'Testing1234','ItemGroupName' : 'ITM_GRP6300825','Active' : '1','AddedByUser' : '0','ItemGroupId' : '1','update' : 'update/itemgroup/1'}],'RecordMeta' : [{'TagName' : 'ItemGroup'}]}",
 "ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='ItemGroupId (10): not found.' /></DATA>"}],
 "ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'ItemGroupId (10): not found.'}]}"}],
 "URLParameter": [{"ParameterName": "id", "Description": "Existing ItemGroupId"}],
@@ -882,7 +910,7 @@ sub add_itemgroup_runmode {
 }
 =cut
 
-  my $self  = $_[0];  
+  my $self  = $_[0];
   my $query = $self->query();
 
   my $data_for_postrun_href = {};
@@ -893,44 +921,17 @@ sub add_itemgroup_runmode {
 
   my $skip_field = {};
 
-  my ($get_scol_err, $get_scol_msg, $scol_data, $pkey_data) = get_static_field($dbh_read, 'itemgroup');
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'itemgroup', $skip_field);
 
-  if ($get_scol_err) {
+  if ($chk_sfield_err) {
 
-    $self->logger->debug("Get static field info failed: $get_scol_msg");
-    
-    my $err_msg = "Unexpected Error.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+    $self->logger->debug($chk_sfield_msg);
 
-    return $data_for_postrun_href;
-  }
-
-  my $required_field_href = {};
-
-  for my $static_field (@{$scol_data}) {
-
-    my $field_name = $static_field->{'Name'};
-    
-    if ($skip_field->{$field_name}) { next; }
-
-    if ($static_field->{'Required'} == 1) {
-
-      $required_field_href->{$field_name} = $query->param($field_name);
-    }
+    return $for_postrun_href;
   }
 
   $dbh_read->disconnect();
-
-  my ($missing_err, $missing_href) = check_missing_href( $required_field_href );
-
-  if ($missing_err) {
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
-
-    return $data_for_postrun_href;
-  }
 
   # Finish generic required static field checking
 
@@ -939,7 +940,7 @@ sub add_itemgroup_runmode {
   my $item_group_active   = $query->param('Active');
 
   my $item_group_by_user  = $self->authen->user_id();
-  
+
   my ( $mdt_to_err, $mdt_to_msg ) = check_dt_value( { 'DateAdded' => $item_group_added_on } );
 
   if ($mdt_to_err) {
@@ -1143,44 +1144,17 @@ sub update_itemgroup_runmode {
 
   my $skip_field = {};
 
-  my ($get_scol_err, $get_scol_msg, $scol_data, $pkey_data) = get_static_field($dbh_read, 'itemgroup');
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'itemgroup', $skip_field);
 
-  if ($get_scol_err) {
+  if ($chk_sfield_err) {
 
-    $self->logger->debug("Get static field info failed: $get_scol_msg");
-    
-    my $err_msg = "Unexpected Error.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+    $self->logger->debug($chk_sfield_msg);
 
-    return $data_for_postrun_href;
-  }
-
-  my $required_field_href = {};
-
-  for my $static_field (@{$scol_data}) {
-
-    my $field_name = $static_field->{'Name'};
-    
-    if ($skip_field->{$field_name}) { next; }
-
-    if ($static_field->{'Required'} == 1) {
-
-      $required_field_href->{$field_name} = $query->param($field_name);
-    }
+    return $for_postrun_href;
   }
 
   $dbh_read->disconnect();
-
-  my ($missing_err, $missing_href) = check_missing_href( $required_field_href );
-
-  if ($missing_err) {
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
-
-    return $data_for_postrun_href;
-  }
 
   # Finish generic required static field checking
 
@@ -1390,7 +1364,7 @@ sub del_itemgroup_runmode {
 # Managing item units
 ###########################################################################
 
-sub list_item_unit {
+sub list_general_unit {
 
   my $self           = $_[0];
   my $extra_attr_yes = $_[1];
@@ -1416,6 +1390,8 @@ sub list_item_unit {
     return (1, $msg, []);
   }
 
+  my $dbh_gis = connect_gis_read();
+
   my $dbh = connect_kdb_read();
   my $sth = $dbh->prepare($sql);
 
@@ -1423,7 +1399,7 @@ sub list_item_unit {
 
   my $err = 0;
   my $msg = '';
-  my $itemunit_data = [];
+  my $unit_data = [];
 
   if ( !$dbh->err() ) {
 
@@ -1431,7 +1407,7 @@ sub list_item_unit {
 
     if ( !$sth->err() ) {
 
-      $itemunit_data = $array_ref;
+      $unit_data = $array_ref;
     }
     else {
 
@@ -1449,17 +1425,17 @@ sub list_item_unit {
 
   $sth->finish();
 
-  my $extra_attr_itemunit_data = [];
+  my $extra_attr_unit_data = [];
 
   if ($extra_attr_yes) {
 
     my $gadmin_status = $self->authen->gadmin_status();
 
-    my $itm_unit_id_aref = [];
+    my $unit_id_aref = [];
 
-    for my $row (@{$itemunit_data}) {
+    for my $row (@{$unit_data}) {
 
-      push(@{$itm_unit_id_aref}, $row->{'ItemUnitId'});
+      push(@{$unit_id_aref}, $row->{'UnitId'});
     }
 
     my $chk_id_err        = 0;
@@ -1467,86 +1443,338 @@ sub list_item_unit {
     my $used_id_href      = {};
     my $not_used_id_href  = {};
 
-    if (scalar(@{$itm_unit_id_aref}) > 0) {
+    my $chk_gis_id_err        = 0;
+    my $chk_gis_id_msg        = '';
+    my $used_gis_id_href      = {};
+    my $not_used_gis_id_href  = {};
 
-      my $chk_table_aref = [{'TableName' => 'item', 'FieldName' => 'ItemUnitId'},
-                            {'TableName' => 'trait', 'FieldName' => 'TraitUnit'}
+    if (scalar(@{$unit_id_aref}) > 0) {
+
+      my $chk_table_aref = [{'TableName' => 'item', 'FieldName' => 'UnitId'},
+                            {'TableName' => 'trait', 'FieldName' => 'UnitId'},
+                            {'TableName' => 'trialtrait', 'FieldName' => 'UnitId'},
+                            {'TableName' => 'trialevent', 'FieldName' => 'UnitId'},
           ];
 
       ($chk_id_err, $chk_id_msg,
-       $used_id_href, $not_used_id_href) = id_existence_bulk($dbh, $chk_table_aref, $itm_unit_id_aref);
+       $used_id_href, $not_used_id_href) = id_existence_bulk($dbh, $chk_table_aref, $unit_id_aref);
 
       if ($chk_id_err) {
 
         $self->logger->debug("Check id existence error: $chk_id_msg");
         $err = 1;
         $msg = $chk_id_msg;
-        
+
+        return ($err, $msg, []);
+      }
+
+      my $chk_gistable_aref = [{'TableName' => 'layerattrib', 'FieldName' => 'unitid'}];
+
+      ($chk_gis_id_err, $chk_gis_id_msg,
+       $used_gis_id_href, $not_used_gis_id_href) = id_existence_bulk($dbh_gis, $chk_gistable_aref, $unit_id_aref);
+
+      if ($chk_gis_id_err) {
+
+        $self->logger->debug("Check id existence error: $chk_gis_id_msg");
+        $err = 1;
+        $msg = $chk_gis_id_msg;
+
         return ($err, $msg, []);
       }
 
     }
 
-    for my $row (@{$itemunit_data}) {
-    
+    for my $row (@{$unit_data}) {
+
       if ($gadmin_status eq '1') {
 
-        my $itemunit_id = $row->{'ItemUnitId'};
-        $row->{'update'} = "update/itemunit/$itemunit_id";
+        my $unit_id = $row->{'UnitId'};
+        $row->{'update'} = "update/generalunit/$unit_id";
 
-        if ( $not_used_id_href->{$itemunit_id} ) {
+        if ( $not_used_id_href->{$unit_id} && $not_used_gis_id_href->{$unit_id} ) {
 
-          $row->{'delete'}   = "delete/itemunit/$itemunit_id";
+          $row->{'delete'}   = "delete/generalunit/$unit_id";
         }
       }
-      push(@{$extra_attr_itemunit_data}, $row);
+      push(@{$extra_attr_unit_data}, $row);
     }
   }
   else {
 
-    $extra_attr_itemunit_data = $itemunit_data;
+    $extra_attr_unit_data = $unit_data;
   }
 
   $dbh->disconnect();
 
-  return ($err, $msg, $extra_attr_itemunit_data);
+  $dbh_gis->disconnect();
+
+  return ($err, $msg, $extra_attr_unit_data);
 }
 
-sub list_item_unit_runmode {
+sub list_general_unit_advanced_runmode {
 
-=pod list_itemunit_HELP_START
+=pod list_generalunit_advanced_HELP_START
 {
-"OperationName" : "List measurement units",
-"Description": "List all available measurement units in the system dictionary.",
+"OperationName" : "List units --- updated needed",
+"Description": "List all available units in the system dictionary.",
 "AuthRequired": 1,
 "GroupRequired": 1,
 "GroupAdminRequired": 0,
 "SignatureRequired": 0,
 "AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><RecordMeta TagName='ItemUnit' /><ItemUnit UnitTypeName='' ItemUnitId='20' UnitTypeId='' ConversionRule='' ItemUnitName='U_2354147' ItemUnitNote='' GramsConversionMultiplier='1' update='update/itemunit/20' /></DATA>",
-"SuccessMessageJSON": "{'RecordMeta' : [{'TagName' : 'ItemUnit'}], 'ItemUnit' : [{'ItemUnitId' : '20', 'UnitTypeName' : null, 'UnitTypeId' : null, 'ConversionRule' : null, 'ItemUnitName' : 'U_2354147', 'ItemUnitNote' : '', 'GramsConversionMultiplier' : '1', 'update' : 'update/itemunit/20'}]}",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Pagination Page='1' NumOfRecords='23' NumOfPages='23' NumPerPage='1' /><RecordMeta TagName='Unit' /><Unit UnitTypeName='' UseByTrialEvent='0' UnitSource='' UnitTypeId='' UnitId='24' UnitNote='' UnitName='U_5646096' UseByTrait='0' UseBylayerattrib='0' UseByItem='0' update='update/generalunit/24' /></DATA>",
+"SuccessMessageJSON": "{'Pagination' : [{'NumOfRecords' : '23', 'NumOfPages' : 23, 'NumPerPage' : '1', 'Page' : '1'}], 'RecordMeta' : [{'TagName' : 'Unit'}], 'Unit' : [{'UnitTypeName' : null, 'UnitSource' : null, 'UseByTrialEvent' : '0', 'UnitTypeId' : null, 'UnitId' : '24', 'UnitNote' : null, 'UnitName' : 'U_5646096', 'UseByTrait' : '0', 'UseBylayerattrib' : '0', 'update' : 'update/generalunit/24', 'UseByItem' : '0'}]}",
 "ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
 "ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
+"URLParameter": [{"ParameterName": "nperpage", "Description": "Number of records in a page for pagination"}, {"ParameterName": "num", "Description": "The page number of the pagination"}],
+"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database field name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "FieldList", "Description": "Comma separated value of wanted fields."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases."}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
 
   my $self  = shift;
+  my $query = $self->query();
 
   my $data_for_postrun_href = {};
 
-  my $group_id = $self->authen->group_id();
+  my $pagination  = 0;
+  my $nb_per_page = -1;
+  my $page        = -1;
 
-  my $sql = 'SELECT itemunit.*, generaltype.TypeName AS UnitTypeName FROM itemunit ';
-  $sql   .= 'LEFT JOIN generaltype ON itemunit.UnitTypeId = generaltype.TypeId ';
-  $sql   .= 'ORDER BY ItemUnitId DESC';
+  $self->logger->debug("Base dir: $main::kddart_base_dir");
 
-  my ($read_itemunit_err, $read_itemunit_msg, $itemunit_data) = $self->list_item_unit(1, $sql);
+  if ( (defined $self->param('nperpage')) && (defined $self->param('num')) ) {
 
-  if ($read_itemunit_err) {
+    $pagination  = 1;
+    $nb_per_page = $self->param('nperpage');
+    $page        = $self->param('num');
+  }
 
-    $self->logger->debug($read_itemunit_msg);
-    
+  my $field_list_csv = '';
+
+  if (defined $query->param('FieldList')) {
+
+    $field_list_csv = $query->param('FieldList');
+  }
+
+  my $filtering_csv = '';
+
+  if (defined $query->param('Filtering')) {
+
+    $filtering_csv = $query->param('Filtering');
+  }
+
+  $self->logger->debug("Filtering csv: $filtering_csv");
+
+  my $sorting = '';
+
+  if (defined $query->param('Sorting')) {
+
+    $sorting = $query->param('Sorting');
+  }
+
+  my $dbh = connect_kdb_read();
+
+  my $sql = 'SELECT * FROM generalunit LIMIT 1';
+
+  my ($sample_gu_err, $sample_gu_msg, $sample_gu_data) = $self->list_general_unit(0, $sql);
+
+  if ($sample_gu_err) {
+
+    $self->logger->debug($sample_gu_msg);
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $sample_data_aref = $sample_gu_data;
+
+  my @field_list_all;
+
+  if (scalar(@{$sample_data_aref}) == 1) {
+
+    @field_list_all = keys(%{$sample_data_aref->[0]});
+  }
+  else {
+
+    $self->logger->debug("It reaches here");
+    my ($sfield_err, $sfield_msg, $sfield_data, $pkey_data) = get_static_field($dbh, 'generalunit');
+
+    if ($sfield_err) {
+
+      $self->logger->debug("Get static field failed: $sfield_msg");
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    for my $sfield_rec (@{$sfield_data}) {
+
+      push(@field_list_all, $sfield_rec->{'Name'});
+    }
+
+    for my $pkey_field (@{$pkey_data}) {
+
+      push(@field_list_all, $pkey_field);
+    }
+  }
+
+  $self->logger->debug("Field list all: " . join(',', @field_list_all));
+
+  my $final_field_list     = \@field_list_all;
+
+  if (length($field_list_csv) > 0) {
+
+    my ($sel_field_err, $sel_field_msg, $sel_field_list) = parse_selected_field($field_list_csv,
+                                                                                $final_field_list,
+                                                                                'UnitId');
+
+    if ($sel_field_err) {
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $sel_field_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    $final_field_list = $sel_field_list;
+  }
+
+  my $field_lookup = {};
+  for my $fd_name (@{$final_field_list}) {
+
+    $field_lookup->{$fd_name} = 1;
+  }
+
+  my $other_join = '';
+
+  if ($field_lookup->{'UnitTypeId'}) {
+
+    push(@{$final_field_list}, 'generaltype.TypeName AS UnitTypeName');
+    $other_join .= ' LEFT JOIN generaltype ON generalunit.UnitTypeId = generaltype.TypeId ';
+  }
+
+  my $field_list_str = join(', ', @{$final_field_list});
+
+  $sql    = "SELECT $field_list_str ";
+  $sql   .= 'FROM generalunit ';
+  $sql   .= " $other_join ";
+
+  my ($filter_err, $filter_msg, $filter_phrase, $where_arg) = parse_filtering('UnitId',
+                                                                              'generalunit',
+                                                                              $filtering_csv,
+                                                                              $final_field_list);
+
+  $self->logger->debug("Filter phrase: $filter_phrase");
+
+  if ($filter_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $filter_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $filter_where_phrase = '';
+  if (length($filter_phrase) > 0) {
+
+    $filter_where_phrase = "WHERE $filter_phrase ";
+  }
+
+  my $filtering_exp = " $filter_where_phrase ";
+
+  my $pagination_aref = [];
+  my $paged_limit_clause = '';
+
+  if ($pagination) {
+
+    my ($int_err, $int_err_msg) = check_integer_value( {'nperpage' => $nb_per_page,
+                                                        'num'      => $page
+                                                       });
+
+    if ($int_err) {
+
+      $int_err_msg .= ' not integer.';
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $int_err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my ($paged_id_err, $paged_id_msg, $nb_records,
+        $nb_pages, $limit_clause, $rcount_time) = get_paged_filter($dbh,
+                                                                   $nb_per_page,
+                                                                   $page,
+                                                                   'generalunit',
+                                                                   'UnitId',
+                                                                   $filtering_exp,
+                                                                   $where_arg
+                                                                  );
+
+    $self->logger->debug("SQL Row count time: $rcount_time");
+
+    if ($paged_id_err == 1) {
+
+      $self->logger->debug($paged_id_msg);
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    if ($paged_id_err == 2) {
+
+      $page = 0;
+    }
+
+    $pagination_aref = [{'NumOfRecords' => $nb_records,
+                         'NumOfPages'   => $nb_pages,
+                         'Page'         => $page,
+                         'NumPerPage'   => $nb_per_page,
+                        }];
+
+    $paged_limit_clause = $limit_clause;
+  }
+
+  $sql .= " $filtering_exp ";
+
+  my ($sort_err, $sort_msg, $sort_sql) = parse_sorting($sorting, $final_field_list);
+
+  if ($sort_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $sort_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh->disconnect();
+
+  if (length($sort_sql) > 0) {
+
+    $sql .= " ORDER BY $sort_sql ";
+  }
+  else {
+
+    $sql .= ' ORDER BY generalunit.UnitId DESC';
+  }
+
+  $sql .= " $paged_limit_clause ";
+
+  $self->logger->debug("Where arg: " . join(',', @{$where_arg}));
+
+  $self->logger->debug("SQL with VCol: $sql");
+
+  my ($read_generalunit_err, $read_generalunit_msg, $generalunit_data) = $self->list_general_unit(1, $sql);
+
+  if ($read_generalunit_err) {
+
+    $self->logger->debug($read_generalunit_msg);
+
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
@@ -1554,59 +1782,59 @@ sub list_item_unit_runmode {
   }
 
   $data_for_postrun_href->{'Error'}     = 0;
-  $data_for_postrun_href->{'Data'}      = {'ItemUnit'    => $itemunit_data,
-                                           'RecordMeta' => [{'TagName' => 'ItemUnit'}],
+  $data_for_postrun_href->{'Data'}      = {'Unit'       => $generalunit_data,
+                                           'Pagination' => $pagination_aref,
+                                           'RecordMeta' => [{'TagName' => 'Unit'}],
   };
 
   return $data_for_postrun_href;
 }
 
-sub get_item_unit_runmode {
+sub get_general_unit_runmode {
 
-=pod get_itemunit_HELP_START
+=pod get_generalunit_HELP_START
 {
-"OperationName" : "Get measurement unit",
-"Description": "Get detailed information about measurement unit specified by id.",
+"OperationName" : "Get unit",
+"Description": "Get detailed information about unit specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
 "GroupAdminRequired": 0,
 "SignatureRequired": 0,
 "AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><RecordMeta TagName='ItemUnit' /><ItemUnit UnitTypeName='UnitType - 3527111' ItemUnitId='1' UnitTypeId='15' ConversionRule='' ItemUnitName='U_1381916' ItemUnitNote='' GramsConversionMultiplier='1' update='update/itemunit/1' /></DATA>",
-"SuccessMessageJSON": "{'RecordMeta' : [{'TagName' : 'ItemUnit'}], 'ItemUnit' : [{'ItemUnitId' : '1', 'UnitTypeName' : 'UnitType - 3527111', 'UnitTypeId' : '15', 'ConversionRule' : null, 'ItemUnitName' : 'U_1381916', 'ItemUnitNote' : '', 'GramsConversionMultiplier' : '1', 'update' : 'update/itemunit/1'}]}",
-"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='ItemUnitId (65): not found.' /></DATA>"}],
-"ErrorMessageJSON": [{"IdNotFound": "{'Error': [{'Message': 'ItemUnitId (65): not found.'}]}"}],
-"URLParameter": [{"ParameterName": "id", "Description": "Existing ItemUnitId."}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><RecordMeta TagName='Unit' /><Unit UnitTypeName='' UnitSource='' UseByTrialEvent='0' UnitTypeId='' UnitId='24' UnitNote='' UnitName='U_5646096' UseByTrait='0' UseBylayerattrib='0' UseByItem='0' update='update/generalunit/24' /></DATA>",
+"SuccessMessageJSON": "{'RecordMeta' : [{'TagName' : 'Unit'}], 'Unit' : [{'UnitTypeName' : null, 'UseByTrialEvent' : '0', 'UnitSource' : null, 'UnitTypeId' : null, 'UnitId' : '24', 'UnitNote' : null, 'UnitName' : 'U_5646096', 'UseByTrait' : '0', 'UseBylayerattrib' : '0', 'update' : 'update/generalunit/24', 'UseByItem' : '0'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='UnitId (65): not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error': [{'Message': 'UnitId (65): not found.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing UnitId."}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
 
   my $self  = shift;
 
-  my $itemunit_id = $self->param('id');
+  my $generalunit_id = $self->param('id');
   my $data_for_postrun_href = {};
 
   my $dbh = connect_kdb_read();
-  my $itemunit_exist = record_existence($dbh, 'itemunit', 'ItemUnitId', $itemunit_id);
+  my $generalunit_exist = record_existence($dbh, 'generalunit', 'UnitId', $generalunit_id);
   $dbh->disconnect();
 
-  if (!$itemunit_exist) {
+  if (!$generalunit_exist) {
 
-    return $self->_set_error("ItemUnitId ($itemunit_id): not found.");
+    return $self->_set_error("UnitId ($generalunit_id): not found.");
   }
 
-  my $group_id = $self->authen->group_id();
+  my $sql = 'SELECT generalunit.*, generaltype.TypeName AS UnitTypeName FROM generalunit ';
+  $sql   .= 'LEFT JOIN generaltype ON generalunit.UnitTypeId = generaltype.TypeId ';
+  $sql   .= 'WHERE UnitId=?';
 
-  my $sql = 'SELECT itemunit.*, generaltype.TypeName AS UnitTypeName FROM itemunit ';
-  $sql   .= 'LEFT JOIN generaltype ON itemunit.UnitTypeId = generaltype.TypeId ';
-  $sql   .= 'WHERE ItemUnitId=?';
+  my ($read_generalunit_err, $read_generalunit_msg, $generalunit_data) = $self->list_general_unit(1, $sql,
+                                                                                                  [$generalunit_id]);
 
-  my ($read_itemunit_err, $read_itemunit_msg, $itemunit_data) = $self->list_item_unit(1, $sql, [$itemunit_id]);
+  if ($read_generalunit_err) {
 
-  if ($read_itemunit_err) {
+    $self->logger->debug($read_generalunit_msg);
 
-    $self->logger->debug($read_itemunit_msg);
-    
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
@@ -1614,30 +1842,30 @@ sub get_item_unit_runmode {
   }
 
   $data_for_postrun_href->{'Error'}     = 0;
-  $data_for_postrun_href->{'Data'}      = {'ItemUnit'    => $itemunit_data,
-                                           'RecordMeta' => [{'TagName' => 'ItemUnit'}],
-  };
+  $data_for_postrun_href->{'Data'}      = {'Unit'       => $generalunit_data,
+                                           'RecordMeta' => [{'TagName' => 'Unit'}],
+                                          };
 
   return $data_for_postrun_href;
 }
 
-sub add_item_unit_runmode {
+sub add_general_unit_runmode {
 
-=pod add_itemunit_gadmin_HELP_START
+=pod add_generalunit_gadmin_HELP_START
 {
-"OperationName" : "Add measurement unit",
-"Description": "Add a new measurement unit definition into the system.",
+"OperationName" : "Add unit",
+"Description": "Add a new unit definition into the system.",
 "AuthRequired": 1,
 "GroupRequired": 1,
 "GroupAdminRequired": 0,
 "SignatureRequired": 1,
 "AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
 "KDDArTModule": "main",
-"KDDArTTable": "itemunit",
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><ReturnId Value='21' ParaName='ItemUnitId' /><Info Message='Item unit (21) has been added successfully.' /></DATA>",
-"SuccessMessageJSON": "{'ReturnId' : [{'Value' : '22', 'ParaName' : 'ItemUnitId'}], 'Info' : [{'Message' : 'Item unit (22) has been added successfully.'}]}",
-"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error UnitTypeId='UnitType (154): not found.' /></DATA>"}],
-"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'UnitTypeId' : 'UnitType (154): not found.'}]}"}],
+"KDDArTTable": "generalunit",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><ReturnId Value='25' ParaName='UnitId' /><Info Message='Item unit (25) has been added successfully.' /></DATA>",
+"SuccessMessageJSON": "{'ReturnId' : [{'Value' : '26', 'ParaName' : 'UnitId'}], 'Info' : [{'Message' : 'Item unit (26) has been added successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error UnitTypeId='UnitType (26): not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'UnitTypeId' : 'UnitType (26): not found.'}]}"}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
@@ -1653,51 +1881,40 @@ sub add_item_unit_runmode {
 
   my $skip_field = {};
 
-  my ($get_scol_err, $get_scol_msg, $scol_data, $pkey_data) = get_static_field($dbh_read, 'itemunit');
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'generalunit', $skip_field);
 
-  if ($get_scol_err) {
+  if ($chk_sfield_err) {
 
-    $self->logger->debug("Get static field info failed: $get_scol_msg");
-    
-    my $err_msg = "Unexpected Error.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+    $self->logger->debug($chk_sfield_msg);
 
-    return $data_for_postrun_href;
-  }
-
-  my $required_field_href = {};
-
-  for my $static_field (@{$scol_data}) {
-
-    my $field_name = $static_field->{'Name'};
-    
-    if ($skip_field->{$field_name}) { next; }
-
-    if ($static_field->{'Required'} == 1) {
-
-      $required_field_href->{$field_name} = $query->param($field_name);
-    }
+    return $for_postrun_href;
   }
 
   $dbh_read->disconnect();
 
-  my ($missing_err, $missing_href) = check_missing_href( $required_field_href );
+  # Finish generic required static field checking
 
-  if ($missing_err) {
+  my $unit_name          = $query->param('UnitName');
+  my $use_by_item        = $query->param('UseByItem');
+  my $use_by_trait       = $query->param('UseByTrait');
+  my $use_by_trial_event = $query->param('UseByTrialEvent');
+  my $use_by_layerattrib = $query->param('UseBylayerattrib');
+
+  my ($chk_bool_err, $bool_href) = check_bool_href( { 'UseByItem'          => $use_by_item,
+                                                      'UseByTrait'         => $use_by_trait,
+                                                      'UseByTrialEvent'    => $use_by_trial_event,
+                                                      'UseBylayerattrib'   => $use_by_layerattrib } );
+
+  if ($chk_bool_err) {
 
     $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$bool_href]};
 
     return $data_for_postrun_href;
   }
 
-  # Finish generic required static field checking
-  
-  my $unit_name         = $query->param('ItemUnitName');
-  my $unit_gram_con_mul = $query->param('GramsConversionMultiplier');
-
-  my $unit_type_id      = '';
+  my $unit_type_id      = undef;
 
   if (defined $query->param('UnitTypeId')) {
 
@@ -1706,29 +1923,41 @@ sub add_item_unit_runmode {
       $unit_type_id = $query->param('UnitTypeId');
     }
   }
-  
-  my $unit_note         = '';
 
-  if (defined $query->param('ItemUnitNote')) { $unit_note = $query->param('ItemUnitNote'); }
+  my $unit_note         = undef;
 
-  my $conversion_rule   = undef;
+  if (defined $query->param('UnitNote')) {
 
-  if (defined $query->param('ConversionRule')) { $conversion_rule = $query->param('ConversionRule'); }
+    if (length($query->param('UnitNote')) > 0) {
+
+      $unit_note = $query->param('UnitNote');
+    }
+  }
+
+  my $unit_src          = undef;
+
+  if (defined $query->param("UnitSource")) {
+
+    if (length($query->param("UnitSource")) > 0) {
+
+      $unit_src = $query->param("UnitSource");
+    }
+  }
 
   my $dbh_k_read = connect_kdb_read();
 
-  my $is_unit_exist = record_existence( $dbh_k_read, 'itemunit', 'ItemUnitName', $unit_name );
+  my $is_unit_exist = record_existence( $dbh_k_read, 'generalunit', 'UnitName', $unit_name );
 
   if ($is_unit_exist) {
 
-    my $err_msg = "ItemUnitName ($unit_name) already exists.";
+    my $err_msg = "UnitName ($unit_name) already exists.";
     $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'ItemUnitName' => $err_msg}]};
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'UnitName' => $err_msg}]};
 
     return $data_for_postrun_href;
   }
 
-  if (length($unit_type_id) > 0) {
+  if (defined $unit_type_id) {
 
     if (!type_existence($dbh_k_read, 'unittype', $unit_type_id)) {
 
@@ -1739,42 +1968,42 @@ sub add_item_unit_runmode {
       return $data_for_postrun_href;
     }
   }
-  else {
-
-    $unit_type_id = undef;
-  }
 
   $dbh_k_read->disconnect();
-  
+
   my $dbh_k_write = connect_kdb_write();
-  
+
   my $insert_statement = "
-        INSERT into itemunit SET
+        INSERT into generalunit SET
             UnitTypeId=?,
-            ItemUnitName=?,
-            GramsConversionMultiplier=?,
-            ItemUnitNote=?,
-            ConversionRule=?
+            UnitName=?,
+            UnitNote=?,
+            UnitSource=?,
+            UseByItem=?,
+            UseByTrait=?,
+            UseByTrialEvent=?,
+            UseBylayerattrib=?
     ";
 
   my $sth = $dbh_k_write->prepare($insert_statement);
-  $sth->execute( $unit_type_id, $unit_name, $unit_gram_con_mul, $unit_note, $conversion_rule );
-  
+  $sth->execute( $unit_type_id, $unit_name, $unit_note, $unit_src,
+                 $use_by_item, $use_by_trait, $use_by_trial_event, $use_by_layerattrib );
+
   if ( $dbh_k_write->err() ) {
 
     return $self->_set_error();
   }
 
-  my $unit_id = $dbh_k_write->last_insert_id( undef, undef, 'itemunit', 'ItemUnitId' )
+  my $unit_id = $dbh_k_write->last_insert_id( undef, undef, 'generalunit', 'UnitId' )
       || -1;
 
-  $self->logger->debug("ItemUnitId: $unit_id");
+  $self->logger->debug("UnitId: $unit_id");
   $sth->finish();
   $dbh_k_write->disconnect();
-  
+
   my $info_msg_aref  = [ { 'Message' => "Item unit ($unit_id) has been added successfully." } ];
-  my $return_id_aref = [ { 'Value' => $unit_id, 'ParaName' => 'ItemUnitId' } ];
-  
+  my $return_id_aref = [ { 'Value' => $unit_id, 'ParaName' => 'UnitId' } ];
+
   return {
     'Error' => 0,
     'Data'  => {
@@ -1785,24 +2014,24 @@ sub add_item_unit_runmode {
   };
 }
 
-sub update_item_unit_runmode {
+sub update_general_unit_runmode {
 
-=pod update_itemunit_gadmin_HELP_START
+=pod update_generalunit_gadmin_HELP_START
 {
-"OperationName" : "Update measurement unit",
-"Description": "Update measurement unit specified by id.",
+"OperationName" : "Update unit",
+"Description": "Update unit specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
 "GroupAdminRequired": 1,
 "SignatureRequired": 1,
 "AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
 "KDDArTModule": "main",
-"KDDArTTable": "itemunit",
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='Item unit (21) has been successfully updated.' /></DATA>",
-"SuccessMessageJSON": "{'Info' : [{'Message' : 'Item unit (21) has been successfully updated.'}]}",
-"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error UnitTypeId='UnitType (154): not found.' /></DATA>"}],
-"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'UnitTypeId' : 'UnitType (154): not found.'}]}"}],
-"URLParameter": [{"ParameterName": "id", "Description": "Existing ItemUnitId"}],
+"KDDArTTable": "generalunit",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='Unit (27) has been successfully updated.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'Unit (27) has been successfully updated.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unit (72): not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Unit (72): not found.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing UnitId"}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
@@ -1818,12 +2047,49 @@ sub update_item_unit_runmode {
 
   my $skip_field = {};
 
-  my ($get_scol_err, $get_scol_msg, $scol_data, $pkey_data) = get_static_field($dbh_read, 'itemunit');
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'generalunit', $skip_field);
 
-  if ($get_scol_err) {
+  if ($chk_sfield_err) {
 
-    $self->logger->debug("Get static field info failed: $get_scol_msg");
-    
+    $self->logger->debug($chk_sfield_msg);
+
+    return $for_postrun_href;
+  }
+
+  $dbh_read->disconnect();
+
+  # Finish generic required static field checking
+
+  my $unit_id           = $self->param('id');
+  my $unit_name         = $query->param('UnitName');
+
+  my $use_by_item        = $query->param('UseByItem');
+  my $use_by_trait       = $query->param('UseByTrait');
+  my $use_by_trial_event = $query->param('UseByTrialEvent');
+  my $use_by_layerattrib = $query->param('UseBylayerattrib');
+
+  my ($chk_bool_err, $bool_href) = check_bool_href( { 'UseByItem'          => $use_by_item,
+                                                      'UseByTrait'         => $use_by_trait,
+                                                      'UseByTrialEvent'    => $use_by_trial_event,
+                                                      'UseBylayerattrib'   => $use_by_layerattrib } );
+
+  if ($chk_bool_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$bool_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $dbh_k_read = connect_kdb_read();
+
+  my $sql = 'SELECT UnitId FROM generalunit WHERE UnitName=? AND UnitId<>?';
+
+  my ($r_unit_err, $db_unit_id) = read_cell($dbh_k_read, $sql, [$unit_name, $unit_id]);
+
+  if ($r_unit_err) {
+
     my $err_msg = "Unexpected Error.";
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
@@ -1831,50 +2097,30 @@ sub update_item_unit_runmode {
     return $data_for_postrun_href;
   }
 
-  my $required_field_href = {};
+  if (length($db_unit_id) > 0) {
 
-  for my $static_field (@{$scol_data}) {
-
-    my $field_name = $static_field->{'Name'};
-    
-    if ($skip_field->{$field_name}) { next; }
-
-    if ($static_field->{'Required'} == 1) {
-
-      $required_field_href->{$field_name} = $query->param($field_name);
-    }
-  }
-
-  $dbh_read->disconnect();
-
-  my ($missing_err, $missing_href) = check_missing_href( $required_field_href );
-
-  if ($missing_err) {
-
+    my $err_msg = "UnitName ($unit_name) already exists.";
     $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'UnitName' => $err_msg}]};
 
     return $data_for_postrun_href;
   }
 
-  # Finish generic required static field checking
-  
-  my $unit_id           = $self->param('id');
-  my $unit_name         = $query->param('ItemUnitName');
-  my $unit_gram_con_mul = $query->param('GramsConversionMultiplier');
+  if (!record_existence( $dbh_k_read, 'generalunit', 'UnitId', $unit_id )) {
 
-  my $dbh_k_read = connect_kdb_read();
-
-  if (!record_existence( $dbh_k_read, 'itemunit', 'ItemUnitId', $unit_id )) {
-
-    my $err_msg = "ItemUnit ($unit_id): not found.";
+    my $err_msg = "Unit ($unit_id): not found.";
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
     return $data_for_postrun_href;
   }
 
-  my $unit_type_id = read_cell_value($dbh_k_read, 'itemunit', 'UnitTypeId', 'ItemUnitId', $unit_id);
+  my $unit_type_id = read_cell_value($dbh_k_read, 'generalunit', 'UnitTypeId', 'UnitId', $unit_id);
+
+  if (length($unit_type_id) == 0) {
+
+    $unit_type_id = undef;
+  }
 
   if (defined $query->param('UnitTypeId')) {
 
@@ -1891,46 +2137,69 @@ sub update_item_unit_runmode {
         return $data_for_postrun_href;
       }
     }
-    else {
+  }
 
-      $unit_type_id = undef;
+  my $unit_note = read_cell_value($dbh_k_read, 'generalunit', 'UnitNote', 'UnitId', $unit_id);
+
+  if (length($unit_note) == 0) {
+
+    $unit_note = undef;
+  }
+
+  if (defined $query->param('UnitNote')) {
+
+    if (length($query->param('UnitNote')) > 0) {
+
+      $unit_note = $query->param('UnitNote');
     }
   }
 
-  my $unit_note = read_cell_value($dbh_k_read, 'itemunit', 'ItemUnitNote', 'ItemUnitId', $unit_id);
+  my $unit_src = read_cell_value($dbh_k_read, 'generalunit', 'UnitSource', 'UnitId', $unit_id);
 
-  if (defined $query->param('ItemUnitNote')) {
-    
-    $unit_note = $query->param('ItemUnitNote');
+  if (length($unit_src) == 0) {
+
+    $unit_src = undef;
+  }
+
+  if (defined $query->param('UnitSource')) {
+
+    if (length($query->param('UnitSource')) > 0) {
+
+      $unit_src = $query->param('UnitSource');
+    }
   }
 
   $dbh_k_read->disconnect();
 
   my $dbh_k_write = connect_kdb_write();
-  
-  my $insert_statement = "
-        UPDATE itemunit SET
-            UnitTypeId=?,
-            ItemUnitName=?,
-            GramsConversionMultiplier=?,
-            ItemUnitNote=?
-        WHERE ItemUnitId=?
-    ";
 
-  my $sth = $dbh_k_write->prepare($insert_statement);
-  $sth->execute( $unit_type_id, $unit_name, $unit_gram_con_mul, $unit_note, $unit_id );
-  
+  $sql    = "UPDATE generalunit SET ";
+  $sql   .= "UnitTypeId=?, ";
+  $sql   .= "UnitName=?, ";
+  $sql   .= "UnitNote=?, ";
+  $sql   .= "UnitSource=?, ";
+  $sql   .= "UseByItem=?, ";
+  $sql   .= "UseByTrait=?, ";
+  $sql   .= "UseByTrialEvent=?, ";
+  $sql   .= "UseBylayerattrib=? ";
+  $sql   .= "WHERE UnitId=?";
+
+  my $sth = $dbh_k_write->prepare($sql);
+  $sth->execute( $unit_type_id, $unit_name, $unit_note, $unit_src,
+                 $use_by_item, $use_by_trait, $use_by_trial_event, $use_by_layerattrib,
+                 $unit_id );
+
   if ( $dbh_k_write->err() ) {
 
     return $self->_set_error();
   }
 
-  $self->logger->debug("ItemUnitId: $unit_id updated");
+  $self->logger->debug("UnitId: $unit_id updated");
   $sth->finish();
   $dbh_k_write->disconnect();
-  
-  my $info_msg_aref = [ { 'Message' => "Item unit ($unit_id) has been successfully updated." } ];
-  
+
+  my $info_msg_aref = [ { 'Message' => "Unit ($unit_id) has been successfully updated." } ];
+
   return {
     'Error'     => 0,
     'Data'      => { 'Info' => $info_msg_aref, },
@@ -1938,62 +2207,97 @@ sub update_item_unit_runmode {
   };
 }
 
-sub del_item_unit_runmode {
+sub del_general_unit_runmode {
 
-=pod del_itemunit_gadmin_HELP_START
+=pod del_generalunit_gadmin_HELP_START
 {
-"OperationName" : "Delete measurement unit",
-"Description": "Delete a measurement unit definition from a system. Unit definition can be deleted only if not attached to any lower level related record.",
+"OperationName" : "Delete unit",
+"Description": "Delete a unit definition from a system. Unit definition can be deleted only if not attached to any lower level related record.",
 "AuthRequired": 1,
 "GroupRequired": 1,
 "GroupAdminRequired": 1,
 "SignatureRequired": 1,
 "AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='Item unit (21) has been successfully deleted.' /></DATA>",
-"SuccessMessageJSON": "{'Info' : [{'Message' : 'Item unit (22) has been successfully deleted.'}]}",
-"ErrorMessageXML": [{"IdUsed": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='ItemUnitId (20): is used in Item.' /></DATA>"}],
-"ErrorMessageJSON": [{"IdUsed": "{'Error' : [{'Message' : 'ItemUnitId (20): is used in Item.'}]}"}],
-"URLParameter": [{"ParameterName": "id", "Description": "Existing ItemUnitId."}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='Unit (27) has been successfully deleted.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'Unit (29) has been successfully deleted.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unit (72): not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Unit (72): not found.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing UnitId."}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
 
   my ($self) = @_;
 
+  my $data_for_postrun_href = {};
+
   my $unit_id = $self->param('id');
 
-  my $dbh_k_read = connect_kdb_read();
+  my $dbh_k_read   = connect_kdb_read();
 
-  my $is_unit_id_exist = record_existence( $dbh_k_read, 'itemunit', 'ItemUnitId', $unit_id );
+  my $dbh_gis_read = connect_gis_read();
+
+  my $is_unit_id_exist = record_existence( $dbh_k_read, 'generalunit', 'UnitId', $unit_id );
 
   if ( !$is_unit_id_exist ) {
 
-    return $self->_set_error("ItemUnitId ($unit_id): not found.");
+    return $self->_set_error("UnitId ($unit_id): not found.");
   }
 
-  my $is_unit_attached_to_item = record_existence( $dbh_k_read, 'item', 'ItemUnitId', $unit_id );
+  my $is_unit_attached_to_item = record_existence( $dbh_k_read, 'item', 'UnitId', $unit_id );
 
   if ($is_unit_attached_to_item) {
-    
-    return $self->_set_error("ItemUnitId ($unit_id): is used in Item.");
+
+    return $self->_set_error("UnitId ($unit_id): is used in item.");
   }
+
+  if (record_existence($dbh_k_read, 'trait', 'UnitId', $unit_id)) {
+
+    my $err_msg = "Unit ($unit_id): is used in trait.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (record_existence($dbh_k_read, 'trialevent', 'UnitId', $unit_id)) {
+
+    my $err_msg = "Unit ($unit_id): is used in trialevent.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (record_existence($dbh_gis_read, 'layerattrib', 'unitid', $unit_id)) {
+
+    my $err_msg = "Unit ($unit_id): is used in layerattrib.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh_gis_read->disconnect();
+
+  $dbh_k_read->disconnect();
 
   my $dbh_k_write = connect_kdb_write();
 
-  my $insert_statement = "DELETE FROM itemunit WHERE ItemUnitId=?";
+  my $insert_statement = "DELETE FROM generalunit WHERE UnitId=?";
   my $sth              = $dbh_k_write->prepare($insert_statement);
   $sth->execute($unit_id);
-  
+
   if ( $dbh_k_write->err() ) {
 
     return $self->_set_error();
   }
-  
-  $self->logger->debug("ItemUnitId: $unit_id deleted");
+
+  $self->logger->debug("UnitId: $unit_id deleted");
   $sth->finish();
   $dbh_k_write->disconnect();
-  
-  my $info_msg_aref = [ { 'Message' => "Item unit ($unit_id) has been successfully deleted." } ];
+
+  my $info_msg_aref = [ { 'Message' => "Unit ($unit_id) has been successfully deleted." } ];
 
   return {
     'Error'     => 0,
@@ -2016,21 +2320,21 @@ sub list_item_advanced_runmode {
 "GroupAdminRequired": 0,
 "SignatureRequired": 0,
 "AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "FILTERING"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Pagination NumOfRecords='33' NumOfPages='33' Page='1' NumPerPage='1' /><Item DateAdded='2014-08-06 16:48:18' ItemId='33' ItemState='Seed - 7849516' AddedByUserId='0' ItemTypeId='157' TrialUnitSpecimenId='0' ContainerTypeId='155' ItemStateId='158' ItemNote='' SpecimenId='490' ScaleId='18' ItemOperation='group' addParent='item/33/add/parent' SpecimenName='Specimen_7549386' DeviceNote='' LastMeasuredUserId='0' ItemBarcode='I_6817763' ItemUnitId='20' StorageId='12' ItemSource='Add Item' StorageLocation='Non existing' ItemUnitName='U_2354147' Amount='5.000' ItemType='Seed - 7849516' ItemSourceId='34' LastMeasuredDate='2012-08-01 00:00:00' AddedByUser='admin' update='update/item/33'><ItemGroup ItemGroupName='ITM_GRP2763864' ItemGroupId='14' /></Item><RecordMeta TagName='Item' /></DATA>",
-"SuccessMessageJSON": "{'Pagination' : [{'NumOfRecords' : '33', 'NumOfPages' : 33, 'NumPerPage' : '1', 'Page' : '1'}], 'VCol' : [], 'Item' : [{'ItemGroup' : [{'ItemGroupName' : 'ITM_GRP2763864', 'ItemGroupId' : '14'}], 'DateAdded' : '2014-08-06 16:48:18', 'ItemId' : '33', 'ItemState' : 'Seed - 7849516', 'AddedByUserId' : '0', 'TrialUnitSpecimenId' : '0', 'ItemTypeId' : '157', 'ContainerTypeId' : '155', 'ItemStateId' : '158', 'ItemNote' : '', 'ScaleId' : '18', 'SpecimenId' : '490', 'addParent' : 'item/33/add/parent', 'SpecimenName' : 'Specimen_7549386', 'DeviceNote' : '', 'LastMeasuredUserId' : '0', 'ItemBarcode' : 'I_6817763', 'ItemOperation' : 'group', 'ItemUnitId' : '20', 'StorageId' : '12', 'ItemSource' : 'Add Item', 'StorageLocation' : 'Non existing', 'ItemUnitName' : 'U_2354147', 'Amount' : '5.000', 'LastMeasuredDate' : '2012-08-01 00:00:00', 'ItemSourceId' : '34', 'ItemType' : 'Seed - 7849516', 'AddedByUser' : 'admin', 'update' : 'update/item/33'}], 'RecordMeta' : [{'TagName' : 'Item'}]}",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Pagination NumOfRecords='20' NumOfPages='20' Page='1' NumPerPage='1' /><Item DateAdded='2015-09-29 16:39:50' ItemId='20' ItemState='Seed - 0990613' AddedByUserId='0' ItemTypeId='134' TrialUnitSpecimenId='' ContainerTypeId='132' ItemNote='' ItemStateId='135' SpecimenId='30' ScaleId='12' LastMeasuredUserId='0' addParent='item/20/add/parent' DeviceNote='' SpecimenName='Specimen_5478572' ItemOperation='group' ItemBarcode='I_6356286' StorageId='6' ItemSource='Add Item' UnitId='11' StorageLocation='Non existing' Amount='5.000' ItemSourceId='12' LastMeasuredDate='2015-09-29 16:39:50' ItemType='Seed - 0990613' UnitName='U_1442236' AddedByUser='admin' delete='delete/item/20' update='update/item/20' /><RecordMeta TagName='Item' /></DATA>",
+"SuccessMessageJSON": "{'Pagination' : [{'NumOfRecords' : '20', 'NumOfPages' : 20, 'NumPerPage' : '1', 'Page' : '1'}], 'VCol' : [], 'Item' : [{'DateAdded' : '2015-09-29 16:39:50', 'ItemId' : '20', 'ItemState' : 'Seed - 0990613', 'AddedByUserId' : '0', 'TrialUnitSpecimenId' : null, 'ItemTypeId' : '134', 'ContainerTypeId' : '132', 'ItemNote' : '', 'ItemStateId' : '135', 'ScaleId' : '12', 'SpecimenId' : '30', 'addParent' : 'item/20/add/parent', 'DeviceNote' : '', 'SpecimenName' : 'Specimen_5478572', 'ItemOperation' : 'group', 'ItemBarcode' : 'I_6356286', 'LastMeasuredUserId' : '0', 'StorageId' : '6', 'ItemSource' : 'Add Item', 'UnitId' : '11', 'StorageLocation' : 'Non existing', 'Amount' : '5.000', 'UnitName' : 'U_1442236', 'ItemType' : 'Seed - 0990613', 'LastMeasuredDate' : '2015-09-29 16:39:50', 'ItemSourceId' : '12', 'delete' : 'delete/item/20', 'AddedByUser' : 'admin', 'update' : 'update/item/20'}], 'RecordMeta' : [{'TagName' : 'Item'}]}",
 "ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
 "ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
 "URLParameter": [{"ParameterName": "nperpage", "Description": "Number of records in a page for pagination"}, {"ParameterName": "num", "Description": "The page number of the pagination"}],
-"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database filed name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "FieldList", "Description": "Comma separated value of wanted fields."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases."}],
+"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database field name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "FieldList", "Description": "Comma separated value of wanted fields."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases."}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
 
   my ($self) = @_;
-  
+
   my $query = $self->query();
   my $dbh   = connect_kdb_read();
-  
+
   my $pagination  = 0;
   my $nb_per_page = -1;
   my $page        = -1;
@@ -2043,35 +2347,65 @@ sub list_item_advanced_runmode {
   }
 
   $self->logger->debug("Page number: $page");
-  
+
   my $field_list_csv = $query->param('FieldList') ? $query->param('FieldList') : '';
   my $filtering_csv  = $query->param('Filtering') ? $query->param('Filtering') : '';
   my $sorting        = $query->param('Sorting')   ? $query->param('Sorting')   : '';
-  
+
   my $field_list = [ 'item.*', 'VCol*' ];
   my ( $vcol_err, $trouble_vcol, $sql, $vcol_list ) = generate_factor_sql( $dbh, $field_list,
                                                                            'item', 'ItemId', '' );
 
   return $self->_set_error("Problem with virtual column ($trouble_vcol) containing space.") if $vcol_err;
-  
+
   $sql .= " LIMIT 1";
 
   $self->logger->debug("SQL with VCol: $sql");
-  
-  my ($samp_itm_d_err, $samp_itm_d_msg, $item_data) = $self->list_item(0, $sql);
-  
-  my @field_list_all   = keys( %{ $item_data->[0] } );
 
-  # no field return, it means no record. error prevention
-  if (scalar(@field_list_all) == 0) {
-    
-    push(@field_list_all, '*');
+  my ($samp_itm_d_err, $samp_itm_d_msg, $item_data) = $self->list_item(0, $sql);
+
+  if ($samp_itm_d_err) {
+
+    $self->logger->debug("Retrieve sample item data failed: $samp_itm_d_msg");
+    return $self->_set_error();
   }
+
+  my $sample_data_aref = $item_data;
+
+  my @field_list_all;
+
+  if (scalar(@{$sample_data_aref}) == 1) {
+
+    @field_list_all = keys(%{$sample_data_aref->[0]});
+  }
+  else {
+
+    $self->logger->debug("It reaches here");
+    my ($sfield_err, $sfield_msg, $sfield_data, $pkey_data) = get_static_field($dbh, 'item');
+
+    if ($sfield_err) {
+
+      $self->logger->debug("Get static field failed: $sfield_msg");
+      return $self->_set_error();
+    }
+
+    for my $sfield_rec (@{$sfield_data}) {
+
+      push(@field_list_all, $sfield_rec->{'Name'});
+    }
+
+    for my $pkey_field (@{$pkey_data}) {
+
+      push(@field_list_all, $pkey_field);
+    }
+  }
+
+  $self->logger->debug("Field list all: " . join(',', @field_list_all));
 
   my $final_field_list = \@field_list_all;
 
   $self->logger->debug("Final field list: " . join(',', @{$final_field_list}));
-  
+
   if ( length($field_list_csv) > 0 ) {
 
     my ( $sel_field_err, $sel_field_msg, $sel_field_list ) = parse_selected_field( $field_list_csv,
@@ -2095,10 +2429,10 @@ sub list_item_advanced_runmode {
         push( @{$final_field_list}, 'CONCAT(contact.ContactFirstName, " ", contact.ContactLastName) AS ItemSource' );
         $join .= ' LEFT JOIN contact ON contact.ContactId = item.ItemSourceId ';
       }
-      when (/^ItemUnitId$/i) {
+      when (/^UnitId$/i) {
 
-        push( @{$final_field_list}, 'itemunit.ItemUnitName' );
-        $join .= ' LEFT JOIN itemunit ON itemunit.ItemUnitId = item.ItemUnitId ';
+        push( @{$final_field_list}, 'generalunit.UnitName' );
+        $join .= ' LEFT JOIN generalunit ON generalunit.UnitId = item.UnitId ';
       }
       when (/^SpecimenId$/i) {
 
@@ -2239,8 +2573,8 @@ sub get_item_runmode {
 "GroupAdminRequired": 0,
 "SignatureRequired": 0,
 "AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Item DateAdded='2014-07-01 13:16:02' ItemId='1' ItemState='Seed - 3592281' AddedByUserId='0' ItemTypeId='34' TrialUnitSpecimenId='0' ContainerTypeId='32' ItemNote='Testing' ItemStateId='35' DeviceId='' ScaleId='2' SpecimenId='13' ItemBarcode='I_6498409' addParent='item/1/add/parent' SpecimenName='Specimen_7681379' ItemOperation='group' LastMeasuredUserId='0' ItemUnitId='3' StorageId='1' ItemSource='Add Item' StorageLocation='Non existing' ItemUnitName='U_1281774' Amount='50.000' ItemType='Seed - 3592281' LastMeasuredDate='2012-08-01 00:00:00' ItemSourceId='7' AddedByUser='admin' delete='delete/item/1' update='update/item/1' /><RecordMeta TagName='Item' /></DATA>",
-"SuccessMessageJSON": "{'VCol' : [], 'Item' : [{'DateAdded' : '2014-07-01 13:16:02', 'ItemId' : '1', 'ItemState' : 'Seed - 3592281', 'AddedByUserId' : '0', 'TrialUnitSpecimenId' : '0', 'ItemTypeId' : '34', 'ContainerTypeId' : '32', 'ItemNote' : 'Testing', 'ItemStateId' : '35', 'DeviceId' : null, 'SpecimenId' : '13', 'ScaleId' : '2', 'addParent' : 'item/1/add/parent', 'SpecimenName' : 'Specimen_7681379', 'ItemOperation' : 'group', 'LastMeasuredUserId' : '0', 'ItemBarcode' : 'I_6498409', 'ItemUnitId' : '3', 'StorageId' : '1', 'ItemSource' : 'Add Item', 'StorageLocation' : 'Non existing', 'ItemUnitName' : 'U_1281774', 'Amount' : '50.000', 'ItemSourceId' : '7', 'LastMeasuredDate' : '2012-08-01 00:00:00', 'ItemType' : 'Seed - 3592281', 'delete' : 'delete/item/1', 'AddedByUser' : 'admin', 'update' : 'update/item/1'}], 'RecordMeta' : [{'TagName' : 'Item'}]}",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Item DateAdded='2014-07-01 13:16:02' ItemId='1' ItemState='Seed - 3592281' AddedByUserId='0' ItemTypeId='34' TrialUnitSpecimenId='0' ContainerTypeId='32' ItemNote='Testing' ItemStateId='35' DeviceId='' ScaleId='2' SpecimenId='13' ItemBarcode='I_6498409' addParent='item/1/add/parent' SpecimenName='Specimen_7681379' ItemOperation='group' LastMeasuredUserId='0' UnitId='3' StorageId='1' ItemSource='Add Item' StorageLocation='Non existing' ItemUnitName='U_1281774' Amount='50.000' ItemType='Seed - 3592281' LastMeasuredDate='2012-08-01 00:00:00' ItemSourceId='7' AddedByUser='admin' delete='delete/item/1' update='update/item/1' /><RecordMeta TagName='Item' /></DATA>",
+"SuccessMessageJSON": "{'VCol' : [], 'Item' : [{'DateAdded' : '2014-07-01 13:16:02', 'ItemId' : '1', 'ItemState' : 'Seed - 3592281', 'AddedByUserId' : '0', 'TrialUnitSpecimenId' : '0', 'ItemTypeId' : '34', 'ContainerTypeId' : '32', 'ItemNote' : 'Testing', 'ItemStateId' : '35', 'DeviceId' : null, 'SpecimenId' : '13', 'ScaleId' : '2', 'addParent' : 'item/1/add/parent', 'SpecimenName' : 'Specimen_7681379', 'ItemOperation' : 'group', 'LastMeasuredUserId' : '0', 'ItemBarcode' : 'I_6498409', 'UnitId' : '3', 'StorageId' : '1', 'ItemSource' : 'Add Item', 'StorageLocation' : 'Non existing', 'ItemUnitName' : 'U_1281774', 'Amount' : '50.000', 'ItemSourceId' : '7', 'LastMeasuredDate' : '2012-08-01 00:00:00', 'ItemType' : 'Seed - 3592281', 'delete' : 'delete/item/1', 'AddedByUser' : 'admin', 'update' : 'update/item/1'}], 'RecordMeta' : [{'TagName' : 'Item'}]}",
 "ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='ItemId (45) not found.' /></DATA>"}],
 "ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'ItemId (45) not found.'}]}"}],
 "URLParameter": [{"ParameterName": "id", "Description": "Existing ItemId"}],
@@ -2261,7 +2595,7 @@ sub get_item_runmode {
 
   my $field_list = [ 'item.*', 'VCol*',
                      'CONCAT(contact.ContactFirstName, " ", contact.ContactLastName) AS ItemSource',
-                     'itemunit.ItemUnitName',
+                     'generalunit.UnitName',
                      'specimen.SpecimenName',
                      'storage.StorageLocation',
                      'generaltype.TypeName as ItemType',
@@ -2270,13 +2604,13 @@ sub get_item_runmode {
                      'systemuser.UserName as AddedByUser'
       ];
   my $other_join = ' LEFT JOIN contact ON contact.ContactId = item.ItemSourceId';
-  $other_join   .= ' LEFT JOIN itemunit ON itemunit.ItemUnitId = item.ItemUnitId';
+  $other_join   .= ' LEFT JOIN generalunit ON generalunit.UnitId = item.UnitId';
   $other_join   .= ' LEFT JOIN specimen ON specimen.SpecimenId = item.SpecimenId';
   $other_join   .= ' LEFT JOIN storage ON storage.StorageId = item.StorageId';
   $other_join   .= ' LEFT JOIN generaltype ON generaltype.TypeId = item.ItemTypeId';
   $other_join   .= ' LEFT JOIN deviceregister ON deviceregister.DeviceRegisterId = item.ScaleId';
   $other_join   .= ' LEFT JOIN systemuser ON systemuser.UserId = item.AddedByUserId';
-  
+
   my ( $vcol_err, $trouble_vcol, $sql, $vcol_list ) = generate_factor_sql( $dbh, $field_list, 'item',
                                                                            'ItemId', $other_join );
 
@@ -2427,25 +2761,45 @@ sub add_item_runmode {
 
   my $data_for_postrun_href = {};
 
-  my $item_specimen        = $query->param('SpecimenId');
-  my $item_type            = $query->param('ItemTypeId');
-  my $item_barcode         = $query->param('ItemBarcode');
+  # Generic required static field checking
 
-  # Check for the required field
-  my ( $missing_err, $missing_href ) = check_missing_href( { 'SpecimenId'      => $item_specimen,
-                                                             'ItemTypeId'      => $item_type,
-                                                             'ItemBarcode'     => $item_barcode,
-                                                           } );
+  my $dbh_read = connect_kdb_read();
 
-  if ($missing_err) {
-    
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
+  my $skip_field = {'DateAdded'     => 1,
+                    'AddedByUserId' => 1,
+                   };
 
-    return $data_for_postrun_href;
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'item', $skip_field);
+
+  if ($chk_sfield_err) {
+
+    $self->logger->debug($chk_sfield_msg);
+
+    return $for_postrun_href;
   }
 
-  my $trial_unit_spec_id   = '0';
+  $dbh_read->disconnect();
+
+  # Finish generic required static field checking
+
+  my $cur_dt = DateTime->now( time_zone => $TIMEZONE );
+  $cur_dt = DateTime::Format::MySQL->format_datetime($cur_dt);
+
+  my $item_specimen        = $query->param('SpecimenId');
+  my $item_type            = $query->param('ItemTypeId');
+
+  my $item_barcode         = undef;
+
+  if (defined $query->param('ItemBarcode')) {
+
+    if (length($query->param('ItemBarcode')) > 0) {
+
+      $item_barcode = $query->param('ItemBarcode');
+    }
+  }
+
+  my $trial_unit_spec_id   = undef;
 
   if (defined $query->param('TrialUnitSpecimenId')) {
 
@@ -2455,7 +2809,7 @@ sub add_item_runmode {
     }
   }
 
-  my $item_source          = '0';
+  my $item_source          = undef;
 
   if (defined $query->param('ItemSourceId')) {
 
@@ -2465,7 +2819,7 @@ sub add_item_runmode {
     }
   }
 
-  my $item_container_type  = '0';
+  my $item_container_type  = undef;
 
   if (defined $query->param('ContainerTypeId')) {
 
@@ -2475,7 +2829,7 @@ sub add_item_runmode {
     }
   }
 
-  my $item_scale           = '0';
+  my $item_scale           = undef;
 
   if (defined $query->param('ScaleId')) {
 
@@ -2485,8 +2839,8 @@ sub add_item_runmode {
     }
   }
 
-  my $item_storage         = '0';
-  
+  my $item_storage         = undef;
+
   if (defined $query->param('StorageId')) {
 
     if (length($query->param('StorageId')) > 0) {
@@ -2495,17 +2849,17 @@ sub add_item_runmode {
     }
   }
 
-  my $item_unit            = '0';
+  my $item_unit            = undef;
 
-  if (defined $query->param('ItemUnitId')) {
+  if (defined $query->param('UnitId')) {
 
-    if (length($query->param('ItemUnitId')) > 0) {
+    if (length($query->param('UnitId')) > 0) {
 
-      $item_unit = $query->param('ItemUnitId');
+      $item_unit = $query->param('UnitId');
     }
   }
-  
-  my $item_state           = '0';
+
+  my $item_state           = undef;
 
   if (defined $query->param('ItemStateId')) {
 
@@ -2514,7 +2868,7 @@ sub add_item_runmode {
       $item_state = $query->param('ItemStateId');
     }
   }
-  
+
   my $item_amount          = '0';
 
   if (defined $query->param('Amount')) {
@@ -2524,8 +2878,8 @@ sub add_item_runmode {
       $item_amount = $query->param('Amount');
     }
   }
-  
-  my $item_measure_date    = '';
+
+  my $item_measure_date    = $cur_dt;
 
   if (defined $query->param('LastMeasuredDate')) {
 
@@ -2556,20 +2910,36 @@ sub add_item_runmode {
     $item_note = $query->param('ItemNote');
   }
 
-  my $cur_dt = DateTime->now( time_zone => $TIMEZONE );
-  $cur_dt = DateTime::Format::MySQL->format_datetime($cur_dt);
-  
   my $item_added_date      = $cur_dt;
+
+  if (defined $query->param('DateAdded')) {
+
+    if (length($query->param('DateAdded')) > 0) {
+
+      $item_added_date = $query->param('DateAdded');
+
+      my ( $mdt_err, $mdt_href ) = check_dt_href( { 'DateAdded' => $item_added_date } );
+
+      if ($mdt_err) {
+
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [$mdt_href]};
+
+        return $data_for_postrun_href;
+      }
+    }
+  }
+
   my $item_added_by_user   = $self->authen->user_id();
 
   my $dbh_k_write = connect_kdb_write();
 
-  if ($trial_unit_spec_id ne '0') {
+  if (defined $trial_unit_spec_id) {
 
     if (!record_existence($dbh_k_write, 'trialunitspecimen', 'TrialUnitSpecimenId', $trial_unit_spec_id)) {
 
       my $err_msg = "TrialUnitSpecimen ($trial_unit_spec_id): not found.";
-    
+
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'TrialUnitSpecimenId' => $err_msg}]};
 
@@ -2577,12 +2947,12 @@ sub add_item_runmode {
     }
   }
 
-  if ($item_source ne '0') {
+  if (defined $item_source) {
 
     if (!record_existence($dbh_k_write, 'contact', 'ContactId', $item_source)) {
 
       my $err_msg = "ItemSource ($item_source): not found.";
-    
+
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'ItemSourceId' => $err_msg}]};
 
@@ -2590,19 +2960,19 @@ sub add_item_runmode {
     }
   }
 
-  if ($item_container_type ne '0') {
+  if (defined $item_container_type) {
 
     if (!type_existence($dbh_k_write, 'container', $item_container_type)) {
 
       my $err_msg = "ContainerTypeId ($item_container_type): not found or inactive.";
-    
+
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'ContainerTypeId' => $err_msg}]};
 
       return $data_for_postrun_href;
     }
   }
-  
+
   if (!record_existence($dbh_k_write, 'specimen', 'SpecimenId', $item_specimen)) {
 
     my $err_msg = "Specimen ($item_specimen): not found.";
@@ -2612,7 +2982,7 @@ sub add_item_runmode {
     return $data_for_postrun_href;
   }
 
-  if ($item_scale ne '0') {
+  if (defined $item_scale) {
 
     if (!record_existence($dbh_k_write, 'deviceregister', 'DeviceRegisterId', $item_scale)) {
 
@@ -2624,7 +2994,7 @@ sub add_item_runmode {
     }
   }
 
-  if ($item_storage ne '0') {
+  if (defined $item_storage) {
 
     if (!record_existence($dbh_k_write, 'storage', 'StorageId', $item_storage)) {
 
@@ -2636,13 +3006,13 @@ sub add_item_runmode {
     }
   }
 
-  if ($item_unit ne '0') {
+  if (defined $item_unit) {
 
-    if (!record_existence($dbh_k_write, 'itemunit', 'ItemUnitId', $item_unit)) {
+    if (!record_existence($dbh_k_write, 'generalunit', 'UnitId', $item_unit)) {
 
-      my $err_msg = "ItemUnitId ($item_unit): not found.";
+      my $err_msg = "UnitId ($item_unit): not found.";
       $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'ItemUnitId' => $err_msg}]};
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'UnitId' => $err_msg}]};
 
       return $data_for_postrun_href;
     }
@@ -2657,7 +3027,7 @@ sub add_item_runmode {
     return $data_for_postrun_href;
   }
 
-  if ($item_state ne '0') {
+  if (defined $item_state) {
 
     if (!type_existence($dbh_k_write, 'state', $item_state)) {
 
@@ -2669,7 +3039,7 @@ sub add_item_runmode {
     }
   }
 
-  if ($item_barcode ne '0') {
+  if (defined $item_barcode) {
 
     if (record_existence($dbh_k_write, 'item', 'ItemBarcode', $item_barcode)) {
 
@@ -2679,10 +3049,6 @@ sub add_item_runmode {
 
       return $data_for_postrun_href;
     }
-  }
-  else {
-
-    $item_barcode = undef;
   }
 
   if ($item_amount ne '0') {
@@ -2701,7 +3067,7 @@ sub add_item_runmode {
   if (length($item_measure_date) > 0) {
 
     my ( $mdt_err, $mdt_href ) = check_dt_href( { 'LastMeasuredDate' => $item_measure_date } );
-    
+
     if ($mdt_err) {
 
       $data_for_postrun_href->{'Error'} = 1;
@@ -2709,10 +3075,6 @@ sub add_item_runmode {
 
       return $data_for_postrun_href;
     }
-  }
-  else {
-
-    $item_measure_date = undef;
   }
 
   if ($item_measure_by_user ne '-1') {
@@ -2739,7 +3101,7 @@ sub add_item_runmode {
       return $data_for_postrun_href;
     }
   }
-  
+
   # Get the virtual col from the factor table
   my $vcol_data              = $self->_get_item_factor();
   my $vcol_param_data        = {};
@@ -2757,7 +3119,7 @@ sub add_item_runmode {
     $vcol_len_info->{$vcol_param_name}          = $vcol_data->{$vcol_id}->{'FactorValueMaxLength'};
     $vcol_param_data_maxlen->{$vcol_param_name} = $vcol_value;
   }
-  
+
   # Validate virtual column for factor
   my ( $vcol_missing_err, $vcol_missing_href ) = check_missing_href($vcol_param_data);
 
@@ -2817,14 +3179,14 @@ sub add_item_runmode {
   }
 
   if (scalar(@{$geno_data}) != scalar(@{$geno_p_data_perm})) {
-      
+
     my $err_msg = "SpecimenId ($item_specimen): permission denied.";
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{"SpecimenId" => $err_msg}]};
 
     return $data_for_postrun_href;
   }
-  
+
   my $insert_statement = "
         INSERT into item SET
             TrialUnitSpecimenId=?,
@@ -2833,7 +3195,7 @@ sub add_item_runmode {
             SpecimenId=?,
             ScaleId=?,
             StorageId=?,
-            ItemUnitId=?,
+            UnitId=?,
             ItemTypeId=?,
             ItemStateId=?,
             ItemBarcode=?,
@@ -2852,7 +3214,7 @@ sub add_item_runmode {
                  $item_added_date, $item_added_by_user, $item_measure_date, $item_measure_by_user,
                  $item_operation, $item_note
       );
-  
+
   if ( $dbh_k_write->err() ) {
 
     my $err_msg = "Unexpected Error.";
@@ -2861,13 +3223,13 @@ sub add_item_runmode {
 
     return $data_for_postrun_href;
   }
-  
+
   my $item_id = $dbh_k_write->last_insert_id( undef, undef, 'item', 'ItemId' )
       || -1;
   $self->logger->debug("ItemId: $item_id");
   $sth->finish();
   $dbh_k_write->disconnect();
-  
+
   my $success = $self->_add_factor( $item_id, $vcol_data );
   if ( !$success ) {
 
@@ -2909,40 +3271,56 @@ sub update_item_runmode {
 "ErrorMessageXML": [{"MissingParameter": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error ItemBarcode='ItemBarcode is missing.' /></DATA>"}],
 "ErrorMessageJSON": [{"MissingParameter": "{'Error' : [{'ItemBarcode' : 'ItemBarcode is missing.'}]}"}],
 "URLParameter": [{"ParameterName": "id", "Description": "Existing ItemId"}],
+"HTTPParameter": [{"ParameterName": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database field name, a filtering operator and the filtering value.", "Required": "0"}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
 
   my ($self) = @_;
-  
+
   my $item_id = $self->param('id');
-  
+
   my $query                = $self->query();
 
+  my $filtering_csv = '';
+
+  if (defined $query->param('Filtering')) {
+
+    $filtering_csv = $query->param('Filtering');
+  }
+
   my $data_for_postrun_href = {};
+
+  # Generic required static field checking
+
+  my $dbh_read = connect_kdb_read();
+
+  my $skip_field = {'DateAdded'     => 1,
+                    'AddedByUserId' => 1,
+                   };
+
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'item', $skip_field);
+
+  if ($chk_sfield_err) {
+
+    $self->logger->debug($chk_sfield_msg);
+
+    return $for_postrun_href;
+  }
+
+  $dbh_read->disconnect();
+
+  # Finish generic required static field checking
 
   my $item_specimen        = $query->param('SpecimenId');
   my $item_type            = $query->param('ItemTypeId');
   my $item_barcode         = $query->param('ItemBarcode');
 
-  # Check for the required field
-  my ( $missing_err, $missing_href ) = check_missing_href( { 'SpecimenId'      => $item_specimen,
-                                                             'ItemTypeId'      => $item_type,
-                                                             'ItemBarcode'     => $item_barcode,
-                                                           } );
-
-  if ($missing_err) {
-    
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
-
-    return $data_for_postrun_href;
-  }
-
   my $dbh_k_write = connect_kdb_write();
 
   if (!record_existence($dbh_k_write, 'item', 'ItemId', $item_id)) {
-    
+
     my $err_msg = "Item ($item_id): not found.";
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
@@ -2952,6 +3330,11 @@ sub update_item_runmode {
 
   my $trial_unit_spec_id = read_cell_value($dbh_k_write, 'item', 'TrialUnitSpecimenId', 'ItemId', $item_id);
 
+  if (length($trial_unit_spec_id) == 0) {
+
+    $trial_unit_spec_id = undef;
+  }
+
   if (defined $query->param('TrialUnitSpecimenId')) {
 
     if (length($query->param('TrialUnitSpecimenId')) > 0) {
@@ -2960,12 +3343,12 @@ sub update_item_runmode {
     }
   }
 
-  if (length($trial_unit_spec_id) == 0) {
-
-    $trial_unit_spec_id = '0';
-  }
-
   my $item_source          = read_cell_value($dbh_k_write, 'item', 'ItemSourceId', 'ItemId', $item_id);
+
+  if (length($item_source) == 0) {
+
+    $item_source = undef;
+  }
 
   if (defined $query->param('ItemSourceId')) {
 
@@ -2982,6 +3365,11 @@ sub update_item_runmode {
 
   my $item_container_type  = read_cell_value($dbh_k_write, 'item', 'ContainerTypeId', 'ItemId', $item_id);
 
+  if (length($item_container_type) == 0) {
+
+    $item_container_type = undef;
+  }
+
   if (defined $query->param('ContainerTypeId')) {
 
     if (length($query->param('ContainerTypeId')) > 0) {
@@ -2990,12 +3378,12 @@ sub update_item_runmode {
     }
   }
 
-  if (length($item_container_type) == 0) {
-
-    $item_container_type = '0';
-  }
-
   my $item_scale = read_cell_value($dbh_k_write, 'item', 'ScaleId', 'ItemId', $item_id);
+
+  if (length($item_scale) == 0) {
+
+    $item_scale = undef;
+  }
 
   if (defined $query->param('ScaleId')) {
 
@@ -3005,13 +3393,13 @@ sub update_item_runmode {
     }
   }
 
-  if (length($item_scale) == 0) {
+  my $item_storage = read_cell_value($dbh_k_write, 'item', 'StorageId', 'ItemId', $item_id);
 
-    $item_scale = '0';
+  if (length($item_storage) == 0) {
+
+    $item_storage = undef;
   }
 
-  my $item_storage = read_cell_value($dbh_k_write, 'item', 'StorageId', 'ItemId', $item_id);
-  
   if (defined $query->param('StorageId')) {
 
     if (length($query->param('StorageId')) > 0) {
@@ -3020,27 +3408,27 @@ sub update_item_runmode {
     }
   }
 
-  if (length($item_storage) == 0) {
-
-    $item_storage = '0';
-  }
-
-  my $item_unit = read_cell_value($dbh_k_write, 'item', 'ItemUnitId', 'ItemId', $item_id);
-
-  if (defined $query->param('ItemUnitId')) {
-
-    if (length($query->param('ItemUnitId')) > 0) {
-
-      $item_unit = $query->param('ItemUnitId');
-    }
-  }
+  my $item_unit = read_cell_value($dbh_k_write, 'item', 'UnitId', 'ItemId', $item_id);
 
   if (length($item_unit) == 0) {
 
-    $item_unit = '0';
+    $item_unit = undef;
   }
-  
+
+  if (defined $query->param('UnitId')) {
+
+    if (length($query->param('UnitId')) > 0) {
+
+      $item_unit = $query->param('UnitId');
+    }
+  }
+
   my $item_state = read_cell_value($dbh_k_write, 'item', 'ItemStateId', 'ItemId', $item_id);
+
+  if (length($item_state) == 0) {
+
+    $item_state = undef;
+  }
 
   if (defined $query->param('ItemStateId')) {
 
@@ -3050,11 +3438,6 @@ sub update_item_runmode {
     }
   }
 
-  if (length($item_state) == 0) {
-
-    $item_state = '0';
-  }
-  
   my $item_amount = read_cell_value($dbh_k_write, 'item', 'Amount', 'ItemId', $item_id);
 
   if (defined $query->param('Amount')) {
@@ -3069,8 +3452,11 @@ sub update_item_runmode {
 
     $item_amount = '0';
   }
-  
-  my $item_measure_date = read_cell_value($dbh_k_write, 'item', 'LastMeasuredDate', 'ItemId', $item_id);
+
+  my $cur_dt = DateTime->now( time_zone => $TIMEZONE );
+  $cur_dt = DateTime::Format::MySQL->format_datetime($cur_dt);
+
+  my $item_measure_date = $cur_dt;
 
   if (defined $query->param('LastMeasuredDate')) {
 
@@ -3078,14 +3464,6 @@ sub update_item_runmode {
 
       $item_measure_date = $query->param('LastMeasuredDate');
     }
-  }
-
-  # Unknown DateTime value from database 0000-00-00 00:00:00 which should be reset to empty string, undef,
-  # and then null in the db
-
-  if ($item_measure_date eq '0000-00-00 00:00:00') {
-
-    $item_measure_date = '';
   }
 
   my $item_measure_by_user = read_cell_value($dbh_k_write, 'item', 'LastMeasuredUserId', 'ItemId', $item_id);
@@ -3120,18 +3498,15 @@ sub update_item_runmode {
     $item_note = $query->param('ItemNote');
   }
 
-  my $cur_dt = DateTime->now( time_zone => $TIMEZONE );
-  $cur_dt = DateTime::Format::MySQL->format_datetime($cur_dt);
-  
   my $item_added_date      = $cur_dt;
   my $item_added_by_user   = $self->authen->user_id();
 
-  if ($trial_unit_spec_id ne '0') {
+  if (defined $trial_unit_spec_id) {
 
     if (!record_existence($dbh_k_write, 'trialunitspecimen', 'TrialUnitSpecimenId', $trial_unit_spec_id)) {
 
       my $err_msg = "TrialUnitSpecimen ($trial_unit_spec_id): not found.";
-    
+
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'TrialUnitSpecimenId' => $err_msg}]};
 
@@ -3139,32 +3514,32 @@ sub update_item_runmode {
     }
   }
 
-  if ($item_source ne '0') {
+  if (defined $item_source) {
 
     if (!record_existence($dbh_k_write, 'contact', 'ContactId', $item_source)) {
 
       my $err_msg = "ItemSource ($item_source): not found.";
-      
+
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'ItemSourceId' => $err_msg}]};
-      
+
       return $data_for_postrun_href;
     }
   }
 
-  if ($item_container_type ne '0') {
+  if (defined $item_container_type) {
 
     if (!type_existence($dbh_k_write, 'container', $item_container_type)) {
 
       my $err_msg = "ContainerTypeId ($item_container_type): not found or inactive.";
-    
+
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'ContainerTypeId' => $err_msg}]};
 
       return $data_for_postrun_href;
     }
   }
-  
+
   if (!record_existence($dbh_k_write, 'specimen', 'SpecimenId', $item_specimen)) {
 
     my $err_msg = "Specimen ($item_specimen): not found.";
@@ -3174,7 +3549,7 @@ sub update_item_runmode {
     return $data_for_postrun_href;
   }
 
-  if ($item_scale ne '0') {
+  if (defined $item_scale) {
 
     if (!record_existence($dbh_k_write, 'deviceregister', 'DeviceRegisterId', $item_scale)) {
 
@@ -3186,7 +3561,7 @@ sub update_item_runmode {
     }
   }
 
-  if ($item_storage ne '0') {
+  if (defined $item_storage) {
 
     if (!record_existence($dbh_k_write, 'storage', 'StorageId', $item_storage)) {
 
@@ -3198,13 +3573,13 @@ sub update_item_runmode {
     }
   }
 
-  if ($item_unit ne '0') {
+  if (defined $item_unit) {
 
-    if (!record_existence($dbh_k_write, 'itemunit', 'ItemUnitId', $item_unit)) {
+    if (!record_existence($dbh_k_write, 'generalunit', 'UnitId', $item_unit)) {
 
-      my $err_msg = "ItemUnitId ($item_unit): not found.";
+      my $err_msg = "UnitId ($item_unit): not found.";
       $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'ItemUnitId' => $err_msg}]};
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'UnitId' => $err_msg}]};
 
       return $data_for_postrun_href;
     }
@@ -3219,7 +3594,7 @@ sub update_item_runmode {
     return $data_for_postrun_href;
   }
 
-  if ($item_state ne '0') {
+  if (defined $item_state) {
 
     if (!type_existence($dbh_k_write, 'state', $item_state)) {
 
@@ -3231,7 +3606,7 @@ sub update_item_runmode {
     }
   }
 
-  if ($item_barcode ne '0') {
+  if (defined $item_barcode) {
 
     my $barcode_sql = 'SELECT ItemId FROM item WHERE ItemId<>? AND ItemBarcode=? LIMIT 1';
     my ($r_barcode_err, $found_item_id) = read_cell($dbh_k_write, $barcode_sql, [$item_id, $item_barcode]);
@@ -3251,7 +3626,7 @@ sub update_item_runmode {
       my $err_msg = "ItemBarcode ($item_barcode): already exits.";
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'ItemBarcode' => $err_msg}]};
-      
+
       return $data_for_postrun_href;
     }
   }
@@ -3259,7 +3634,7 @@ sub update_item_runmode {
 
     $item_barcode = undef;
   }
-  
+
   if ($item_amount ne '0') {
 
     my ($afloat_err, $afloat_href) = check_float_href( { 'Amount' => $item_amount } );
@@ -3276,7 +3651,7 @@ sub update_item_runmode {
   if (length($item_measure_date) > 0) {
 
     my ( $mdt_err, $mdt_href ) = check_dt_href( { 'LastMeasuredDate' => $item_measure_date } );
-    
+
     if ($mdt_err) {
 
       $data_for_postrun_href->{'Error'} = 1;
@@ -3284,10 +3659,6 @@ sub update_item_runmode {
 
       return $data_for_postrun_href;
     }
-  }
-  else {
-
-    $item_measure_date = undef;
   }
 
   if ($item_measure_by_user ne '-1') {
@@ -3334,7 +3705,7 @@ sub update_item_runmode {
     $vcol_len_info->{$vcol_param_name}          = $vcol_data->{$vcol_id}->{'FactorValueMaxLength'};
     $vcol_param_data_maxlen->{$vcol_param_name} = $vcol_value;
   }
-  
+
   # Validate virtual column for factor
   my ( $vcol_missing_err, $vcol_missing_msg ) = check_missing_value($vcol_param_data_compul);
 
@@ -3382,11 +3753,46 @@ sub update_item_runmode {
   }
 
   if (scalar(@{$geno_data}) != scalar(@{$geno_p_data_perm})) {
-      
+
     my $err_msg = "SpecimenId ($item_specimen): permission denied.";
     return $self->_set_error($err_msg);
   }
-  
+
+  my ($get_scol_err, $get_scol_msg, $scol_data, $pkey_data) = get_static_field($dbh_k_write, 'item');
+
+  if ($get_scol_err) {
+
+    $self->logger->debug("Get static field info failed: $get_scol_msg");
+
+    my $err_msg = "Unexpected Error.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my @field_list;
+
+  for my $scol_rec (@{$scol_data}) {
+
+    push(@field_list, $scol_rec->{'Name'});
+  }
+
+  my ($filter_err, $filter_msg, $filter_phrase, $where_arg) = parse_filtering('ItemId',
+                                                                              'item',
+                                                                              $filtering_csv,
+                                                                              \@field_list);
+
+  $self->logger->debug("Filter phrase: $filter_phrase");
+
+  if ($filter_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $filter_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
   my $update_statement = "
         UPDATE item SET
             TrialUnitSpecimenId=?,
@@ -3395,7 +3801,7 @@ sub update_item_runmode {
             SpecimenId=?,
             ScaleId=?,
             StorageId=?,
-            ItemUnitId=?,
+            UnitId=?,
             ItemTypeId=?,
             ItemStateId=?,
             ItemBarcode=?,
@@ -3409,16 +3815,34 @@ sub update_item_runmode {
         WHERE ItemId=?
     ";
 
+  if (length($filter_phrase) > 0) {
+
+    $update_statement .= " AND $filter_phrase";
+  }
+
   my $sth = $dbh_k_write->prepare($update_statement);
   $sth->execute( $trial_unit_spec_id, $item_source, $item_container_type, $item_specimen, $item_scale,
                  $item_storage, $item_unit, $item_type, $item_state, $item_barcode, $item_amount,
                  $item_added_date, $item_added_by_user, $item_measure_date, $item_measure_by_user,
-                 $item_operation, $item_note, $item_id
+                 $item_operation, $item_note, $item_id, @{$where_arg}
       );
-  
+
   if ( $dbh_k_write->err() ) {
 
     return $self->_set_error();
+  }
+
+  my $affected_rows = $sth->rows();
+
+  if ($affected_rows != 1) {
+
+    $self->logger->debug("Number of affected rows: $affected_rows");
+
+    my $err_msg = "Operation is unsuccessful.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
   }
 
   my ($up_vcol_err, $up_vcol_err_msg) = update_vcol_data($dbh_k_write, $vcol_data, $vcol_param_data,
@@ -3432,9 +3856,9 @@ sub update_item_runmode {
 
   $sth->finish();
   $dbh_k_write->disconnect();
-  
+
   my $info_msg_aref = [ { 'Message' => "Item ($item_id) has been updated successfully." } ];
-  
+
   return {
     'Error' => 0,
     'Data'  => {
@@ -3474,7 +3898,7 @@ sub add_item_to_group_runmode {
 
   my $query         = $self->query();
   my $item_group_id = $self->param('groupid');
-  
+
   my $item_id       = $query->param('ItemId');
 
   my $data_for_postrun_href = {};
@@ -3490,7 +3914,7 @@ sub add_item_to_group_runmode {
 
     return $data_for_postrun_href;
   }
-  
+
   my $dbh_k_write = connect_kdb_write();
 
   if (!record_existence($dbh_k_write, 'itemgroup', 'ItemGroupId', $item_group_id)) {
@@ -3676,50 +4100,31 @@ sub add_storage_runmode {
 
   my $skip_field = {};
 
-  my ($get_scol_err, $get_scol_msg, $scol_data, $pkey_data) = get_static_field($dbh_read, 'storage');
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'storage', $skip_field);
 
-  if ($get_scol_err) {
+  if ($chk_sfield_err) {
 
-    $self->logger->debug("Get static field info failed: $get_scol_msg");
-    
-    my $err_msg = "Unexpected Error.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+    $self->logger->debug($chk_sfield_msg);
 
-    return $data_for_postrun_href;
-  }
-
-  my $required_field_href = {};
-
-  for my $static_field (@{$scol_data}) {
-
-    my $field_name = $static_field->{'Name'};
-    
-    if ($skip_field->{$field_name}) { next; }
-
-    if ($static_field->{'Required'} == 1) {
-
-      $required_field_href->{$field_name} = $query->param($field_name);
-    }
+    return $for_postrun_href;
   }
 
   $dbh_read->disconnect();
-
-  my ($missing_err, $missing_href) = check_missing_href( $required_field_href );
-
-  if ($missing_err) {
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
-
-    return $data_for_postrun_href;
-  }
 
   # Finish generic required static field checking
 
   my $storage_barcode   = $query->param('StorageBarcode');
   my $storage_loc       = $query->param('StorageLocation');
-  my $storage_parent_id = $query->param('StorageParentId');
+  my $storage_parent_id = undef;
+
+  if (defined $query->param('StorageParentId')) {
+
+    if (length($query->param('StorageParentId')) > 0) {
+
+      $storage_parent_id = $query->param('StorageParentId');
+    }
+  }
 
   my $storage_details   = '';
   my $storage_note      = '';
@@ -3736,7 +4141,7 @@ sub add_storage_runmode {
 
   my $dbh_k_write = connect_kdb_write();
 
-  if ($storage_parent_id != 0) {
+  if (defined $storage_parent_id) {
 
     if (!record_existence($dbh_k_write, 'storage', 'StorageId', $storage_parent_id)) {
 
@@ -3833,44 +4238,17 @@ sub update_storage_runmode {
 
   my $skip_field = {};
 
-  my ($get_scol_err, $get_scol_msg, $scol_data, $pkey_data) = get_static_field($dbh_read, 'storage');
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'storage', $skip_field);
 
-  if ($get_scol_err) {
+  if ($chk_sfield_err) {
 
-    $self->logger->debug("Get static field info failed: $get_scol_msg");
-    
-    my $err_msg = "Unexpected Error.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+    $self->logger->debug($chk_sfield_msg);
 
-    return $data_for_postrun_href;
-  }
-
-  my $required_field_href = {};
-
-  for my $static_field (@{$scol_data}) {
-
-    my $field_name = $static_field->{'Name'};
-    
-    if ($skip_field->{$field_name}) { next; }
-
-    if ($static_field->{'Required'} == 1) {
-
-      $required_field_href->{$field_name} = $query->param($field_name);
-    }
+    return $for_postrun_href;
   }
 
   $dbh_read->disconnect();
-
-  my ($missing_err, $missing_href) = check_missing_href( $required_field_href );
-
-  if ($missing_err) {
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
-
-    return $data_for_postrun_href;
-  }
 
   # Finish generic required static field checking
 
@@ -3878,10 +4256,23 @@ sub update_storage_runmode {
 
   my $storage_barcode   = $query->param('StorageBarcode');
   my $storage_loc       = $query->param('StorageLocation');
-  my $storage_parent_id = $query->param('StorageParentId');
 
   my $storage_details   = read_cell_value($dbh_k_write, 'storage', 'StorageDetails', 'StorageId', $storage_id);
   my $storage_note      = read_cell_value($dbh_k_write, 'storage', 'StorageNote', 'StorageId', $storage_id);
+  my $storage_parent_id = read_cell_value($dbh_k_write, 'storage', 'StorageParentId', 'StorageId', $storage_id);
+
+  if (length($storage_parent_id) == 0) {
+
+    $storage_parent_id = undef;
+  }
+
+  if (defined $query->param('StorageParentId')) {
+
+    if (length($query->param('StorageParentId')) > 0) {
+
+      $storage_parent_id = $query->param('StorageParentId');
+    }
+  }
 
   if (defined $query->param('StorageDetails')) {
 
@@ -3903,12 +4294,12 @@ sub update_storage_runmode {
     return $data_for_postrun_href;
   }
 
-  if ($storage_parent_id != 0) {
+  if (defined $storage_parent_id) {
 
     if (!record_existence($dbh_k_write, 'storage', 'StorageId', $storage_parent_id)) {
 
       my $err_msg = "StorageParentId ($storage_parent_id): not found.";
-      
+
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'StorageParentId' => $err_msg}]};
 
@@ -4657,8 +5048,8 @@ sub list_itemparent_runmode {
 "GroupAdminRequired": 0,
 "SignatureRequired": 0,
 "AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><ItemParent DateAdded='2014-08-06 15:15:58' AddedByUserId='0' ItemTypeId='148' TrialUnitSpecimenId='0' ContainerTypeId='146' ItemNote='' ItemStateId='149' ParentId='25' ScaleId='16' SpecimenId='488' ItemOperation='group' LastMeasuredUserId='0' ItemBarcode='I_1343739' ItemUnitId='18' StorageId='10' Amount='5.000' ItemSourceId='32' LastMeasuredDate='2012-08-01 00:00:00'><ItemChild DateAdded='2014-08-06 15:15:58' ItemId='24' AddedByUserId='0' ItemParentType='150' ItemTypeId='148' TrialUnitSpecimenId='0' ContainerTypeId='146' ItemNote='' ItemStateId='149' ScaleId='16' SpecimenId='488' ItemOperation='group' LastMeasuredUserId='0' ItemBarcode='I_3423475' removeChild='delete/itemparent/4' ItemUnitId='18' StorageId='10' ItemParentTypeName='Tower - 4888818' Amount='5.000' LastMeasuredDate='2012-08-01 00:00:00' ItemSourceId='32' ItemParentId='4' /></ItemParent></DATA>",
-"SuccessMessageJSON": "{'ItemParent' : [{'DateAdded' : '2014-08-06 15:15:58', 'AddedByUserId' : '0', 'TrialUnitSpecimenId' : '0', 'ItemTypeId' : '148', 'ItemChild' : [{'DateAdded' : '2014-08-06 15:15:58', 'ItemId' : '24', 'ItemParentType' : '150', 'AddedByUserId' : '0', 'TrialUnitSpecimenId' : '0', 'ItemTypeId' : '148', 'ContainerTypeId' : '146', 'ItemNote' : '', 'ItemStateId' : '149', 'SpecimenId' : '488', 'ScaleId' : '16', 'ItemOperation' : 'group', 'LastMeasuredUserId' : '0', 'ItemBarcode' : 'I_3423475', 'removeChild' : 'delete/itemparent/4', 'ItemUnitId' : '18', 'StorageId' : '10', 'ItemParentTypeName' : 'Tower - 4888818', 'Amount' : '5.000', 'ItemParentId' : '4', 'ItemSourceId' : '32', 'LastMeasuredDate' : '2012-08-01 00:00:00'}], 'ContainerTypeId' : '146', 'ItemNote' : '', 'ItemStateId' : '149', 'ParentId' : '25', 'SpecimenId' : '488', 'ScaleId' : '16', 'ItemOperation' : 'group', 'LastMeasuredUserId' : '0', 'ItemBarcode' : 'I_1343739', 'ItemUnitId' : '18', 'StorageId' : '10', 'Amount' : '5.000', 'LastMeasuredDate' : '2012-08-01 00:00:00', 'ItemSourceId' : '32'}], 'RecordMeta' : [{'TagName' : 'ItemParent'}]}",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><ItemParent DateAdded='2014-08-06 15:15:58' AddedByUserId='0' ItemTypeId='148' TrialUnitSpecimenId='0' ContainerTypeId='146' ItemNote='' ItemStateId='149' ParentId='25' ScaleId='16' SpecimenId='488' ItemOperation='group' LastMeasuredUserId='0' ItemBarcode='I_1343739' UnitId='18' StorageId='10' Amount='5.000' ItemSourceId='32' LastMeasuredDate='2012-08-01 00:00:00'><ItemChild DateAdded='2014-08-06 15:15:58' ItemId='24' AddedByUserId='0' ItemParentType='150' ItemTypeId='148' TrialUnitSpecimenId='0' ContainerTypeId='146' ItemNote='' ItemStateId='149' ScaleId='16' SpecimenId='488' ItemOperation='group' LastMeasuredUserId='0' ItemBarcode='I_3423475' removeChild='delete/itemparent/4' UnitId='18' StorageId='10' ItemParentTypeName='Tower - 4888818' Amount='5.000' LastMeasuredDate='2012-08-01 00:00:00' ItemSourceId='32' ItemParentId='4' /></ItemParent></DATA>",
+"SuccessMessageJSON": "{'ItemParent' : [{'DateAdded' : '2014-08-06 15:15:58', 'AddedByUserId' : '0', 'TrialUnitSpecimenId' : '0', 'ItemTypeId' : '148', 'ItemChild' : [{'DateAdded' : '2014-08-06 15:15:58', 'ItemId' : '24', 'ItemParentType' : '150', 'AddedByUserId' : '0', 'TrialUnitSpecimenId' : '0', 'ItemTypeId' : '148', 'ContainerTypeId' : '146', 'ItemNote' : '', 'ItemStateId' : '149', 'SpecimenId' : '488', 'ScaleId' : '16', 'ItemOperation' : 'group', 'LastMeasuredUserId' : '0', 'ItemBarcode' : 'I_3423475', 'removeChild' : 'delete/itemparent/4', 'UnitId' : '18', 'StorageId' : '10', 'ItemParentTypeName' : 'Tower - 4888818', 'Amount' : '5.000', 'ItemParentId' : '4', 'ItemSourceId' : '32', 'LastMeasuredDate' : '2012-08-01 00:00:00'}], 'ContainerTypeId' : '146', 'ItemNote' : '', 'ItemStateId' : '149', 'ParentId' : '25', 'SpecimenId' : '488', 'ScaleId' : '16', 'ItemOperation' : 'group', 'LastMeasuredUserId' : '0', 'ItemBarcode' : 'I_1343739', 'UnitId' : '18', 'StorageId' : '10', 'Amount' : '5.000', 'LastMeasuredDate' : '2012-08-01 00:00:00', 'ItemSourceId' : '32'}], 'RecordMeta' : [{'TagName' : 'ItemParent'}]}",
 "ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
 "ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
@@ -4705,8 +5096,8 @@ sub get_itemparent_runmode {
 "GroupAdminRequired": 0,
 "SignatureRequired": 0,
 "AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><ItemParent DateAdded='2014-08-06 15:10:06' AddedByUserId='0' ItemTypeId='143' TrialUnitSpecimenId='0' ContainerTypeId='141' ItemNote='' ItemStateId='144' ParentId='23' SpecimenId='487' ScaleId='15' ItemOperation='group' LastMeasuredUserId='0' ItemBarcode='I_7440343' ItemUnitId='17' StorageId='9' Amount='5.000' ItemSourceId='31' LastMeasuredDate='2012-08-01 00:00:00'><ItemChild DateAdded='2014-08-06 15:10:06' ItemId='22' AddedByUserId='0' ItemParentType='145' ItemTypeId='143' TrialUnitSpecimenId='0' ContainerTypeId='141' ItemNote='' ItemStateId='144' ScaleId='15' SpecimenId='487' ItemOperation='group' LastMeasuredUserId='0' ItemBarcode='I_5674613' removeChild='delete/itemparent/3' ItemUnitId='17' StorageId='9' ItemParentTypeName='Tower - 6294191' Amount='5.000' LastMeasuredDate='2012-08-01 00:00:00' ItemSourceId='31' ItemParentId='3' /></ItemParent><RecordMeta TagName='ItemParent' /></DATA>",
-"SuccessMessageJSON": "{'ItemParent' : [{'DateAdded' : '2014-08-06 15:10:06', 'AddedByUserId' : '0', 'TrialUnitSpecimenId' : '0', 'ItemTypeId' : '143', 'ItemChild' : [{'DateAdded' : '2014-08-06 15:10:06', 'ItemId' : '22', 'ItemParentType' : '145', 'AddedByUserId' : '0', 'TrialUnitSpecimenId' : '0', 'ItemTypeId' : '143', 'ContainerTypeId' : '141', 'ItemNote' : '', 'ItemStateId' : '144', 'SpecimenId' : '487', 'ScaleId' : '15', 'ItemOperation' : 'group', 'LastMeasuredUserId' : '0', 'ItemBarcode' : 'I_5674613', 'removeChild' : 'delete/itemparent/3', 'ItemUnitId' : '17', 'StorageId' : '9', 'ItemParentTypeName' : 'Tower - 6294191', 'Amount' : '5.000', 'ItemParentId' : '3', 'ItemSourceId' : '31', 'LastMeasuredDate' : '2012-08-01 00:00:00'}], 'ContainerTypeId' : '141', 'ItemNote' : '', 'ItemStateId' : '144', 'ParentId' : '23', 'ScaleId' : '15', 'SpecimenId' : '487', 'ItemOperation' : 'group', 'LastMeasuredUserId' : '0', 'ItemBarcode' : 'I_7440343', 'ItemUnitId' : '17', 'StorageId' : '9', 'Amount' : '5.000', 'LastMeasuredDate' : '2012-08-01 00:00:00', 'ItemSourceId' : '31'}], 'RecordMeta' : [{'TagName' : 'ItemParent'}]}",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><ItemParent DateAdded='2014-08-06 15:10:06' AddedByUserId='0' ItemTypeId='143' TrialUnitSpecimenId='0' ContainerTypeId='141' ItemNote='' ItemStateId='144' ParentId='23' SpecimenId='487' ScaleId='15' ItemOperation='group' LastMeasuredUserId='0' ItemBarcode='I_7440343' UnitId='17' StorageId='9' Amount='5.000' ItemSourceId='31' LastMeasuredDate='2012-08-01 00:00:00'><ItemChild DateAdded='2014-08-06 15:10:06' ItemId='22' AddedByUserId='0' ItemParentType='145' ItemTypeId='143' TrialUnitSpecimenId='0' ContainerTypeId='141' ItemNote='' ItemStateId='144' ScaleId='15' SpecimenId='487' ItemOperation='group' LastMeasuredUserId='0' ItemBarcode='I_5674613' removeChild='delete/itemparent/3' UnitId='17' StorageId='9' ItemParentTypeName='Tower - 6294191' Amount='5.000' LastMeasuredDate='2012-08-01 00:00:00' ItemSourceId='31' ItemParentId='3' /></ItemParent><RecordMeta TagName='ItemParent' /></DATA>",
+"SuccessMessageJSON": "{'ItemParent' : [{'DateAdded' : '2014-08-06 15:10:06', 'AddedByUserId' : '0', 'TrialUnitSpecimenId' : '0', 'ItemTypeId' : '143', 'ItemChild' : [{'DateAdded' : '2014-08-06 15:10:06', 'ItemId' : '22', 'ItemParentType' : '145', 'AddedByUserId' : '0', 'TrialUnitSpecimenId' : '0', 'ItemTypeId' : '143', 'ContainerTypeId' : '141', 'ItemNote' : '', 'ItemStateId' : '144', 'SpecimenId' : '487', 'ScaleId' : '15', 'ItemOperation' : 'group', 'LastMeasuredUserId' : '0', 'ItemBarcode' : 'I_5674613', 'removeChild' : 'delete/itemparent/3', 'UnitId' : '17', 'StorageId' : '9', 'ItemParentTypeName' : 'Tower - 6294191', 'Amount' : '5.000', 'ItemParentId' : '3', 'ItemSourceId' : '31', 'LastMeasuredDate' : '2012-08-01 00:00:00'}], 'ContainerTypeId' : '141', 'ItemNote' : '', 'ItemStateId' : '144', 'ParentId' : '23', 'ScaleId' : '15', 'SpecimenId' : '487', 'ItemOperation' : 'group', 'LastMeasuredUserId' : '0', 'ItemBarcode' : 'I_7440343', 'UnitId' : '17', 'StorageId' : '9', 'Amount' : '5.000', 'LastMeasuredDate' : '2012-08-01 00:00:00', 'ItemSourceId' : '31'}], 'RecordMeta' : [{'TagName' : 'ItemParent'}]}",
 "ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='ItemParentId (1): not found.' /></DATA>"}],
 "ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'ItemParentId (1): not found.'}]}"}],
 "URLParameter": [{"ParameterName": "id", "Description": "Existing ItemParentId"}],
@@ -4755,7 +5146,767 @@ sub get_itemparent_runmode {
 
 sub import_item_csv_runmode {
 
-  return 'Import item CSV';
+=pod import_item_csv_gadmin_HELP_START
+{
+"OperationName" : "Import items",
+"Description": "Import items from a csv file formatted as a sparse matrix of item data.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 1,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='2 records of items have been inserted successfully.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : '2 records of items have been inserted successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Row (1): SpecimenId (872) not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Row (1): SpecimenId (872) not found.'}]}"}],
+"RequiredUpload": 1,
+"UploadFileFormat": "CSV",
+"UploadFileParameterName": "uploadfile",
+"HTTPParameter": [{}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self  = shift;
+  my $query = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  my $data_csv_file = $self->authen->get_upload_file();
+
+  my $num_of_col = get_csvfile_num_of_col($data_csv_file);
+
+  $self->logger->debug("Number of columns: $num_of_col");
+
+  my $ItemTypeId_col = $query->param('ItemTypeId');
+
+  my ($col_def_err, $col_def_err_href) = check_col_def_href( { 'ItemTypeId' => $ItemTypeId_col }, $num_of_col );
+
+  if ($col_def_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$col_def_err_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $matched_col = {};
+
+  $matched_col->{$ItemTypeId_col} = 'ItemTypeId';
+
+  # Checking optional columns
+
+  my $TrialUnitSpecimenId_col      = '';
+  my $ItemSourceId_col             = '';
+  my $ContainerTypeId_col          = '';
+  my $SpecimenId_col               = '';
+  my $ScaleId_col                  = '';
+  my $StorageId_col                = '';
+  my $UnitId_col                   = '';
+  my $ItemStateId_col              = '';
+  my $ItemBarcode_col              = '';
+  my $Amount_col                   = '';
+  my $DateAdded_col                = '';
+  my $AddedByUserId_col            = '';
+  my $ItemOperation_col            = '';
+  my $ItemNote_col                 = '';
+
+  my $chk_optional_col_href = {};
+
+  if (defined $query->param('TrialUnitSpecimenId')) {
+
+    if (length($query->param('TrialUnitSpecimenId')) > 0) {
+
+      $TrialUnitSpecimenId_col = $query->param('TrialUnitSpecimenId');
+
+      $chk_optional_col_href->{'TrialUnitSpecimenId'} = $TrialUnitSpecimenId_col;
+      $matched_col->{$TrialUnitSpecimenId_col}        = 'TrialUnitSpecimenId';
+    }
+  }
+
+  if (defined $query->param('ItemSourceId')) {
+
+    if (length($query->param('ItemSourceId')) > 0) {
+
+      $ItemSourceId_col = $query->param('ItemSourceId');
+
+      $chk_optional_col_href->{'ItemSourceId'} = $ItemSourceId_col;
+      $matched_col->{$ItemSourceId_col}        = 'ItemSourceId';
+    }
+  }
+
+  if (defined $query->param('ContainerTypeId')) {
+
+    if (length($query->param('ContainerTypeId')) > 0) {
+
+      $ContainerTypeId_col = $query->param('ContainerTypeId');
+
+      $chk_optional_col_href->{'ContainerTypeId'} = $ContainerTypeId_col;
+      $matched_col->{$ContainerTypeId_col}        = 'ContainerTypeId';
+    }
+  }
+
+  if (defined $query->param('SpecimenId')) {
+
+    if (length($query->param('SpecimenId')) > 0) {
+
+      $SpecimenId_col = $query->param('SpecimenId');
+
+      $chk_optional_col_href->{'SpecimenId'} = $SpecimenId_col;
+      $matched_col->{$SpecimenId_col}        = 'SpecimenId';
+    }
+  }
+
+  if (defined $query->param('ScaleId')) {
+
+    if (length($query->param('ScaleId')) > 0) {
+
+      $ScaleId_col = $query->param('ScaleId');
+
+      $chk_optional_col_href->{'ScaleId'} = $ScaleId_col;
+      $matched_col->{$ScaleId_col}        = 'ScaleId';
+    }
+  }
+
+  if (defined $query->param('StorageId')) {
+
+    if (length($query->param('StorageId')) > 0) {
+
+      $StorageId_col = $query->param('StorageId');
+
+      $chk_optional_col_href->{'StorageId'} = $StorageId_col;
+      $matched_col->{$StorageId_col}        = 'StorageId';
+    }
+  }
+
+  if (defined $query->param('UnitId')) {
+
+    if (length($query->param('UnitId')) > 0) {
+
+      $UnitId_col = $query->param('UnitId');
+
+      $chk_optional_col_href->{'UnitId'} = $UnitId_col;
+      $matched_col->{$UnitId_col}        = 'UnitId';
+    }
+  }
+
+  if (defined $query->param('ItemStateId')) {
+
+    if (length($query->param('ItemStateId')) > 0) {
+
+      $ItemStateId_col = $query->param('ItemStateId');
+
+      $chk_optional_col_href->{'ItemStateId'} = $ItemStateId_col;
+      $matched_col->{$ItemStateId_col}        = 'ItemStateId';
+    }
+  }
+
+  if (defined $query->param('ItemBarcode')) {
+
+    if (length($query->param('ItemBarcode')) > 0) {
+
+      $ItemBarcode_col = $query->param('ItemBarcode');
+
+      $chk_optional_col_href->{'ItemBarcode'} = $ItemBarcode_col;
+      $matched_col->{$ItemBarcode_col}        = 'ItemBarcode';
+    }
+  }
+
+  if (defined $query->param('Amount')) {
+
+    if (length($query->param('Amount')) > 0) {
+
+      $Amount_col = $query->param('Amount');
+
+      $chk_optional_col_href->{'Amount'} = $Amount_col;
+      $matched_col->{$Amount_col}        = 'Amount';
+    }
+  }
+
+  if (defined $query->param('DateAdded')) {
+
+    if (length($query->param('DateAdded')) > 0) {
+
+      $DateAdded_col = $query->param('DateAdded');
+
+      $chk_optional_col_href->{'DateAdded'} = $DateAdded_col;
+      $matched_col->{$DateAdded_col}        = 'DateAdded';
+    }
+  }
+
+  if (defined $query->param('AddedByUserId')) {
+
+    if (length($query->param('AddedByUserId')) > 0) {
+
+      $AddedByUserId_col = $query->param('AddedByUserId');
+
+      $chk_optional_col_href->{'AddedByUserId'} = $AddedByUserId_col;
+      $matched_col->{$AddedByUserId_col}        = 'AddedByUserId';
+    }
+  }
+
+  if (defined $query->param('ItemOperation')) {
+
+    if (length($query->param('ItemOperation')) > 0) {
+
+      $ItemOperation_col = $query->param('ItemOperation');
+
+      $chk_optional_col_href->{'ItemOperation'} = $ItemOperation_col;
+      $matched_col->{$ItemOperation_col}        = 'ItemOperation';
+    }
+  }
+
+  if (defined $query->param('ItemNote')) {
+
+    if (length($query->param('ItemNote')) > 0) {
+
+      $ItemNote_col = $query->param('ItemNote');
+
+      $chk_optional_col_href->{'ItemNote'} = $ItemNote_col;
+      $matched_col->{$ItemNote_col}        = 'ItemNote';
+    }
+  }
+
+  ($col_def_err, $col_def_err_href) = check_col_def_href( $chk_optional_col_href, $num_of_col );
+
+  if ($col_def_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$col_def_err_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  my @fieldname_list;
+
+  for (my $i = 0; $i < $num_of_col; $i++) {
+
+    if ($matched_col->{$i}) {
+
+      push(@fieldname_list, $matched_col->{$i});
+    }
+    else {
+
+      push(@fieldname_list, 'null');
+    }
+  }
+
+  my ($data_aref, $csv_err, $err_msg) = csvfile2arrayref($data_csv_file, \@fieldname_list, 0);
+
+  if ($csv_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (scalar(@{$data_aref}) == 0) {
+
+    $self->logger->debug("No data provided");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $user_id       = $self->authen->user_id();
+  my $group_id      = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+  my $perm_str      = permission_phrase($group_id, 0, $gadmin_status, 'genotype');
+
+  my $bulk_sql = 'INSERT INTO item ';
+  $bulk_sql   .= '(TrialUnitSpecimenId,ItemSourceId,ContainerTypeId,SpecimenId,ScaleId,StorageId,UnitId,';
+  $bulk_sql   .= 'ItemTypeId,ItemStateId,ItemBarcode,Amount,DateAdded,AddedByUserId,ItemOperation,ItemNote) ';
+  $bulk_sql   .= 'VALUES ';
+
+  my $sql;
+  my $sth;
+
+  my $geno_specimen_sql = "SELECT genotype.GenotypeId ";
+  $geno_specimen_sql   .= "FROM genotype LEFT JOIN genotypespecimen ON ";
+  $geno_specimen_sql   .= "genotype.GenotypeId = genotypespecimen.GenotypeId ";
+  $geno_specimen_sql   .= "WHERE genotypespecimen.SpecimenId=?";
+
+  my $cur_dt = DateTime->now( time_zone => $TIMEZONE );
+  $cur_dt = DateTime::Format::MySQL->format_datetime($cur_dt);
+
+  my $dbh_write = connect_kdb_write();
+
+  my $row_counter = 1;
+  for my $data_row (@{$data_aref}) {
+
+    my $db_specimen_id     = '';
+    my $trial_unit_spec_id = '';
+
+    if (defined $data_row->{'TrialUnitSpecimenId'}) {
+
+      if (length($data_row->{'TrialUnitSpecimenId'}) > 0) {
+
+        $trial_unit_spec_id = $data_row->{'TrialUnitSpecimenId'};
+        $db_specimen_id = read_cell_value($dbh_write, 'trialunitspecimen', 'SpecimenId',
+                                          'TrialUnitSpecimenId', $trial_unit_spec_id);
+
+        if (length($db_specimen_id) == 0) {
+
+          my $err_msg = "Row ($row_counter): TrialUnitSpecimenId ($trial_unit_spec_id) not found.";
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+          return $data_for_postrun_href;
+        }
+      }
+    }
+
+    my $item_src_id = '';
+
+    if (defined $data_row->{'ItemSourceId'}) {
+
+      if (length($data_row->{'ItemSourceId'}) > 0) {
+
+        $item_src_id = $data_row->{'ItemSourceId'};
+
+        if (!record_existence($dbh_write, 'contact', 'ContactId', $item_src_id)) {
+
+          my $err_msg = "Row ($row_counter): ItemSourceId ($item_src_id) not found.";
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+          return $data_for_postrun_href;
+        }
+      }
+    }
+
+    my $container_type_id = '';
+
+    if (defined $data_row->{'ContainerTypeId'}) {
+
+      if (length($data_row->{'ContainerTypeId'}) > 0) {
+
+        $container_type_id = $data_row->{'ContainerTypeId'};
+
+        if (!type_existence($dbh_write, 'container', $container_type_id)) {
+
+          my $err_msg = "Row ($row_counter): ContainerTypeId ($container_type_id) not found or inactive.";
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+          return $data_for_postrun_href;
+        }
+      }
+    }
+
+    my $specimen_id = '';
+
+    if (defined $data_row->{'SpecimenId'}) {
+
+      if (length($data_row->{'SpecimenId'}) > 0) {
+
+        $specimen_id = $data_row->{'SpecimenId'};
+
+        if (!record_existence($dbh_write, 'specimen', 'SpecimenId', $specimen_id)) {
+
+          my $err_msg = "Row ($row_counter): SpecimenId ($specimen_id) not found.";
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+          return $data_for_postrun_href;
+        }
+
+        if (length($db_specimen_id) > 0) {
+
+          if ($db_specimen_id != $specimen_id) {
+
+            my $err_msg = "Row ($row_counter): SpecimenId ($specimen_id) with SpecimenId ($db_specimen_id) from TrialUnitSpecimenId.";
+            $data_for_postrun_href->{'Error'} = 1;
+            $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+            return $data_for_postrun_href;
+          }
+        }
+      }
+    }
+    else {
+
+      $specimen_id = $db_specimen_id;
+    }
+
+    if (length($specimen_id) == 0) {
+
+      my $err_msg = "Row ($row_counter): SpecimenId is missing.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my ($geno_err, $geno_msg, $geno_data) = read_data($dbh_write, $geno_specimen_sql, [$specimen_id]);
+
+    if ($geno_err) {
+
+      $self->logger->debug($geno_msg);
+      my $err_msg = "Unexpected Error.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    $geno_specimen_sql   .= " AND ((($perm_str) & $LINK_PERM) = $LINK_PERM)";
+
+    $self->logger->debug("Genotype specimen permission SQL: $geno_specimen_sql");
+
+    my ($geno_p_err, $geno_p_msg, $geno_p_data_perm) = read_data($dbh_write, $geno_specimen_sql, [$specimen_id]);
+
+    if ($geno_p_err) {
+
+      $self->logger->debug($geno_p_msg);
+      my $err_msg = "Unexpected Error.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    if (scalar(@{$geno_data}) != scalar(@{$geno_p_data_perm})) {
+
+      my $err_msg = "Row ($row_counter): SpecimenId ($specimen_id): permission denied.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{"Message" => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my $scale_id = '';
+
+    if (defined $data_row->{'ScaleId'}) {
+
+      if (length($data_row->{'ScaleId'}) > 0) {
+
+        $scale_id = $data_row->{'ScaleId'};
+
+        if (!record_existence($dbh_write, 'deviceregister', 'DeviceId', $scale_id)) {
+
+          my $err_msg = "Row ($row_counter): ScaleId ($scale_id) not found.";
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+          return $data_for_postrun_href;
+        }
+      }
+    }
+
+    my $storage_id = '';
+
+    if (defined $data_row->{'StorageId'}) {
+
+      if (length($data_row->{'StorageId'}) > 0) {
+
+        $storage_id = $data_row->{'StorageId'};
+
+        if (!record_existence($dbh_write, 'storage', 'StorageId', $storage_id)) {
+
+          my $err_msg = "Row ($row_counter): StorageId ($storage_id) not found.";
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+          return $data_for_postrun_href;
+        }
+      }
+    }
+
+    my $item_unit_id = '';
+
+    if (defined $data_row->{'UnitId'}) {
+
+      if (length($data_row->{'UnitId'}) > 0) {
+
+        $item_unit_id = $data_row->{'UnitId'};
+
+        if (!record_existence($dbh_write, 'generalunit', 'UnitId', $item_unit_id)) {
+
+          my $err_msg = "Row ($row_counter): UnitId ($item_unit_id) not found.";
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+          return $data_for_postrun_href;
+        }
+      }
+    }
+
+    if (length($item_unit_id) == 0) {
+
+      my $err_msg = "Row ($row_counter): UnitId is missing.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my $item_type_id = $data_row->{'ItemTypeId'};
+
+    my ( $missing_err, $missing_href ) = check_missing_href( { 'ItemTypeId' => $item_type_id } );
+
+    if ($missing_err) {
+
+      my $err_msg = "Row ($row_counter): ItemTypeId missing";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    if (!type_existence($dbh_write, 'item', $item_type_id)) {
+
+      my $err_msg = "Row ($row_counter): ItemTypeId ($item_type_id) not found or inactive.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my $item_state_id = '';
+
+    if (defined $data_row->{'ItemStateId'}) {
+
+      if (length($data_row->{'ItemStateId'}) > 0) {
+
+        $item_state_id = $data_row->{'ItemStateId'};
+
+        if (!type_existence($dbh_write, 'state', $item_state_id)) {
+
+          my $err_msg = "Row ($row_counter): ItemStateId ($item_state_id) not found or inactive.";
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+          return $data_for_postrun_href;
+        }
+      }
+    }
+
+    my $item_barcode = '';
+
+    if (defined $data_row->{'ItemBarcode'}) {
+
+      if (length($data_row->{'ItemBarcode'}) > 0) {
+
+        $item_barcode = $data_row->{'ItemBarcode'};
+
+        if (record_existence($dbh_write, 'item', 'ItemId', 'ItemBarcode', $item_barcode)) {
+
+          my $err_msg = "Row ($row_counter): ItemBarcode ($item_barcode) already exists.";
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+          return $data_for_postrun_href;
+        }
+      }
+    }
+
+    my $amount = '';
+
+    if (defined $data_row->{'Amount'}) {
+
+      if (length($data_row->{'Amount'}) > 0) {
+
+        $amount = $data_row->{'Amount'};
+
+        my ($amount_err, $amount_msg) = check_float_value( {'Amount' => $amount} );
+
+        if ($amount_err) {
+
+          my $err_msg = "Row ($row_counter): Amount ($amount) invalid number.";
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+          return $data_for_postrun_href;
+        }
+      }
+    }
+
+    my $date_added = $cur_dt;
+
+    if (defined $data_row->{'DateAdded'}) {
+
+      if (length($data_row->{'DateAdded'})) {
+
+        $date_added = $data_row->{'DateAdded'};
+
+        my ( $mdt_to_err, $mdt_to_msg ) = check_dt_value( { 'DateAdded' => $date_added } );
+
+        if ($mdt_to_err) {
+
+          my $err_msg = "Row ($row_counter): DateAdded ($date_added) unknown date format.";
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+          return $data_for_postrun_href;
+        }
+      }
+    }
+
+    my $added_by_user_id = $user_id;
+
+    if (defined $data_row->{'AddedByUserId'}) {
+
+      if (length($data_row->{'AddedByUserId'}) > 0) {
+
+        $added_by_user_id = $data_row->{'AddedByUserId'};
+
+        if (!record_existence($dbh_write, 'systemuser', 'UserId', $added_by_user_id)) {
+
+          my $err_msg = "Row ($row_counter): AddedByUserId ($added_by_user_id) not found.";
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+          return $data_for_postrun_href;
+        }
+      }
+    }
+
+    my $item_operation = '';
+
+    if (defined $data_row->{'ItemOperation'}) {
+
+      if (length($data_row->{'ItemOperation'}) > 0) {
+
+        $item_operation = $data_row->{'ItemOperation'};
+
+        if ($item_operation !~ /^subsample|^group/ ) {
+
+          my $err_msg = "Row ($row_counter): ItemOperation ($item_operation) not valid.";
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+          return $data_for_postrun_href;
+        }
+      }
+    }
+
+    my $item_note = '';
+
+    if (defined $data_row->{'ItemNote'}) {
+
+      if (length($data_row->{'ItemNote'}) > 0) {
+
+        $item_note = $data_row->{'ItemNote'};
+      }
+    }
+
+    if (length($trial_unit_spec_id) == 0) {
+
+      $trial_unit_spec_id = 'NULL';
+    }
+
+    if (length($item_src_id) == 0) {
+
+      $item_src_id = 'NULL';
+    }
+
+    if (length($container_type_id) == 0) {
+
+      $container_type_id = 'NULL';
+    }
+
+    if (length($scale_id) == 0) {
+
+      $scale_id = 'NULL';
+    }
+
+    if (length($storage_id) == 0) {
+
+      $storage_id = 'NULL';
+    }
+
+    if (length($item_state_id) == 0) {
+
+      $item_state_id = 'NULL';
+    }
+
+    if (length($item_barcode) == 0) {
+
+      $item_barcode = 'NULL';
+    }
+    else {
+
+      $item_barcode = qq|'$item_barcode'|;
+    }
+
+    if (length($amount) == 0) {
+
+      $amount = 'NULL';
+    }
+
+    if (length($item_operation) == 0) {
+
+      $item_operation = 'NULL';
+    }
+    else {
+
+      $item_operation = qq|'$item_operation'|;
+    }
+
+    if (length($item_note) == 0) {
+
+      $item_note = 'NULL';
+    }
+    else {
+
+      $item_note = qq|'$item_note'|;
+    }
+
+    $date_added = qq|'$date_added'|;
+
+    $bulk_sql .= qq|($trial_unit_spec_id,$item_src_id,$container_type_id,$specimen_id,$scale_id,$storage_id,$item_unit_id,|;
+    $bulk_sql .= qq|$item_type_id,$item_state_id,$item_barcode,$amount,$date_added,$added_by_user_id,$item_operation,$item_note),|;
+
+    $row_counter += 1;
+  }
+
+  chop($bulk_sql);      # remove excessive comma
+
+  $self->logger->debug("Bulk SQL: $bulk_sql");
+
+  my $nrows_inserted = $dbh_write->do($bulk_sql);
+
+  if ($dbh_write->err()) {
+
+    $self->logger->debug("Db err code: " . $dbh_write->err());
+
+    if ($dbh_write->err() == 1062) {
+
+      my $err_str = $dbh_write->errstr();
+
+      if ( $err_str =~ /Duplicate entry '(.+)'/ ) {
+
+        my $err_msg = "Duplicate Entry: $1";
+
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+        return $data_for_postrun_href;
+      }
+    }
+    else {
+
+      $self->logger->debug('Error code: ' . $dbh_write->err());
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  $dbh_write->disconnect();
+
+  my $info_msg      = "$nrows_inserted records of items have been inserted successfully.";
+  my $info_msg_aref = [{'Message' => $info_msg}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'      => $info_msg_aref};
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
 }
 
 sub import_itemgroup_xml_runmode {
@@ -4769,8 +5920,8 @@ sub import_itemgroup_xml_runmode {
 "GroupAdminRequired": 1,
 "SignatureRequired": 1,
 "AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><ReturnIdFile xml='http://kddart.example.com/data/admin/import_itemgroup_xml_gadmin_return_id_132.xml' /><Info Message='Number of ItemGroup imported: 1.' /></DATA>",
-"SuccessMessageJSON": "{'ReturnIdFile' : [{'json' : 'http://kddart.example.com/data/admin/import_itemgroup_xml_gadmin_return_id_253.json'}], 'Info' : [{'Message' : 'Number of ItemGroup imported: 1.'}]}",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><ReturnIdFile xml='http://kddart-d.diversityarrays.com/data/admin/import_itemgroup_xml_gadmin_return_id_132.xml' /><Info Message='Number of ItemGroup imported: 1.' /></DATA>",
+"SuccessMessageJSON": "{'ReturnIdFile' : [{'json' : 'http://kddart-d.diversityarrays.com/data/admin/import_itemgroup_xml_gadmin_return_id_253.json'}], 'Info' : [{'Message' : 'Number of ItemGroup imported: 1.'}]}",
 "ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='SpecimenId (4927) not found.' /></DATA>"}],
 "ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'SpecimenId (4927) not found.'}]}"}],
 "RequiredUpload": 1,
@@ -4802,7 +5953,7 @@ sub import_itemgroup_xml_runmode {
   eval {
 
     local $XML::Checker::FAIL = sub {
-      
+
       my $code = shift;
       my $err_str = XML::Checker::error_string ($code, @_);
       $self->logger->debug("XML Parsing ERR: $code : $err_str");
@@ -4827,7 +5978,7 @@ sub import_itemgroup_xml_runmode {
   my $item_group_data = xml2arrayref($itemgroup_xml, 'ItemGroup');
 
   my $dbh_read = connect_kdb_read();
-  
+
   my $specimen_href = {};
 
   for my $item_group (@{$item_group_data}) {
@@ -4842,7 +5993,7 @@ sub import_itemgroup_xml_runmode {
 
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-      
+
       return $data_for_postrun_href;
     }
 
@@ -4852,7 +6003,7 @@ sub import_itemgroup_xml_runmode {
 
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-      
+
       return $data_for_postrun_href;
     }
 
@@ -4875,7 +6026,7 @@ sub import_itemgroup_xml_runmode {
         return $data_for_postrun_href;
       }
     }
-    
+
     my $container_type_id = '';
 
     if (defined($item_group->{'ContainerTypeId'})) {
@@ -4938,16 +6089,19 @@ sub import_itemgroup_xml_runmode {
 
     my $item_unit_id = '';
 
-    if (defined($item_group->{'ItemUnitId'})) {
+    if (defined($item_group->{'UnitId'})) {
 
-      $item_unit_id = $item_group->{'ItemUnitId'};
+      if (length($item_group->{'UnitId'}) > 0) {
+
+        $item_unit_id = $item_group->{'UnitId'};
+      }
     }
 
     if (length($item_unit_id) > 0) {
 
-      if (!record_existence($dbh_read, 'itemunit', 'ItemUnitId', $item_unit_id)) {
+      if (!record_existence($dbh_read, 'generalunit', 'UnitId', $item_unit_id)) {
 
-        my $err_msg = "ItemUnitId ($item_unit_id) not found.";
+        my $err_msg = "UnitId ($item_unit_id) not found.";
 
         $data_for_postrun_href->{'Error'} = 1;
         $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
@@ -5004,7 +6158,7 @@ sub import_itemgroup_xml_runmode {
 
         $data_for_postrun_href->{'Error'} = 1;
         $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-        
+
         return $data_for_postrun_href;
       }
 
@@ -5014,7 +6168,7 @@ sub import_itemgroup_xml_runmode {
 
         $data_for_postrun_href->{'Error'} = 1;
         $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-        
+
         return $data_for_postrun_href;
       }
 
@@ -5024,7 +6178,7 @@ sub import_itemgroup_xml_runmode {
 
         $data_for_postrun_href->{'Error'} = 1;
         $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-        
+
         return $data_for_postrun_href;
       }
 
@@ -5034,7 +6188,7 @@ sub import_itemgroup_xml_runmode {
 
         $data_for_postrun_href->{'Error'} = 1;
         $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-        
+
         return $data_for_postrun_href;
       }
 
@@ -5051,25 +6205,28 @@ sub import_itemgroup_xml_runmode {
 
           $data_for_postrun_href->{'Error'} = 1;
           $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-        
+
           return $data_for_postrun_href;
         }
       }
 
-      if (defined($item->{'ItemUnitId'})) {
+      if (defined($item->{'UnitId'})) {
 
-        $item_unit_id = $item->{'ItemUnitId'};
+        if (length($item->{'UnitId'}) > 0) {
+
+          $item_unit_id = $item->{'UnitId'};
+        }
       }
 
       if (length($item_unit_id) > 0) {
 
-        if (!record_existence($dbh_read, 'itemunit', 'ItemUnitId', $item_unit_id)) {
+        if (!record_existence($dbh_read, 'generalunit', 'UnitId', $item_unit_id)) {
 
-          my $err_msg = "ItemUnitId ($item_unit_id) not found.";
+          my $err_msg = "UnitId ($item_unit_id) not found.";
 
           $data_for_postrun_href->{'Error'} = 1;
           $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-          
+
           return $data_for_postrun_href;
         }
       }
@@ -5117,6 +6274,16 @@ sub import_itemgroup_xml_runmode {
 
       $specimen_href->{$specimen_id} = 1;
     }
+
+    if (length($item_unit_id) == 0) {
+
+      my $err_msg = "UnitId is missing.";
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
   }
 
   my @geno_list;
@@ -5134,7 +6301,7 @@ sub import_itemgroup_xml_runmode {
 
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-      
+
       return $data_for_postrun_href;
     }
 
@@ -5161,12 +6328,12 @@ sub import_itemgroup_xml_runmode {
 
     my $perm_err_msg = '';
     $perm_err_msg   .= "Permission denied: Group ($group_id) and Genotype ($trouble_geno_id_str).";
-    
+
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $perm_err_msg}]};
 
     return $data_for_postrun_href;
-  }  
+  }
 
   $dbh_read->disconnect();
 
@@ -5193,12 +6360,12 @@ sub import_itemgroup_xml_runmode {
     my @item_id_list;
 
     for my $item (@{$item_data}) {
-      
+
       my $item_source_id     = $item_group->{'ItemSourceId'};
       my $container_type_id  = $item_group->{'ContainerTypeId'};
       my $specimen_id        = $item->{'SpecimenId'};
       my $scale_id           = $item_group->{'ScaleId'};
- 
+
       my $storage_id         = $item_group->{'StorageId'};
 
       if (defined($item->{'StorageId'})) {
@@ -5206,11 +6373,11 @@ sub import_itemgroup_xml_runmode {
         $storage_id = $item->{'StorageId'};
       }
 
-      my $item_unit_id       = $item_group->{'ItemUnitId'};
+      my $item_unit_id       = $item_group->{'UnitId'};
 
-      if (defined($item->{'ItemUnitId'})) {
+      if (defined($item->{'UnitId'})) {
 
-        $item_unit_id = $item->{'ItemUnitId'};
+        $item_unit_id = $item->{'UnitId'};
       }
 
       my $item_type_id       = $item->{'ItemTypeId'};
@@ -5233,7 +6400,7 @@ sub import_itemgroup_xml_runmode {
       $sql   .= 'SpecimenId=?, ';
       $sql   .= 'ScaleId=?, ';
       $sql   .= 'StorageId=?, ';
-      $sql   .= 'ItemUnitId=?, ';
+      $sql   .= 'UnitId=?, ';
       $sql   .= 'ItemTypeId=?, ';
       $sql   .= 'ItemStateId=?, ';
       $sql   .= 'ItemBarcode=?, ';
@@ -5246,7 +6413,7 @@ sub import_itemgroup_xml_runmode {
       $sth->execute($item_source_id, $container_type_id, $specimen_id, $scale_id, $storage_id, $item_unit_id,
                     $item_type_id, $item_state_id, $item_barcode, $amount, $date_added, $added_by_user_id,
                     $item_note);
-       
+
       my $item_id = -1;
       if (!$dbh_write->err()) {
 
@@ -5277,7 +6444,7 @@ sub import_itemgroup_xml_runmode {
 
           $data_for_postrun_href->{'Error'} = 1;
           $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-      
+
           return $data_for_postrun_href;
         }
 
@@ -5285,13 +6452,13 @@ sub import_itemgroup_xml_runmode {
 
         $data_for_postrun_href->{'Error'} = 1;
         $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-      
+
         return $data_for_postrun_href;
       }
       $sth->finish();
 
       push(@item_id_list, $item_id);
-      
+
     }
 
     my $item_group_name       = $item_group->{'ItemGroupName'};
@@ -5307,10 +6474,10 @@ sub import_itemgroup_xml_runmode {
 
     my $item_group_sth = $dbh_write->prepare($sql);
     $item_group_sth->execute($item_group_name, $item_group_note, $added_by_user, $date_added);
-       
+
     my $item_group_id = -1;
     if (!$dbh_write->err()) {
-    
+
       $item_group_id = $dbh_write->last_insert_id(undef, undef, 'itemgroup', 'ItemGroupId');
       $self->logger->debug("ItemGroupId: $item_group_id");
 
@@ -5533,44 +6700,17 @@ sub add_item_log_runmode {
                     'SystemUserId' => 1,
   };
 
-  my ($get_scol_err, $get_scol_msg, $scol_data, $pkey_data) = get_static_field($dbh_read, 'itemlog');
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'itemlog', $skip_field);
 
-  if ($get_scol_err) {
+  if ($chk_sfield_err) {
 
-    $self->logger->debug("Get static field info failed: $get_scol_msg");
-    
-    my $err_msg = "Unexpected Error.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+    $self->logger->debug($chk_sfield_msg);
 
-    return $data_for_postrun_href;
-  }
-
-  my $required_field_href = {};
-
-  for my $static_field (@{$scol_data}) {
-
-    my $field_name = $static_field->{'Name'};
-    
-    if ($skip_field->{$field_name}) { next; }
-
-    if ($static_field->{'Required'} == 1) {
-
-      $required_field_href->{$field_name} = $query->param($field_name);
-    }
+    return $for_postrun_href;
   }
 
   $dbh_read->disconnect();
-
-  my ($missing_err, $missing_href) = check_missing_href( $required_field_href );
-
-  if ($missing_err) {
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
-
-    return $data_for_postrun_href;
-  }
 
   # Finish generic required static field checking
 
@@ -5578,7 +6718,7 @@ sub add_item_log_runmode {
   my $log_type_id    = $query->param('LogTypeId');
   my $log_dt         = $query->param('LogDateTime');
   my $system_user_id = $self->authen->user_id();
-  
+
   my $dbh_k_read = connect_kdb_read();
 
   if (!type_existence($dbh_k_read, 'itemlog', $log_type_id)) {
@@ -5601,7 +6741,7 @@ sub add_item_log_runmode {
   }
 
   my ($log_dt_err, $log_dt_href ) = check_dt_href( { 'LogDateTime' => $log_dt } );
-    
+
   if ($log_dt_err) {
 
     $data_for_postrun_href->{'Error'} = 1;
@@ -5625,7 +6765,7 @@ sub add_item_log_runmode {
 
   my $item_log_id = -1;
   if ( $dbh_k_write->err() ) {
-    
+
     $self->logger->debug("INSERT INTO itemlog failed");
     my $err_msg = "Unexpected Error.";
 
@@ -5784,6 +6924,565 @@ sub show_item_log_runmode {
   return $data_for_postrun_href;
 }
 
+sub add_conversionrule_runmode {
+
+=pod add_conversionrule_gadmin_HELP_START
+{
+"OperationName" : "Add conversionrule",
+"Description": "Add conversionrule from one general unit to another unit",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 1,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"KDDArTModule": "main",
+"KDDArTTable": "conversionrule",
+"SkippedField": ["FromUnitId"],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><ReturnId Value='1' ParaName='ConversionRuleId' /><Info Message='ConversionRule (1) has been added successfully.' /></DATA>",
+"SuccessMessageJSON": "{'ReturnId' : [{'Value' : '7', 'ParaName' : 'ConversionRuleId'}], 'Info' : [{'Message' : 'ConversionRule (7) has been added successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error ToUnitId='To Unit (72): not found' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'ToUnitId' : 'To Unit (72): not found'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "UnitId from which the conversionrule applies."}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self          = shift;
+  my $query         = $self->query();
+
+  my $unit_id_from  = $self->param('id');
+
+  my $data_for_postrun_href = {};
+
+  # Generic required static field checking
+
+  my $dbh_read = connect_kdb_read();
+
+  my $skip_field = {'FromUnitId' => 1};
+
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'conversionrule', $skip_field);
+
+  if ($chk_sfield_err) {
+
+    $self->logger->debug($chk_sfield_msg);
+
+    return $for_postrun_href;
+  }
+
+  $dbh_read->disconnect();
+
+  # Finish generic required static field checking
+
+  my $unit_id_to  = $query->param('ToUnitId');
+  my $formula     = $query->param('ConversionFormula');
+
+  my $dbh_write = connect_kdb_write();
+
+  if (!record_existence($dbh_write, 'generalunit', 'UnitId', $unit_id_from)) {
+
+    my $err_msg = "From Unit ($unit_id_from): not found";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (!record_existence($dbh_write, 'generalunit', 'UnitId', $unit_id_to)) {
+
+    my $err_msg = "To Unit ($unit_id_to): not found";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'ToUnitId' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $sql = 'SELECT ConversionRuleId FROM conversionrule WHERE FromUnitId=? AND ToUnitId=?';
+
+  my ($r_crule_err, $db_crule_id) = read_cell($dbh_write, $sql, [$unit_id_from, $unit_id_to]);
+
+  if ($r_crule_err) {
+
+    $self->logger->debug("Check if conversion rule already exists");
+    my $err_msg = "Unexpected Error.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (length($db_crule_id) > 0) {
+
+    my $err_msg = "Conversionrule from Unit ($unit_id_from) to Unit ($unit_id_to): already exists.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sql    = 'INSERT INTO conversionrule SET ';
+  $sql   .= 'FromUnitId=?, ';
+  $sql   .= 'ToUnitId=?, ';
+  $sql   .= 'ConversionFormula=?';
+
+  my $sth = $dbh_write->prepare($sql);
+  $sth->execute($unit_id_from, $unit_id_to, $formula);
+
+  my $conversion_rule_id = -1;
+
+  if (!$dbh_write->err()) {
+
+    $conversion_rule_id = $dbh_write->last_insert_id(undef, undef, 'conversionrule', 'ConversionRuleId');
+  }
+  else {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+  $sth->finish();
+
+  $dbh_write->disconnect();
+
+  my $info_msg_aref  = [{'Message' => "ConversionRule ($conversion_rule_id) has been added successfully."}];
+  my $return_id_aref = [{'Value' => "$conversion_rule_id", 'ParaName' => 'ConversionRuleId'}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'      => $info_msg_aref,
+                                           'ReturnId'  => $return_id_aref,
+  };
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub del_conversionrule_runmode {
+
+=pod del_conversionrule_gadmin_HELP_START
+{
+"OperationName" : "Delete conversionrule",
+"Description": "Delete conversionrule",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 1,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='ConversionRule (8) has been deleted successfully.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'ConversionRule (9) has been deleted successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='ConversionRule (11) not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'ConversionRule (11) not found.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing conversionrule id."}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self              = shift;
+  my $conversionrule_id = $self->param('id');
+
+  my $data_for_postrun_href = {};
+
+  my $dbh_k_read = connect_kdb_read();
+
+  my $conversionrule_exist = record_existence($dbh_k_read, 'conversionrule', 'ConversionRuleId', $conversionrule_id);
+
+  if (!$conversionrule_exist) {
+
+    my $err_msg = "ConversionRule ($conversionrule_id) not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh_k_read->disconnect();
+
+  my $dbh_k_write = connect_kdb_write();
+
+  my $sql = 'DELETE FROM conversionrule WHERE ConversionRuleId=?';
+  my $sth = $dbh_k_write->prepare($sql);
+
+  $sth->execute($conversionrule_id);
+
+  if ($dbh_k_write->err()) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sth->finish();
+
+  $dbh_k_write->disconnect();
+
+  my $info_msg_aref = [{'Message' => "ConversionRule ($conversionrule_id) has been deleted successfully."}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info' => $info_msg_aref};
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub update_conversionrule_runmode {
+
+=pod update_conversionrule_gadmin_HELP_START
+{
+"OperationName" : "Update conversionrule",
+"Description": "Update conversionrule",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 1,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"KDDArTModule": "main",
+"KDDArTTable": "conversionrule",
+"SkippedField": ["FromUnitId", "ToUnitId"],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='ConversionRule (11) has been updated successfully.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'ConversionRule (11) has been updated successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='ConversionRule (72): not found' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'ConversionRule (72): not found'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing conversionrule id."}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self          = shift;
+  my $query         = $self->query();
+
+  my $conversionrule_id  = $self->param('id');
+
+  my $data_for_postrun_href = {};
+
+  # Generic required static field checking
+
+  my $dbh_read = connect_kdb_read();
+
+  my $skip_field = {'FromUnitId' => 1,
+                    'ToUnitId'   => 1,
+                   };
+
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'conversionrule', $skip_field);
+
+  if ($chk_sfield_err) {
+
+    $self->logger->debug($chk_sfield_msg);
+
+    return $for_postrun_href;
+  }
+
+  $dbh_read->disconnect();
+
+  # Finish generic required static field checking
+
+  my $formula     = $query->param('ConversionFormula');
+
+  my $dbh_write = connect_kdb_write();
+
+  if (!record_existence($dbh_write, 'conversionrule', 'ConversionRuleId', $conversionrule_id)) {
+
+    my $err_msg = "ConversionRule ($conversionrule_id): not found";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $sql = 'UPDATE conversionrule SET ';
+  $sql   .= 'ConversionFormula=? ';
+  $sql   .= 'WHERE ConversionRuleId=?';
+
+  my $sth = $dbh_write->prepare($sql);
+  $sth->execute($formula, $conversionrule_id);
+
+
+  if ($dbh_write->err()) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+  $sth->finish();
+
+  $dbh_write->disconnect();
+
+  my $info_msg_aref  = [{'Message' => "ConversionRule ($conversionrule_id) has been updated successfully."}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'      => $info_msg_aref};
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub list_conversionrule {
+
+  my $self           = $_[0];
+  my $extra_attr_yes = $_[1];
+  my $sql            = $_[2];
+
+  my $where_para_aref = [];
+
+  if (defined $_[3]) {
+
+    $where_para_aref = $_[3];
+  }
+
+  my $count = 0;
+  while ($sql =~ /\?/g) {
+
+    $count += 1;
+  }
+
+  if ( scalar(@{$where_para_aref}) != $count ) {
+
+    my $msg = 'Number of arguments does not match with ';
+    $msg   .= 'number of SQL parameter.';
+    return (1, $msg, []);
+  }
+
+  my $dbh = connect_kdb_read();
+  my $sth = $dbh->prepare($sql);
+
+  $sth->execute(@{$where_para_aref});
+
+  my $err = 0;
+  my $msg = '';
+  my $conversionrule_data = [];
+
+  if ( !$dbh->err() ) {
+
+    my $array_ref = $sth->fetchall_arrayref({});
+
+    if ( !$sth->err() ) {
+
+      $conversionrule_data = $array_ref;
+    }
+    else {
+
+      $err = 1;
+      $msg = 'Unexpected error';
+      $self->logger->debug('Err: ' . $dbh->errstr());
+    }
+  }
+  else {
+
+    $err = 1;
+    $msg = 'Unexpected error';
+    $self->logger->debug('Err: ' . $dbh->errstr());
+  }
+
+  $sth->finish();
+
+  my $extra_attr_conversionrule_data = [];
+
+  if ($extra_attr_yes) {
+
+    my $gadmin_status = $self->authen->gadmin_status();
+
+    for my $row (@{$conversionrule_data}) {
+
+      if ($gadmin_status eq '1') {
+
+        my $conversionrule_id = $row->{'ConversionRuleId'};
+        $row->{'update'} = "update/conversionrule/$conversionrule_id";
+        $row->{'delete'} = "delete/conversionrule/$conversionrule_id";
+      }
+      push(@{$extra_attr_conversionrule_data}, $row);
+    }
+  }
+  else {
+
+    $extra_attr_conversionrule_data = $conversionrule_data;
+  }
+
+  $dbh->disconnect();
+
+  return ($err, $msg, $extra_attr_conversionrule_data);
+}
+
+sub list_conversionrule_runmode {
+
+=pod list_conversionrule_HELP_START
+{
+"OperationName" : "List conversionrule",
+"Description": "Return list of conversionrules for a unit specified by id.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><RecordMeta TagName='ConversionRule' /><ConversionRule ConversionFormula='1' FromUnitName='U_1498338' ToUnitName='U_1498338' ConversionRuleId='1' FromUnitId='31' delete='delete/conversionrule/1' update='update/conversionrule/1' ToUnitId='31' /></DATA>",
+"SuccessMessageJSON": "{'RecordMeta' : [{'TagName' : 'ConversionRule'}], 'ConversionRule' : [{'ConversionFormula' : '1', 'FromUnitName' : 'U_1498338', 'FromUnitId' : '31', 'delete' : 'delete/conversionrule/1', 'update' : 'update/conversionrule/1', 'ToUnitName' : 'U_1498338', 'ToUnitId' : '31', 'ConversionRuleId' : '1'}]}",
+"ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
+"HTTPParameter": [{"Required": 0, "Name": "FromUnitId", "Description": "Filtering parameter for the UnitId from which the conversion rules apply."}, {"Required": 0, "Name": "ToUnitId", "Description": "Filtering parameter for the UnitId to which the conversion rules apply."}],
+"ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self     = shift;
+  my $query    = $self->query();
+
+  my $from_unit_id  = undef;
+  my $to_unit_id    = undef;
+
+  my @where_clause_list;
+  my $where_arg = [];
+
+  if (defined $query->param('FromUnitId')) {
+
+    if (length($query->param('FromUnitId')) > 0) {
+
+      $from_unit_id = $query->param('FromUnitId');
+
+      push(@{$where_arg}, $from_unit_id);
+      push(@where_clause_list, 'FromUnitId=?');
+    }
+  }
+
+  if (defined $query->param('ToUnitId')) {
+
+    if (length($query->param('ToUnitId')) > 0) {
+
+      $to_unit_id = $query->param('ToUnitId');
+
+      push(@{$where_arg}, $to_unit_id);
+      push(@where_clause_list, 'ToUnitId=?');
+    }
+  }
+
+  my $data_for_postrun_href = {};
+
+  my $dbh = connect_kdb_read();
+
+  if (defined $from_unit_id) {
+
+    if (!record_existence($dbh, 'generalunit', 'UnitId', $from_unit_id)) {
+
+      my $err_msg = "Unit ($from_unit_id): not found.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'FromUnitId' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  if (defined $to_unit_id) {
+
+    if (!record_existence($dbh, 'generalunit', 'UnitId', $to_unit_id)) {
+
+      my $err_msg = "Unit ($to_unit_id): not found.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'ToUnitId' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  $dbh->disconnect();
+
+  my $sql = 'SELECT conversionrule.*, fromunit.UnitName AS FromUnitName, tounit.UnitName AS ToUnitName ';
+  $sql   .= 'FROM conversionrule ';
+  $sql   .= 'LEFT JOIN generalunit AS fromunit ON conversionrule.FromUnitId = fromunit.UnitId ';
+  $sql   .= 'LEFT JOIN generalunit AS tounit ON conversionrule.ToUnitId = tounit.UnitId ';
+
+  if (scalar(@where_clause_list) > 0) {
+
+    $sql .= 'WHERE ' . join(' AND ', @where_clause_list);
+  }
+
+  $self->logger->debug("SQL: $sql");
+
+  my ($conversionrule_err, $conversionrule_msg, $conversionrule_data) = $self->list_conversionrule(1, $sql, $where_arg);
+
+  if ($conversionrule_err) {
+
+    my $err_msg = 'Unexpected error';
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'ConversionRule'      => $conversionrule_data,
+                                           'RecordMeta'          => [{'TagName' => 'ConversionRule'}],
+  };
+
+  return $data_for_postrun_href;
+}
+
+sub get_conversionrule_runmode {
+
+=pod get_conversionrule_HELP_START
+{
+"OperationName" : "Get conversionrule",
+"Description": "Return conversionrule details for specified conversionrule id.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><RecordMeta TagName='ConversionRule' /><ConversionRule ConversionFormula='2' FromUnitName='U_3621603' ToUnitName='U_3621603' ConversionRuleId='11' FromUnitId='41' delete='delete/conversionrule/11' update='update/conversionrule/11' ToUnitId='41' /></DATA>",
+"SuccessMessageJSON": "{'RecordMeta' : [{'TagName' : 'ConversionRule'}], 'ConversionRule' : [{'ConversionFormula' : '2', 'FromUnitName' : 'U_3621603', 'FromUnitId' : '41', 'delete' : 'delete/conversionrule/11', 'update' : 'update/conversionrule/11', 'ToUnitName' : 'U_3621603', 'ToUnitId' : '41', 'ConversionRuleId' : '11'}]}",
+"ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
+"ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing conversionrule id."}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self         = shift;
+  my $conv_rule_id = $self->param('id');
+
+  my $data_for_postrun_href = {};
+
+  my $dbh = connect_kdb_read();
+
+  if (!record_existence($dbh, 'conversionrule', 'ConversionRuleId', $conv_rule_id)) {
+
+    my $err_msg = "ConversionRule ($conv_rule_id): not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+
+  $dbh->disconnect();
+
+  my $sql = 'SELECT conversionrule.*, fromunit.UnitName AS FromUnitName, tounit.UnitName AS ToUnitName ';
+  $sql   .= 'FROM conversionrule ';
+  $sql   .= 'LEFT JOIN generalunit AS fromunit ON conversionrule.FromUnitId = fromunit.UnitId ';
+  $sql   .= 'LEFT JOIN generalunit AS tounit ON conversionrule.ToUnitId = tounit.UnitId ';
+  $sql   .= 'WHERE ConversionRuleId=?';
+
+
+  $self->logger->debug("SQL: $sql");
+
+  my ($conversionrule_err, $conversionrule_msg, $conversionrule_data) = $self->list_conversionrule(1, $sql, [$conv_rule_id]);
+
+  if ($conversionrule_err) {
+
+    my $err_msg = 'Unexpected error';
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'ConversionRule'      => $conversionrule_data,
+                                           'RecordMeta'          => [{'TagName' => 'ConversionRule'}],
+  };
+
+  return $data_for_postrun_href;
+}
+
 ######################################################################
 # Utility functions
 
@@ -5837,10 +7536,10 @@ sub _get_item_factor {
 sub _add_factor {
 
   my ( $self, $item_id, $vcol_data ) = @_;
-  
+
   my $query       = $self->query();
   my $dbh_k_write = connect_kdb_write();
-  
+
   for my $vcol_id ( keys( %{$vcol_data} ) ) {
 
     my $factor_value = $query->param( 'VCol_' . "$vcol_id" );
@@ -5855,9 +7554,9 @@ sub _add_factor {
             ";
       my $factor_sth = $dbh_k_write->prepare($sql);
       $factor_sth->execute( $item_id, $vcol_id, $factor_value );
-      
+
       if ( $dbh_k_write->err() ) {
-        
+
         # Return undef if any error occur
         return undef;
       }
@@ -5872,14 +7571,14 @@ sub _add_factor {
 
 sub get_itemgroup_dtd_file {
 
-  my $dtd_path = $DTD_PATH;
+  my $dtd_path = $ENV{DOCUMENT_ROOT} . '/' . $DTD_PATH;
 
   return "${dtd_path}/itemgroup.dtd";
 }
 
 sub get_item_group_entry_dtd_file {
 
-  my $dtd_path = $DTD_PATH;
+  my $dtd_path = $ENV{DOCUMENT_ROOT} . '/' . $DTD_PATH;
 
   return "${dtd_path}/itemgroupentry.dtd";
 }

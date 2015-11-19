@@ -24,6 +24,6 @@
   <Parent CaseFile="xml/add_data_no_vcol/case_00006_add_site.xml" Force="1" Order="3" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00339_add_trialtype.xml" Force="1" Order="4" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00118_add_designtype.xml" Force="1" Order="5" />
-  <ReturnId ParaName="TrialId" Value="263" />
+  
   
 </TestCase>

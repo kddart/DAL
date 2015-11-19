@@ -11,6 +11,6 @@
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00394_add_project.xml" Order="3" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00402_add_filetype1.xml" Order="4" />
-  <ReturnId ParaName="MultimediaId" Value="2" />
-  <RunInfo Success="1" Time="1409792247" />
+  <ReturnId ParaName="MultimediaId" Value="17" />
+  <RunInfo Success="1" Time="1443160582" />
 </TestCase>

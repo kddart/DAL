@@ -15,6 +15,5 @@
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00108_add_specimen.xml" Order="3" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00380_add_breedmeth_4update_spec.xml" Order="4" />
-  <ReturnId ParaName="SpecimenId" Value="998" />
-  <RunInfo Success="1" Time="1409792077" />
+  <RunInfo Success="1" Time="1443160382" />
 </TestCase>

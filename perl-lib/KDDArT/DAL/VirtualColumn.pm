@@ -1,5 +1,7 @@
-#$Id: VirtualColumn.pm 790 2014-09-03 06:43:00Z puthick $
+#$Id: VirtualColumn.pm 1016 2015-10-08 06:06:28Z puthick $
 #$Author: puthick $
+
+# Copyright (c) 2015, Diversity Arrays Technology, All rights reserved.
 
 # COPYRIGHT AND LICENSE
 # 
@@ -16,8 +18,7 @@
 # GNU General Public License for more details.
 
 # Author    : Puthick Hok
-# Version   : 2.2.5 build 795
-# Created   : 02/06/2010
+# Version   : 2.3.0 build 1040
 
 package KDDArT::DAL::VirtualColumn;
 
@@ -84,6 +85,7 @@ sub setup {
     'get_general_type'                => 'get_general_type_runmode',
     'update_general_type_gadmin'      => 'update_general_type_runmode',
     'del_general_type_gadmin'         => 'del_general_type_runmode',
+    'count_groupby'                   => 'count_groupby_runmode',
       );
 
   my $logger = get_logger();
@@ -390,10 +392,11 @@ sub list_field_runmode {
 
   $tbl_info_sth->finish();
 
-  my $vcol_aref = [];
-  my $scol_aref = [];
-  my $mcol_aref = [];
-  my $lcol_aref = [];
+  my $vcol_aref        = [];
+  my $scol_aref        = [];
+  my $mcol_aref        = [];
+  my $lcol_aref        = [];
+  my $primary_key_aref = [];
 
   my $rec_meta_aref = [];
 
@@ -421,11 +424,6 @@ sub list_field_runmode {
     # genotypemarkermetaX uses the virtual column concept 
     # its actual table structure is different.
 
-    if ($parent_table eq 'genotypemarkermetaX') {
-
-       $factor_table = $parent_table;
-    }
-
     my $dbh   = connect_kdb_read();
     my $dbh_m = connect_mdb_read();
 
@@ -435,10 +433,10 @@ sub list_field_runmode {
     $sql   .= 'FactorValueMaxLength, FactorUnit ';
     $sql   .= 'FROM factor ';
     $sql   .= 'WHERE TableNameOfFactor=?';
-    
+
     my $sth = $dbh->prepare($sql);
     $sth->execute($factor_table);
-    
+
     my $vcol_data = [];
 
     if (!$dbh->err()) {
@@ -450,7 +448,7 @@ sub list_field_runmode {
         $vcol_data = $array_ref;
       }
       else {
-        
+
         $data_for_postrun_href->{'Error'} = 1;
         $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
@@ -458,20 +456,20 @@ sub list_field_runmode {
       }
     }
     else {
-      
+
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
       return $data_for_postrun_href;
     }
-    
+
     $sth->finish();
 
     if (scalar(@{$vcol_data}) > 0) {
 
       push(@{$rec_meta_aref}, {'TagName' => 'VCol'});
     }
-    
+
     $vcol_aref = $vcol_data;
 
     my $static_field_aref = [];
@@ -479,7 +477,9 @@ sub list_field_runmode {
 
     my ($k_sfield_err, $k_sfield_msg, $k_sfield_aref, $k_pkey) = get_static_field($dbh,
                                                                                   $parent_table);
-    
+
+    $self->logger->debug("Get static field error message: $k_sfield_msg");
+
     if ($k_sfield_err) {
 
       # this table is not in the main database, maybe it is in the marker database.
@@ -487,7 +487,7 @@ sub list_field_runmode {
                                                                                     $parent_table);
 
       if ($m_sfield_err) {
-      
+
         my $err_msg = "Table ($parent_table) does not exist.";
         $data_for_postrun_href->{'Error'} = 1;
         $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
@@ -505,67 +505,72 @@ sub list_field_runmode {
       $static_field_aref = $k_sfield_aref;
       $pkey = $k_pkey;
     }
-    
+
     my @primary_key_names = @{$pkey};
-    
+
+    foreach my $pkey_name (@primary_key_names) {
+
+      push(@{$primary_key_aref}, {'Name' => $pkey_name});
+    }
+
     $scol_aref = $static_field_aref;
 
     if (scalar(@{$static_field_aref}) > 0) {
 
       push(@{$rec_meta_aref}, {'TagName' => 'SCol'});
     }
-    
+
     my $many2many_info = $M2M_RELATION;
-    
+
     if ($many2many_info->{$parent_table}) {
-      
+
       my $m2m_field_aref = [];
       for my $m2m_table (@{$many2many_info->{$parent_table}}) {
-        
+
         my @m2m_pkey_names = $dbh->primary_key( undef, undef, $m2m_table );
-        
+
         $sql = "SELECT * FROM $m2m_table LIMIT 1";
         $sth = $dbh->prepare($sql);
         $sth->execute();
-        
+
         if ($dbh->err()) {
-          
+
           $data_for_postrun_href->{'Error'} = 1;
           $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
           return $data_for_postrun_href;
         }
-        
+
         my $m2m_nfield = $sth->{'NUM_OF_FIELDS'};
-        
+
         for (my $i = 0; $i < $m2m_nfield; $i++) {
-          
+
           my $m2m_fieldname = $sth->{'NAME'}->[$i];
-          
+
           if (scalar(@m2m_pkey_names) == 1) {
-            
+
             if ($m2m_fieldname eq $m2m_pkey_names[0]) {
-              
+
               next;
             }
           }
-          
+
           if (scalar(@primary_key_names) == 1) {
-            
+
             if ($m2m_fieldname eq $primary_key_names[0]) {
-              
+
               next;
             }
           }
-          
+
           my $m2m_required = 1;
-          
+
           if ($sth->{'NULLABLE'}->[$i] eq '1') {
-            
+
             $m2m_required = 0;
           }
           else {
-          
+
             $m2m_required = 1;
           }
 
@@ -578,7 +583,7 @@ sub list_field_runmode {
           $m2m_field->{'Required'}  = $m2m_required;
           $m2m_field->{'TableName'} = $m2m_table;
           $m2m_field->{'DataType'}  = $m2m_dtype_name;
-          
+
           push(@{$m2m_field_aref}, $m2m_field);
         }
         $sth->finish();
@@ -591,7 +596,7 @@ sub list_field_runmode {
         push(@{$rec_meta_aref}, {'TagName' => 'MCol'});
       }
     }
-    
+
     $dbh->disconnect();
     $dbh_m->disconnect();
 
@@ -629,7 +634,7 @@ sub list_field_runmode {
       push(@{$lcol_aref}, $lcol_href);
 
       if (scalar(@{$lcol_aref}) > 0) {
-      
+
         push(@{$rec_meta_aref}, {'TagName' => 'LCol'});
       }
     }
@@ -655,12 +660,17 @@ sub list_field_runmode {
 
     $data_for_postrun_href->{'Data'}->{'MCol'} = $mcol_aref;
   }
-  
+
   if (scalar(@{$lcol_aref}) > 0) {
 
     $data_for_postrun_href->{'Data'}->{'LCol'} = $lcol_aref;
   }
-    
+
+  if (scalar(@{$primary_key_aref}) > 0) {
+
+    $data_for_postrun_href->{'Data'}->{'PrimaryKey'} = $primary_key_aref;
+  }
+
   $data_for_postrun_href->{'Error'}                = 0;
   $data_for_postrun_href->{'Data'}->{'RecordMeta'} = $rec_meta_aref;
 
@@ -704,44 +714,17 @@ sub update_vcolumn_runmode {
                      'OwnGroupId'        => 1
   };
 
-  my ($get_scol_err, $get_scol_msg, $scol_data, $pkey_data) = get_static_field($dbh_read, 'factor');
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'factor', $skip_field);
 
-  if ($get_scol_err) {
+  if ($chk_sfield_err) {
 
-    $self->logger->debug("Get static field info failed: $get_scol_msg");
-    
-    my $err_msg = "Unexpected Error.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+    $self->logger->debug($chk_sfield_msg);
 
-    return $data_for_postrun_href;
-  }
-
-  my $required_field_href = {};
-
-  for my $static_field (@{$scol_data}) {
-
-    my $field_name = $static_field->{'Name'};
-    
-    if ($skip_field->{$field_name}) { next; }
-
-    if ($static_field->{'Required'} == 1) {
-
-      $required_field_href->{$field_name} = $query->param($field_name);
-    }
+    return $for_postrun_href;
   }
 
   $dbh_read->disconnect();
-
-  my ($missing_err, $missing_href) = check_missing_href( $required_field_href );
-
-  if ($missing_err) {
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
-
-    return $data_for_postrun_href;
-  }
 
   # Finish generic required field checking
 
@@ -1187,44 +1170,17 @@ sub add_vcolumn_runmode {
                      'OwnGroupId'        => 1
   };
 
-  my ($get_scol_err, $get_scol_msg, $scol_data, $pkey_data) = get_static_field($dbh_read, 'factor');
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'factor', $skip_field);
 
-  if ($get_scol_err) {
+  if ($chk_sfield_err) {
 
-    $self->logger->debug("Get static field info failed: $get_scol_msg");
-    
-    my $err_msg = "Unexpected Error.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+    $self->logger->debug($chk_sfield_msg);
 
-    return $data_for_postrun_href;
-  }
-
-  my $required_field_href = {};
-
-  for my $static_field (@{$scol_data}) {
-
-    my $field_name = $static_field->{'Name'};
-    
-    if ($skip_field->{$field_name}) { next; }
-
-    if ($static_field->{'Required'} == 1) {
-
-      $required_field_href->{$field_name} = $query->param($field_name);
-    }
+    return $for_postrun_href;
   }
 
   $dbh_read->disconnect();
-
-  my ($missing_err, $missing_href) = check_missing_href( $required_field_href );
-
-  if ($missing_err) {
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
-
-    return $data_for_postrun_href;
-  }
 
   # Finish generic required field checking
 
@@ -1411,8 +1367,10 @@ sub get_dtd_runmode {
   my $table_name = $self->param('tname');
 
   my $data_for_postrun_href = {};
-  
-  my $dtd_file = "${DTD_PATH}/${table_name}.dtd";
+
+  my $dtd_path = $ENV{DOCUMENT_ROOT} . '/' . $DTD_PATH;
+
+  my $dtd_file = "${dtd_path}/${table_name}.dtd";
 
   if ( !(-e $dtd_file) ) {
 
@@ -1454,7 +1412,7 @@ sub add_general_type_runmode {
 "SuccessMessageJSON": "{'ReturnId' : [{'Value' : '225', 'ParaName' : 'TypeId'}], 'Info' : [{'Message' : 'GeneralType (225) has been added successfully.'}]}",
 "ErrorMessageXML": [{"NameAlreadyExists": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Type (Research Station) for class (site) already exists.' /></DATA>"}],
 "ErrorMessageJSON": [{"NameAlreadyExists": "{'Error' : [{'Message' : 'Type (Research Station) for class (site) already exists.'}]}"}],
-"URLParameter": [{"ParameterName": "class", "Description": "Value from a predefined list of values for classification of the type. This list of values is site, item, container, deviceregister, trial, trialevent, sample, specimengroup, state, parent, itemparent, genotypespecimen, markerstate, markerquality, workflow, project, itemlog, plate, genmap, multimedia, tissue, genotypealias, genparent, genotypealiasstatus, traitgroup, unittype and multilocation."}],
+"URLParameter": [{"ParameterName": "class", "Description": "Value from a predefined list of values for classification of the type. This list of values is site, item, container, deviceregister, trial, trialevent, sample, specimengroup, state, parent, itemparent, genotypespecimen, dataset, workflow, project, itemlog, plate, genmap, multimedia, tissue, genotypealias, genparent, genotypealiasstatus, traitgroup, unittype and multilocation."}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
@@ -1468,52 +1426,25 @@ sub add_general_type_runmode {
 
   my $dbh_read = connect_kdb_read();
 
-  my $skip_field = {'Class' => 1};
+  my $skip_field = {'Class'   => 1};
 
-  my ($get_scol_err, $get_scol_msg, $scol_data, $pkey_data) = get_static_field($dbh_read, 'generaltype');
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'generaltype', $skip_field);
 
-  if ($get_scol_err) {
+  if ($chk_sfield_err) {
 
-    $self->logger->debug("Get static field info failed: $get_scol_msg");
+    $self->logger->debug($chk_sfield_msg);
 
-    my $err_msg = "Unexpected Error.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-    return $data_for_postrun_href;
-  }
-
-  my $required_field_href = {};
-
-  for my $static_field (@{$scol_data}) {
-
-    my $field_name = $static_field->{'Name'};
-    
-    if ($skip_field->{$field_name}) { next; }
-
-    if ($static_field->{'Required'} == 1) {
-
-      $required_field_href->{$field_name} = $query->param($field_name);
-    }
+    return $for_postrun_href;
   }
 
   $dbh_read->disconnect();
-
-  my ($missing_err, $missing_href) = check_missing_href( $required_field_href );
-
-  if ($missing_err) {
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
-
-    return $data_for_postrun_href;
-  }
 
   # Finish generic required static field checking
 
   my $class            = $self->param('class');
   my $type_name        = $query->param('TypeName');
-  
+
   my $is_active        = '1';
 
   if (defined $query->param('IsTypeActive')) {
@@ -1539,6 +1470,17 @@ sub add_general_type_runmode {
     return $data_for_postrun_href;
   }
 
+  my $is_fixed = $query->param('IsFixed');
+
+  if ( $is_fixed !~ /^(1|0){1}$/ ) {
+
+    my $err_msg = "IsFixed ($is_fixed): invalid";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'IsFixed' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
   my $class_lookup = { 'site'                 => 1,
                        'item'                 => 1,
                        'container'            => 1,
@@ -1552,8 +1494,7 @@ sub add_general_type_runmode {
                        'itemparent'           => 1,
                        'plate'                => 1,
                        'tissue'               => 1,
-                       'markerstate'          => 1,
-                       'markerquality'        => 1,
+                       'markerdataset'        => 1,
                        'workflow'             => 1,
                        'project'              => 1,
                        'itemlog'              => 1,
@@ -1566,12 +1507,18 @@ sub add_general_type_runmode {
                        'traitgroup'           => 1,
                        'unittype'             => 1,
                        'multilocation'        => 1,
+                       'breedingmethod'       => 1,
+                       'specimengroupstatus'  => 1,
   };
 
   if (!($class_lookup->{$class})) {
 
     my $err_msg = "Class ($class) not supported.";
-    return $self->_set_error($err_msg);
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
   }
 
   my $dbh_k_read = connect_kdb_read();
@@ -1586,7 +1533,7 @@ sub add_general_type_runmode {
 
     my $err_msg = "Type ($type_name) for class ($class) already exists.";
     $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'TypeName' => $err_msg}]};
 
     return $data_for_postrun_href;
   }
@@ -1643,10 +1590,11 @@ sub add_general_type_runmode {
   $sql .= 'Class=?, ';
   $sql .= 'TypeName=?, ';
   $sql .= 'TypeNote=?, ';
-  $sql .= 'IsTypeActive=?';
+  $sql .= 'IsTypeActive=?, ';
+  $sql .= 'IsFixed=?';
 
   my $sth = $dbh_k_write->prepare($sql);
-  $sth->execute($class, $type_name, $type_note, $is_active);
+  $sth->execute($class, $type_name, $type_note, $is_active, $is_fixed);
 
   if (!$dbh_k_write->err()) {
 
@@ -1670,9 +1618,9 @@ sub add_general_type_runmode {
       $sql .= 'FactorValue=?';
       my $factor_sth = $dbh_k_write->prepare($sql);
       $factor_sth->execute($type_id, $vcol_id, $factor_value);
-      
+
       if ($dbh_k_write->err()) {
-        
+
         return $self->_set_error('Unexpected Error.');
       }
 
@@ -1723,8 +1671,7 @@ sub list_general_type {
                                  'parent'              => [{'TableName' => 'pedigree', 'FieldName' => 'ParentType'}],
                                  'itemparent'          => [{'TableName' => 'itemparent', 'FieldName' => 'ItemParentType'}],
                                  'genotypespecimen'    => [{'TableName' => 'genotypespecimen', 'FieldName' => 'GenotypeSpecimenType'}],
-                                 'markerstate'         => [{'TableName' => 'analysisgroup', 'FieldName' => 'MarkerStateType'}],
-                                 'markerquality'       => [{'TableName' => 'analysisgroup', 'FieldName' => 'MarkerQualityType'}],
+                                 'markerdataset'       => [{'TableName' => 'dataset', 'FieldName' => 'DataSetType'}],
                                  'workflow'            => [{'TableName' => 'workflow', 'FieldName' => 'WorkflowType'}],
                                  'project'             => [{'TableName' => 'project', 'FieldName' => 'TypeId'}],
                                  'itemlog'             => [{'TableName' => 'itemlog', 'FieldName' => 'LogTypeId'}],
@@ -1737,11 +1684,12 @@ sub list_general_type {
                                  'genotypealiasstatus' => [{'TableName' => 'genotypealias', 'FieldName' => 'GenotypeAliasStatus'}],
                                  'traitgroup'          => [{'TableName' => 'trait', 'FieldName' => 'TraitGroupTypeId'}],
                                  'unittype'            => [{'TableName' => 'itemunit', 'FieldName' => 'UnitTypeId'}],
+                                 'breedingmethod'      => [{'TableName' => 'breedingmethod', 'FieldName' => 'BreedingMethodTypeId'}],
                                  'multilocation'       => [],
+                                 'specimengroupstatus' => [{'TableName' => 'specimengroup', 'FieldName' => 'SpecimenGroupStatus'}]
   };
 
-  my $marker_class_lookup = {'markerstate'       => 1,
-                             'markerquality'     => 1,
+  my $marker_class_lookup = {'markerdataset'     => 1,
                              'plate'             => 1,
                              'genmap'            => 1,
                              'tissue'            => 1,
@@ -1812,17 +1760,17 @@ sub list_general_type {
 
         my $type_id       = $type_row->{'TypeId'};
         my $class         = $type_row->{'Class'};
-    
+
         if ($gadmin_status eq '1') {
-      
+
           $type_row->{'update'} = "update/type/$class/$type_id";
-        
+
           if ( $not_used_id_href->{$type_id} ) {
-        
+
             $type_row->{'delete'}   = "delete/type/$class/$type_id";
           }
         }
-    
+
         push(@{$extra_attr_type_data}, $type_row);
       }
     }
@@ -1853,7 +1801,7 @@ sub list_general_type_runmode {
 "SuccessMessageJSON": "{'VCol' : [], 'RecordMeta' : [{'TagName' : 'GeneralType'}], 'GeneralType' : [{'IsTypeActive' : '0', 'TypeId' : '225', 'TypeName' : 'Farm', 'Class' : 'site', 'update' : 'update/type/site/225', 'TypeNote' : ''},{'IsTypeActive' : '1', 'TypeId' : '224', 'TypeName' : 'Research Station', 'Class' : 'site', 'update' : 'update/type/site/224', 'TypeNote' : ''}]}",
 "ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Class (contact) not supported.' /></DATA>"}],
 "ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Class (contact) not supported.'}]}"}],
-"URLParameter": [{"ParameterName": "class", "Description": "Value from a predefined list of values for classification of the type. This list of values is site, item, container, deviceregister, trial, trialevent, sample, specimengroup, state, parent, itemparent, genotypespecimen, markerstate, markerquality, workflow, project, itemlog, plate, genmap, multimedia, tissue, genotypealias, genparent, genotypealiasstatus, traitgroup, unittype and multilocation."}, {"ParameterName": "status", "Description": "Status filtering value which can be 'active', 'inactive' or 'all'."}],
+"URLParameter": [{"ParameterName": "class", "Description": "Value from a predefined list of values for classification of the type. This list of values is site, item, container, deviceregister, trial, trialevent, sample, specimengroup, state, parent, itemparent, genotypespecimen, dataset, workflow, project, itemlog, plate, genmap, multimedia, tissue, genotypealias, genparent, genotypealiasstatus, traitgroup, unittype and multilocation."}, {"ParameterName": "status", "Description": "Status filtering value which can be 'active', 'inactive' or 'all'."}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
@@ -1888,8 +1836,7 @@ sub list_general_type_runmode {
                        'itemparent'           => 1,
                        'plate'                => 1,
                        'tissue'               => 1,
-                       'markerstate'          => 1,
-                       'markerquality'        => 1,
+                       'markerdataset'        => 1,
                        'workflow'             => 1,
                        'project'              => 1,
                        'itemlog'              => 1,
@@ -1902,6 +1849,8 @@ sub list_general_type_runmode {
                        'traitgroup'           => 1,
                        'unittype'             => 1,
                        'multilocation'        => 1,
+                       'breedingmethod'       => 1,
+                       'specimengroupstatus'  => 1,
                        'any'                  => 1,
   };
 
@@ -1998,7 +1947,7 @@ sub get_general_type_runmode {
   }
 
   my $field_list = ['generaltype.*', 'VCol*'];
-  
+
   my ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_sql($dbh, $field_list, 'generaltype',
                                                                         'TypeId', '');
   $dbh->disconnect();
@@ -2049,7 +1998,7 @@ sub update_general_type_runmode {
 "SuccessMessageJSON": "{'Info' : [{'Message' : 'GeneralType (224) has been updated successfully.'}]}",
 "ErrorMessageXML": [{"NameAlreadyExists": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Type (Farm) for class (site) already exists.' /></DATA>"}],
 "ErrorMessageJSON": [{"NameAlreadyExists": "{'Error' : [{'Message' : 'Type (Farm) for class (site) already exists.'}]}"}],
-"URLParameter": [{"ParameterName": "class", "Description": "Value from a predefined list of values for classification of the type. This list of values is site, item, container, deviceregister, trial, trialevent, sample, specimengroup, state, parent, itemparent, genotypespecimen, markerstate, markerquality, workflow, project, itemlog, plate, genmap, multimedia, tissue, genotypealias, genparent, genotypealiasstatus, traitgroup, unittype and multilocation."}, {"ParameterName": "id", "Description": "Existing GeneralTypeId"}],
+"URLParameter": [{"ParameterName": "class", "Description": "Value from a predefined list of values for classification of the type. This list of values is site, item, container, deviceregister, trial, trialevent, sample, specimengroup, state, parent, itemparent, genotypespecimen, dataset, workflow, project, itemlog, plate, genmap, multimedia, tissue, genotypealias, genparent, genotypealiasstatus, traitgroup, unittype and multilocation."}, {"ParameterName": "id", "Description": "Existing GeneralTypeId"}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
@@ -2065,44 +2014,17 @@ sub update_general_type_runmode {
 
   my $skip_field = {'Class' => 1};
 
-  my ($get_scol_err, $get_scol_msg, $scol_data, $pkey_data) = get_static_field($dbh_read, 'generaltype');
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'generaltype', $skip_field);
 
-  if ($get_scol_err) {
+  if ($chk_sfield_err) {
 
-    $self->logger->debug("Get static field info failed: $get_scol_msg");
-    
-    my $err_msg = "Unexpected Error.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+    $self->logger->debug($chk_sfield_msg);
 
-    return $data_for_postrun_href;
-  }
-
-  my $required_field_href = {};
-
-  for my $static_field (@{$scol_data}) {
-
-    my $field_name = $static_field->{'Name'};
-    
-    if ($skip_field->{$field_name}) { next; }
-
-    if ($static_field->{'Required'} == 1) {
-
-      $required_field_href->{$field_name} = $query->param($field_name);
-    }
+    return $for_postrun_href;
   }
 
   $dbh_read->disconnect();
-
-  my ($missing_err, $missing_href) = check_missing_href( $required_field_href );
-
-  if ($missing_err) {
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
-
-    return $data_for_postrun_href;
-  }
 
   # Finish generic required static field checking
 
@@ -2110,11 +2032,15 @@ sub update_general_type_runmode {
   my $type_id          = $self->param('id');
 
   my $type_name        = $query->param('TypeName');
+  my $is_fixed         = $query->param('IsFixed');
 
   my $dbh_k_read = connect_kdb_read();
 
   my $type_note        = read_cell_value($dbh_k_read, 'generaltype', 'TypeNote', 'TypeId', $type_id);
   my $is_active        = read_cell_value($dbh_k_read, 'generaltype', 'IsTypeActive', 'TypeId', $type_id);
+
+  my $db_is_fixed      = read_cell_value($dbh_k_read, 'generaltype', 'IsFixed', 'TypeId', $type_id);
+  my $db_type_name     = read_cell_value($dbh_k_read, 'generaltype', 'TypeName', 'TypeId', $type_id);
 
   if (defined $query->param('IsTypeActive')) {
 
@@ -2134,6 +2060,15 @@ sub update_general_type_runmode {
     my $err_msg = "IsTypeActive ($is_active): invalid";
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'IsTypeActive' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if ( $is_fixed !~ /^(1|0){1}$/ ) {
+
+    my $err_msg = "IsFixed ($is_fixed): invalid";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'IsFixed' => $err_msg}]};
 
     return $data_for_postrun_href;
   }
@@ -2158,8 +2093,20 @@ sub update_general_type_runmode {
     return $data_for_postrun_href;
   }
 
+  if ("$db_is_fixed" eq '1') {
+
+    if ($type_name ne $db_type_name) {
+
+      my $err_msg = "Type ($type_name) cannot be changed.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'TypeName' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
   $sql = 'SELECT TypeId FROM generaltype WHERE Class=? AND TypeName=? AND TypeId<>?';
-  $read_err;
+  $read_err      = 0;
   $check_type_id = '';
 
   ($read_err, $check_type_id) = read_cell($dbh_k_read, $sql, [$class, $type_name, $type_id]);
@@ -2223,11 +2170,12 @@ sub update_general_type_runmode {
   $sql  = 'UPDATE generaltype SET ';
   $sql .= 'TypeName=?, ';
   $sql .= 'TypeNote=?, ';
-  $sql .= 'IsTypeActive=? ';
+  $sql .= 'IsTypeActive=?, ';
+  $sql .= 'IsFixed=? ';
   $sql .= 'WHERE Class=? AND TypeId=?';
 
   my $sth = $dbh_k_write->prepare($sql);
-  $sth->execute($type_name, $type_note, $is_active, $class, $type_id);
+  $sth->execute($type_name, $type_note, $is_active, $is_fixed, $class, $type_id);
 
   if ($dbh_k_write->err()) {
 
@@ -2331,7 +2279,7 @@ sub del_general_type_runmode {
 "SuccessMessageJSON": "{ 'Info' : [{ 'Message' : 'GeneralType (225) has been deleted successfully.'} ]}",
 "ErrorMessageXML": [{"IdUsed": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Type (9) used in trial table.' /></DATA>"}],
 "ErrorMessageJSON": [{"IdUsed": "{ 'Error' : [{ 'Message' : 'Type (9) used in trial table.'} ]}"}],
-"URLParameter": [{"ParameterName": "class", "Description": "Value from a predefined list of values for classification of the type. This list of values is site, item, container, deviceregister, trial, trialevent, sample, specimengroup, state, parent, itemparent, genotypespecimen, markerstate, markerquality, workflow, project, itemlog, plate, genmap, multimedia, tissue, genotypealias, genparent, genotypealiasstatus, traitgroup, unittype and multilocation."}, {"ParameterName": "id", "Description": "Existing GeneralTypeId"}],
+"URLParameter": [{"ParameterName": "class", "Description": "Value from a predefined list of values for classification of the type. This list of values is site, item, container, deviceregister, trial, trialevent, sample, specimengroup, state, parent, itemparent, genotypespecimen, dataset, workflow, project, itemlog, plate, genmap, multimedia, tissue, genotypealias, genparent, genotypealiasstatus, traitgroup, unittype and multilocation."}, {"ParameterName": "id", "Description": "Existing GeneralTypeId"}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
@@ -2401,8 +2349,7 @@ sub del_general_type_runmode {
     { 'table' => 'extract',           'field' => 'Tissue',              'value' => $type_id },
     { 'table' => 'plate',             'field' => 'PlateType',           'value' => $type_id },
     { 'table' => 'markermap',         'field' => 'MapType',             'value' => $type_id },
-    { 'table' => 'analysisgroup',     'field' => 'MarkerStateType',     'value' => $type_id },
-    { 'table' => 'analysisgroup',     'field' => 'MarkerQualityType',   'value' => $type_id },
+    { 'table' => 'dataset',           'field' => 'DataSetType',         'value' => $type_id },
       );
 
   for my $relation (@fk_relationship) {
@@ -2457,6 +2404,402 @@ sub del_general_type_runmode {
   $data_for_postrun_href->{'Error'}     = 0;
   $data_for_postrun_href->{'Data'}      = {'Info'     => $info_msg_aref};
   $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub count_groupby_runmode {
+
+=pod count_groupby_HELP_START
+{
+"OperationName" : "Count records with GROUP BY",
+"Description": "Count records in the specified table based on the submitted group by fields. It supports pagination, filtering and sorting",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Pagination NumOfRecords='4' NumOfPages='1' Page='1' NumPerPage='10' /><RecordMeta TagName='CountGroupBy' /><CountGroupBy GenusId='2' CountResult='227' /><CountGroupBy GenusId='4' CountResult='4' /><CountGroupBy GenusId='3' CountResult='2' /><CountGroupBy GenusId='1' CountResult='1' /></DATA>",
+"SuccessMessageJSON": "{'Pagination' : [{'NumOfRecords' : '4', 'NumOfPages' : 1, 'NumPerPage' : '10', 'Page' : '1'}], 'RecordMeta' : [{'TagName' : 'CountGroupBy'}], 'CountGroupBy' : [{'GenusId' : '2', 'CountResult' : '227'},{'GenusId' : '4', 'CountResult' : '4'},{'GenusId' : '3', 'CountResult' : '2'},{'GenusId' : '1', 'CountResult' : '1'}]}",
+"ErrorMessageXML": [{"InvalidValue": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Table name (samplemeasurement) does not support counting.' /></DATA>"}],
+"ErrorMessageJSON": [{"InvalidValue": "{'Error' : [{'Message' : 'Table name (samplemeasurement) does not support counting.'}]}"}],
+"URLParameter": [{"ParameterName": "nperpage", "Description": "Number of records in a page for pagination"}, {"ParameterName": "num", "Description": "The page number of the pagination"}, {"ParameterName": "tname", "Description": "Table name in which record count operation is executed. Most tables in KDDart are supported. However, tables that stores the lowest level data like samplemeasurement or virtual column storage tables are not supported."}],
+"HTTPParameter": [{"Required": 1, "Name": "GroupByField", "Description": "Comma separated value of group by fields in the specified table (tname in the URL parameter)."}, {"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database field name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases. Fields that are applicable for sorting are those specified in the GroupByField parameter and the count field which is named CountResult"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self              = shift;
+  my $query             = $self->query();
+  my $table_name        = $self->param('tname');
+
+  my $nb_per_page       = $self->param('nperpage');
+  my $page              = $self->param('num');
+
+  my $groupby_field_csv = $query->param('GroupByField');
+
+  my $filtering_csv = '';
+
+  if (defined $query->param('Filtering')) {
+
+    $filtering_csv = $query->param('Filtering');
+  }
+
+  my $sorting = '';
+
+  if (defined $query->param('Sorting')) {
+
+    $sorting = $query->param('Sorting');
+  }
+
+  my $data_for_postrun_href = {};
+
+  my @restricted_table_list = ('samplemeasurement', '.+factor', '.+loc', 'layer\d+',
+                               'layer\d+attrib', 'markerdata\d+');
+
+  for my $restricted_table (@restricted_table_list) {
+
+    if ($table_name =~ /$restricted_table/) {
+
+      my $err_msg = "Table name ($table_name) does not support counting.";
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  my ($missing_err, $missing_href) = check_missing_href( {'GroupByField' => $groupby_field_csv} );
+
+  if ($missing_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  my ($int_err, $int_err_msg) = check_integer_value( {'nperpage' => $nb_per_page,
+                                                      'num'      => $page
+                                                     });
+
+  if ($int_err) {
+
+    $int_err_msg .= ' not integer.';
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $int_err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if ($table_name =~ /\s+/) {
+
+    my $err_msg = "Table name ($table_name) contains spaces.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $gis_table = 0;
+
+  my $dbh_gis = connect_gis_read();
+  my $tbl_info_sth = $dbh_gis->table_info();
+  $tbl_info_sth->execute();
+
+  while( my @gis_table = $tbl_info_sth->fetchrow_array() ) {
+
+    if ($gis_table[2] eq $table_name) {
+
+      $gis_table = 1;
+      last;
+    }
+  }
+
+  $tbl_info_sth->finish();
+
+  my $scol_aref = [];
+  my $pkey_aref = [];
+
+  my $dbh;
+  my $dbh_k = connect_kdb_read();
+  my $dbh_m = connect_mdb_read();
+
+  if ($gis_table) {
+
+    my ($gis_sfield_err, $gis_sfield_msg, $gis_sfield_aref, $gis_pkey) = get_static_field($dbh_gis, $table_name);
+
+    if ($gis_sfield_err) {
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    $scol_aref = $gis_sfield_aref;
+    $pkey_aref = $gis_pkey;
+
+    $dbh = $dbh_gis;
+  }
+  else {
+
+    my ($k_sfield_err, $k_sfield_msg, $k_sfield_aref, $k_pkey) = get_static_field($dbh_k, $table_name);
+
+    if ($k_sfield_err) {
+
+      # this table is not in the main database, maybe it is in the marker database.
+      my ($m_sfield_err, $m_sfield_msg, $m_sfield_aref, $m_pkey) = get_static_field($dbh_m, $table_name);
+
+      if ($m_sfield_err) {
+
+        my $err_msg = "Table ($table_name) does not exist.";
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+        return $data_for_postrun_href;
+      }
+      else {
+
+        $scol_aref = $m_sfield_aref;
+        $pkey_aref = $m_pkey;
+
+        $dbh = $dbh_m;
+      }
+    }
+    else {
+
+      $scol_aref = $k_sfield_aref;
+      $pkey_aref = $k_pkey;
+
+      $dbh = $dbh_k;
+    }
+  }
+
+  my $first_primary_key = $pkey_aref->[0];
+
+  $self->logger->debug("Primary key [0]: $first_primary_key");
+
+  my $field_name_lookup = {};
+
+  for my $scol_rec (@{$scol_aref}) {
+
+    my $field_name = $scol_rec->{'Name'};
+    $field_name_lookup->{$field_name} = 1;
+  }
+
+  for my $pkey_name (@{$pkey_aref}) {
+
+    $field_name_lookup->{$pkey_name} = 1;
+  }
+
+  my @groupby_field_list = split(',', $groupby_field_csv);
+
+  my @full_groupby_field_list;
+
+  for my $groupby_field (@groupby_field_list) {
+
+    if ( !(defined $field_name_lookup->{$groupby_field}) ) {
+
+      my $err_msg = "Field ($groupby_field) not found.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'GroupByField' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    push(@full_groupby_field_list, "${table_name}.${groupby_field}");
+  }
+
+  my $table_with_perm_lookup = {
+                                'genotype'             => 'genotype',
+                                'specimen'             => 'genotype',
+                                'trial'                => 'trial',
+                                'trialunit'            => 'trial',
+                                'trialunitspecimen'    => 'trial',
+                                'layer'                => 'layer',
+                                'trait'                => 'trait',
+                                'analysisgroup'        => 'analysisgroup',
+                                'analgroupextract'     => 'analysisgroup',
+                                'analysisgroupmarker'  => 'analysisgroup',
+                                'genotypealias'        => 'genotype',
+                                'genotypetrait'        => 'genotype',
+                                'traitalias'           => 'trait',
+                                'trialtrait'           => 'trial',
+                                'layerattrib'          => 'layer',
+                                };
+
+  my $other_join_lookup = {};
+
+  $other_join_lookup->{'specimen'}  = ' LEFT JOIN genotypespecimen ON specimen.SpecimenId = genotypespecimen.SpecimenId ';
+  $other_join_lookup->{'specimen'} .= ' LEFT JOIN genotype ON genotypespecimen.GenotypeId = genotype.GenotypeId ';
+
+  $other_join_lookup->{'trialunit'} = ' LEFT JOIN trial ON trialunit.TrialId = trial.TrialId ';
+
+  $other_join_lookup->{'trialunitspecimen'}  = ' LEFT JOIN trialunit ON trialunitspecimen.TrialUnitId = trialunit.TrialUnitId ';
+  $other_join_lookup->{'trialunitspecimen'} .= ' LEFT JOIN trial ON trialunit.TrialId = trial.TrialId ';
+
+  $other_join_lookup->{'analgroupextract'}   = ' LEFT JOIN analysisgroup ON ';
+  $other_join_lookup->{'analgroupextract'}  .= 'analgroupextract.AnalysisGroupId = analysisgroup.AnalysisGroupId ';
+
+  $other_join_lookup->{'analysisgroupmarker'}  = ' LEFT JOIN analysisgroup ON ';
+  $other_join_lookup->{'analysisgroupmarker'} .= 'analysisgroupmarker.AnalysisGroupId = analysisgroup.AnalysisGroupId ';
+
+  $other_join_lookup->{'genotypealias'}   = ' LEFT JOIN genotype ON genotypealias.GenotypeId = genotype.GenotypeId ';
+
+  $other_join_lookup->{'genotypetrait'}   = ' LEFT JOIN genotype ON genotypetrait.GenotypeId = genotype.GenotypeId ';
+
+  $other_join_lookup->{'traitalias'}      = ' LEFT JOIN trait ON traitalias.TraitId = trait.TraitId ';
+
+  $other_join_lookup->{'trialtrait'}      = ' LEFT JOIN trial ON trialtrait.TrialId = trial.TrialId ';
+
+  $other_join_lookup->{'layerattrib'}     = ' LEFT JOIN layer ON layerattrib.layer = layer.id ';
+
+  my $group_id      = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+  my $perm_str      = '';
+
+  if (defined $table_with_perm_lookup->{$table_name}) {
+
+    my $src_perm_table = $table_with_perm_lookup->{$table_name};
+    $perm_str = permission_phrase($group_id, 0, $gadmin_status, $src_perm_table);
+  }
+
+  my $filtering_exp = '';
+
+  my @field_list = keys(%{$field_name_lookup});
+
+  my ($filter_err, $filter_msg, $filter_phrase, $where_arg) = parse_filtering($first_primary_key,
+                                                                              $table_name,
+                                                                              $filtering_csv,
+                                                                              \@field_list);
+
+  if ($filter_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $filter_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (length($filter_phrase) > 0) {
+
+    if (length($perm_str) > 0) {
+
+      $filtering_exp = " WHERE (($perm_str) & $READ_PERM) = $READ_PERM AND $filter_phrase ";
+    }
+    else {
+
+      $filtering_exp = " WHERE $filter_phrase ";
+    }
+  }
+
+  my $other_join = '';
+
+  if (defined $other_join_lookup->{$table_name}) {
+
+    $other_join = $other_join_lookup->{$table_name};
+  }
+
+  my $valid_groupby_field_csv = join(',', @full_groupby_field_list);
+
+  my $pagination_aref = [];
+
+  my $count_sql  = "SELECT COUNT(subq.CountResult) FROM ( ";
+  $count_sql    .= "SELECT COUNT(DISTINCT ${table_name}.${first_primary_key}) AS CountResult FROM $table_name ";
+  $count_sql    .= "$other_join ";
+  $count_sql    .= "$filtering_exp ";
+  $count_sql    .= "GROUP BY $valid_groupby_field_csv) AS subq";
+
+  $self->logger->debug("COUNT SQL: $count_sql");
+
+  my ($paged_id_err, $paged_id_msg, $nb_records,
+      $nb_pages, $limit_clause, $sql_count_time) = get_paged_filter_sql($dbh,
+                                                                        $nb_per_page,
+                                                                        $page,
+                                                                        $count_sql,
+                                                                        $where_arg);
+
+  $self->logger->debug("SQL Count time: $sql_count_time");
+
+  if ($paged_id_err == 1) {
+
+    $self->logger->debug($paged_id_msg);
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if ($paged_id_err == 2) {
+
+    $page = 0;
+  }
+
+  $pagination_aref = [{'NumOfRecords' => $nb_records,
+                       'NumOfPages'   => $nb_pages,
+                       'Page'         => $page,
+                       'NumPerPage'   => $nb_per_page,
+                      }];
+
+  push(@groupby_field_list, 'CountResult');
+
+  my $field_list_with_count = \@groupby_field_list;
+
+  my ($sort_err, $sort_msg, $sort_sql) = parse_sorting($sorting, $field_list_with_count);
+
+  if ($sort_err) {
+
+    $self->logger->debug("Parsing sort failed: $sort_msg");
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $sort_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $sql  = "SELECT $valid_groupby_field_csv , COUNT(DISTINCT ${table_name}.$first_primary_key) AS `CountResult` ";
+  $sql    .= "FROM $table_name ";
+  $sql    .= "$other_join ";
+  $sql    .= "$filtering_exp ";
+  $sql    .= "GROUP BY $valid_groupby_field_csv ";
+
+  if (length($sort_sql) > 0) {
+
+    $sql .= " ORDER BY $sort_sql ";
+  }
+  else {
+
+    $sql .= " ORDER BY CountResult DESC ";
+  }
+
+  $sql    .= "$limit_clause";
+
+  $self->logger->debug("SQL: $sql");
+
+  my ($count_err, $count_msg, $count_data) = read_data($dbh, $sql, $where_arg);
+
+  if ($count_err) {
+
+    $self->logger->debug("Read count data failed: $count_msg");
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh_k->disconnect();
+  $dbh_m->disconnect();
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'CountGroupBy' => $count_data,
+                                           'Pagination'   => $pagination_aref,
+                                           'RecordMeta'   => [{'TagName' => 'CountGroupBy'}],
+  };
 
   return $data_for_postrun_href;
 }

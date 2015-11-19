@@ -2,13 +2,14 @@
   <CaseInfo CustomMethod="add_record_upload" Description="Import Marker Data" TargetURL="analysisgroup/:AnalysisGroupId/import/markerdata/dart" Type="BLOCKING" />
   <INPUT ParaName="AnalysisGroupId" SrcValue="xml/add_data_no_vcol/case_00303_add_analysisgroup.xml" />
   <INPUT ParaName="Forced" Value="1" />
-  <INPUT ParaName="HeaderRow" Value="0" />
-  <INPUT ParaName="MarkerNameCol" Value="4" />
+  <INPUT ParaName="DataSetType" SrcValue="xml/add_data_no_vcol/case_00473_add_datasettype.xml" />
+  <INPUT ParaName="HeaderRow" Value="1" />
+  <INPUT ParaName="MarkerNameCol" Value="0" />
   <INPUT ParaName="SequenceCol" Value="1" />
-  <INPUT ParaName="MarkerMetaColStart" Value="5" />
-  <INPUT ParaName="MarkerMetaColEnd" Value="22" />
-  <INPUT ParaName="MarkerDataColStart" Value="23" />
-  <INPUT ParaName="MarkerDataColEnd" Value="28" />
+  <INPUT ParaName="MarkerMetaColStart" Value="2" />
+  <INPUT ParaName="MarkerMetaColEnd" Value="19" />
+  <INPUT ParaName="MarkerDataColStart" Value="20" />
+  <INPUT ParaName="MarkerDataColEnd" Value="25" />
   <INPUT ParaName="ExtractId" SrcValue="xml/add_data_no_vcol/case_00302_add_extract.xml" />
   <INPUT ParaName="ExtractId1" SrcValue="xml/add_data_no_vcol/case_00375_add_extract1.xml" />
   <INPUT ParaName="ExtractId2" SrcValue="xml/add_data_no_vcol/case_00376_add_extract2.xml" />
@@ -16,11 +17,12 @@
   <INPUT ParaName="ExtractId4" SrcValue="xml/add_data_no_vcol/case_00378_add_extract4.xml" />
   <INPUT ParaName="ExtractId5" SrcValue="xml/add_data_no_vcol/case_00379_add_extract5.xml" />
   <INPUT ParaName="uploadfile" SrcFile="xml/add_data_no_vcol/marker.csv" />
-  <INPUT ParaName="Force" Value="0" />
   <Match Attr="StatusCode" Value="200" />
   <Match Attr="Message" Tag="Info" Value="regex(successful)" />
   <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00303_add_analysisgroup.xml" Order="3" />
-  <RunInfo Success="1" Time="1409792341" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00473_add_datasettype.xml" Order="4" />
+  <ReturnId ParaName="DataSetId" Value="1" />
+  <RunInfo Success="1" Time="1443160667" />
 </TestCase>

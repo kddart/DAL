@@ -5,6 +5,6 @@
   <Match Attr="GenotypeId" Tag="Genotype" Value="boolex(x=19)" />
   <Parent CaseFile="./json/case_00201_login_testuser.xml" Order="1" />
   <Parent CaseFile="./json/case_00203_switch4testu.xml" Order="2" />
-  <ReturnId ParaName="GenotypeId" Value="19" />
+  
   
 </TestCase>

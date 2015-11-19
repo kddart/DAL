@@ -3,10 +3,11 @@
   <Delete TargetURL="delete/type/plate/:TypeId" />
   <INPUT ParaName="TypeName" PrefixVal="PlateType - " Random="1" />
   <INPUT ParaName="IsTypeActive" Value="1" />
+  <INPUT ParaName="IsFixed" Value="0" />
   <Match Attr="StatusCode" Value="200" />
   <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
   <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
-  <ReturnId ParaName="TypeId" Value="53" />
-  <RunInfo Success="1" Time="1409792321" />
+  <ReturnId ParaName="TypeId" Value="414" />
+  <RunInfo Success="1" Time="1443160650" />
 </TestCase>

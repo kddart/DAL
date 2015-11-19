@@ -18,6 +18,6 @@
   <Match Attr="ParaName" Tag="ReturnId" Value="GenotypeId" />
   <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
-  <ReturnId ParaName="GenotypeId" Value="5" />
-  <RunInfo Success="1" Time="1409792061" />
+  <ReturnId ParaName="GenotypeId" Value="1380" />
+  <RunInfo Success="1" Time="1443160365" />
 </TestCase>

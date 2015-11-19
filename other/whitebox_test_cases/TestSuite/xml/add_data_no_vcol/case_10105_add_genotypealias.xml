@@ -3,6 +3,7 @@
   <INPUT ParaName="GenotypeId" SrcValue="xml/add_data_no_vcol/case_00104_add_geno.xml" />
   <INPUT ParaName="GenotypeAliasName" PrefixVal="Genotype Alias Name - " Random="1" />
   <INPUT ParaName="GenotypeAliasType" SrcValue="xml/add_data_no_vcol/case_00383_add_genotypealias_type.xml" />
+  <INPUT ParaName="GenotypeAliasLang" Value="EN" />
   <Match Attr="StatusCode" Value="200" />
   <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
   <Match Attr="ParaName" Tag="ReturnId" Value="GenotypeAliasId" />
@@ -10,6 +11,6 @@
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00104_add_geno.xml" Order="3" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00383_add_genotypealias_type.xml" Order="4" />
-  <ReturnId ParaName="GenotypeAliasId" Value="1" />
-  <RunInfo Success="1" Time="1409792277" />
+  <ReturnId ParaName="GenotypeAliasId" Value="4" />
+  <RunInfo Success="1" Time="1443160611" />
 </TestCase>

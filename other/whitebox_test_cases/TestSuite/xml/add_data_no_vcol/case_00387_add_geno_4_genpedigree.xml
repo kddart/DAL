@@ -22,6 +22,6 @@
   <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00105_add_genus.xml" Order="3" />
-  <ReturnId ParaName="GenotypeId" Value="232" />
-  <RunInfo Success="1" Time="1409792355" />
+  <ReturnId ParaName="GenotypeId" Value="3427" />
+  <RunInfo Success="1" Time="1444715385" />
 </TestCase>

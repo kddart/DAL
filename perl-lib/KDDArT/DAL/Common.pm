@@ -1,5 +1,7 @@
-#$Id: Common.pm 785 2014-09-02 06:23:12Z puthick $
+#$Id: Common.pm 1028 2015-10-21 07:39:52Z puthick $
 #$Author: puthick $
+
+# Copyright (c) 2015, Diversity Arrays Technology, All rights reserved.
 
 # COPYRIGHT AND LICENSE
 # 
@@ -16,8 +18,7 @@
 # GNU General Public License for more details.
 
 # Author    : Puthick Hok
-# Version   : 2.2.5 build 795
-# Created   : 02/06/2010
+# Version   : 2.3.0 build 1040
 
 package KDDArT::DAL::Common;
 require Exporter;
@@ -45,102 +46,179 @@ use Text::CSV_XS;
 use Text::CSV::Simple;
 use DateTime::Format::MySQL;
 use Time::HiRes qw( tv_interval gettimeofday );
+use Email::Valid;
 
 our @ISA      = qw(Exporter);
 our @EXPORT   = qw($DTD_PATH $RPOSTGRES_UP_FILE $GIS_BUFFER_DISTANCE
-                    $CGI_INDEX_SCRIPT $LINK_PERM $READ_PERM $WRITE_PERM
-                    $READ_LINK_PERM $READ_WRITE_PERM $ALL_PERM $VALID_CTYPE
-                    $GIS_ENFORCE_GEO_WITHIN $TMP_DATA_PATH $SESSION_STORAGE_PATH
-                    $TIMEZONE $MARKER_TABLE_SIZE_THRESHOLD $ACCEPT_HEADER_LOOKUP
-                    $DAL_VERSION $DAL_ABOUT $DAL_COPYRIGHT $NB_RECORD_BULK_INSERT
-                    $UNIT_POSITION_SPLITTER $MARKER_META_OPT_THRESHOLD 
-                    $MARKER_STATE_OPT_THRESHOLD $M2M_RELATION $MRK_DATA_STORAGE_PATH
-                    $GENO_SPEC_ONE2ONE $GENO_SPEC_ONE2MANY $GENO_SPEC_MANY2MANY
-                    $GENOTYPE2SPECIMEN_CFG $MULTIMEDIA_STORAGE_PATH $ERR_INFO_AREF
-                    trim ltrim rtrim read_uname_pass connect_kdb_read
-                    execute_sql read_cell permission_phrase
-                    read_cookie arrayref2csvfile arrayref2xml reconstruct_server_url
-                    read_dispatch_table dispatch_table2xml merge_xml
-                    connect_kdb_write record_existence read_cell_value
-                    generate_factor_sql make_empty_xml connect_gis_read connect_gis_write
-                    geocode check_missing_value check_datatype is_unsigned_int
-                    add_dtd read_file xml2arrayref check_permission read_data
-                    recurse_arrayref2xml is_within check_integer_value
-                    check_dt_value check_float_value csvfile2shp row2col_sql
-                    pg_case_st check_maxlen csvfile2arrayref get_csvfile_num_of_col
-                    check_col_definition get_paged_id get_paged_filter table_existence 
-                    field_existence check_perm_value record_exist_csv connect_mdb_read
-                    connect_mdb_write validate_trait_db generate_mfactor_sql log_activity
-                    parse_selected_field parse_filtering parse_sorting generate_vcol_helpers
-                    check_group_id remove_dtd dispatch_table2arrayref check_char type_existence
-                    type_existence_csv update_vcol_data check_missing_href check_integer_href
-                    check_maxlen_href check_dt_href is_valid_wkt_href WKT2geoJSON check_col_def_href
-                    csvfh2aref is_correct_validation_rule samplemeasure_row2col rollback_cleanup_multi
-                    gen_mfactor_sql gen_paged_mkd_sql write_aref2csv write_href2csv check_float_href
-                    get_static_field check_datatype_href is_unsigned_int_href get_paged_filter_sql
-                    build_seek_index get_file_line csvfh2aref_index_lnl csvfh2aref_index_sline
-                    copy_file filter_csv parse_marker_filtering recurse_read generate_factor_sql_v2
-                    parse_filtering_v2 get_file_block id_existence_bulk table_existence_bulk check_perm_href
-                   );
+                   $CGI_INDEX_SCRIPT $LINK_PERM $READ_PERM $WRITE_PERM
+                   $READ_LINK_PERM $READ_WRITE_PERM $ALL_PERM $VALID_CTYPE
+                   $GIS_ENFORCE_GEO_WITHIN $TMP_DATA_PATH $SESSION_STORAGE_PATH
+                   $TIMEZONE $ACCEPT_HEADER_LOOKUP
+                   $DAL_VERSION $DAL_ABOUT $DAL_COPYRIGHT $NB_RECORD_BULK_INSERT
+                   $UNIT_POSITION_SPLITTER $M2M_RELATION
+                   $GENO_SPEC_ONE2ONE $GENO_SPEC_ONE2MANY $GENO_SPEC_MANY2MANY
+                   $GENOTYPE2SPECIMEN_CFG $MULTIMEDIA_STORAGE_PATH $ERR_INFO_AREF
+                   $CFG_FILE_PATH $DSN_KDB_READ $DSN_KDB_WRITE $DSN_MDB_READ
+                   $DSN_MDB_WRITE $DSN_GIS_READ $DSN_GIS_WRITE $RMYSQL_UP_FILE
+                   $MONETDB_UP_FILE $GENOTYPE2SPECIMEN_CFG $OAUTH2_SITE
+                   $OAUTH2_AUTHORIZE_PATH $OAUTH2_CLIENT_ID $OAUTH2_CLIENT_SECRET
+                   $OAUTH2_SCOPE $OAUTH2_ACCESS_TOKEN_URL $JSON_SCHEMA_PATH
+                   trim ltrim rtrim read_uname_pass connect_kdb_read
+                   execute_sql read_cell permission_phrase
+                   read_cookie arrayref2csvfile arrayref2xml reconstruct_server_url
+                   read_dispatch_table dispatch_table2xml merge_xml
+                   connect_kdb_write record_existence read_cell_value
+                   generate_factor_sql make_empty_xml connect_gis_read connect_gis_write
+                   geocode check_missing_value check_datatype is_unsigned_int
+                   add_dtd read_file xml2arrayref check_permission read_data
+                   recurse_arrayref2xml is_within check_integer_value
+                   check_dt_value check_float_value csvfile2shp row2col_sql
+                   pg_case_st check_maxlen csvfile2arrayref get_csvfile_num_of_col
+                   check_col_definition get_paged_id get_paged_filter table_existence
+                   field_existence check_perm_value record_exist_csv connect_mdb_read
+                   connect_mdb_write validate_trait_db generate_mfactor_sql log_activity
+                   parse_selected_field parse_filtering parse_sorting generate_vcol_helpers
+                   check_group_id remove_dtd dispatch_table2arrayref check_char type_existence
+                   type_existence_csv update_vcol_data check_missing_href check_integer_href
+                   check_maxlen_href check_dt_href is_valid_wkt_href WKT2geoJSON check_col_def_href
+                   csvfh2aref is_correct_validation_rule samplemeasure_row2col rollback_cleanup_multi
+                   gen_mfactor_sql gen_paged_mkd_sql write_aref2csv write_href2csv check_float_href
+                   get_static_field check_datatype_href is_unsigned_int_href get_paged_filter_sql
+                   build_seek_index get_file_line csvfh2aref_index_lnl csvfh2aref_index_sline
+                   copy_file filter_csv parse_marker_filtering recurse_read generate_factor_sql_v2
+                   parse_filtering_v2 get_file_block id_existence_bulk table_existence_bulk check_perm_href
+                   filter_csv_aref parse_marker_sorting get_sorting_function check_static_field
+                   get_next_value_for check_bool_href check_email_href check_value_href
+                 );
 
 our $DSN_KDB_READ = {};
 
-$DSN_KDB_READ->{"$main::kddart_base_dir/vhosts/kddart.example.com"}      = 'DBI:mysql:database=kddart_v2_2_2:host=localhost:mysql_connect_timeout=6000:mysql_write_timeout=600:mysql_read_timeout=300';
+$DSN_KDB_READ->{"$main::kddart_base_dir/vhosts/kddart.diversityarrays.com"}      = 'DBI:mysql:database=kddart_v2_3:host=localhost:mysql_connect_timeout=6000:mysql_write_timeout=600:mysql_read_timeout=300';
+
+$DSN_KDB_READ->{"$main::kddart_base_dir/vhosts/kddart-d.diversityarrays.com"}    = 'FROM CFG_FILE';
+
+$DSN_KDB_READ->{"$main::kddart_base_dir/vhosts/kddart-t.diversityarrays.com"}    = 'DBI:mysql:database=kddart_v2_3:host=localhost:mysql_connect_timeout=6000:mysql_write_timeout=600:mysql_read_timeout=300';
+
+$DSN_KDB_READ->{"$main::kddart_base_dir/vhosts/kddart-dal.diversityarrays.com"}  = 'DBI:mysql:database=kddart_v2_3:host=localhost:mysql_connect_timeout=6000:mysql_write_timeout=600:mysql_read_timeout=300';
 
 our $DSN_KDB_WRITE = {};
 
-$DSN_KDB_WRITE->{"$main::kddart_base_dir/vhosts/kddart.example.com"}     = 'DBI:mysql:database=kddart_v2_2_2:host=localhost:mysql_connect_timeout=6000:mysql_write_timeout=600:mysql_read_timeout=300';
+$DSN_KDB_WRITE->{"$main::kddart_base_dir/vhosts/kddart.diversityarrays.com"}     = 'DBI:mysql:database=kddart_v2_3:host=localhost:mysql_connect_timeout=6000:mysql_write_timeout=600:mysql_read_timeout=300';
+
+$DSN_KDB_WRITE->{"$main::kddart_base_dir/vhosts/kddart-d.diversityarrays.com"}   = 'FROM CFG_FILE';
+
+$DSN_KDB_WRITE->{"$main::kddart_base_dir/vhosts/kddart-t.diversityarrays.com"}   = 'DBI:mysql:database=kddart_v2_3:host=localhost:mysql_connect_timeout=6000:mysql_write_timeout=600:mysql_read_timeout=300';
+
+$DSN_KDB_WRITE->{"$main::kddart_base_dir/vhosts/kddart-dal.diversityarrays.com"} = 'DBI:mysql:database=kddart_v2_3:host=localhost:mysql_connect_timeout=6000:mysql_write_timeout=600:mysql_read_timeout=300';
 
 our $DSN_MDB_READ = {};
 
-$DSN_MDB_READ->{"$main::kddart_base_dir/vhosts/kddart.example.com"}      = 'DBI:mysql:database=kddart_marker_v2_2_2:host=localhost:mysql_connect_timeout=6000:mysql_write_timeout=600:mysql_read_timeout=300';
+$DSN_MDB_READ->{"$main::kddart_base_dir/vhosts/kddart.diversityarrays.com"}      = 'dbi:monetdb:database=kddart_marker_v2_3;host=localhost;port=50000;language=sql';
+
+$DSN_MDB_READ->{"$main::kddart_base_dir/vhosts/kddart-d.diversityarrays.com"}    = 'FROM CFG_FILE';
+
+$DSN_MDB_READ->{"$main::kddart_base_dir/vhosts/kddart-t.diversityarrays.com"}    = 'dbi:monetdb:database=kddart_marker_v2_3;host=localhost;port=50000;language=sql';
+
+$DSN_MDB_READ->{"$main::kddart_base_dir/vhosts/kddart-dal.diversityarrays.com"}  = 'dbi:monetdb:database=kddart_marker_v2_3;host=localhost;port=50000;language=sql';
 
 our $DSN_MDB_WRITE = {};
 
-$DSN_MDB_WRITE->{"$main::kddart_base_dir/vhosts/kddart.example.com"}     = 'DBI:mysql:database=kddart_marker_v2_2_2:host=localhost:mysql_connect_timeout=6000:mysql_write_timeout=600:mysql_read_timeout=300';
+$DSN_MDB_WRITE->{"$main::kddart_base_dir/vhosts/kddart.diversityarrays.com"}     = 'dbi:monetdb:database=kddart_marker_v2_3;host=localhost;port=50000;language=sql';
+
+$DSN_MDB_WRITE->{"$main::kddart_base_dir/vhosts/kddart-d.diversityarrays.com"}   = 'FROM CFG_FILE';
+
+$DSN_MDB_WRITE->{"$main::kddart_base_dir/vhosts/kddart-t.diversityarrays.com"}   = 'dbi:monetdb:database=kddart_marker_v2_3;host=localhost;port=50000;language=sql';
+
+$DSN_MDB_WRITE->{"$main::kddart_base_dir/vhosts/kddart-dal.diversityarrays.com"} = 'dbi:monetdb:database=kddart_marker_v2_3;host=localhost;port=50000;language=sql';
+
+# End of MonetDB DSN
 
 our $DSN_GIS_READ = {};
 
-$DSN_GIS_READ->{"$main::kddart_base_dir/vhosts/kddart.example.com"}      = 'dbi:Pg:dbname=kddart_gis_enviro_v2_2_2;host=localhost';
+$DSN_GIS_READ->{"$main::kddart_base_dir/vhosts/kddart.diversityarrays.com"}      = 'dbi:Pg:dbname=kddart_gis_enviro_v2_3;host=localhost';
+
+$DSN_GIS_READ->{"$main::kddart_base_dir/vhosts/kddart-d.diversityarrays.com"}    = 'FROM CFG_FILE';
+
+$DSN_GIS_READ->{"$main::kddart_base_dir/vhosts/kddart-t.diversityarrays.com"}    = 'dbi:Pg:dbname=kddart_gis_enviro_v2_3;host=localhost';
+
+$DSN_GIS_READ->{"$main::kddart_base_dir/vhosts/kddart-dal.diversityarrays.com"}  = 'dbi:Pg:dbname=kddart_gis_enviro_v2_3;host=localhost';
 
 our $DSN_GIS_WRITE = {};
 
-$DSN_GIS_WRITE->{"$main::kddart_base_dir/vhosts/kddart.example.com"}     = 'dbi:Pg:dbname=kddart_gis_enviro_v2_2_2;host=localhost';
+$DSN_GIS_WRITE->{"$main::kddart_base_dir/vhosts/kddart.diversityarrays.com"}     = 'dbi:Pg:dbname=kddart_gis_enviro_v2_3;host=localhost';
+
+$DSN_GIS_WRITE->{"$main::kddart_base_dir/vhosts/kddart-d.diversityarrays.com"}   = 'FROM CFG_FILE';
+
+$DSN_GIS_WRITE->{"$main::kddart_base_dir/vhosts/kddart-t.diversityarrays.com"}   = 'dbi:Pg:dbname=kddart_gis_enviro_v2_3;host=localhost';
+
+$DSN_GIS_WRITE->{"$main::kddart_base_dir/vhosts/kddart-dal.diversityarrays.com"} = 'dbi:Pg:dbname=kddart_gis_enviro_v2_3;host=localhost';
 
 our $RMYSQL_UP_FILE = {};
 
-$RMYSQL_UP_FILE->{"$main::kddart_base_dir/vhosts/kddart.example.com"}    = "$main::kddart_base_dir/secure/mysql_user.txt";
+$RMYSQL_UP_FILE->{"$main::kddart_base_dir/vhosts/kddart.diversityarrays.com"}     = "$main::kddart_base_dir/secure/mysql_user.txt";
+
+$RMYSQL_UP_FILE->{"$main::kddart_base_dir/vhosts/kddart-d.diversityarrays.com"}   = "FROM CFG_FILE";
+
+$RMYSQL_UP_FILE->{"$main::kddart_base_dir/vhosts/kddart-t.diversityarrays.com"}   = "$main::kddart_base_dir/secure/mysql_user.txt";
+
+$RMYSQL_UP_FILE->{"$main::kddart_base_dir/vhosts/kddart-dal.diversityarrays.com"} = "$main::kddart_base_dir/secure/mysql_user.txt";
+
+our $MONETDB_UP_FILE = {};
+
+$MONETDB_UP_FILE->{"$main::kddart_base_dir/vhosts/kddart.diversityarrays.com"}     = "$main::kddart_base_dir/secure/monetdb_user.txt";
+
+$MONETDB_UP_FILE->{"$main::kddart_base_dir/vhosts/kddart-d.diversityarrays.com"}   = "FROM CFG_FILE";
+
+$MONETDB_UP_FILE->{"$main::kddart_base_dir/vhosts/kddart-t.diversityarrays.com"}   = "$main::kddart_base_dir/secure/monetdb_user.txt";
+
+$MONETDB_UP_FILE->{"$main::kddart_base_dir/vhosts/kddart-dal.diversityarrays.com"} = "$main::kddart_base_dir/secure/monetdb_user.txt";
 
 our $RPOSTGRES_UP_FILE = {};
 
-$RPOSTGRES_UP_FILE->{"$main::kddart_base_dir/vhosts/kddart.example.com"} = "$main::kddart_base_dir/secure/postgres_user.txt";
+$RPOSTGRES_UP_FILE->{"$main::kddart_base_dir/vhosts/kddart.diversityarrays.com"}      = "$main::kddart_base_dir/secure/postgres_user.txt";
 
-our $MRK_DATA_STORAGE_PATH  = $ENV{DOCUMENT_ROOT} . "/storage/marker_data/";
+$RPOSTGRES_UP_FILE->{"$main::kddart_base_dir/vhosts/kddart-d.diversityarrays.com"}    = "FROM CFG_FILE";
+
+$RPOSTGRES_UP_FILE->{"$main::kddart_base_dir/vhosts/kddart-t.diversityarrays.com"}    = "$main::kddart_base_dir/secure/postgres_user.txt";
+
+$RPOSTGRES_UP_FILE->{"$main::kddart_base_dir/vhosts/kddart-dal.diversityarrays.com"}  = "$main::kddart_base_dir/secure/postgres_user.txt";
+
+our $OAUTH2_SITE              = {};
+
+$OAUTH2_SITE->{"$main::kddart_base_dir/vhosts/kddart-d.diversityarrays.com"}          = "FROM CFG_FILE";
+
+our $OAUTH2_AUTHORIZE_PATH    = {};
+
+$OAUTH2_AUTHORIZE_PATH->{"$main::kddart_base_dir/vhosts/kddart-d.diversityarrays.com"} = "FROM CFG_FILE";
+
+our $OAUTH2_CLIENT_ID         = {};
+
+$OAUTH2_CLIENT_ID->{"$main::kddart_base_dir/vhosts/kddart-d.diversityarrays.com"}     = "FROM CFG_FILE";
+
+our $OAUTH2_CLIENT_SECRET     = {};
+
+$OAUTH2_CLIENT_SECRET->{"$main::kddart_base_dir/vhosts/kddart-d.diversityarrays.com"} = "FROM CFG_FILE";
+
+our $OAUTH2_SCOPE             = {};
+
+$OAUTH2_SCOPE->{"$main::kddart_base_dir/vhosts/kddart-d.diversityarrays.com"}         = "FROM CFG_FILE";
+
+our $OAUTH2_ACCESS_TOKEN_URL  = {};
+
+$OAUTH2_ACCESS_TOKEN_URL->{"$main::kddart_base_dir/vhosts/kddart-d.diversityarrays.com"} = "FROM CFG_FILE";
 
 our $MULTIMEDIA_STORAGE_PATH
-                            = $ENV{DOCUMENT_ROOT} . "/storage/multimedia/";
+                            = "FROM CFG_FILE";
 
-our $DTD_PATH               = $ENV{DOCUMENT_ROOT} . "/dtd";
+our $DTD_PATH               = "FROM CFG_FILE";
 
-our $TMP_DATA_PATH          = '/tmp/kddart/';
+our $JSON_SCHEMA_PATH       = "FROM CFG_FILE";
 
-our $SESSION_STORAGE_PATH   = "$main::kddart_base_dir/session/kddart";
+our $TMP_DATA_PATH          = "FROM CFG_FILE";
 
-our $MARKER_TABLE_SIZE_THRESHOLD
-                            = 10000000;      # If a genotypemarkerstateX table has more than this many rows then 
-                                             # new analyses will by given a new genotypemarkerstateX table.
+our $SESSION_STORAGE_PATH   = "FROM CFG_FILE";
 
-our $MARKER_META_OPT_THRESHOLD
-                            = 400000;        # If the marker importation deletes more records than this threshold
-                                             # specifies from genotypemarkermetaX table, DAL will issue SQL
-                                             # OPTIMIZE statement to MySQL. Importation needs to delete old data
-                                             # during reimportation.
-
-our $MARKER_STATE_OPT_THRESHOLD
-                            = 9000000;       # If the marker importation deletes more records than this threshold
-                                             # specifies from genotypemarkerstateX table, DAL will issue SQL
-                                             # OPTIMIZE statement to MySQL. Importation needs to delete old data
-                                             # during reimportation.
+our $CFG_FILE_PATH          = "$main::kddart_base_dir/secure/kddart_dal.cfg";
 
 our $NB_RECORD_BULK_INSERT  = 3000;
 
@@ -159,7 +237,7 @@ our $READ_WRITE_PERM        = 6;
 our $READ_LINK_PERM         = 5;
 our $ALL_PERM               = 7;
 
-our $TIMEZONE               = 'Australia/Sydney';
+our $TIMEZONE               = 'FROM CFG_FILE';
 
 our $ACCEPT_HEADER_LOOKUP   = { 'application/json' => 'JSON',
                                 'text/xml'         => 'XML',
@@ -167,17 +245,17 @@ our $ACCEPT_HEADER_LOOKUP   = { 'application/json' => 'JSON',
 
 our $VALID_CTYPE            = {'xml' => 1, 'json' => 1, 'geojson' => 1};
 
-our $DAL_VERSION            = '2.2.5';
-our $DAL_COPYRIGHT          = 'Copyright (c) 2011, Diversity Arrays Technology, All rights reserved.';
+our $DAL_VERSION            = '2.3.1';
+our $DAL_COPYRIGHT          = 'Copyright (c) 2015, Diversity Arrays Technology, All rights reserved.';
 our $DAL_ABOUT              = 'Data Access Layer';
 
 our $GENO_SPEC_ONE2ONE      = '1-TO-1';
 our $GENO_SPEC_ONE2MANY     = '1-TO-M';
 our $GENO_SPEC_MANY2MANY    = 'M-TO-M';
 
-our $GENOTYPE2SPECIMEN_CFG  = $GENO_SPEC_MANY2MANY;
+our $GENOTYPE2SPECIMEN_CFG  = "FROM CFG_FILE";
 
-our $UNIT_POSITION_SPLITTER = '|';
+our $UNIT_POSITION_SPLITTER = "FROM CFG_FILE";
 
 our $M2M_RELATION           = {};
 
@@ -245,11 +323,11 @@ sub read_uname_pass  {
     ($left, $right) = split(/=/, $line);
     $left = trim($left);
     $right = trim($right);
-    if ($left eq 'username') 
+    if ($left eq 'username')
     {
       $uname = $right;
     }
-    if ($left eq 'password') 
+    if ($left eq 'password')
     {
       $pass = $right;
     }
@@ -267,9 +345,9 @@ sub connect_kdb_read {
 
 sub connect_mdb_read {
 
-  my ($mysql_uname, $mysql_pass) = read_uname_pass($RMYSQL_UP_FILE->{$ENV{DOCUMENT_ROOT}});
+  my ($monetdb_uname, $monetdb_pass) = read_uname_pass($MONETDB_UP_FILE->{$ENV{DOCUMENT_ROOT}});
   my $dsn = $DSN_MDB_READ->{$ENV{DOCUMENT_ROOT}};
-  my $dbh = DBI->connect($dsn, $mysql_uname, $mysql_pass);
+  my $dbh = DBI->connect($dsn, $monetdb_uname, $monetdb_pass);
   return $dbh;
 }
 
@@ -315,15 +393,15 @@ sub connect_mdb_write {
     $no_auto_commit = $_[0];
   }
 
-  my ($mysql_uname, $mysql_pass) = read_uname_pass($RMYSQL_UP_FILE->{$ENV{DOCUMENT_ROOT}});
+  my ($monetdb_uname, $monetdb_pass) = read_uname_pass($MONETDB_UP_FILE->{$ENV{DOCUMENT_ROOT}});
   my $dsn = $DSN_MDB_WRITE->{$ENV{DOCUMENT_ROOT}};
   my $dbh;
 
   if (!$no_auto_commit) {
-    $dbh = DBI->connect($dsn, $mysql_uname, $mysql_pass);
+    $dbh = DBI->connect($dsn, $monetdb_uname, $monetdb_pass);
   }
   else {
-    $dbh = DBI->connect($dsn, $mysql_uname, $mysql_pass, { 'RaiseError' => 1, 'AutoCommit' => 0});
+    $dbh = DBI->connect($dsn, $monetdb_uname, $monetdb_pass, { 'RaiseError' => 1, 'AutoCommit' => 0});
   }
 
 
@@ -427,6 +505,13 @@ sub read_cell {
   my $cell_value;
   my $sth = $dbh->prepare($sql);
   $sth->execute(@{$para_arg});
+
+  if ($dbh->err()) {
+
+    $err = 1;
+    return ($err, $dbh->errstr());
+  }
+
   $sth->bind_col(1, \$cell_value);
   $sth->fetch();
   $sth->finish();
@@ -446,13 +531,20 @@ sub read_cell {
 sub permission_phrase {
 
   my $group_id        = $_[0];
-  my $is_type_casting = $_[1];
+  my $sql_type        = $_[1];
   my $gadmin          = $_[2];
 
   my $tablename = q{};
   if ($_[3]) {
 
-    $tablename = $_[3] . '.';
+    if ($sql_type == 2) {
+
+      $tablename = '"' . $_[3] . '".';
+    }
+    else {
+
+      $tablename = $_[3] . '.';
+    }
   }
 
   my $sql_phrase = '';
@@ -463,19 +555,33 @@ sub permission_phrase {
 
   if ($group_id == 0) {
 
-    $o_grp_id = "${tablename}OwnGroupId";
-    $a_grp_id = "${tablename}AccessGroupId";
+    if ($sql_type == 2) {
+
+      $o_grp_id = qq|${tablename}"OwnGroupId"|;
+      $a_grp_id = qq|${tablename}"AccessGroupId"|;
+    }
+    else {
+
+      $o_grp_id = "${tablename}OwnGroupId";
+      $a_grp_id = "${tablename}AccessGroupId";
+    }
   }
 
   if ($gadmin eq '1') {
 
-    if ($is_type_casting) {#Postgres
+    if ($sql_type == 1) {#Postgres
 
       $sql_phrase .= "(( CAST( (${tablename}OwnGroupId = $o_grp_id) AS INTEGER) * $PERM_MASK ) | ";
       $sql_phrase .= "(( CAST( (${tablename}AccessGroupId = $a_grp_id) AS INTEGER) * $PERM_MASK ) & ${tablename}AccessGroupPerm) | ";
       $sql_phrase .= "${tablename}OtherPerm)";
     }
-    else {#MySQL
+    elsif ($sql_type == 2) { # MonetDB
+
+      $sql_phrase .= qq/(( (${tablename}"OwnGroupId" = $o_grp_id) * $PERM_MASK ) | /;
+      $sql_phrase .= qq/(( (${tablename}"AccessGroupId" = $a_grp_id) * $PERM_MASK ) & ${tablename}"AccessGroupPerm") | /;
+      $sql_phrase .= qq/${tablename}"OtherPerm")/;
+    }
+    elsif ($sql_type == 0) {#MySQL
 
       $sql_phrase .= "(( (${tablename}OwnGroupId = $o_grp_id) * $PERM_MASK ) | ";
       $sql_phrase .= "(( (${tablename}AccessGroupId = $a_grp_id) * $PERM_MASK ) & ${tablename}AccessGroupPerm) | ";
@@ -484,13 +590,19 @@ sub permission_phrase {
   }
   else {
 
-    if ($is_type_casting) {#Postgres
+    if ($sql_type == 1) {#Postgres
 
       $sql_phrase .= "((( CAST( (${tablename}OwnGroupId = $o_grp_id) AS INTEGER) * $PERM_MASK ) & ${tablename}OwnGroupPerm) | ";
       $sql_phrase .= "(( CAST( (${tablename}AccessGroupId = $a_grp_id) AS INTEGER) * $PERM_MASK ) & ${tablename}AccessGroupPerm) | ";
       $sql_phrase .= "${tablename}OtherPerm)";
     }
-    else {#MySQL
+    elsif ($sql_type == 2) { # MonetDB
+
+      $sql_phrase .= qq/((( (${tablename}"OwnGroupId" = $o_grp_id) * $PERM_MASK ) & ${tablename}"OwnGroupPerm") | /;
+      $sql_phrase .= qq/(( (${tablename}"AccessGroupId" = $a_grp_id) * $PERM_MASK ) & ${tablename}"AccessGroupPerm") | /;
+      $sql_phrase .= qq/${tablename}"OtherPerm")/;
+    }
+    elsif ($sql_type == 0) {#MySQL
 
       $sql_phrase .= "((( (${tablename}OwnGroupId = $o_grp_id) * $PERM_MASK ) & ${tablename}OwnGroupPerm) | ";
       $sql_phrase .= "(( (${tablename}AccessGroupId = $a_grp_id) * $PERM_MASK ) & ${tablename}AccessGroupPerm) | ";
@@ -812,7 +924,7 @@ sub read_dispatch_table {
 
   my $dispatch_file = $_[0];
 
-  open(DISPATCH_FHANDLE, "<$dispatch_file");
+  open(DISPATCH_FHANDLE, "<$dispatch_file") || die "Cannot open file: $dispatch_file ($!)";
 
   my $line;
   my $record = 0;
@@ -877,18 +989,24 @@ sub record_existence {
   my $field_name  = $_[2];
   my $field_value = $_[3];
 
+  my $driver_name = $dbh->{'Driver'}->{'Name'};
+
+  if (lc($driver_name) eq 'monetdb') {
+
+    $field_name = qq|"$field_name"|;
+    $table_name = qq|"$table_name"|;
+  }
+
   $field_value = lc($field_value);
 
   my $sql = "SELECT $field_name ";
   $sql   .= "FROM $table_name ";
 
-  my $driver_name = $dbh->{'Driver'}->{'Name'};
-
   if (lc($driver_name) eq 'pg') {
 
     $sql .= "WHERE lower(CAST($field_name AS VARCHAR(255)))=? ";
   }
-  elsif (lc($driver_name) eq 'mysql') {
+  else {
 
     $sql .= "WHERE LOWER($field_name)=? ";
   }
@@ -917,6 +1035,8 @@ sub id_existence_bulk {
   my $lookup_table_aref = $_[1];
   my $id_value_aref     = $_[2];
 
+  my $driver_name = $dbh->{'Driver'}->{'Name'};
+
   my $id_value_txt  = '(' . join(',', @{$id_value_aref}) . ')';
   my $nb_id         = scalar(@{$id_value_aref});
 
@@ -927,7 +1047,8 @@ sub id_existence_bulk {
 
   for my $table_info (@{$lookup_table_aref}) {
 
-    if (scalar(keys(%{$exist_href})) == $nb_id) {
+    # no id record
+    if ($nb_id == 0) {
 
       last;
     }
@@ -935,9 +1056,20 @@ sub id_existence_bulk {
     my $table_name    = $table_info->{'TableName'};
     my $field_name    = $table_info->{'FieldName'};
 
-    my $sql = "SELECT DISTINCT $field_name ";
-    $sql   .= "FROM $table_name ";
-    $sql   .= "WHERE $field_name IN $id_value_txt";
+    my $sql;
+
+    if (lc($driver_name) eq 'monetdb') {
+
+      $sql    = qq|SELECT DISTINCT "$field_name" |;
+      $sql   .= qq|FROM "$table_name" |;
+      $sql   .= qq|WHERE "$field_name" IN $id_value_txt|;
+    }
+    else {
+
+      $sql = "SELECT DISTINCT $field_name ";
+      $sql   .= "FROM $table_name ";
+      $sql   .= "WHERE $field_name IN $id_value_txt";
+    }
 
     my $sth = $dbh->prepare($sql);
     $sth->execute();
@@ -1078,6 +1210,13 @@ sub read_cell_value {
 
   my $driver_name = $dbh->{'Driver'}->{'Name'};
 
+  if (lc($driver_name) eq 'monetdb') {
+
+    $id_field   = qq|"$id_field"|;
+    $field_name = qq|"$field_name"|;
+    $table_name = qq|"$table_name"|;
+  }
+
   my $sql = "SELECT $field_name ";
   $sql   .= "FROM $table_name ";
 
@@ -1085,10 +1224,11 @@ sub read_cell_value {
 
     $sql .= "WHERE lower(CAST($id_field AS VARCHAR(255)))=? ";
   }
-  elsif (lc($driver_name) eq 'mysql') {
+  else {
 
     $sql .= "WHERE LOWER($id_field)=? ";
   }
+
   $sql   .= "LIMIT 1";
 
   my $field_value;
@@ -1199,7 +1339,7 @@ sub generate_factor_sql {
       # If the specific field name does not start with Factor. If it does start with
       # Factor, then virtual colum field selection has been done as part of vcol_field_part.
 
-      if (!($field =~ /Factor/)) {
+      if ($field !~ /Factor/) {
 
         if ($field =~ /\./) {
 
@@ -1265,7 +1405,7 @@ sub generate_mfactor_sql {
 
   my $factor_table = $table_name . 'factor';
 
-  my $sql = "SELECT FactorId FROM $factor_table GROUP BY FactorId";
+  my $sql = qq|SELECT "FactorId" FROM "$factor_table" GROUP BY "FactorId"|;
 
   my ($read_err, $read_msg, $used_factor_data) = read_data($dbh_m, $sql);
   my @used_factor_ids;
@@ -1319,8 +1459,8 @@ sub generate_mfactor_sql {
 
     if ($field_list_href->{$field_name} || $field_list_href->{'VCol*'} || $field_list_href->{'*'}) {
 
-      $vcol_field_part .= qq/ GROUP_CONCAT(IF(FactorId = $vcol_id, FactorValue, NULL) SEPARATOR '') AS /;
-      $vcol_field_part .= qq/$field_name,/;
+      $vcol_field_part .= qq/ group_concat(CASE WHEN "FactorId"=$vcol_id THEN "FactorValue" ELSE '' END) AS /;
+      $vcol_field_part .= qq/"$field_name",/;
 
       push(@vcol_list, {'Name'       => "Factor${vcol_name}",
                         'Caption'    => "$vcol_caption",
@@ -1336,14 +1476,25 @@ sub generate_mfactor_sql {
 
   $sth->finish();
 
-  my $select_field_part = q{};
+  my @select_field_list;
   for my $field (@{$field_list}) {
 
-    if ($field =~ /Col\*$/) {
+    if ($field =~ /\*$/) {
 
-      if ($field eq 'SCol*') {
+      if ($field ne 'VCol*') {
 
-        $select_field_part .= "${table_name}.*,";
+        my ($sfield_err, $sfield_msg, $sfield_data, $pkey_data) = get_static_field($dbh_m, $table_name);
+        if ($sfield_err) {
+
+          $err = 1;
+          return ($err, $sfield_msg, '', []);
+        }
+
+        for my $sfield_info (@{$sfield_data}) {
+
+          my $sfield_name = $sfield_info->{'Name'};
+          push(@select_field_list, qq|"$table_name"."$sfield_name"|);
+        }
       }
     }
     else {
@@ -1352,50 +1503,68 @@ sub generate_mfactor_sql {
       # If the specific field name does not start with Factor. If it does start with
       # Factor, then virtual colum field selection has been done as part of vcol_field_part.
 
-      if (!($field =~ /Factor/)) {
+      if ($field !~ /Factor/) {
 
         if ($field =~ /\./) {
 
-          $select_field_part .= "$field,";
+          if ($field =~ /"/) {
+
+            push(@select_field_list, qq|$field|);
+          }
+          else {
+
+            push(@select_field_list, qq|"$field"|);
+          }
         }
         else {
 
-          $select_field_part .= "${table_name}.$field,";
+          if ($field =~ /"/) {
+
+            push(@select_field_list, qq|"${table_name}".$field|);
+          }
+          else {
+
+            push(@select_field_list, qq|"${table_name}"."$field"|);
+          }
         }
       }
     }
   }
-  # remove last character - last "," must not exist
-  chop($select_field_part);
+
+  if (scalar(@select_field_list) == 0) {
+
+    push(@select_field_list, qq|"${table_name}"."$id_fieldname"|);
+  }
+
+  my $select_field_part = join(',', @select_field_list);
 
   my $returned_sql = '';
-  if (length($select_field_part) > 0) {
 
-    if (length($vcol_field_part) > 0) {
+  if (length($vcol_field_part) > 0) {
 
-      $returned_sql = "SELECT ${select_field_part}, ${vcol_field_part} ";
-    }
-    else {
-
-      $returned_sql = "SELECT ${select_field_part} ";
-    }
+    $returned_sql = "SELECT ${select_field_part}, ${vcol_field_part} ";
   }
   else {
 
-    if (length($vcol_field_part) > 0) {
+    $returned_sql = "SELECT ${select_field_part} ";
+  }
 
-      $returned_sql = "SELECT ${vcol_field_part} ";
-    }
-    else {
+  my @group_by_field_list;
 
-      $err = 1;
-      $trouble_vcol_str = 'Neither static nor virtual column matched.';
+  for my $select_field_name (@select_field_list) {
+
+    if ($select_field_name !~ /\s+AS\s+/i) {
+
+      push(@group_by_field_list, $select_field_name);
     }
   }
-  $returned_sql   .= "FROM $table_name LEFT JOIN $factor_table ";
-  $returned_sql   .= "ON ${table_name}.${id_fieldname} = ${factor_table}.${id_fieldname} ";
+
+  my $group_by_part = join(',', @group_by_field_list);
+
+  $returned_sql   .= qq|FROM "$table_name" LEFT JOIN "$factor_table" |;
+  $returned_sql   .= qq|ON "${table_name}"."${id_fieldname}" = "${factor_table}"."${id_fieldname}" |;
   $returned_sql   .= $other_join;
-  $returned_sql   .= " GROUP BY ${table_name}.${id_fieldname} ";
+  $returned_sql   .= qq| GROUP BY $group_by_part |;
 
   return ($err, $trouble_vcol_str, $returned_sql, \@vcol_list);
 }
@@ -1668,11 +1837,25 @@ sub is_valid_wkt_href {
 
   my $dbh_gis         = $_[0];
   my %args            = %{$_[1]};
-  my $geo_type        = '';
+  my $geo_type_aref   = [];
 
   if ( defined($_[2]) ) {
 
-    $geo_type = $_[2];
+    if (ref($_[2]) eq 'ARRAY') {
+
+      $geo_type_aref = $_[2];
+    }
+    else {
+
+      $geo_type_aref = [$_[2]];
+    }
+  }
+
+  my $valid_geo_type_href = {};
+
+  foreach my $geo_type (@{$geo_type_aref}) {
+
+    $valid_geo_type_href->{'ST_' . uc($geo_type)} = 1;
   }
 
   my $err = 0;
@@ -1711,12 +1894,23 @@ sub is_valid_wkt_href {
     }
     else {
 
-      if (length($geo_type) > 0) {
+      if (scalar(@{$geo_type_aref}) > 0) {
 
-        if ( !($well_known_text =~ /$geo_type/) ) {
+        my $geo_type_sql = qq|SELECT ST_GeometryType(ST_GeomFromText('$well_known_text'))|;
+
+        my $geo_type_sth = $dbh_gis->prepare($geo_type_sql);
+        $geo_type_sth->execute();
+
+        my $db_geo_type = '';
+
+        $geo_type_sth->bind_col(1, \$db_geo_type);
+        $geo_type_sth->fetch();
+        $geo_type_sth->finish();
+
+        if ( ! (defined $valid_geo_type_href->{uc($db_geo_type)}) ) {
 
           $err = 1;
-          $err_detail->{$param_name} = "$param_name is not a geometry type of $geo_type.";
+          $err_detail->{$param_name} = "$param_name is not a geometry type of " . join(',', @{$geo_type_aref});
         }
       }
     }
@@ -1737,6 +1931,28 @@ sub check_missing_href {
 
       $err = 1;
       $err_detail->{$param_name} = "$param_name is missing.";
+    }
+  }
+
+  return ($err, $err_detail);
+}
+
+sub check_value_href {
+
+  my %args    = %{$_[0]};
+  my %lookup  = %{$_[1]};
+
+  my $err = 0;
+  my $err_detail = {};
+  for my $param_name (keys(%args)) {
+
+    if (length($args{$param_name}) > 0) {
+
+      if (!(defined $lookup{$args{$param_name}})) {
+
+        $err = 1;
+        $err_detail->{$param_name} = $args{$param_name} . ' value is not acceptable.';
+      }
     }
   }
 
@@ -1774,7 +1990,7 @@ sub check_maxlen_href {
     if (length($args{$param_name}) > $len_info{$param_name}) {
 
       $err = 1;
-      $err_detail->{$param_name} = "$param_name is longer than " . $len_info{$param_name} . '.';
+      $err_detail->{$param_name} = "$param_name is longer than " . $len_info{$param_name} . ' characters.';
     }
   }
 
@@ -1945,6 +2161,23 @@ sub check_dt_href {
   return ($err, $err_detail);
 }
 
+sub check_bool_href {
+
+  my %args = %{$_[0]};
+
+  my $err = 0;
+  my $err_detail = {};
+  for my $param_name (keys(%args)) {
+
+    if (!($args{$param_name} =~ /^0|1$/)) {
+
+      $err = 1;
+      $err_detail->{$param_name} = "$param_name is not in boolean (0|1) format.";
+    }
+  }
+
+  return ($err, $err_detail);
+}
 
 sub check_float_value {
 
@@ -1955,7 +2188,7 @@ sub check_float_value {
   for my $param_name (keys(%args)) {
 
     if ( !($args{$param_name} =~ /^[-|+]?\d+\.?\d+$/) &&
-         !($args{$param_name} =~ /^\d+$/) 
+         !($args{$param_name} =~ /^\d+$/)
         ) {
 
       $err = 1;
@@ -1975,11 +2208,44 @@ sub check_float_href {
   for my $param_name (keys(%args)) {
 
     if ( !($args{$param_name} =~ /^[-|+]?\d+\.?\d+$/) &&
-         !($args{$param_name} =~ /^\d+$/) 
+         !($args{$param_name} =~ /^\d+$/)
         ) {
 
       $err = 1;
       $err_detail->{$param_name} = "$param_name is not a floating point number.";
+    }
+  }
+
+  return ($err, $err_detail);
+}
+
+sub check_email_href {
+
+  my %args = %{$_[0]};
+
+  my $err = 0;
+  my $err_detail = {};
+  for my $param_name (keys(%args)) {
+
+    my $is_valid = 0;
+
+    eval {
+
+      $is_valid = Email::Valid->address($args{$param_name});
+    };
+
+    if ($@) {
+
+      $err = 1;
+      $err_detail->{$param_name} = "$param_name is not a valid email.";
+    }
+    else {
+
+      if ( !$is_valid ) {
+
+        $err = 1;
+        $err_detail->{$param_name} = "$param_name is not a valid email.";
+      }
     }
   }
 
@@ -2180,6 +2446,7 @@ sub check_permission {
   my $perm          = $_[6];
 
   my $driver_name = $dbh->{'Driver'}->{'Name'};
+
   my $perm_str = '';
 
   my $id_list_str = join(',', @{$id_value_aref});
@@ -2192,11 +2459,25 @@ sub check_permission {
 
     $perm_str = permission_phrase($group_id, 0, $gadmin_status);
   }
+  elsif (lc($driver_name) eq 'monetdb') {
+
+    $perm_str = permission_phrase($group_id, 2, $gadmin_status);
+  }
 
   my $sql = '';
-  $sql   .= "SELECT $id_field ";
-  $sql   .= "FROM $table ";
-  $sql   .= "WHERE ((($perm_str) & $perm) = $perm) AND $id_field IN ($id_list_str)";
+
+  if (lc($driver_name) eq 'monetdb') {
+
+    $sql   .= qq|SELECT "$id_field" |;
+    $sql   .= qq|FROM "$table" |;
+    $sql   .= qq|WHERE ((($perm_str) & $perm) = $perm) AND "$id_field" IN ($id_list_str)|;
+  }
+  else {
+
+    $sql   .= "SELECT $id_field ";
+    $sql   .= "FROM $table ";
+    $sql   .= "WHERE ((($perm_str) & $perm) = $perm) AND $id_field IN ($id_list_str)";
+  }
 
   my $n_id = scalar(@{$id_value_aref});
   my $count_from_db;
@@ -2687,7 +2968,7 @@ sub build_seek_index {
 
     print $index_file_handle pack("N", $offset);
     $offset = tell($data_file_handle);
-    
+
     $line_counter += 1;
   }
 
@@ -2933,7 +3214,7 @@ sub check_col_definition {
     }
   }
 
-  return ($err, $msg);  
+  return ($err, $msg);
 }
 
 sub check_col_def_href {
@@ -3149,6 +3430,8 @@ sub get_paged_filter {
     $where_argument = $_[6];
   }
 
+  my $driver_name = lc($dbh->{'Driver'}->{'Name'});
+
   my $err     = 0;
   my $err_msg = qq{};
 
@@ -3226,8 +3509,28 @@ sub get_paged_filter {
     return ($err, $err_msg, $nb_records, $nb_pages, 'LIMIT 0');
   }
 
-  my $limit_start = ($page-1)*$nb_per_page;
-  my $limit_clause = "LIMIT ${limit_start},${nb_per_page}";
+  my $limit_start  = ($page-1)*$nb_per_page;
+  my $limit_clause = '';
+
+  if ($driver_name eq 'mysql') {
+
+    $limit_clause = "LIMIT ${limit_start},${nb_per_page}";
+  }
+  elsif ($driver_name eq 'pg') {
+
+    $limit_clause = "LIMIT ${nb_per_page} OFFSET ${limit_start}";
+  }
+  elsif ($driver_name eq 'monetdb') {
+
+    $limit_clause = "LIMIT ${nb_per_page} OFFSET ${limit_start}";
+  }
+  else {
+
+    $err     = 1;
+    $err_msg = 'Unknown DBI driver';
+
+    return ($err, $err_msg, -1, -1, '', $sql_count_elapsed);
+  }
 
   return ($err, $err_msg, $nb_records, $nb_pages, $limit_clause, $sql_count_elapsed);
 }
@@ -3245,6 +3548,8 @@ sub get_paged_filter_sql {
 
     $where_argument = $_[4];
   }
+
+  my $driver_name = lc($dbh->{'Driver'}->{'Name'});
 
   my $err     = 0;
   my $err_msg = qq{};
@@ -3298,7 +3603,27 @@ sub get_paged_filter_sql {
   }
 
   my $limit_start  = ($page-1)*$nb_per_page;
-  my $limit_clause = "LIMIT ${limit_start},${nb_per_page}";
+  my $limit_clause = '';
+
+  if ($driver_name eq 'mysql') {
+
+    $limit_clause = "LIMIT ${limit_start},${nb_per_page}";
+  }
+  elsif ($driver_name eq 'pg') {
+
+    $limit_clause = "LIMIT ${nb_per_page} OFFSET ${limit_start}";
+  }
+  elsif ($driver_name eq 'monetdb') {
+
+    $limit_clause = "LIMIT ${nb_per_page} OFFSET ${limit_start}";
+  }
+  else {
+
+    $err     = 1;
+    $err_msg = 'Unknown DBI driver';
+
+    return ($err, $err_msg, -1, -1, '', $sql_count_elapsed);
+  }
 
   return ($err, $err_msg, $nb_records, $nb_pages, $limit_clause, $sql_count_elapsed);
 }
@@ -3552,9 +3877,27 @@ sub validate_trait_db {
         $err = 1;
         $err_msg = 'No variable x in boolean expression.';
       }
+      elsif ( ($validation_rule_body =~ /\&/) ||
+                ($validation_rule_body =~ /\|/) ) {
+
+        $err = 1;
+        $err_msg = 'Contain forbidden characters';
+      }
+      elsif ( $validation_rule_body =~ /\d+\.?\d*\s*,/) {
+
+        $err = 1;
+        $err_msg = 'Contain a comma - invalid boolean expression';
+      }
       else {
 
-        $validation_rule_body =~ s/x/ $trait_value /ig;
+        if ($trait_value =~ /^[-+]?\d+\.?\d*$/) {
+
+          $validation_rule_body =~ s/x/ $trait_value /ig;
+        }
+        else {
+
+          $validation_rule_body =~ s/x/ '$trait_value' /ig;
+        }
 
         for my $operator (keys(%{$operator_lookup})) {
 
@@ -3569,7 +3912,7 @@ sub validate_trait_db {
         if($@) {
 
           $err = 1;
-          $err_msg = 'Invalid boolean trait value validation expression.';
+          $err_msg = "Invalid boolean trait value validation expression ($validation_rule_body).";
         }
         else {
 
@@ -3583,6 +3926,90 @@ sub validate_trait_db {
             $err = 0;
             $err_msg = '';
           }
+        }
+      }
+    }
+    elsif (uc($validation_rule_prefix) eq 'CHOICE') {
+
+      if ($validation_rule_body =~ /^\[.*\]$/) {
+
+        $err = 1;
+        $err_msg = 'Invalid choice expression containing [].';
+      }
+      else {
+
+        my @choice_list = split(/\|/, $validation_rule_body);
+
+        $err     = 1;
+        $err_msg = $validation_err_msg;
+
+        foreach my $choice (@choice_list) {
+
+          if (lc("$choice") eq lc("$trait_value")) {
+
+            $err = 0;
+            $err_msg = '';
+            last;
+          }
+        }
+      }
+    }
+    elsif ( (uc($validation_rule_prefix) eq 'RANGE')   ||
+            (uc($validation_rule_prefix) eq 'LERANGE') ||
+            (uc($validation_rule_prefix) eq 'RERANGE') ||
+            (uc($validation_rule_prefix) eq 'BERANGE') ) {
+
+      if ($validation_rule_body !~ /^[-+]?\d+\.?\d*\s*\.\.\s*[-+]?\d+\.?\d*$/) {
+
+        $err     = 1;
+        $err_msg = 'Invalid range expression';
+      }
+      else {
+
+        $err     = 1;
+        $err_msg = $validation_err_msg;
+
+        if ($trait_value =~ /^[-+]?\d+\.?\d*$/) {
+
+          my ($left_val, $right_val) = split(/\s*\.\.\s*/, $validation_rule_body);
+
+          if (uc($validation_rule_prefix) eq 'RANGE') {
+
+            if ($trait_value >= $left_val && $trait_value <= $right_val) {
+
+              $err = 0;
+              $err_msg = '';
+            }
+          }
+          elsif (uc($validation_rule_prefix) eq 'LERANGE') {
+
+            if ($trait_value > $left_val && $trait_value <= $right_val) {
+
+              $err = 0;
+              $err_msg = '';
+            }
+          }
+          elsif (uc($validation_rule_prefix) eq 'RERANGE') {
+
+            if ($trait_value >= $left_val && $trait_value < $right_val) {
+
+              $err = 0;
+              $err_msg = '';
+            }
+          }
+          elsif (uc($validation_rule_prefix) eq 'BERANGE') {
+
+            if ($trait_value > $left_val && $trait_value < $right_val) {
+
+              $err = 0;
+              $err_msg = '';
+            }
+          }
+        }
+        else {
+
+          $err = 1;
+          $err_msg = "Trait value ($trait_value) not a valid number";
         }
       }
     }
@@ -3634,6 +4061,11 @@ sub is_correct_validation_rule {
         $correct = 0;
         $msg     = 'Contain forbidden characters';
       }
+      elsif ( $validation_rule_body =~ /\d+\.?\d*\s*,/) {
+
+        $correct = 0;
+        $msg     = 'Contain a comma - invalid boolean expression';
+      }
       else {
 
         $validation_rule_body =~ s/x/ $dummy_trait_val /ig;
@@ -3663,6 +4095,27 @@ sub is_correct_validation_rule {
 
         $correct = 0;
         $msg     = 'Invalid regular expression.';
+      }
+    }
+    elsif (uc($validation_rule_prefix) eq 'CHOICE') {
+
+      if ($validation_rule_body =~ /^\[.*\]$/) {
+
+        $correct = 0;
+        $msg     = 'Invalid choice expression containing [].';
+      }
+    }
+    elsif ( (uc($validation_rule_prefix) eq 'RANGE')   ||
+            (uc($validation_rule_prefix) eq 'LERANGE') ||
+            (uc($validation_rule_prefix) eq 'RERANGE') ||
+            (uc($validation_rule_prefix) eq 'BERANGE') ) {
+
+      warn("Validation rule body: $validation_rule_body");
+
+      if ($validation_rule_body !~ /^[-+]?\d+\.?\d*\s*\.\.\s*[-+]?\d+\.?\d*$/) {
+
+        $correct = 0;
+        $msg     = 'Invalid range expression';
       }
     }
     else {
@@ -3746,7 +4199,10 @@ sub parse_selected_field {
 
     if (!$id_field_selected) {
 
-      push(@{$final_field_list}, "$id_field_name");
+      if (length($id_field_name) > 0) {
+
+        push(@{$final_field_list}, "$id_field_name");
+      }
     }
   }
 
@@ -3767,7 +4223,7 @@ sub parse_marker_filtering {
 
   for my $field (@{$fieldlist_aref}) {
 
-    $field_href->{$field} = 1;      
+    $field_href->{$field} = 1;
   }
 
   my @filtering_exp = split(/&/, $filtering_csv);
@@ -3877,7 +4333,7 @@ sub parse_marker_filtering {
       $err     = 1;
       $err_msg = "( $expression ): invalid filtering expression.";
       last;
-    } 
+    }
   }
 
   if (!$err) {
@@ -3904,7 +4360,15 @@ sub parse_sorting {
 
   for my $field (@{$field_list_all}) {
 
-    $field_href->{$field} = 1;
+    if ($field =~ /ST_AsText\((.+)\)/) {
+
+      my $geo_field = $1;
+      $field_href->{$geo_field}     = 1;
+    }
+    else {
+
+      $field_href->{$field} = 1;
+    }
   }
 
   my $err     = 0;
@@ -3937,7 +4401,57 @@ sub parse_sorting {
         last;
       }
 
-      my $new_exp = "${table_name}$field_name $sort_order";
+      my $new_exp = '';
+
+      if ($table_name =~ /\"/) {
+
+        $new_exp = qq|${table_name}"$field_name" $sort_order|;
+      }
+      else {
+
+        $new_exp = "${table_name}$field_name $sort_order";
+      }
+
+      if (!$seen_sort_expression->{$new_exp}) {
+
+        $seen_sort_expression->{$new_exp} = 1;
+        if (length($field_href->{$field_name}) > 0) {
+
+          push(@{$sort_list}, $new_exp);
+        }
+        else {
+
+          $err     = 1;
+          $err_msg = "Field ($field_name) unknown.";
+        }
+      }
+    }
+    elsif ($expression =~ /(\w+)\s+(NASC|NDESC)/i) {
+
+      my ($field_name, $sort_order) = split(/\s+/, $expression);
+
+      $field_name = trim($field_name);
+      $sort_order = uc(trim($sort_order));
+
+      $sort_order =~ s/^N//;
+
+      if ($field_name eq 'Longitude' || $field_name eq 'Latitude' || $field_name =~ /location/) {
+
+        $err = 1;
+        $err_msg = "Field ($field_name) cannot be used for sorting.";
+        last;
+      }
+
+      my $new_exp = '';
+
+      if ($table_name =~ /\"/) {
+
+        $new_exp = qq|LENGTH(${table_name}"$field_name") $sort_order, ${table_name}"$field_name" $sort_order|;
+      }
+      else {
+
+        $new_exp = "LENGTH(${table_name}$field_name) $sort_order, ${table_name}$field_name $sort_order";
+      }
 
       if (!$seen_sort_expression->{$new_exp}) {
 
@@ -3963,6 +4477,134 @@ sub parse_sorting {
   my $sql_exp = join(',', @{$sort_list});
 
   return ($err, $err_msg, $sql_exp);
+}
+
+sub parse_marker_sorting {
+
+  my $sorting_csv       = $_[0];
+  my $field2col_lookup  = $_[1];
+
+  my $err     = 0;
+  my $err_msg = '';
+
+  my @sort_exp = split(/,/, $sorting_csv);
+
+  my $sort_function_text = '';
+
+  my $sort_list            = [];
+  my $seen_sort_expression = {};
+
+  for my $expression (@sort_exp) {
+
+    $expression = trim($expression);
+    if (length($expression) == 0) {
+
+      next;
+    }
+
+    if ($expression =~ /(\w+)\s+(ASC|DESC)/i) {
+
+      my ($field_name, $sort_order) = split(/\s+/, $expression);
+
+      $field_name = trim($field_name);
+      $sort_order = uc(trim($sort_order));
+
+      my $new_exp = "$field_name $sort_order";
+
+      if (!$seen_sort_expression->{$new_exp}) {
+
+        $seen_sort_expression->{$new_exp} = 1;
+
+        if (defined $field2col_lookup->{$field_name}) {
+
+          push(@{$sort_list}, {'FieldName' => $field_name, 'Order' => $sort_order});
+        }
+        else {
+
+          $err     = 1;
+          $err_msg = "Field ($field_name) unknown.";
+
+          return ($err, $err_msg, []);
+        }
+      }
+    }
+    else {
+
+      $err     = 1;
+      $err_msg = "Expression ($expression) invalid.";
+
+      return ($err, $err_msg, []);
+    }
+  }
+
+  return ($err, $err_msg, $sort_list);
+}
+
+sub get_sorting_function {
+
+  my $sort_aref         = $_[0];
+  my $field2col_lookup  = $_[1];
+  my $data_2sort_aref   = $_[2];
+
+  my $field2numeric_lookup = {};
+
+  my $log_msg = '';
+
+  for my $field_name (keys(%{$field2col_lookup})) {
+
+    my $data_index = $field2col_lookup->{$field_name};
+
+    my $is_numeric = 1;
+
+    for (my $i = 0; $i < scalar(@{$data_2sort_aref}); $i++) {
+
+      my $data_point = $data_2sort_aref->[$i]->[$data_index];
+
+      if ($data_point !~ /^[-|+]?\d+\.?\d+$/ && $data_point !~ /^\d+$/) {
+
+        $log_msg .= "field: $field_name data index: $data_index - data_aref [ $i ]: ";
+        $log_msg .= $data_point . " is not numeric.\n";
+
+        $is_numeric = 0;
+        last;
+      }
+    }
+
+    $field2numeric_lookup->{$field_name} = $is_numeric;
+  }
+
+  my @sort_func_list;
+
+  for my $sort_href (@{$sort_aref}) {
+
+    my $field_name = $sort_href->{'FieldName'};
+    my $sort_order = $sort_href->{'Order'};
+    my $col_num    = $field2col_lookup->{$field_name};
+
+    my $sort_oper = 'cmp';
+
+    if ($field2numeric_lookup->{$field_name}) {
+
+      $sort_oper = '<=>';
+    }
+
+    my $sort_func_txt = '';
+
+    if (uc($sort_order) eq 'ASC') {
+
+      $sort_func_txt = qq|\$a\-\>\[$col_num\] $sort_oper \$b\-\>\[$col_num\]|;
+    }
+    else {
+
+      $sort_func_txt = qq|\$b\-\>\[$col_num\] $sort_oper \$a\-\>\[$col_num\]|;
+    }
+
+    push(@sort_func_list, $sort_func_txt);
+  }
+
+  my $sort_function_text = join(' || ', @sort_func_list);
+
+  return ($sort_function_text, $log_msg);
 }
 
 sub update_vcol_data {
@@ -4069,7 +4711,16 @@ sub WKT2geoJSON {
     $wkt =~ s/\(/\[/og;
     $wkt =~ s/(-?\d+(?:\.\d+)?)\s(-?\d+(?:\.\d+)?)/ [$1, $2]/og;
     $geom->{'coordinates'} = eval($wkt);
-  } 
+  }
+  elsif ($wkt =~ /^MULTIPOLYGON/) {
+
+    $geom->{type} = "MultiPolygon";
+    $wkt =~ s/MULTIPOLYGON//og;
+    $wkt =~ s/\)/\]/og;
+    $wkt =~ s/\(/\[/og;
+    $wkt =~ s/(-?\d+(?:\.\d+)?)\s(-?\d+(?:\.\d+)?)/ [$1, $2]/og;
+    $geom->{'coordinates'} = eval($wkt);
+  }
   elsif ($wkt =~ /^POINT/) {
 
     $geom->{type} = "Point";
@@ -4113,7 +4764,7 @@ sub samplemeasure_row2col {
   my $tt_trait_where = '';
 
   if (scalar(@{$trait_id_aref}) > 0) {
-   
+
     $trait_where    = ' AND TraitId IN (' . join(',', @{$trait_id_aref}) . ')';
     $tt_trait_where = ' AND trialtrait.TraitId IN (' . join(',', @{$trait_id_aref}) . ')';
   }
@@ -4207,6 +4858,26 @@ sub samplemeasure_row2col {
         $date_field_name      = "Date_${trait_name}__$hum_inst_num";
       }
 
+      my $chk_inst_num_sql = 'SELECT samplemeasurement.TrialUnitId ';
+      $chk_inst_num_sql   .= 'FROM samplemeasurement LEFT JOIN trialunit ';
+      $chk_inst_num_sql   .= 'ON samplemeasurement.TrialUnitId = trialunit.TrialUnitId ';
+      $chk_inst_num_sql   .= 'WHERE TrialId=? AND TraitId=? AND SampleTypeId=? AND InstanceNumber=? ';
+      $chk_inst_num_sql   .= 'LIMIT 1';
+
+      my ($read_chk_inst_num_err, $found_trial_unit_id) = read_cell($dbh, $chk_inst_num_sql,
+                                                                    [$trial_id, $trait_id, $sample_type_id, $inst_num]);
+
+      if ($read_chk_inst_num_err) {
+
+        $err = 1;
+        $err_msg = "Unexpected error: checking instance number.";
+
+        return ($err, $err_msg, '', [], -1);
+      }
+
+      # The instance number has no data
+      if (length($found_trial_unit_id) == 0) { next; }
+
       my $sub_sql = qq| GROUP_CONCAT( IF(TraitId = $trait_id, IF(InstanceNumber = $inst_num, TraitValue , NULL) , NULL) SEPARATOR '' ) |;
       $sub_sql   .= qq|AS \`${trait_val_field_name}\` |;
 
@@ -4233,7 +4904,7 @@ sub samplemeasure_row2col {
   return ($err, $err_msg, $return_sql, $field_order_aref, $max_instance_num);
 }
 
-sub rollback_cleanup_multi {  
+sub rollback_cleanup_multi {
 
   # This method takes a hash reference for the records to delete in the following format.
   # $inserted_id->{'table_name'} = { 'IdField' => 'actual id field name',
@@ -4245,6 +4916,8 @@ sub rollback_cleanup_multi {
 
   my $err     = 0;
   my $err_msg = q{};
+
+  my $driver_name = lc($dbh->{'Driver'}->{'Name'});
 
   for my $table_name (keys(%{$inserted_id})) {
 
@@ -4266,8 +4939,20 @@ sub rollback_cleanup_multi {
 
     $logger->debug("Deleting ($id_field, $id_val_csv) from $table_name");
 
-    my $sql = "DELETE FROM $table_name ";
-    $sql   .= "WHERE $id_field IN ($id_val_csv)";
+    my $sql = '';
+
+    if ($driver_name eq 'monetdb') {
+
+      $sql  = qq|DELETE FROM "$table_name" |;
+      $sql .= qq|WHERE "$id_field" IN ($id_val_csv)|;
+    }
+    else {
+
+      $sql  = "DELETE FROM $table_name ";
+      $sql .= "WHERE $id_field IN ($id_val_csv)";
+    }
+
+    $logger->debug("DELETE SQL: $sql");
 
     my $sth = $dbh->prepare($sql);
     $sth->execute();
@@ -4403,130 +5088,236 @@ sub get_static_field {
   my $dbh   = $_[0];
   my $tname = $_[1];
 
-  my $sql   = "SELECT * FROM $tname LIMIT 1";
-
-  my $sth = $dbh->prepare($sql);
-  $sth->execute();
-
-  my $err        = 0;
-  my $msg        = '';
-  my $field_data = [];
-  my $pkey_data  = [];
-
-  if ($dbh->err()) {
-
-    $err = 1;
-    $msg = $dbh->errstr();
-    return ($err, $msg, $field_data, $pkey_data);
-  }
-
-  my @primary_key_names = $dbh->primary_key( undef, undef, $tname );
-
-  my $static_field_aref = [];
-  my $nfield = $sth->{'NUM_OF_FIELDS'};
-
   my $driver_name = $dbh->{'Driver'}->{'Name'};
 
-  my $comment_lookup_href = {};
+  if (lc($driver_name) eq 'monetdb') {
 
-  if (lc($driver_name) eq 'pg') {
+    my $sql = qq|SELECT name AS column_name, type as column_data_type, type_digits, |;
+    $sql   .= qq|"null" as nullable, "default" |;
+    $sql   .= qq|FROM "sys"."columns" |;
+    $sql   .= qq|WHERE table_id = (SELECT id AS table_id FROM "sys"."tables" WHERE name = '$tname')|;
 
-    my $comment_sql = 'SELECT c.table_name, c.column_name, pgd.description ';
-    $comment_sql   .= 'FROM pg_catalog.pg_statio_all_tables AS st ';
-    $comment_sql   .= 'INNER JOIN pg_catalog.pg_description pgd on (pgd.objoid=st.relid) ';
-    $comment_sql   .= 'INNER JOIN information_schema.columns c on (pgd.objsubid=c.ordinal_position ';
-    $comment_sql   .= 'AND c.table_schema=st.schemaname AND c.table_name=st.relname) ';
-    $comment_sql   .= "WHERE c.table_name = '$tname'";
+    my $sth = $dbh->prepare($sql);
+    $sth->execute();
 
-    $comment_lookup_href = $dbh->selectall_hashref($comment_sql, 'column_name');
+    my $err        = 0;
+    my $msg        = '';
+    my $field_data = [];
+    my $pkey_data  = [];
+
+    if ($dbh->err()) {
+
+      $err = 1;
+      $msg = $dbh->errstr();
+      return ($err, $msg, $field_data, $pkey_data);
+    }
+
+    my $col_info_aref = $sth->fetchall_arrayref({});
+
+    if ($sth->err()) {
+
+      $err = 1;
+      $msg = $dbh->errstr();
+      return ($err, $msg, $field_data, $pkey_data);
+    }
+
+    if (scalar(@{$col_info_aref}) == 0) {
+
+      $err = 1;
+      $msg = 'Table not found';
+      return ($err, $msg, $field_data, $pkey_data);
+    }
+
+    $sql  = qq|SELECT "FieldName", "PrimaryKey", "FieldComment" |;
+    $sql .= qq|FROM fieldcomment |;
+    $sql .= qq|WHERE "TableName" = '$tname'|;
+
+    $sth = $dbh->prepare($sql);
+    $sth->execute();
+
+    if ($dbh->err()) {
+
+      $err = 1;
+      $msg = $dbh->errstr();
+      return ($err, $msg, $field_data, $pkey_data);
+    }
+
+    my $col_info_lookup = $sth->fetchall_hashref('FieldName');
+
+    if ($sth->err()) {
+
+      $err = 1;
+      $msg = $dbh->errstr();
+      return ($err, $msg, $field_data, $pkey_data);
+    }
+
+    for my $col_info (@{$col_info_aref}) {
+
+      my $field_name    = $col_info->{"column_name"};
+      my $dtype_name    = $col_info->{"column_data_type"};
+      my $col_size      = $col_info->{"type_digits"};
+      my $field_comment = $col_info_lookup->{$field_name}->{'FieldComment'};
+
+      if ($col_info_lookup->{$field_name}->{'PrimaryKey'} == 1) {
+
+        push(@{$pkey_data}, $field_name);
+      }
+
+      my $required_status;
+
+      if ($col_info->{'nullable'} eq 'true') {
+
+        $required_status = 0;
+      }
+      else {
+
+        $required_status = 1;
+      }
+
+      if ($col_info->{'default'} =~ /next value for/) {
+
+        # it's an auto number
+        $required_status = 0;
+      }
+
+      my $static_field = {};
+
+      $static_field->{'Name'}        = $field_name;
+      $static_field->{'Required'}    = $required_status;
+      $static_field->{'DataType'}    = $dtype_name;
+      $static_field->{'ColSize'}     = $col_size;
+      $static_field->{'Description'} = $field_comment;
+
+      push(@{$field_data}, $static_field);
+    }
+
+    return ($err, $msg, $field_data, $pkey_data);
   }
   else {
 
-    my $comment_sql = "SHOW FULL COLUMNS IN $tname";
+    my $sql   = "SELECT * FROM $tname LIMIT 1";
 
-    $comment_lookup_href = $dbh->selectall_hashref($comment_sql, 'Field');
-  }
+    my $sth = $dbh->prepare($sql);
+    $sth->execute();
 
-  for (my $i = 0; $i < $nfield; $i++ ) {
+    my $err        = 0;
+    my $msg        = '';
+    my $field_data = [];
+    my $pkey_data  = [];
 
-    my $field_name = $sth->{'NAME'}->[$i];
+    if ($dbh->err()) {
 
-    if (scalar(@primary_key_names) == 1) {
-
-      if ($field_name eq $primary_key_names[0]) {
-
-        # this column must be an auto number.
-        # no other way to check if a column is an auto number.
-
-        next;
-      }
+      $err = 1;
+      $msg = $dbh->errstr();
+      return ($err, $msg, $field_data, $pkey_data);
     }
 
-    my $required_status;
-    if ( $sth->{'NULLABLE'}->[$i] eq '1' ) {
+    my @primary_key_names = $dbh->primary_key( undef, undef, $tname );
 
-      $required_status = 0;
-    }
-    else {
+    my $static_field_aref = [];
+    my $nfield = $sth->{'NUM_OF_FIELDS'};
 
-      $required_status = 1;
-    }
-
-    my $static_field = {};
-
-    if ($field_name eq 'name' || $field_name eq 'id') {
-
-      $field_name = "${tname}$field_name";
-    }
-
-    my $datatype   = $sth->{'TYPE'}->[$i];
-    my @type_info  = $dbh->type_info([$datatype]);
-    my $dtype_name = 'Unknown';
-
-    if (defined $type_info[0]->{'TYPE_NAME'}) {
-
-      $dtype_name = $type_info[0]->{'TYPE_NAME'};
-    }
-
-    my $col_size   = $sth->{'PRECISION'}->[$i];
+    my $comment_lookup_href = {};
 
     if (lc($driver_name) eq 'pg') {
 
-      if ($dtype_name eq 'text') {
+      my $comment_sql = 'SELECT c.table_name, c.column_name, pgd.description ';
+      $comment_sql   .= 'FROM pg_catalog.pg_statio_all_tables AS st ';
+      $comment_sql   .= 'INNER JOIN pg_catalog.pg_description pgd on (pgd.objoid=st.relid) ';
+      $comment_sql   .= 'INNER JOIN information_schema.columns c on (pgd.objsubid=c.ordinal_position ';
+      $comment_sql   .= 'AND c.table_schema=st.schemaname AND c.table_name=st.relname) ';
+      $comment_sql   .= "WHERE c.table_name = '$tname'";
 
-        # somehow for text in Postgres the precision is 4 higher than what \d command display
-        # in the psql client for the table
-        $col_size -= 4;
-      }
-
-      if (defined $comment_lookup_href->{$field_name}->{'description'}) {
-
-        $static_field->{'Description'} = $comment_lookup_href->{$field_name}->{'description'};
-      }
+      $comment_lookup_href = $dbh->selectall_hashref($comment_sql, 'column_name');
     }
     else {
 
-      if (defined $comment_lookup_href->{$field_name}->{'Comment'}) {
+      my $comment_sql = "SHOW FULL COLUMNS IN $tname";
 
-        $static_field->{'Description'} = $comment_lookup_href->{$field_name}->{'Comment'};
-      }
+      $comment_lookup_href = $dbh->selectall_hashref($comment_sql, 'Field');
     }
 
-    $static_field->{'Name'}       = $field_name;
-    $static_field->{'Required'}   = $required_status;
-    $static_field->{'DataType'}   = $dtype_name;
-    $static_field->{'ColSize'}    = $col_size;
+    for (my $i = 0; $i < $nfield; $i++ ) {
 
-    push(@{$static_field_aref}, $static_field);
+      my $field_name = $sth->{'NAME'}->[$i];
+
+      if (scalar(@primary_key_names) == 1) {
+
+        if ($field_name eq $primary_key_names[0]) {
+
+          # this column must be an auto number.
+          # no other way to check if a column is an auto number.
+
+          next;
+        }
+      }
+
+      my $required_status;
+      if ( $sth->{'NULLABLE'}->[$i] eq '1' ) {
+
+        $required_status = 0;
+      }
+      else {
+
+        $required_status = 1;
+      }
+
+      my $static_field = {};
+
+      if ($field_name eq 'name' || $field_name eq 'id') {
+
+        $field_name = "${tname}$field_name";
+      }
+
+      my $datatype   = $sth->{'TYPE'}->[$i];
+      my @type_info  = $dbh->type_info([$datatype]);
+      my $dtype_name = 'Unknown';
+
+      if (defined $type_info[0]->{'TYPE_NAME'}) {
+
+        $dtype_name = $type_info[0]->{'TYPE_NAME'};
+      }
+
+      my $col_size   = $sth->{'PRECISION'}->[$i];
+
+      if (lc($driver_name) eq 'pg') {
+
+        if ($dtype_name eq 'text') {
+
+          # somehow for text in Postgres the precision is 4 higher than what \d command display
+          # in the psql client for the table
+          $col_size -= 4;
+        }
+
+        if (defined $comment_lookup_href->{$field_name}->{'description'}) {
+
+          $static_field->{'Description'} = $comment_lookup_href->{$field_name}->{'description'};
+        }
+      }
+      else {
+
+        if (defined $comment_lookup_href->{$field_name}->{'Comment'}) {
+
+          $static_field->{'Description'} = $comment_lookup_href->{$field_name}->{'Comment'};
+        }
+      }
+
+      $static_field->{'Name'}       = $field_name;
+      $static_field->{'Required'}   = $required_status;
+      $static_field->{'DataType'}   = $dtype_name;
+      $static_field->{'ColSize'}    = $col_size;
+
+      push(@{$static_field_aref}, $static_field);
+    }
+
+    $sth->finish();
+
+    $field_data = $static_field_aref;
+
+    $pkey_data = \@primary_key_names;
+
+    return ($err, $msg, $field_data, $pkey_data);
   }
-
-  $sth->finish();
-
-  $field_data = $static_field_aref;
-
-  $pkey_data = \@primary_key_names;
-
-  return ($err, $msg, $field_data, $pkey_data);
 }
 
 sub table_existence {
@@ -4687,6 +5478,99 @@ sub filter_csv {
   return ($err, $err_msg, $nb_row_selected);
 }
 
+sub filter_csv_aref {
+
+  my $input_filehandle      = $_[0];
+  my $index_filehandle      = $_[1];
+  my $filtering             = $_[2];
+  my $wanted_field_idx_aref = $_[3];
+  my $access_by_line_yn     = $_[4];
+  my $line_aref             = $_[5];
+
+  my $start_from_line       = 1;
+
+  if (defined $_[6]) {
+
+    $start_from_line = $_[6];
+  }
+
+  my $err         = 0;
+  my $err_msg     = '';
+  my $output_aref = [];
+
+  my $csv = Text::CSV_XS->new ({ sep_char => ',', binary => 1 });
+
+  my $nb_row_selected = 0;
+
+  my $line_counter = 0;
+
+  while(1) {
+
+    my $line = undef;
+
+    if ($access_by_line_yn) {
+
+      my $line_num = shift(@{$line_aref});
+
+      if (defined($line_num)) {
+
+        $line_counter = $line_num;
+
+        my ($get_line_err, $line_result) = get_file_line($input_filehandle, $index_filehandle, $line_num);
+        if ( !$get_line_err ) {
+
+          $line = $line_result;
+        }
+      }
+    }
+    else {
+
+      if ($start_from_line != -1) {
+
+        my ($get_line_err, $line_result) = get_file_line($input_filehandle, $index_filehandle, $start_from_line);
+
+        if ( !$get_line_err ) {
+
+          $line = $line_result;
+        }
+
+        $line_counter = $start_from_line;
+        $start_from_line = -1;
+      }
+      else {
+
+        $line = <$input_filehandle>;
+        $line_counter += 1;
+      }
+    }
+
+    if (!defined($line)) { last; }
+
+    $csv->parse($line);
+
+    if ($csv->error_input) {
+
+      $err_msg = "Error: while parsing csv file - line: $line";
+      $err     = 1;
+      last;
+    }
+
+    my @COL = $csv->fields();
+
+    if (eval $filtering) {
+
+      my @matched_selected_col = @COL[@{$wanted_field_idx_aref}];
+
+      push(@matched_selected_col, $line_counter);
+      push(@{$output_aref}, \@matched_selected_col);
+
+      $nb_row_selected += 1;
+    }
+  }
+
+  return ($err, $err_msg, $nb_row_selected, $output_aref);
+}
+
 sub recurse_read {
 
   my $dbh              = $_[0];
@@ -4760,8 +5644,8 @@ sub recurse_read {
   return ($err, $msg, $finish_level, $data);
 }
 
-# This function has been superseded by parse_filtering_v2 which can return
-# relevant data to filter virtual columns.
+# There is a similar function called parse_filtering_v2 which can filter filter virtual columns.
+# However, this function can filter geometry column.
 
 sub parse_filtering {
 
@@ -4800,11 +5684,21 @@ sub parse_filtering {
     }
   }
 
-  my $field_href = {};
+  my $field_href     = {};
+  my $geo_field_href = {};
 
   for my $field (@{$field_list_all}) {
 
-    $field_href->{$field} = 1;      
+    if ($field =~ /ST_AsText\((.+)\)/) {
+
+      my $geo_field = $1;
+      $geo_field_href->{$geo_field} = 1;
+      $field_href->{$geo_field}     = 1;
+    }
+    else {
+
+      $field_href->{$field} = 1;
+    }
   }
 
   my @filtering_exp = split(/&/, $filtering_csv);
@@ -4815,7 +5709,7 @@ sub parse_filtering {
 
     $expression = trim($expression);
     if (length($expression) == 0) {
-      
+
       next;
     }
 
@@ -4823,17 +5717,17 @@ sub parse_filtering {
     my $field_name       = '';
     my $is_quote_arg_val = 0;
 
-    if ($expression =~ /^(\w+)\s*([=|>|<])\s*\d+$/) {
+    if ($expression =~ /^(\w+)\s*([=|>|<])\s*[-+]?\d+\.?\d*$/) {
 
       $field_name       = $1;
       $operator         = $2;
     }
-    elsif ($expression =~ /^(\w+)\s*(<>)\s*\d+$/) {
+    elsif ($expression =~ /^(\w+)\s*(<>)\s*[-+]?\d+\.?\d*$/) {
 
       $field_name       = $1;
       $operator         = $2;
     }
-    elsif ($expression =~ /^(\w+)\s*([>|<]=)\s*\d+$/) {
+    elsif ($expression =~ /^(\w+)\s*([>|<]=)\s*[-+]?\d+\.?\d*$/) {
 
       $field_name       = $1;
       $operator         = $2;
@@ -4885,7 +5779,7 @@ sub parse_filtering {
       $operator         = $2;
       $is_quote_arg_val = 1;
     }
-    elsif ($expression =~ /^(\w+)\s*(<>)\s*'[\w|\s|\-|\(|\)|\^|\>|\<|\%|\:|\?|\+|\[|\]|\.|\*|\/|\\|\;|\|]+'$/i) {
+    elsif ($expression =~ /^(\w+)\s*(<>)\s*'[\w|\s|\-|\(|\)|\^|\>|\<|\%|\:|\?|\+|\[|\]|\.|\*|\/|\\|\;|\|]*'$/i) {
 
       $field_name       = $1;
       $operator         = $2;
@@ -4914,6 +5808,22 @@ sub parse_filtering {
       $field_name       = $1;
       $operator         = $2;
     }
+    elsif ($expression =~ /^(\w+)\s+(\-GBCGT)\s+\d+$/i) {
+
+      $field_name       = $1;
+      $operator         = $2;
+    }
+    elsif ($expression =~ /^(\w+)\s+(\-GBCLT)\s+\d+$/i) {
+
+      $field_name       = $1;
+      $operator         = $2;
+    }
+    elsif ($expression =~ /^(\w+)\s+(\-GEOEQ)\s+'.+'/i) {
+
+      $field_name       = $1;
+      $operator         = $2;
+      $is_quote_arg_val = 1;
+    }
 
     if (length($operator) > 0) {
 
@@ -4923,8 +5833,8 @@ sub parse_filtering {
       $field_value = trim($field_value);
       $operator    = uc($operator);
 
-      if ($field_name eq 'Longitude' || 
-          $field_name eq 'Latitude' || 
+      if ($field_name eq 'Longitude' ||
+          $field_name eq 'Latitude' ||
           $field_name =~ /location/ ||
           $field_name =~ /^Factor/ ) {
 
@@ -4936,6 +5846,43 @@ sub parse_filtering {
         $err = 1;
         $err_msg = "Field ($field_name) cannot be used for filtering.";
         last;
+      }
+
+      if ($geo_field_href->{$field_name}) {
+
+        if ($field_value =~ /^'([A-Z]+)\(.+\)'$/) {
+
+          my $geo_type = $1;
+          $field_value =~ s/'//g;
+
+          my $dbh_gis = connect_gis_read();
+
+          my ($is_wkt_err, $wkt_err_href) = is_valid_wkt_href($dbh_gis, {$field_name => $field_value}, $geo_type);
+
+          if ($is_wkt_err) {
+
+            $err     = 1;
+            $err_msg = "Filtering field ($field_name): $field_value invalid well known text.";
+            last;
+          }
+          else {
+
+            if ($operator =~ /\-GEOEQ/i) {
+
+              $operator = '=';
+            }
+
+            $field_value = qq|ST_GeomFromText('${field_value}', -1)|;
+          }
+
+          $dbh_gis->disconnect();
+        }
+        else {
+
+          $err     = 1;
+          $err_msg = "Filtering field ($field_name): unknown geometry text.";
+          last;
+        }
       }
 
       my $new_exp = "$field_name $operator $field_value";
@@ -4959,7 +5906,7 @@ sub parse_filtering {
         my $sub_query  = 0;
         my $table_name = '';
         if (length($field_name2table_name->{$field_name}) > 0) {
-          
+
           $table_name    = $field_name2table_name->{$field_name};
           $sub_query     = 1;
         }
@@ -4971,23 +5918,53 @@ sub parse_filtering {
           last;
         }
 
+        if ($operator =~ /\-GBCGT/i && $sub_query == 0) {
+
+          $err = 1;
+          $err_msg = "$field_name does not support -GBCGT operator.";
+          last;
+        }
+
+        if ($operator =~ /\-GBCLT/i && $sub_query == 0) {
+
+          $err = 1;
+          $err_msg = "$field_name does not support -GBCGT operator.";
+          last;
+        }
+
         if ($field_href->{$field_name}) {
-          
+
           if ($is_quote_arg_val) {
-            
+
             if ($sub_query) {
 
               my $sub_query_where = '';
 
-              $sub_query_where   = "${main_tname}.${id_field_name} IN ";
-              $sub_query_where  .= "(SELECT DISTINCT $id_field_name FROM $table_name ";
-              $sub_query_where  .= "WHERE ${field_name} $operator $field_value)";
-                
+              if ($main_tname =~ /\"/) {
+
+                $sub_query_where   = "${main_tname}.${id_field_name} IN ";
+                $sub_query_where  .= "(SELECT DISTINCT $id_field_name FROM $table_name ";
+                $sub_query_where  .= qq|WHERE "${field_name}" $operator $field_value)|;
+              }
+              else {
+
+                $sub_query_where   = "${main_tname}.${id_field_name} IN ";
+                $sub_query_where  .= "(SELECT DISTINCT $id_field_name FROM $table_name ";
+                $sub_query_where  .= "WHERE ${field_name} $operator $field_value)";
+              }
+
               push(@{$where_exp}, $sub_query_where);
             }
             else {
-            
-              push(@{$where_exp}, "${main_tname}.${field_name} $operator $field_value");  
+
+              if ($main_tname =~ /\"/) {
+
+                push(@{$where_exp}, qq|${main_tname}."${field_name}" $operator $field_value|);
+              }
+              else {
+
+                push(@{$where_exp}, "${main_tname}.${field_name} $operator $field_value");
+              }
             }
           }
           else {
@@ -4997,7 +5974,7 @@ sub parse_filtering {
               my $sub_query_where = '';
 
               if ($operator =~ /\-EQ/i) {
-                
+
                 my $multi_field_val = $field_value;
                 $multi_field_val    =~ s/\(|\)//g;
 
@@ -5007,25 +5984,77 @@ sub parse_filtering {
 
                   $ind_field_val = trim($ind_field_val);
 
-                  my $sub_query_where = "${main_tname}.${id_field_name} IN ";
+                  $sub_query_where    = "${main_tname}.${id_field_name} IN ";
                   $sub_query_where   .= "(SELECT DISTINCT $id_field_name FROM $table_name ";
                   $sub_query_where   .= "WHERE ${field_name} = ?#${ind_field_val}#)";
 
                   push(@{$where_exp}, $sub_query_where);
                 }
               }
-              else {
-                
-                $sub_query_where  = "${main_tname}.${id_field_name} IN ";
-                $sub_query_where .= "(SELECT DISTINCT $id_field_name FROM $table_name ";
-                $sub_query_where .= "WHERE ${field_name} $operator ?#${field_value}#)";
+              elsif ($operator =~ /\-GBC([G|L])T/i) {
 
-                push(@{$where_exp}, $sub_query_where);
+                my $gbc_oper_sym = lc($1);
+
+                my $gbc_oper     = '';
+
+                if ($gbc_oper_sym eq 'l') {
+
+                  $gbc_oper = '<';
+                }
+                else {
+
+                  $gbc_oper = '>';
+                }
+
+                if ($main_tname =~ /\"/) {
+
+                  $sub_query_where  = qq|${main_tname}."${field_name}" IN |;
+                  $sub_query_where .= qq|(SELECT "${field_name}" |;
+                  $sub_query_where .= qq|FROM $table_name GROUP BY "${field_name}" |;
+                  $sub_query_where .= qq|HAVING COUNT("${field_name}") $gbc_oper ?#${field_value}#)|;
+
+                  push(@{$where_exp}, $sub_query_where);
+                }
+                else {
+
+                  $sub_query_where  = qq|${main_tname}.${field_name} IN |;
+                  $sub_query_where .= qq|(SELECT ${field_name} |;
+                  $sub_query_where .= qq|FROM $table_name GROUP BY ${field_name} |;
+                  $sub_query_where .= qq|HAVING COUNT(${field_name}) $gbc_oper ?#${field_value}#)|;
+
+                  push(@{$where_exp}, $sub_query_where);
+                }
+              }
+              else {
+
+                if ($main_tname =~ /\"/) {
+
+                  $sub_query_where  = "${main_tname}.${id_field_name} IN ";
+                  $sub_query_where .= "(SELECT DISTINCT $id_field_name FROM $table_name ";
+                  $sub_query_where .= qq|WHERE "${field_name}" $operator ?#${field_value}#)|;
+
+                  push(@{$where_exp}, $sub_query_where);
+                }
+                else {
+
+                  $sub_query_where  = "${main_tname}.${id_field_name} IN ";
+                  $sub_query_where .= "(SELECT DISTINCT $id_field_name FROM $table_name ";
+                  $sub_query_where .= "WHERE ${field_name} $operator ?#${field_value}#)";
+
+                  push(@{$where_exp}, $sub_query_where);
+                }
               }
             }
             else {
 
-              push(@{$where_exp}, "${main_tname}.${field_name} $operator ?#${field_value}#");
+              if ($main_tname =~ /\"/) {
+
+                push(@{$where_exp}, qq|${main_tname}."${field_name}" $operator ?#${field_value}#|);
+              }
+              else {
+
+                push(@{$where_exp}, "${main_tname}.${field_name} $operator ?#${field_value}#");
+              }
             }
           }
         }
@@ -5038,11 +6067,11 @@ sub parse_filtering {
       }
     }
     else {
-      
+
       $err     = 1;
       $err_msg = "( $expression ): invalid filtering expression.";
       last;
-    } 
+    }
   }
 
   my $clean_where_exp = [];
@@ -5051,10 +6080,20 @@ sub parse_filtering {
 
     my $exp = $where_exp->[$i];
 
-    while ($exp =~ s/\#(\d+)\#//) {
+    my $count_arg = 0;
+    while ($exp =~ s/\#([-+]?\d+\.?\d*)\#//) {
 
       my $arg_val = $1;
       push(@{$where_arg}, $arg_val);
+      $count_arg += 1;
+    }
+
+    if ($count_arg > 1) {
+
+      my $prob_exp = $where_exp->[$i];
+      $err     = 1;
+      $err_msg = "$prob_exp is very strange.";
+      return ($err, $err_msg, '', []);
     }
 
     if (length($exp) > 0) {
@@ -5183,7 +6222,7 @@ sub generate_factor_sql_v2 {
   }
 
   if (length($vcol_field_part) > 0) {
-  
+
     $returned_sql .= ", " . join(',', @vcol_fieldname_list) . " FROM ";
     $returned_sql .= " (SELECT $id_fieldname, $vcol_field_part FROM $factor_table ";
     $returned_sql .= " GROUP BY $id_fieldname ";
@@ -5199,6 +6238,7 @@ sub generate_factor_sql_v2 {
   return ($err, $trouble_vcol_str, $returned_sql, \@vcol_list);
 }
 
+# It can filter on virtual (factor) columns
 sub parse_filtering_v2 {
 
   my $id_field_name          = $_[0];
@@ -5224,7 +6264,7 @@ sub parse_filtering_v2 {
   my $factorname2factorid_lookup = {};
 
   for my $vcol_row (@{$vcol_aref}) {
-    
+
     my $vcol_id    = $vcol_row->{'FactorId'};
     my $vcol_name  = $vcol_row->{'FactorName'};
 
@@ -5259,7 +6299,7 @@ sub parse_filtering_v2 {
 
   for my $field (@{$field_list_all}) {
 
-    $field_href->{$field} = 1;      
+    $field_href->{$field} = 1;
   }
 
   my @filtering_exp = split(/&/, $filtering_csv);
@@ -5278,17 +6318,17 @@ sub parse_filtering_v2 {
     my $field_name       = '';
     my $is_quote_arg_val = 0;
 
-    if ($expression =~ /^(\w+)\s*([=|>|<])\s*\d+$/) {
+    if ($expression =~ /^(\w+)\s*([=|>|<])\s*[-+]?\d+\.?\d*$/) {
 
       $field_name       = $1;
       $operator         = $2;
     }
-    elsif ($expression =~ /^(\w+)\s*(<>)\s*\d+$/) {
+    elsif ($expression =~ /^(\w+)\s*(<>)\s*[-+]?\d+\.?\d*$/) {
 
       $field_name       = $1;
       $operator         = $2;
     }
-    elsif ($expression =~ /^(\w+)\s*([>|<]=)\s*\d+$/) {
+    elsif ($expression =~ /^(\w+)\s*([>|<]=)\s*[-+]?\d+\.?\d*$/) {
 
       $field_name       = $1;
       $operator         = $2;
@@ -5340,7 +6380,7 @@ sub parse_filtering_v2 {
       $operator         = $2;
       $is_quote_arg_val = 1;
     }
-    elsif ($expression =~ /^(\w+)\s*(<>)\s*'[\w|\s|\-|\(|\)|\^|\>|\<|\%|\:|\?|\+|\[|\]|\.|\*|\/|\\|\|]+'$/i) {
+    elsif ($expression =~ /^(\w+)\s*(<>)\s*'[\w|\s|\-|\(|\)|\^|\>|\<|\%|\:|\?|\+|\[|\]|\.|\*|\/|\\|\|]*'$/i) {
 
       $field_name       = $1;
       $operator         = $2;
@@ -5369,17 +6409,48 @@ sub parse_filtering_v2 {
       $field_name       = $1;
       $operator         = $2;
     }
+    elsif ($expression =~ /^(\w+)\s*(<>)\s*NULL$/) {
+
+      $field_name       = $1;
+      $operator         = $2;
+
+      my $new_field_name = "ISNULL($field_name)";
+
+      $expression =~ s/NULL/1/;
+      $expression =~ s/$field_name/$new_field_name/;
+      $field_name = $new_field_name;
+    }
+    elsif ($expression =~ /^(\w+)\s*(=)\s*NULL$/) {
+
+      $field_name       = $1;
+      $operator         = $2;
+
+      my $new_field_name = "ISNULL($field_name)";
+
+      $expression =~ s/NULL/1/;
+      $expression =~ s/$field_name/$new_field_name/;
+      $field_name = $new_field_name;
+    }
 
     if (length($operator) > 0) {
 
-      my ($empty, $field_value) = split(/$field_name\s*$operator/, $expression);
+      my ($empty, $field_value);
+
+      if ($field_name =~ /^ISNULL/) {
+
+        $field_value = 1;
+      }
+      else {
+
+        ($empty, $field_value) = split(/$field_name\s*$operator/, $expression);
+      }
 
       $field_name  = trim($field_name);
       $field_value = trim($field_value);
       $operator    = uc($operator);
 
-      if ($field_name eq 'Longitude' || 
-          $field_name eq 'Latitude' || 
+      if ($field_name eq 'Longitude' ||
+          $field_name eq 'Latitude' ||
           $field_name =~ /location/ ) {
 
         $err = 1;
@@ -5419,6 +6490,28 @@ sub parse_filtering_v2 {
             $err_msg = "Filtering field ($field_name) unknown.";
             last;
           }
+        }
+      }
+      elsif ($field_name =~ /^ISNULL\((\w+)\)$/) {
+
+        my $new_exp = "$field_name $operator $field_value";
+
+        $field_name = $1;
+
+        if (!$seen_expression_lookup->{$new_exp}) {
+
+          if ($field_href->{$field_name}) {
+
+            push(@{$scol_where_exp}, "ISNULL(${main_tname}.${field_name}) $operator ?#${field_value}#");
+          }
+          else {
+
+            $err     = 1;
+            $err_msg = "Filtering field ($field_name) unknown.";
+            last;
+          }
+
+          $seen_expression_lookup->{$new_exp} = 1;
         }
       }
       else {
@@ -5472,7 +6565,7 @@ sub parse_filtering_v2 {
               }
               else {
 
-                push(@{$scol_where_exp}, "${main_tname}.${field_name} $operator $field_value");  
+                push(@{$scol_where_exp}, "${main_tname}.${field_name} $operator $field_value");
               }
             }
             else {
@@ -5528,7 +6621,7 @@ sub parse_filtering_v2 {
       $err     = 1;
       $err_msg = "( $expression ): invalid filtering expression.";
       last;
-    }  
+    }
   }
 
   my $clean_scol_where_exp = [];
@@ -5537,7 +6630,7 @@ sub parse_filtering_v2 {
 
     my $exp = $scol_where_exp->[$i];
 
-    while ($exp =~ s/\#(\d+)\#//) {
+    while ($exp =~ s/\#([-+]?\d+\.?\d*)\#//) {
 
       my $arg_val = $1;
       push(@{$scol_where_arg}, $arg_val);
@@ -5598,6 +6691,138 @@ sub get_file_block {
   close($file_handle);
 
   return $content;
+}
+
+sub check_static_field {
+
+  my $query      = $_[0];
+  my $dbh_read   = $_[1];
+  my $tname      = $_[2];
+  my $skip_field = $_[3];
+
+  my $fname_translation = {};
+
+  if (defined $_[4]) {
+
+    $fname_translation = $_[4];
+  }
+
+  my $data_for_postrun_href = {};
+
+  my ($get_scol_err, $get_scol_msg, $scol_data, $pkey_data) = get_static_field($dbh_read, $tname);
+
+  if ($get_scol_err) {
+
+    my $err_msg = "Get static field info failed: $get_scol_msg";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return (1, $err_msg, $data_for_postrun_href);
+  }
+
+  my $required_field_href    = {};
+  my $chk_maxlen_field_href  = {};
+  my $colsize_info           = {};
+
+  for my $static_field (@{$scol_data}) {
+
+    my $field_name       = $static_field->{'Name'};
+    my $field_dtype      = $static_field->{'DataType'};
+    my $tran_field_name  = $field_name;
+
+    if (defined $fname_translation->{$field_name}) {
+
+      $tran_field_name = $fname_translation->{$field_name};
+    }
+
+    if ($skip_field->{$field_name}) { next; }
+
+    if ($static_field->{'Required'} == 1) {
+
+      $required_field_href->{$field_name} = $query->param($tran_field_name);
+    }
+
+    if (lc($field_dtype) eq 'varchar' || lc($field_dtype) eq 'text' || lc($field_dtype) eq 'char') {
+
+      $colsize_info->{$field_name}           = $static_field->{'ColSize'};
+      $chk_maxlen_field_href->{$field_name}  = $query->param($tran_field_name);
+    }
+  }
+
+  $dbh_read->disconnect();
+
+  my ($missing_err, $missing_href) = check_missing_href( $required_field_href );
+
+  if ($missing_err) {
+
+    my $err_msg = "Missing fields";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
+
+    return (1, $err_msg, $data_for_postrun_href);
+  }
+
+  my ($maxlen_err, $maxlen_href) = check_maxlen_href($chk_maxlen_field_href, $colsize_info);
+
+  if ($maxlen_err) {
+
+    my $err_msg = "Longer than maximum length";
+
+    $data_for_postrun_href->{'Error'}       = 1;
+    $data_for_postrun_href->{'Data'}        = {'Error' => [$maxlen_href]};
+
+    return (1, $err_msg, $data_for_postrun_href);
+  }
+
+  return (0, '', $data_for_postrun_href);
+}
+
+sub get_next_value_for {
+
+  my $monetdb_dbh = $_[0];
+  my $table_name  = $_[1];
+  my $field_name  = $_[2];
+
+  my $err     = 0;
+  my $err_msg = '';
+
+  my $sql = qq|SELECT "default" FROM "sys"."columns" |;
+  $sql   .= qq|WHERE table_id=(SELECT id AS table_id FROM "sys"."tables" WHERE name=?) AND |;
+  $sql   .= qq|name=?|;
+
+  my ($r_default_err, $default_str) = read_cell($monetdb_dbh, $sql, [$table_name, $field_name]);
+
+  if ($r_default_err) {
+
+    $err = 1;
+    $err_msg = "Retrieving default string for field $field_name in table $table_name failed.";
+
+    return ($err, $err_msg, undef);
+  }
+
+  if (length($default_str) == 0) {
+
+    $err = 1;
+    $err_msg = "Field $field_name in table $table_name ($default_str) is not auto number.";
+
+    return ($err, $err_msg, undef);
+  }
+
+  $sql = qq|SELECT $default_str|;
+
+  my ($r_next_val_err, $next_val) = read_cell($monetdb_dbh, $sql, []);
+
+  if ($r_next_val_err) {
+
+    $err = 1;
+    $err_msg = "Retrieving next value for field $field_name in table $table_name ($default_str) failed.";
+
+    return ($err, $err_msg, undef);
+  }
+
+  return ($err, $err_msg, $next_val);
 }
 
 1;

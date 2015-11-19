@@ -1,3 +1,217 @@
+List of CHANGES from version 2.2.5 to 2.3
+
+Feature changes:
+
+- There are 61 new interfaces introduced in the new version. See details below.
+
+- 9 interfaces has been removed. Carefully review information below.
+
+- 6 interfaces has been renamed. All details and explanations below.
+
+- Marker module has been re-implemented into a new database back-end. It uses now MonetDB for large table storage. It means vast improvements in speed and efficiency.
+
+- Marker module now supports more than one dataset per analysis. Associated interface changes:
+  * analysisgroup/_id/list/dataset
+  * dataset/_datasetid/export/markerdata/csv
+
+- Additionally to csv export there is now an option to list marker data in pages and column blocks. Added interfaces are:
+  * analysisgroup/_analid/list/marker/_nperpage/page/_num
+  * analysisgroup/_analid/get/marker/_id
+  * analysisgroup/_analid/list/markerdata/_nperpage/page/_num/n/_nperblock/block/_bnum
+
+- Now there is a full support for marker maps storage. New interfaces added:
+  * add/markermap
+  * update/markermap/_id
+  * list/markermap
+  * get/markermap/_id
+  * markermap/_mrkmapid/import/mapposition/csv
+  * markermap/_mrkmapid/list/mapposition/_nperpage/page/_num
+
+- Concept of measurement units vocabulary has been re-worked. Now it is generic and centralized across the entire system. See renamed interfaces:
+  * add/generalunit (from previous URL: add/itemunit)
+  * delete/generalunit/_id (from previous URL: delete/itemunit/_id)
+  * update/generalunit/_id (from previous URL: update/itemunit/_id)
+  * get/generalunit/_id (from previous URL: get/itemunit/_id)
+  * list/generalunit/_nperpage/page/_num (from previous URL: list/itemunit)
+
+- Following the change in measurement units vocabulary concept, layerattrib table in Environmental GIS module has been removed and now uses generalunit table. Thus number of interfaces has been removed:
+  * list/layerattrib/valuetype
+  * add/layerattrib/valuetype
+  * update/layerattrib/valuetype/_id
+  * get/layerattrib/valuetype/_id
+  * delete/layerattrib/valuetype/_id
+
+- Units vocabulary now also support unit conversion rules. New interfaces are:
+  * generalunit/_id/add/conversionrule
+  * delete/conversionrule/_id
+  * update/conversionrule/_id
+  * list/conversionrule
+  * get/conversionrule/_id
+
+- Breeding method support has been extended. Now supports acronyms and better pedigree strings definitions.
+
+- Specimen lists support has been extended. System user has a better control of ownership and sharing germplasm resources.
+
+- Trial unit positions concept has been re-worked. trialunitpostion table and it's factor is no longer present in the database. trialdimension table has been introduced and relevant changes has been done to the trialunit table instead. Please, see database schema for model changes details.
+  
+  REMOVED INTERFACES:
+  * list/unitposition
+  * get/unitposition/_id
+  * update/unitposition/_id
+  * delete/unitposition/_id
+  
+  NEW INTERFACES:
+  * trial/_id/add/dimension
+  * trial/_id/list/dimension
+  * get/trialdimension/_id
+  * update/trialdimension/_id
+  * delete/trialdimension/_id
+
+- Support for workflows definition and workflow data for trials has been completed.
+  * add/workflow
+  * update/workflow/_id
+  * delete/workflow/_id
+  * list/workflow
+  * get/workflow/_id
+  * workflow/_id/add/definition
+  * update/workflowdef/_id
+  * workflow/_id/list/definition
+  * get/workflowdef/_id
+  * delete/workflowdef/_id
+  * trial/_id/add/workflow
+  * update/trialworkflow/_id
+  * trial/_id/list/workflow
+  * get/trialworkflow/_id
+  * delete/trialworkflow/_id
+
+- Trials can now be assembled into multi-location groups. New interfaces:
+  * add/multiloctrial
+  * update/multiloctrial/_id
+  * list/multiloctrial/_nperpage/page/_num
+  * get/multiloctrial/_id
+  * delete/multiloctrial/_id
+  * multiloctrial/_id/add/trial
+  * multiloctrial/_id/remove/trial/_tid
+
+- Better (broader) support of trait validation rules - now includes CHOICE and RANGE.
+
+- Better GeoJSON support in Environmental GIS module.
+
+- Extended support for layer and layer data management. Layer2d is now fully supported too. New interfaces:
+  * delete/layer/_id
+  * update/layerattrib/_id
+  * delete/layerattrib/_id
+  * layer/_id/list/data/_nperpage/page/_num
+  * layer/_id/add/data
+  * layer/_id/update/data
+  * layer/_id/delete/data
+  * layer2d/_id/add/data
+  * layer2d/_layerid/update/data/_recid
+  * layer2d/_layerid/list/data/_nperpage/page/_num
+  * layer2d/_layerid/get/data/_recid
+  * layer2d/_layerid/delete/data/_recid
+
+- DAL can now be configured to authenticate against Google OAuth2 protocol. New interface:
+  * oauth2google
+
+- Extra interfaces added to manage multimedia:
+  * get/multimedia/_id
+  * update/multimedia/_id
+  * delete/multimedia/_id
+
+- New interface to import inventory data in bulk:
+  * import/item/csv
+
+- Count group by interface added. Useful to count records per values in tables:
+  * _tname/countgroupby/_nperpage/page/_num
+
+- System group management interfaces has been renamed:
+  * group/_id/add/member/_username (from previous URL: group/_id/add/member/_username/_random)
+
+- All configuration settings are now moved to a configuration file.
+  
+- DAL now checks the maximum length of all text fields. If the input is longer than the maximum number of characters specified in the database, DAL will return a DAL error with an HTTP status error code of 420.
+
+- Number of bug fixes and a lot of new test cases added.
+
+Version 2.3
+Date: 19/10/2015
+
+Major:
+
++ Marker data is stored in MonetDB.
+
++ Config is moved from Common.pm to kddart_dal.cfg.
+
++ Workflow is supported.
+
++ Unit position is replaced with trial dimension.
+
+Minor:
+
++ List user will return all users if the login group is the admin group with an ID of zero; otherwise the interface will return only the users in the current login group.
+
++ Support geojson for list and get trial.
+
++ Support filtering on null value.
+
+Version 2.2.7
+
+Minor:
+
++ Check max len for all varchar fields.
+
++ Change empty string to undef as the default value for datetime.
+
++ Change the temporary directory from '/tmp/kddart' to '/srv/www/tmp/kddart'. Apache2.4 on openSuSe 13.2 cannot write to '/tmp/kddart'.
+
++ Fix bug 886 which prevents '3>2.3,4' which is valid in Perl from being a valid boolean expression.
+
++ RANGE, BERANGE, LERANGE and RERANGE supports floating point numbers and negative values.
+
++ Google OAuth2 callback is supported. With Google OAuth2 support, DAL returns the username when the login or google oauth2 callback is successful in addition to the user id and the write token.
+
++ Support BOOLEX((x>0 and x<10) or x eq 'NA').
+
++ Admin user password is changed to 'kddartadmin'.
+
+
+Version 2.2.6
+
+Major:
+
++ Add, update, get and list and import markermap are available.
+
++ Count group by interface is available.
+
++ Cookie authetication is upgraded to check and protect files under storage directory which stores marker data and multimedia files.
+
++ Instance number is based on both TraitId and TrialId. In previous versions of DAL, instance number is like a auto number. From this version onward, instance number is incremented based on the specific trial.
+
++ GIS/Environment module: 2D layer type is supported.
+
+Minor:
+
++ New interfaces to list marker in an analysisgroup.
+
++ Update layer supports changing layertype and geometry type if the layer does not any data yet.
+
++ Filtering parameter is available for update item.
+
++ Fix GenotypeSpecimenType perl variable declaration bug (#1735).
+
++ Fix update trial unit specimen bug (#1434).
+
++ Apache configuration changes for storage directory.
+
++ Fix instance number column which does not have data in export KDSmart data.
+
++ Export samplemeasurement csv can take TrialIdCSV as its additional filtering parameter. If TrialUnitIdCSV is provided as well, the export will only return the intersected records that match both TrialId and TrialUnitId filtering criteria (feature #1511).
+
++ Fix bug #1481 when the number of trait replicates for all the traits in the selected trial is all zero, DAL will return an error 'No trait selected'.
+
++ Fix bug #1776 regarding missing field in list layer and get layer interfaces.
+
 Version 2.2.5
 
 Major:

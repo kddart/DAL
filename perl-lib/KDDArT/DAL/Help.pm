@@ -1,5 +1,7 @@
-#$Id: Help.pm 785 2014-09-02 06:23:12Z puthick $
+#$Id: Help.pm 925 2015-06-12 08:25:04Z puthick $
 #$Author: puthick $
+
+# Copyright (c) 2015, Diversity Arrays Technology, All rights reserved.
 
 # COPYRIGHT AND LICENSE
 # 
@@ -16,8 +18,7 @@
 # GNU General Public License for more details.
 
 # Author    : Puthick Hok
-# Version   : 2.2.5 build 795
-# Created   : 17/05/2014
+# Version   : 2.3.0 build 1040
 
 package KDDArT::DAL::Help;
 
@@ -61,6 +62,7 @@ sub setup {
     'help'                              => 'help_runmode',
     'get_dal_error_info'                => 'get_dal_error_info_runmode',
     'list_dal_error_info'               => 'list_dal_error_info_runmode',
+    'get_version'                       => 'get_version_runmode',
       );
 
   my $logger = get_logger();
@@ -317,7 +319,7 @@ sub help_runmode {
           if ( defined $errid_lookup->{$err_id} ) {
 
             #$self->logger->debug("ErrorId: $err_id");
-          
+
             my $err_msg = $errid_lookup->{$err_id}->{'Message'};
             $err_id_href->{'Message'} = $err_msg;
 
@@ -336,9 +338,9 @@ sub help_runmode {
 
         my $dtd_url = "$url/dtd/" . $dtd_file_name;
         $help_href->{'DTDURLForUploadXML'} = $dtd_url;
-        
-        my $dtd_full_path = "${DTD_PATH}/" . $dtd_file_name;
-        my $dtd_content = read_file($dtd_full_path);
+
+        my $dtd_full_path = $ENV{DOCUMENT_ROOT} . '/' . $DTD_PATH . '/' . $dtd_file_name;
+        my $dtd_content   = read_file($dtd_full_path);
 
         $dtd_content =~ s/"/'/g;
         $dtd_content =~ s/\n//g;
@@ -454,6 +456,40 @@ sub list_dal_error_info_runmode {
   $data_for_postrun_href->{'Data'}      = {'ErrorInfo'  => $error_info_aref,
              'RecordMeta' => [{'TagName' => 'ErrorInfo'}],
   };
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub get_version_runmode {
+
+=pod get_version_HELP_START
+{
+"OperationName" : "Get version",
+"Description": "Get version information of the system.",
+"AuthRequired": 0,
+"GroupRequired": 0,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Version='2.2.4' Copyright='Copyright (c) 2011, Diversity Arrays Technology, All rights reserved.' About='Data Access Layer' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Version' : '2.2.4', 'Copyright' : 'Copyright (c) 2011, Diversity Arrays Technology, All rights reserved.', 'About' : 'Data Access Layer'}]}",
+"ErrorMessageXML": [{"LoginRequired": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='You need to login first.' /></DATA>"}],
+"ErrorMessageJSON": [{"LoginRequired": "{'Error' : [{'Message' : 'You need to login first.'}]}"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self = shift;
+
+  my $data_for_postrun_href = {};
+
+  my $info_msg_aref = [{ 'Version'   => $DAL_VERSION,
+                         'About'     => $DAL_ABOUT,
+                         'Copyright' => $DAL_COPYRIGHT}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info' => $info_msg_aref};
   $data_for_postrun_href->{'ExtraData'} = 0;
 
   return $data_for_postrun_href;

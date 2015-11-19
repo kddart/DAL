@@ -6,7 +6,7 @@
   <INPUT ParaName="SpecimenId" SrcValue="xml/add_data_no_vcol/case_00228_add_spec4add_item.xml" />
   <INPUT ParaName="ScaleId" SrcValue="xml/add_data_no_vcol/case_00229_register_scale.xml" />
   <INPUT ParaName="StorageId" SrcValue="xml/add_data_no_vcol/case_00306_add_storage4add_item.xml" />
-  <INPUT ParaName="ItemUnitId" SrcValue="xml/add_data_no_vcol/case_00307_add_item_unit4add_item.xml" />
+  <INPUT ParaName="UnitId" SrcValue="xml/add_data_no_vcol/case_00307_add_item_unit4add_item.xml" />
   <INPUT ParaName="ItemTypeId" SrcValue="xml/add_data_no_vcol/case_00308_add_item_type.xml" />
   <INPUT ParaName="ItemStateId" SrcValue="xml/add_data_no_vcol/case_00309_add_item_state.xml" />
   <INPUT ParaName="ItemBarcode" PrefixVal="I_" Random="1" />
@@ -28,6 +28,6 @@
   <Parent CaseFile="xml/add_data_no_vcol/case_00307_add_item_unit4add_item.xml" Order="8" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00308_add_item_type.xml" Order="9" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00309_add_item_state.xml" Order="10" />
-  <ReturnId ParaName="ItemId" Value="3" />
-  <RunInfo Success="1" Time="1409792195" />
+  <ReturnId ParaName="ItemId" Value="61" />
+  <RunInfo Success="1" Time="1443160511" />
 </TestCase>

@@ -1,5 +1,7 @@
-#$Id: System.pm 785 2014-09-02 06:23:12Z puthick $
+#$Id: System.pm 1028 2015-10-21 07:39:52Z puthick $
 #$Author: puthick $
+
+# Copyright (c) 2015, Diversity Arrays Technology, All rights reserved.
 
 # COPYRIGHT AND LICENSE
 # 
@@ -16,8 +18,7 @@
 # GNU General Public License for more details.
 
 # Author    : Puthick Hok
-# Version   : 2.2.5 build 795
-# Created   : 02/06/2010
+# Version   : 2.3.0 build 1040
 
 package KDDArT::DAL::System;
 
@@ -44,6 +45,7 @@ use Digest::HMAC_SHA1 qw(hmac_sha1 hmac_sha1_hex);
 use DateTime::Format::MySQL;
 use Digest::MD5 qw(md5 md5_hex md5_base64);
 use Crypt::Random qw( makerandom );
+use JSON::XS qw(encode_json decode_json);
 
 sub setup {
 
@@ -55,12 +57,14 @@ sub setup {
   __PACKAGE__->authen->check_login_runmodes(':all');
   __PACKAGE__->authen->check_content_type_runmodes(':all');
   __PACKAGE__->authen->count_session_request_runmodes(':all');
-  __PACKAGE__->authen->ignore_group_assignment_runmodes('list_group');
+  __PACKAGE__->authen->ignore_group_assignment_runmodes('list_group',
+                                                        'update_user_preference',
+                                                        'get_user_preference'
+                                                       );
 
   __PACKAGE__->authen->check_rand_runmodes('add_user_gadmin',
                                            'update_user_gadmin',
                                            'add_group_gadmin',
-                                           'reset_user_password_gadmin',
                                            'change_user_password',
                                            'remove_group_member_gadmin',
                                            'remove_owner_status_gadmin',
@@ -68,29 +72,51 @@ sub setup {
                                            'change_owner',
                                            'add_barcodeconf_gadmin',
                                            'add_multimedia',
+                                           'update_multimedia',
+                                           'del_multimedia_gadmin',
+                                           'add_workflow_gadmin',
+                                           'update_workflow_gadmin',
+                                           'del_workflow_gadmin',
+                                           'add_workflow_def_gadmin',
+                                           'update_workflow_def_gadmin',
+                                           'del_workflow_def_gadmin',
+                                           'update_user_preference',
       );
   __PACKAGE__->authen->check_signature_runmodes('add_user_gadmin',
                                                 'update_user_gadmin',
                                                 'add_group_gadmin',
-                                                'reset_user_password_gadmin',
                                                 'change_user_password',
                                                 'remove_group_member_gadmin',
                                                 'remove_owner_status_gadmin',
                                                 'change_permission',
                                                 'change_owner',
                                                 'add_barcodeconf_gadmin',
+                                                'update_multimedia',
+                                                'del_multimedia_gadmin',
+                                                'add_workflow_gadmin',
+                                                'update_workflow_gadmin',
+                                                'del_workflow_gadmin',
+                                                'add_workflow_def_gadmin',
+                                                'update_workflow_def_gadmin',
+                                                'del_workflow_def_gadmin',
+                                                'update_user_preference',
       );
   __PACKAGE__->authen->check_gadmin_runmodes('add_user_gadmin',
                                              'update_user_gadmin',
                                              'add_group_member_gadmin',
                                              'add_group_gadmin',
-                                             'add_group_owner_gadmin',
-                                             'reset_user_password_gadmin',
                                              'list_user_gadmin',
                                              'remove_group_member_gadmin',
                                              'remove_owner_status_gadmin',
                                              'get_group_gadmin',
                                              'add_barcodeconf_gadmin',
+                                             'del_multimedia_gadmin',
+                                             'add_workflow_gadmin',
+                                             'update_workflow_gadmin',
+                                             'del_workflow_gadmin',
+                                             'add_workflow_def_gadmin',
+                                             'update_workflow_def_gadmin',
+                                             'del_workflow_def_gadmin',
       );
   __PACKAGE__->authen->check_sign_upload_runmodes('add_multimedia',
       );
@@ -104,8 +130,6 @@ sub setup {
     'get_session_expiry'           => 'get_session_expiry_runmode',
     'add_group_member_gadmin'      => 'add_group_member_runmode',
     'add_group_gadmin'             => 'add_group_runmode',
-    'add_group_owner_gadmin'       => 'add_group_owner_runmode',
-    'reset_user_password_gadmin'   => 'reset_user_password_runmode',
     'list_user_gadmin'             => 'list_user_runmode',
     'change_user_password'         => 'change_user_password_runmode',
     'remove_group_member_gadmin'   => 'remove_group_member_runmode',
@@ -115,12 +139,26 @@ sub setup {
     'get_group_gadmin'             => 'get_group_runmode',
     'get_user'                     => 'get_user_runmode',
     'get_permission'               => 'get_permission_runmode',
-    'get_version'                  => 'get_version_runmode',
     'add_barcodeconf_gadmin'       => 'add_barcodeconf_runmode',
     'list_barcodeconf'             => 'list_barcodeconf_runmode',
     'get_barcodeconf'              => 'get_barcodeconf_runmode',
     'add_multimedia'               => 'add_multimedia_runmode',
     'list_multimedia'              => 'list_multimedia_runmode',
+    'get_multimedia'               => 'get_multimedia_runmode',
+    'update_multimedia'            => 'update_multimedia_runmode',
+    'del_multimedia_gadmin'        => 'del_multimedia_runmode',
+    'add_workflow_gadmin'          => 'add_workflow_runmode',
+    'update_workflow_gadmin'       => 'update_workflow_runmode',
+    'del_workflow_gadmin'          => 'del_workflow_runmode',
+    'list_workflow'                => 'list_workflow_runmode',
+    'get_workflow'                 => 'get_workflow_runmode',
+    'add_workflow_def_gadmin'      => 'add_workflow_def_runmode',
+    'update_workflow_def_gadmin'   => 'update_workflow_def_runmode',
+    'list_workflow_def'            => 'list_workflow_def_runmode',
+    'get_workflow_def'             => 'get_workflow_def_runmode',
+    'del_workflow_def_gadmin'      => 'del_workflow_def_runmode',
+    'get_user_preference'          => 'get_user_preference_runmode',
+    'update_user_preference'       => 'update_user_preference_runmode',
       );
 
   my $logger = get_logger();
@@ -133,9 +171,9 @@ sub setup {
         );
 
     my $layout = Log::Log4perl::Layout::PatternLayout->new("[%d] [%H] [%X{client_ip}] [%p] [%F{1}:%L] [%M] [%m]%n");
-    
+
     $app->layout($layout);
-    
+
     $logger->add_appender($app);
   }
   $logger->level($DEBUG);
@@ -176,7 +214,7 @@ sub setup {
                                           'ChkPermFunc'   => sub { return $self->check_item_perm(@_); }
   };
 
-  $multimedia_href->{'extract'}       = { 'ChkRecSql'     => 'SELECT ExtractId FROM extract WHERE ExtractId=?',
+  $multimedia_href->{'extract'}       = { 'ChkRecSql'     => 'SELECT "ExtractId" FROM "extract" WHERE "ExtractId"=?',
                                           'ChkPermFunc'   => sub { return $self->check_extract_perm(@_); }
   };
 
@@ -207,27 +245,33 @@ sub add_user_runmode {
 
   my $self  = shift;
   my $query = $self->query();
-  
+
   my $data_for_postrun_href = {};
+
+  # Generic required static field checking
+
+  my $dbh_read = connect_kdb_read();
+
+  my $skip_field = {'PasswordSalt' => 1};
+
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'systemuser', $skip_field);
+
+  if ($chk_sfield_err) {
+
+    $self->logger->debug($chk_sfield_msg);
+
+    return $for_postrun_href;
+  }
+
+  $dbh_read->disconnect();
+
+  # Finish generic required static field checking
 
   my $username   = $query->param('UserName');
   my $password   = $query->param('UserPassword');
   my $contact_id = $query->param('ContactId');
   my $usertype   = $query->param('UserType');
-
-  my ($missing_err, $missing_href) = check_missing_href( { 'UserName'      => $username,
-                                                           'UserPassword'  => $password,
-                                                           'ContactId'     => $contact_id,
-                                                           'UserType'      => $usertype,
-                                                         } );
-
-  if ($missing_err) {
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
-
-    return $data_for_postrun_href;
-  }
 
   if ($username =~ /\s+/) {
 
@@ -327,21 +371,31 @@ sub update_user_runmode {
 
   my $data_for_postrun_href = {};
 
+  # Generic required static field checking
+
+  my $dbh_read = connect_kdb_read();
+
+  my $skip_field = {'PasswordSalt' => 1,
+                    'UserName'     => 1,
+                    'UserPassword' => 1,
+                   };
+
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'systemuser', $skip_field);
+
+  if ($chk_sfield_err) {
+
+    $self->logger->debug($chk_sfield_msg);
+
+    return $for_postrun_href;
+  }
+
+  $dbh_read->disconnect();
+
+  # Finish generic required static field checking
+
   my $contact_id = $query->param('ContactId');
   my $usertype   = $query->param('UserType');
-
-  my ($missing_err, $missing_href) = check_missing_href( {
-                                                          'ContactId'     => $contact_id,
-                                                           'UserType'     => $usertype,
-                                                         } );
-
-  if ($missing_err) {
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
-
-    return $data_for_postrun_href;
-  }
 
   my $dbh_write = connect_kdb_write();
 
@@ -388,7 +442,7 @@ sub update_user_runmode {
   $dbh_write->disconnect();
 
   my $info_msg_aref = [{'Message' => "User ($username) has been updated successfully."}];
-  
+
   $data_for_postrun_href->{'Error'}     = 0;
   $data_for_postrun_href->{'Data'}      = {'Info'      => $info_msg_aref};
   $data_for_postrun_href->{'ExtraData'} = 0;
@@ -563,50 +617,173 @@ sub add_group_member_runmode {
 
 =pod add_group_member_gadmin_HELP_START
 {
-"OperationName" : "Add group member (Out of date)",
-"Description": "Add system user as an ordinary member of the system group. This interface is out of date and it will be redone.",
+"OperationName" : "Add group member",
+"Description": "Add system user to a system group.",
 "AuthRequired": 1,
 "GroupRequired": 1,
 "GroupAdminRequired": 1,
 "SignatureRequired": 1,
 "AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "",
-"SuccessMessageJSON": "",
-"ErrorMessageXML": [],
-"ErrorMessageJSON": [],
-"URLParameter": [{"ParameterName": "id", "Description": "GroupId"}, {"ParameterName": "username", "Description": "Username of the user to be added as a member to the group"}, {"ParameterName": "random", "Description": "Random number"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><ReturnId Value='14' ParaName='AuthorisedSystemGroupId' /><Info Message='User (user1) has been added to Group (2) successfully.' /></DATA>",
+"SuccessMessageJSON": "{'ReturnId' : [{'Value' : '15', 'ParaName' : 'AuthorisedSystemGroupId'}], 'Info' : [{'Message' : 'User (user2) has been added to Group (2) successfully.'}]}",
+"ErrorMessageXML": [{"AlreadyExists": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='User (user1) is already a member of Group (2).' /></DATA>"}],
+"ErrorMessageJSON": [{"AlreadyExists": "{'Error' : [{'Message' : 'User (user2) is already a member of Group (2).'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "GroupId"}, {"ParameterName": "username", "Description": "Username of the user to be added to the group"}],
+"HTTPParameter": [{"Required": 1, "Name": "IsGroupOwner", "Description": "Status value either 1 or 0 indicating if the user which is to be added to the group is a group admin or not. 1 is for a group admin and 0 is for not a group admin."}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
 
-  my $self = shift;
-  
-  return $self->add_group_member(0);
-}
+  my $self      = shift;
 
-sub add_group_owner_runmode {
+  my $group_id  = $self->param('id');
+  my $username  = $self->param('username');
 
-=pod add_group_owner_gadmin_HELP_START
-{
-"OperationName" : "Add group owner (Out of date)",
-"Description": "Add a system user as an owner (admin) of the system group. This interface is out of date and it will be redone.",
-"AuthRequired": 1,
-"GroupRequired": 1,
-"GroupAdminRequired": 1,
-"SignatureRequired": 1,
-"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "",
-"SuccessMessageJSON": "",
-"ErrorMessageXML": [],
-"ErrorMessageJSON": [],
-"URLParameter": [{"ParameterName": "id", "Description": "GroupId"}, {"ParameterName": "username", "Description": "Username of the user to be added as an owner (group admin) to the group"}, {"ParameterName": "random", "Description": "Random number"}],
-"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
-}
-=cut
+  my $data_for_postrun_href = {};
 
-  my $self = shift;
+  my $dbh_write = connect_kdb_write();
 
-  return $self->add_group_member(1);
+  if (!record_existence($dbh_write, 'systemgroup', 'SystemGroupId', $group_id)) {
+
+    my $err_msg = "Group ($group_id): not found";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $login_group_id = $self->authen->group_id();
+  my $login_user_id  = $self->authen->user_id();
+  my $login_username = $self->authen->username();
+
+  my $sql;
+
+  $sql  = 'SELECT AuthorisedSystemGroupId ';
+  $sql .= 'FROM authorisedsystemgroup ';
+  $sql .= 'WHERE SystemGroupId=? AND UserId=? LIMIT 1';
+
+  # This runmode is only for a group admin. Therefore, checking IsGroupOwner is not required.
+  # If this SQL retuns a number, it can be deduced that the user is a group owner of this group.
+
+  my ($r_sysgrp_err, $auth_sys_grp_id) = read_cell($dbh_write, $sql, [$group_id, $login_user_id]);
+
+  if ($r_sysgrp_err) {
+
+    $self->logger->debug("Checking if login user is a group admin of this group failed.");
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if ($login_group_id ne '0') {
+
+    if (length($auth_sys_grp_id) == 0) {
+
+      my $err_msg = "Group ($group_id) and User ($login_username): permission denied.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  my $user_id = read_cell_value($dbh_write, 'systemuser', 'UserId', 'UserName', $username);
+
+  if (length($user_id) == 0) {
+
+    my $err_msg = "User ($username): not found";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $self->logger->debug("Looked up UserId: $user_id - GroupId: $group_id");
+
+  $sql  = 'SELECT AuthorisedSystemGroupId ';
+  $sql .= 'FROM authorisedsystemgroup ';
+  $sql .= 'WHERE SystemGroupId=? AND UserId=? LIMIT 1';
+
+  ($r_sysgrp_err, $auth_sys_grp_id) = read_cell($dbh_write, $sql, [$group_id, $user_id]);
+
+  if ($r_sysgrp_err) {
+
+    $self->logger->debug("Checking if the user is already a member of the group failed.");
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $self->logger->debug("Looked up AuthorisedSystemGroupId: $auth_sys_grp_id");
+
+  if (length("$auth_sys_grp_id") > 0) {
+
+    my $err_msg = "User ($username) is already a member of Group ($group_id).";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $query = $self->query();
+
+  my $is_group_owner = $query->param('IsGroupOwner');
+
+  my ($missing_err, $missing_href) = check_missing_href( {'IsGroupOwner' => $is_group_owner} );
+
+  if ($missing_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  if ($is_group_owner !~ /^0|1$/) {
+
+    my $err_msg = "IsGroupOwner ($is_group_owner) is not 0 or 1.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'IsGroupOwner' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sql  = 'INSERT INTO authorisedsystemgroup SET ';
+  $sql .= 'UserId=?, ';
+  $sql .= 'SystemGroupId=?, ';
+  $sql .= 'IsGroupOwner=?';
+
+  my $sth = $dbh_write->prepare($sql);
+  $sth->execute($user_id, $group_id, $is_group_owner);
+
+  if ($dbh_write->err()) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $authorised_sys_grp_id = $dbh_write->last_insert_id(undef, undef, 'authorisedsystemgroup', 'AuthorisedSystemGroupId');
+
+  $sth->finish();
+
+  $dbh_write->disconnect();
+
+  my $info_msg_aref  = [{'Message' => "User ($username) has been added to Group ($group_id) successfully."}];
+  my $return_id_aref = [{'Value' => "$authorised_sys_grp_id", 'ParaName' => 'AuthorisedSystemGroupId'}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'      => $info_msg_aref,
+                                           'ReturnId'  => $return_id_aref,
+  };
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
 }
 
 sub add_group_member {
@@ -835,18 +1012,27 @@ sub add_group_runmode {
 
   my $data_for_postrun_href = {};
 
-  my $group_name        = $query->param('SystemGroupName');
+  # Generic required static field checking
 
-  my ($missing_err, $missing_msg) = check_missing_value( { 'SystemGroupName'      => $group_name } );
+  my $dbh_read = connect_kdb_read();
 
-  if ($missing_err) {
+  my $skip_field = {};
 
-    $missing_msg .= ' missing.';
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $missing_msg}]};
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'systemgroup', $skip_field);
 
-    return $data_for_postrun_href;
+  if ($chk_sfield_err) {
+
+    $self->logger->debug($chk_sfield_msg);
+
+    return $for_postrun_href;
   }
+
+  $dbh_read->disconnect();
+
+  # Finish generic required static field checking
+
+  my $group_name        = $query->param('SystemGroupName');
 
   if ($group_name =~ /\s+/) {
 
@@ -905,101 +1091,6 @@ sub add_group_runmode {
   $data_for_postrun_href->{'Data'}      = {'Info'     => $info_msg_aref,
                                            'ReturnId' => $return_id_aref,
   };
-  $data_for_postrun_href->{'ExtraData'} = 0;
-
-  return $data_for_postrun_href;
-}
-
-sub reset_user_password_runmode {
-
-=pod reset_user_password_gadmin_HELP_START
-{
-"OperationName" : "Reset password",
-"Description": "Reset current password into something new for the user. This functionality is only available for global administrator.",
-"AuthRequired": 1,
-"GroupRequired": 1,
-"GroupAdminRequired": 1,
-"SignatureRequired": 1,
-"AdministratorRequired": 1,
-"SkippedField": ["PasswordSalt", "LastLoginDateTime", "UserPreference", "UserName", "ContactId", "UserType"],
-"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
-"KDDArTModule": "main",
-"KDDArTTable": "systemuser",
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='Password for user1 has been reset successfully.' /></DATA>",
-"SuccessMessageJSON": "{'Info' : [{'Message' : 'Password for user1 has been reset successfully.'}]}",
-"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='user3 not found.' /></DATA>"}],
-"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'user3 not found.'}]}"}],
-"URLParameter": [{"ParameterName": "username", "Description": "Existing username"}],
-"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
-}
-=cut
-
-  my $self     = shift;
-  my $username = $self->param('username');
-
-  my $data_for_postrun_href = {};
-
-  my $query    = $self->query();
-  my $pass     = $query->param('UserPassword');
-
-  my ($missing_err, $missing_msg) = check_missing_value( { 'UserPassword' => $pass } );
-
-  if ($missing_err) {
-
-    $missing_msg .= ' missing.';
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $missing_msg}]};
-
-    return $data_for_postrun_href;
-  }
-
-  my $dbh_write = connect_kdb_write();
-
-  my $user_id_on_request = read_cell_value($dbh_write, 'systemuser', 'UserId', 'UserName', $username);
-
-  if (length($user_id_on_request) == 0) {
-
-    my $err_msg = "$username not found.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-    return $data_for_postrun_href;
-  }
-
-  my $group_id = $self->authen->group_id();
-
-  if ($group_id != 0) {
-
-    my $err_msg = 'Permission denied.';
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-    return $data_for_postrun_href;
-  }
-
-  my $sql  = 'UPDATE systemuser SET ';
-  $sql    .= 'UserPassword=? ';
-  $sql    .= 'WHERE UserId=?';
-
-  my $sth = $dbh_write->prepare($sql);
-  $sth->execute($pass, $user_id_on_request);
-
-  if ($dbh_write->err()) {
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-    return $data_for_postrun_href;
-  }
-  
-  $sth->finish();
-
-  $dbh_write->disconnect();
-
-  my $info_msg_aref = [{'Message' => "Password for $username has been reset successfully."}];
-
-  $data_for_postrun_href->{'Error'}     = 0;
-  $data_for_postrun_href->{'Data'}      = {'Info' => $info_msg_aref};
   $data_for_postrun_href->{'ExtraData'} = 0;
 
   return $data_for_postrun_href;
@@ -1095,12 +1186,21 @@ sub list_user_runmode {
   my $group_id = $self->authen->group_id();
   my $user_id  = $self->authen->user_id();
 
+  my $where_arg    = [$group_id];
+  my $where_clause = 'WHERE authorisedsystemgroup.SystemGroupId=?';
+
+  if ("$group_id" eq '0') {
+
+    $where_arg    = [];
+    $where_clause = '';
+  }
+
   my $sql = 'SELECT UserName, ContactId, UserType ';
   $sql   .= 'FROM systemuser LEFT JOIN authorisedsystemgroup ';
   $sql   .= 'ON systemuser.UserId = authorisedsystemgroup.UserId ';
-  $sql   .= 'WHERE authorisedsystemgroup.SystemGroupId=?';
+  $sql   .= $where_clause;
 
-  my ($read_user_err, $read_user_msg, $user_data) = $self->list_user(1, $sql, [$group_id]);
+  my ($read_user_err, $read_user_msg, $user_data) = $self->list_user(1, $sql, $where_arg);
 
   if ($read_user_err) {
 
@@ -1149,9 +1249,7 @@ sub change_user_password_runmode {
 
   my $data_for_postrun_href = {};
 
-  my ($missing_err, $missing_href) = check_missing_href( { 'CurrentUserPassword' => $current_pass,
-                                                           'NewUserPassword'     => $new_pass,
-                                                         } );
+  my ($missing_err, $missing_href) = check_missing_href( { 'NewUserPassword'     => $new_pass } );
 
   if ($missing_err) {
 
@@ -1161,28 +1259,52 @@ sub change_user_password_runmode {
     return $data_for_postrun_href;
   }
 
+  my $group_id = $self->authen->group_id();
+
   my $username = $self->authen->username();
 
-  if ($username_on_request ne $username) {
+  my $dbh_write = connect_kdb_write();
 
-    my $err_msg = 'Incorrect username or password.';
+  if (!record_existence($dbh_write, 'systemuser', 'UserName', $username_on_request)) {
+
+    my $err_msg = "Username ($username_on_request): not found.";
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
     return $data_for_postrun_href;
   }
 
-  my $dbh_write = connect_kdb_write();
+  if ("$group_id" ne '0') {
 
-  my $db_hash_pass = read_cell_value($dbh_write, 'systemuser', 'UserPassword', 'UserName', $username);
+    my ($missing_err, $missing_href) = check_missing_href( { 'CurrentUserPassword' => $current_pass } );
 
-  if ($current_pass ne $db_hash_pass) {
+    if ($missing_err) {
 
-    my $err_msg = 'Incorrect username or password.';
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
 
-    return $data_for_postrun_href;
+      return $data_for_postrun_href;
+    }
+
+    if ($username_on_request ne $username) {
+
+      my $err_msg = 'Incorrect username or password.';
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my $db_hash_pass = read_cell_value($dbh_write, 'systemuser', 'UserPassword', 'UserName', $username);
+
+    if ($current_pass ne $db_hash_pass) {
+
+      my $err_msg = 'Incorrect username or password.';
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
   }
 
   my $sql = 'UPDATE systemuser SET ';
@@ -1190,7 +1312,7 @@ sub change_user_password_runmode {
   $sql   .= 'WHERE UserName=?';
 
   my $sth = $dbh_write->prepare($sql);
-  $sth->execute($new_pass, $username);
+  $sth->execute($new_pass, $username_on_request);
 
   if ($dbh_write->err()) {
 
@@ -1500,6 +1622,7 @@ sub change_permission_runmode {
                             'trialanalysis'   => 'TrialAnalysisId',
                             'analysisgroup'   => 'AnalysisGroupId',
                             'layer'           => 'id',
+                            'specimengroup'   => 'SpecimenGroupId',
   };
 
   my $dbh_kdb_write = connect_kdb_write();
@@ -1509,7 +1632,7 @@ sub change_permission_runmode {
   my $dbh = $dbh_kdb_write;
 
   my $id_field = '';
- 
+
   if (defined $tablename2idfield->{$table_name}) {
 
     $id_field = $tablename2idfield->{$table_name};
@@ -1518,7 +1641,7 @@ sub change_permission_runmode {
   my $perm_fields = ['OwnGroupId', 'AccessGroupId', 'OwnGroupPerm', 'AccessGroupPerm', 'OtherPerm'];
 
   my $table_exists_kdb = table_existence($dbh_kdb_write, $table_name);
-  
+
   if ($table_exists_kdb == 0) {
 
     my $table_exists_gis = table_existence($dbh_gis_write, $table_name);
@@ -1693,6 +1816,8 @@ sub change_owner_runmode {
                             'trait'           => 'TraitId',
                             'trialanalysis'   => 'TrialAnalysisId',
                             'analysisgroup'   => 'AnalysisGroupId',
+                            'layer'           => 'id',
+                            'specimengroup'   => 'SpecimenGroupId',
   };
 
   my $dbh_kdb_write = connect_kdb_write();
@@ -1729,7 +1854,7 @@ sub change_owner_runmode {
   my $perm_fields = ['OwnGroupId', 'AccessGroupId', 'OwnGroupPerm', 'AccessGroupPerm', 'OtherPerm'];
 
   my $table_exists_kdb = table_existence($dbh_kdb_write, $table_name);
-  
+
   if ($table_exists_kdb == 0) {
 
     my $table_exists_gis = table_existence($dbh_gis_write, $table_name);
@@ -2149,8 +2274,8 @@ sub get_user_runmode {
 "GroupAdminRequired": 0,
 "SignatureRequired": 0,
 "AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><RecordMeta TagName='User' /><User ContactFirstName='Diversity' ContactLastName='Arrays' UserId='0' UserType='human' LastLoginDateTime='2014-08-27 14:39:48' UserName='admin' resetpass='user/admin/reset/password' ContactId='1' ContactName='Diversity Arrays' ContactEMail='admin@example.com' UserPreference='' /></DATA>",
-"SuccessMessageJSON": "{'RecordMeta' : [{'TagName' : 'User'}], 'User' : [{'ContactFirstName' : 'Diversity', 'UserId' : '0', 'ContactLastName' : 'Arrays', 'LastLoginDateTime' : '2014-08-27 14:39:48', 'UserType' : 'human', 'UserName' : 'admin', 'resetpass' : 'user/admin/reset/password', 'ContactId' : '1', 'ContactName' : 'Diversity Arrays', 'ContactEMail' : 'admin@example.com', 'UserPreference' : ''}]}",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><RecordMeta TagName='User' /><User ContactFirstName='Diversity' ContactLastName='Arrays' UserId='0' UserType='human' LastLoginDateTime='2014-08-27 14:39:48' UserName='admin' resetpass='user/admin/reset/password' ContactId='1' ContactName='Diversity Arrays' ContactEMail='dart-it@diversityarrays.com' UserPreference='' /></DATA>",
+"SuccessMessageJSON": "{'RecordMeta' : [{'TagName' : 'User'}], 'User' : [{'ContactFirstName' : 'Diversity', 'UserId' : '0', 'ContactLastName' : 'Arrays', 'LastLoginDateTime' : '2014-08-27 14:39:48', 'UserType' : 'human', 'UserName' : 'admin', 'resetpass' : 'user/admin/reset/password', 'ContactId' : '1', 'ContactName' : 'Diversity Arrays', 'ContactEMail' : 'dart-it@diversityarrays.com', 'UserPreference' : ''}]}",
 "ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='User (5) not found.' /></DATA>"}],
 "ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'User (5) not found.'}]}"}],
 "URLParameter": [{"ParameterName": "id", "Description": "UserId which needs to match with the UserId of the current login session unless the current login session has a group administration privilege."}],
@@ -2220,40 +2345,6 @@ sub get_user_runmode {
   return $data_for_postrun_href;
 }
 
-sub get_version_runmode {
-
-=pod get_version_HELP_START
-{
-"OperationName" : "Get version",
-"Description": "Get version information of the system.",
-"AuthRequired": 1,
-"GroupRequired": 1,
-"GroupAdminRequired": 0,
-"SignatureRequired": 0,
-"AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Version='2.2.4' Copyright='Copyright (c) 2011, Diversity Arrays Technology, All rights reserved.' About='Data Access Layer' /></DATA>",
-"SuccessMessageJSON": "{'Info' : [{'Version' : '2.2.4', 'Copyright' : 'Copyright (c) 2011, Diversity Arrays Technology, All rights reserved.', 'About' : 'Data Access Layer'}]}",
-"ErrorMessageXML": [{"LoginRequired": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='You need to login first.' /></DATA>"}],
-"ErrorMessageJSON": [{"LoginRequired": "{'Error' : [{'Message' : 'You need to login first.'}]}"}],
-"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
-}
-=cut
-
-  my $self = shift;
-
-  my $data_for_postrun_href = {};
-
-  my $info_msg_aref = [{ 'Version'   => $DAL_VERSION,
-                         'About'     => $DAL_ABOUT,
-                         'Copyright' => $DAL_COPYRIGHT}];
-
-  $data_for_postrun_href->{'Error'}     = 0;
-  $data_for_postrun_href->{'Data'}      = {'Info' => $info_msg_aref};
-  $data_for_postrun_href->{'ExtraData'} = 0;
-
-  return $data_for_postrun_href;
-}
-
 sub add_barcodeconf_runmode {
 
 =pod add_barcodeconf_gadmin_HELP_START
@@ -2286,44 +2377,17 @@ sub add_barcodeconf_runmode {
 
   my $skip_field = {};
 
-  my ($get_scol_err, $get_scol_msg, $scol_data, $pkey_data) = get_static_field($dbh_read, 'barcodeconf');
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'barcodeconf', $skip_field);
 
-  if ($get_scol_err) {
+  if ($chk_sfield_err) {
 
-    $self->logger->debug("Get static field info failed: $get_scol_msg");
-    
-    my $err_msg = "Unexpected Error.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+    $self->logger->debug($chk_sfield_msg);
 
-    return $data_for_postrun_href;
-  }
-
-  my $required_field_href = {};
-
-  for my $static_field (@{$scol_data}) {
-
-    my $field_name = $static_field->{'Name'};
-    
-    if ($skip_field->{$field_name}) { next; }
-
-    if ($static_field->{'Required'} == 1) {
-
-      $required_field_href->{$field_name} = $query->param($field_name);
-    }
+    return $for_postrun_href;
   }
 
   $dbh_read->disconnect();
-
-  my ($missing_err, $missing_href) = check_missing_href( $required_field_href );
-
-  if ($missing_err) {
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
-
-    return $data_for_postrun_href;
-  }
 
   # Finish generic required static field checking
 
@@ -2664,6 +2728,16 @@ sub add_multimedia_runmode {
   my $table_name = $self->param('tablename');
   my $rec_id     = $self->param('recid');
 
+  my $note       = undef;
+
+  if (defined $query->param('MultimediaNote')) {
+
+    if (length($query->param('MultimediaNote')) > 0) {
+
+      $note = $query->param('MultimediaNote');
+    }
+  }
+
   my $multimedia_setting_href = $self->{'multimedia'};
 
   if (!defined $multimedia_setting_href->{$table_name}) {
@@ -2711,7 +2785,7 @@ sub add_multimedia_runmode {
   }
 
   if (defined $multimedia_setting_href->{$table_name}->{'ChkPermFunc'}) {
-  
+
     my $chk_perm_func = $multimedia_setting_href->{$table_name}->{'ChkPermFunc'};
     if (!$chk_perm_func->($dbh, $rec_id, $READ_WRITE_PERM)) {
 
@@ -2777,11 +2851,12 @@ sub add_multimedia_runmode {
   $sql   .= 'OrigFileName=?, ';
   $sql   .= 'HashFileName=?, ';
   $sql   .= 'UploadTime=?, ';
-  $sql   .= 'FileExtension=?';
+  $sql   .= 'FileExtension=?, ';
+  $sql   .= 'MultimediaNote=?';
 
   my $sth = $dbh_write->prepare($sql);
   $sth->execute($table_name, $rec_id, $user_id, $file_type, $org_up_fname,
-                $hash_filename, $upload_time, $file_extension);
+                $hash_filename, $upload_time, $file_extension, $note);
 
   my $multimedia_id = -1;
 
@@ -2799,7 +2874,7 @@ sub add_multimedia_runmode {
   }
   $sth->finish();
 
-  my $dest_storage_path = $MULTIMEDIA_STORAGE_PATH . "$table_name";
+  my $dest_storage_path = $ENV{DOCUMENT_ROOT} . '/' . $MULTIMEDIA_STORAGE_PATH . "$table_name";
 
   $self->logger->debug("Dest Storage PATH: $dest_storage_path");
 
@@ -2853,6 +2928,49 @@ sub add_multimedia_runmode {
   return $data_for_postrun_href;
 }
 
+sub list_multimedia {
+
+  my $self            = $_[0];
+  my $table_name      = $_[1];
+  my $sql             = $_[2];
+  my $where_para_aref = $_[3];
+
+  my $err = 0;
+  my $msg = '';
+
+  my $data_aref = [];
+
+  my $dbh = connect_kdb_read();
+
+  ($err, $msg, $data_aref) = read_data($dbh, $sql, $where_para_aref);
+
+  if ($err) {
+
+    return ($err, $msg, []);
+  }
+
+  $dbh->disconnect();
+
+  my $url = reconstruct_server_url();
+
+  my $dest_storage_path = $ENV{DOCUMENT_ROOT} . '/' . $MULTIMEDIA_STORAGE_PATH . "$table_name";
+
+  my $output_file_aref = [];
+
+  for my $multimedia_rec (@{$data_aref}) {
+
+    my $hash_filename = $multimedia_rec->{'HashFileName'};
+
+    if ( (-e "${dest_storage_path}/$hash_filename") ) {
+
+      $multimedia_rec->{'url'} = "$url/storage/multimedia/$table_name/$hash_filename";
+      push(@{$output_file_aref}, $multimedia_rec);
+    }
+  }
+
+  return ($err, $msg, $output_file_aref);
+}
+
 sub list_multimedia_runmode {
 
 =pod list_multimedia_HELP_START
@@ -2864,8 +2982,8 @@ sub list_multimedia_runmode {
 "GroupAdminRequired": 0,
 "SignatureRequired": 0,
 "AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info NumOfFile='2' /><OutputFile SystemTable='genotype' OperatorId='0' OrigFileName='kardinal.jpg' FileType='46' UploadTime='2014-08-28 11:00:27' FileExtension='jpg' MultimediaId='7' RecordId='1' url='http://kddart.example.com/storage/multimedia/genotype/a7afb2373498cc2b8575fcb08bd7c1fa.jpg' HashFileName='a7afb2373498cc2b8575fcb08bd7c1fa.jpg' /><OutputFile SystemTable='genotype' OperatorId='0' OrigFileName='kardinal.jpg' FileType='46' UploadTime='2014-08-28 10:59:27' FileExtension='jpg' MultimediaId='6' RecordId='1' url='http://kddart.example.com/storage/multimedia/genotype/b831c45db73c8ea51e4131824605a94c.jpg' HashFileName='b831c45db73c8ea51e4131824605a94c.jpg' /></DATA>",
-"SuccessMessageJSON": "{'Info' : [{'NumOfFile' : 2}], 'OutputFile' : [{'SystemTable' : 'genotype', 'OperatorId' : '0', 'FileType' : '46', 'OrigFileName' : 'kardinal.jpg', 'UploadTime' : '2014-08-28 11:00:27', 'FileExtension' : 'jpg', 'MultimediaId' : '7', 'url' : 'http://kddart.example.com/storage/multimedia/genotype/a7afb2373498cc2b8575fcb08bd7c1fa.jpg', 'RecordId' : '1', 'HashFileName' : 'a7afb2373498cc2b8575fcb08bd7c1fa.jpg'},{'SystemTable' : 'genotype', 'OperatorId' : '0', 'FileType' : '46', 'OrigFileName' : 'kardinal.jpg', 'UploadTime' : '2014-08-28 10:59:27', 'FileExtension' : 'jpg', 'MultimediaId' : '6', 'url' : 'http://kddart.example.com/storage/multimedia/genotype/b831c45db73c8ea51e4131824605a94c.jpg', 'RecordId' : '1', 'HashFileName' : 'b831c45db73c8ea51e4131824605a94c.jpg'}]}",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info NumOfFile='2' /><OutputFile SystemTable='genotype' OperatorId='0' OrigFileName='kardinal.jpg' FileType='46' UploadTime='2014-08-28 11:00:27' FileExtension='jpg' MultimediaId='7' RecordId='1' url='http://kddart-d.diversityarrays.com/storage/multimedia/genotype/a7afb2373498cc2b8575fcb08bd7c1fa.jpg' HashFileName='a7afb2373498cc2b8575fcb08bd7c1fa.jpg' /><OutputFile SystemTable='genotype' OperatorId='0' OrigFileName='kardinal.jpg' FileType='46' UploadTime='2014-08-28 10:59:27' FileExtension='jpg' MultimediaId='6' RecordId='1' url='http://kddart-d.diversityarrays.com/storage/multimedia/genotype/b831c45db73c8ea51e4131824605a94c.jpg' HashFileName='b831c45db73c8ea51e4131824605a94c.jpg' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'NumOfFile' : 2}], 'OutputFile' : [{'SystemTable' : 'genotype', 'OperatorId' : '0', 'FileType' : '46', 'OrigFileName' : 'kardinal.jpg', 'UploadTime' : '2014-08-28 11:00:27', 'FileExtension' : 'jpg', 'MultimediaId' : '7', 'url' : 'http://kddart-d.diversityarrays.com/storage/multimedia/genotype/a7afb2373498cc2b8575fcb08bd7c1fa.jpg', 'RecordId' : '1', 'HashFileName' : 'a7afb2373498cc2b8575fcb08bd7c1fa.jpg'},{'SystemTable' : 'genotype', 'OperatorId' : '0', 'FileType' : '46', 'OrigFileName' : 'kardinal.jpg', 'UploadTime' : '2014-08-28 10:59:27', 'FileExtension' : 'jpg', 'MultimediaId' : '6', 'url' : 'http://kddart-d.diversityarrays.com/storage/multimedia/genotype/b831c45db73c8ea51e4131824605a94c.jpg', 'RecordId' : '1', 'HashFileName' : 'b831c45db73c8ea51e4131824605a94c.jpg'}]}",
 "ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Record (28273) in genotype: not found.' /></DATA>"}],
 "ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Record (28273) in genotype: not found.'}]}"}],
 "URLParameter": [{"ParameterName": "tablename", "Description": "Name of a table which has multimedia capability"}, {"ParameterName": "recid", "Description": "Id of the record in the specified table. This Id is dependent on the table. For example, for genotype, this Id would be GenotypeId while for trial, this Id would be TrialId."}],
@@ -2917,7 +3035,7 @@ sub list_multimedia_runmode {
   }
 
   if (defined $multimedia_setting_href->{$table_name}->{'ChkPermFunc'}) {
-  
+
     my $chk_perm_func = $multimedia_setting_href->{$table_name}->{'ChkPermFunc'};
     if (!$chk_perm_func->($dbh, $rec_id, $READ_PERM)) {
 
@@ -2929,14 +3047,94 @@ sub list_multimedia_runmode {
     }
   }
 
+  $dbh->disconnect();
+
+  my $dest_storage_path = $ENV{DOCUMENT_ROOT} . '/' . $MULTIMEDIA_STORAGE_PATH . "$table_name";
+
+  if ( !(-e $dest_storage_path) ) {
+
+    $data_for_postrun_href->{'Error'}     = 0;
+    $data_for_postrun_href->{'Data'}      = {'OutputFile'     => [],
+                                             'RecordMeta'     => [{'TagName' => 'OutputFile'}]
+    };
+
+    $data_for_postrun_href->{'ExtraData'} = 0;
+
+    return $data_for_postrun_href;
+  }
+
   my $sql = 'SELECT * FROM multimedia WHERE SystemTable=? AND RecordId=? ';
   $sql   .= 'ORDER BY UploadTime DESC';
 
-  my ($read_data_err, $read_data_msg, $multimedia_data) = read_data($dbh, $sql, [$table_name, $rec_id]);
+  my ($multimedia_err, $multimedia_msg, $multimedia_data) = $self->list_multimedia($table_name, $sql, [$table_name, $rec_id]);
 
-  if ($read_data_err) {
+  if ($multimedia_err) {
 
-    $self->logger->debug("Read multimedia failed: $read_data_msg");
+    my $err_msg = "Unexpected Error.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'OutputFile'     => $multimedia_data,
+                                           'RecordMeta'     => [{'TagName' => 'OutputFile'}]
+  };
+
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub get_multimedia_runmode {
+
+=pod get_multimedia_HELP_START
+{
+"OperationName" : "Get multimedia file meta data",
+"Description": "Get metat data of a multimedia file specified by id.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><RecordMeta TagName='OutputFile' /><OutputFile SystemTable='genotype' OperatorId='0' MultimediaNote='' FileType='72' OrigFileName='uploadfile' UploadTime='2015-09-29 16:19:07' FileExtension='' MultimediaId='1' RecordId='7' url='http://sandbox.kddart.org/storage/multimedia/genotype/cdd5404419e035b3dbbe51112d5ad7a1' HashFileName='cdd5404419e035b3dbbe51112d5ad7a1' /></DATA>",
+"SuccessMessageJSON": "{'RecordMeta' : [{'TagName' : 'OutputFile'}], 'OutputFile' : [{'SystemTable' : 'genotype', 'MultimediaNote' : null, 'OperatorId' : '0', 'OrigFileName' : 'uploadfile', 'FileType' : '72', 'UploadTime' : '2015-09-29 16:19:07', 'FileExtension' : null, 'MultimediaId' : '1', 'url' : 'http://sandbox.kddart.org/storage/multimedia/genotype/cdd5404419e035b3dbbe51112d5ad7a1', 'RecordId' : '7', 'HashFileName' : 'cdd5404419e035b3dbbe51112d5ad7a1'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Multimedia (11): not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Multimedia (11): not found.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing multimedia id"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self   = shift;
+  my $query  = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  my $multimedia_setting_href = $self->{'multimedia'};
+
+  my $dbh = connect_kdb_read();
+
+  my $multimedia_id = $self->param('id');
+
+  if (!record_existence($dbh, 'multimedia', 'MultimediaId', $multimedia_id)) {
+
+    my $err_msg = "Multimedia ($multimedia_id): not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $table_name = read_cell_value($dbh, 'multimedia', 'SystemTable', 'MultimediaId', $multimedia_id);
+  my $rec_id     = read_cell_value($dbh, 'multimedia', 'RecordId', 'MultimediaId', $multimedia_id);
+
+  my $chk_rec_sql = $multimedia_setting_href->{$table_name}->{'ChkRecSql'};
+
+  my ($read_err, $db_rec_id) = read_cell($dbh, $chk_rec_sql, [$rec_id]);
+
+  if ($read_err) {
 
     my $err_msg = "Unexpected Error";
     $data_for_postrun_href->{'Error'} = 1;
@@ -2945,21 +3143,28 @@ sub list_multimedia_runmode {
     return $data_for_postrun_href;
   }
 
+  if (defined $multimedia_setting_href->{$table_name}->{'ChkPermFunc'}) {
+
+    my $chk_perm_func = $multimedia_setting_href->{$table_name}->{'ChkPermFunc'};
+    if (!$chk_perm_func->($dbh, $rec_id, $READ_PERM)) {
+
+      my $err_msg = "Record ($rec_id) in $table_name: permission denied.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
   $dbh->disconnect();
 
-  my $url = reconstruct_server_url();
-
-  my $output_file_aref = [];
-  my $info_aref        = [];
-
-  my $dest_storage_path = $MULTIMEDIA_STORAGE_PATH . "$table_name";
+  my $dest_storage_path = $ENV{DOCUMENT_ROOT} . '/' . $MULTIMEDIA_STORAGE_PATH . "$table_name";
 
   if ( !(-e $dest_storage_path) ) {
 
-    $info_aref = [{'NumOfFile' => 0}];
     $data_for_postrun_href->{'Error'}     = 0;
-    $data_for_postrun_href->{'Data'}      = {'OutputFile'     => $output_file_aref,
-                                             'Info'           => $info_aref,
+    $data_for_postrun_href->{'Data'}      = {'OutputFile'     => [],
+                                             'RecordMeta'     => [{'TagName' => 'OutputFile'}]
     };
 
     $data_for_postrun_href->{'ExtraData'} = 0;
@@ -2967,24 +3172,1753 @@ sub list_multimedia_runmode {
     return $data_for_postrun_href;
   }
 
-  for my $multimedia_rec (@{$multimedia_data}) {
+  my $sql = 'SELECT * FROM multimedia WHERE MultimediaId=? ';
+  $sql   .= 'ORDER BY UploadTime DESC';
 
-    my $hash_filename = $multimedia_rec->{'HashFileName'};
+  my ($multimedia_err, $multimedia_msg, $multimedia_data) = $self->list_multimedia($table_name, $sql, [$multimedia_id]);
 
-    if ( (-e "${dest_storage_path}/$hash_filename") ) {
+  if ($multimedia_err) {
 
-      $multimedia_rec->{'url'} = "$url/storage/multimedia/$table_name/$hash_filename";
-      push(@{$output_file_aref}, $multimedia_rec);
+    my $err_msg = "Unexpected Error.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'OutputFile'     => $multimedia_data,
+                                           'RecordMeta'     => [{'TagName' => 'OutputFile'}]
+  };
+
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub update_multimedia_runmode {
+
+=pod update_multimedia_HELP_START
+{
+"OperationName" : "Update mulitmedia meta data",
+"Description": "Update multimedia meta data specified by id",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 1,
+"SkippedField": ["SystemTable", "RecordId", "OperatorId", "OrigFileName", "HashFileName", "UploadTime", "FileExtension"],
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"KDDArTModule": "main",
+"KDDArTTable": "multimedia",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='Multimedia (6) has been updated successfully.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'Multimedia (6) has been updated successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Multimedia (14): not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Multimedia (14): not found.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing multimedia id"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self   = shift;
+  my $query  = $self->query();
+
+  my $multimedia_id = $self->param('id');
+
+  my $data_for_postrun_href = {};
+
+  my $file_type = $query->param('FileType');
+
+  my ($missing_err, $missing_href) = check_missing_href( {'FileType' => $file_type} );
+
+  if ($missing_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $dbh_write = connect_kdb_write();
+
+  if (!record_existence($dbh_write, 'multimedia', 'MultimediaId', $multimedia_id)) {
+
+    my $err_msg = "Multimedia ($multimedia_id): not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $table_name = read_cell_value($dbh_write, 'multimedia', 'SystemTable', 'MultimediaId', $multimedia_id);
+  my $rec_id     = read_cell_value($dbh_write, 'multimedia', 'RecordId', 'MultimediaId', $multimedia_id);
+  my $note       = read_cell_value($dbh_write, 'multimedia', 'MultimediaNote', 'MultimediaId', $multimedia_id);
+
+  if (length($note) == 0) {
+
+    $note = undef;
+  }
+
+  if (defined $query->param('MultimediaNote')) {
+
+    if (length($query->param('MultimediaNote')) > 0) {
+
+      $note = $query->param('MultimediaNote');
     }
   }
 
-  $info_aref = [{'NumOfFile' => scalar(@{$output_file_aref})}];
+  my $multimedia_setting_href = $self->{'multimedia'};
+
+  my $dbh;
+
+  if ($table_name eq 'extract') {
+
+    $dbh = connect_mdb_read();
+  }
+  else {
+
+    $dbh = connect_kdb_read();
+  }
+
+  my $chk_rec_sql = $multimedia_setting_href->{$table_name}->{'ChkRecSql'};
+
+  if (defined $multimedia_setting_href->{$table_name}->{'ChkPermFunc'}) {
+
+    my $chk_perm_func = $multimedia_setting_href->{$table_name}->{'ChkPermFunc'};
+    if (!$chk_perm_func->($dbh, $rec_id, $READ_WRITE_PERM)) {
+
+      my $err_msg = "Record ($rec_id) in $table_name: permission denied.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  $dbh->disconnect();
+
+  if (!type_existence($dbh_write, 'multimedia', $file_type)) {
+
+    my $err_msg = "FileType ($file_type): not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'FileType' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $sql = 'UPDATE multimedia SET ';
+  $sql   .= 'FileType=?, ';
+  $sql   .= 'MultimediaNote=? ';
+  $sql   .= 'WHERE MultimediaId=?';
+
+  my $sth = $dbh_write->prepare($sql);
+  $sth->execute($file_type, $note, $multimedia_id);
+
+  if ($dbh_write->err()) {
+
+    my $err_msg = 'Unexpected Error';
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+  $sth->finish();
+
+
+  $dbh_write->disconnect();
+
+  my $info_msg_aref  = [{'Message' => "Multimedia ($multimedia_id) has been updated successfully."}];
 
   $data_for_postrun_href->{'Error'}     = 0;
-  $data_for_postrun_href->{'Data'}      = {'OutputFile'     => $output_file_aref,
-                                           'Info'           => $info_aref,
+  $data_for_postrun_href->{'Data'}      = {'Info'      => $info_msg_aref};
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub del_multimedia_runmode {
+
+=pod del_multimedia_gadmin_HELP_START
+{
+"OperationName" : "Delete mulitmedia",
+"Description": "Delete multimedia",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='Multimedia (8) has been deleted successfully.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'Multimedia (10) has been deleted successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Multimedia (12): not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Multimedia (12): not found.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing multimedia id"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self   = shift;
+  my $query  = $self->query();
+
+  my $multimedia_id = $self->param('id');
+
+  my $data_for_postrun_href = {};
+
+  my $dbh_write = connect_kdb_write();
+
+  if (!record_existence($dbh_write, 'multimedia', 'MultimediaId', $multimedia_id)) {
+
+    my $err_msg = "Multimedia ($multimedia_id): not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $table_name = read_cell_value($dbh_write, 'multimedia', 'SystemTable', 'MultimediaId', $multimedia_id);
+  my $rec_id     = read_cell_value($dbh_write, 'multimedia', 'RecordId', 'MultimediaId', $multimedia_id);
+
+  my $multimedia_setting_href = $self->{'multimedia'};
+
+  my $dbh;
+
+  if ($table_name eq 'extract') {
+
+    $dbh = connect_mdb_read();
+  }
+  else {
+
+    $dbh = connect_kdb_read();
+  }
+
+  my $chk_rec_sql = $multimedia_setting_href->{$table_name}->{'ChkRecSql'};
+
+  if (defined $multimedia_setting_href->{$table_name}->{'ChkPermFunc'}) {
+
+    my $chk_perm_func = $multimedia_setting_href->{$table_name}->{'ChkPermFunc'};
+    if (!$chk_perm_func->($dbh, $rec_id, $READ_WRITE_PERM)) {
+
+      my $err_msg = "Record ($rec_id) in $table_name: permission denied.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  $dbh->disconnect();
+
+  my $hash_filename = read_cell_value($dbh_write, 'multimedia', 'HashFileName', 'MultimediaId', $multimedia_id);
+
+  my $dest_storage_path = $ENV{DOCUMENT_ROOT} . '/' . $MULTIMEDIA_STORAGE_PATH . "$table_name";
+
+  my $stored_multimedia_file = "${dest_storage_path}/$hash_filename";
+
+  if (!(-e $stored_multimedia_file)) {
+
+    my $err_msg = "Unexpected Error.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $nb_deleted_file = unlink($stored_multimedia_file);
+
+  if ($nb_deleted_file != 1) {
+
+    my $err_msg = "Unexpected Error.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $sql = 'DELETE FROM multimedia ';
+  $sql   .= 'WHERE MultimediaId=?';
+
+  my $sth = $dbh_write->prepare($sql);
+  $sth->execute($multimedia_id);
+
+  if ($dbh_write->err()) {
+
+    my $err_msg = 'Unexpected Error';
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+  $sth->finish();
+
+  $dbh_write->disconnect();
+
+  my $info_msg_aref  = [{'Message' => "Multimedia ($multimedia_id) has been deleted successfully."}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'      => $info_msg_aref};
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub add_workflow_runmode {
+
+=pod add_workflow_gadmin_HELP_START
+{
+"OperationName" : "Add workflow",
+"Description": "Add a new workflow into the system",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"KDDArTModule": "main",
+"KDDArTTable": "workflow",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><ReturnId Value='1' ParaName='WorkflowId' /><Info Message='Workflow (1) has been added successfully.' /></DATA>",
+"SuccessMessageJSON": "{'ReturnId' : [{'Value' : '2', 'ParaName' : 'WorkflowId'}], 'Info' : [{'Message' : 'Workflow (2) has been added successfully.'}]}",
+"ErrorMessageXML": [{"idNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error WorkflowType='WorkflowType (11): not found or inactive.' /></DATA>"}],
+"ErrorMessageJSON": [{"idNotFound": "{'Error' : [{'WorkflowType' : 'WorkflowType (11): not found or inactive.'}]}"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self  = shift;
+  my $query = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  # Generic required static field checking
+
+  my $dbh_read = connect_kdb_read();
+
+  my $skip_field = {};
+
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'workflow', $skip_field);
+
+  if ($chk_sfield_err) {
+
+    $self->logger->debug($chk_sfield_msg);
+
+    return $for_postrun_href;
+  }
+
+  $dbh_read->disconnect();
+
+  # Finish generic required static field checking
+
+  my $workflow_name    = $query->param('WorkflowName');
+  my $workflow_type    = $query->param('WorkflowType');
+  my $is_active        = $query->param('IsActive');
+
+  my $workflow_note    = undef;
+
+  if (defined $query->param('WorkflowNote')) {
+
+    if (length($query->param('WorkflowNote')) > 0) {
+
+      $workflow_note = $query->param('WorkflowNote');
+    }
+  }
+
+  my ($chk_bool_err, $bool_href) = check_bool_href( { 'IsActive' => $is_active } );
+
+  if ($chk_bool_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$bool_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $dbh_k_read = connect_kdb_read();
+
+  if (record_existence($dbh_k_read, 'workflow', 'WorkflowName', $workflow_name)) {
+
+    my $err_msg = "WorkflowName ($workflow_name): already exists.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'WorkflowName' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (!type_existence($dbh_k_read, 'workflow', $workflow_type)) {
+
+    my $err_msg = "WorkflowType ($workflow_type): not found or inactive.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'WorkflowType' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh_k_read->disconnect();
+
+  my $dbh_k_write = connect_kdb_write();
+
+  my $sql = 'INSERT INTO workflow SET ';
+  $sql   .= 'WorkflowName=?, ';
+  $sql   .= 'WorkflowType=?, ';
+  $sql   .= 'WorkflowNote=?, ';
+  $sql   .= 'IsActive=?';
+
+  my $sth = $dbh_k_write->prepare($sql);
+  $sth->execute( $workflow_name, $workflow_type, $workflow_note, $is_active );
+
+  my $workflow_id = -1;
+  if (!$dbh_k_write->err()) {
+
+    $workflow_id = $dbh_k_write->last_insert_id(undef, undef, 'workflow', 'WorkflowId');
+    $self->logger->debug("WorkflowId: $workflow_id");
+  }
+  else {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+  $sth->finish();
+
+  $dbh_k_write->disconnect();
+
+  my $info_msg_aref  = [{'Message' => "Workflow ($workflow_id) has been added successfully."}];
+  my $return_id_aref = [{'Value' => "$workflow_id", 'ParaName' => 'WorkflowId'}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'      => $info_msg_aref,
+                                           'ReturnId'  => $return_id_aref,
+  };
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub update_workflow_runmode {
+
+=pod update_workflow_gadmin_HELP_START
+{
+"OperationName" : "Update workflow",
+"Description": "Update workflow specified by id.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 1,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"KDDArTModule": "main",
+"KDDArTTable": "workflow",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='Workflow (3) has been successfully updated.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'Workflow (3) has been successfully updated.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Workflow (19): not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Workflow (19): not found.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing workflow id"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self  = $_[0];
+  my $query = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  # Generic required static field checking
+
+  my $dbh_read = connect_kdb_read();
+
+  my $skip_field = {};
+
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'workflow', $skip_field);
+
+  if ($chk_sfield_err) {
+
+    $self->logger->debug($chk_sfield_msg);
+
+    return $for_postrun_href;
+  }
+
+  $dbh_read->disconnect();
+
+  # Finish generic required static field checking
+
+  my $workflow_id        = $self->param('id');
+  my $workflow_name      = $query->param('WorkflowName');
+
+  my $workflow_type      = $query->param('WorkflowType');
+  my $is_active          = $query->param('IsActive');
+
+  my ($chk_bool_err, $bool_href) = check_bool_href( { 'IsActive'          => $is_active } );
+
+  if ($chk_bool_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$bool_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $dbh_k_read = connect_kdb_read();
+
+  my $sql = 'SELECT WorkflowId FROM workflow WHERE WorkflowName=? AND WorkflowId<>?';
+
+  my ($r_wf_err, $db_wf_id) = read_cell($dbh_k_read, $sql, [$workflow_name, $workflow_id]);
+
+  if ($r_wf_err) {
+
+    my $err_msg = "Unexpected Error.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (length($db_wf_id) > 0) {
+
+    my $err_msg = "WorkflowName ($workflow_name) already exists.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'WorkflowName' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (!record_existence( $dbh_k_read, 'workflow', 'WorkflowId', $workflow_id )) {
+
+    my $err_msg = "Workflow ($workflow_id): not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $workflow_note = read_cell_value($dbh_k_read, 'workflow', 'WorkflowNote', 'WorkflowId', $workflow_id);
+
+  if (length($workflow_note) == 0) {
+
+    $workflow_note = undef;
+  }
+
+  if (defined $query->param('WorkflowNote')) {
+
+    if (length($query->param('WorkflowNote')) > 0) {
+
+      $workflow_note = $query->param('WorkflowNote');
+    }
+  }
+
+  if (!type_existence($dbh_k_read, 'workflow', $workflow_type)) {
+
+    my $err_msg = "WorkflowType ($workflow_type): not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'WorkflowType' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh_k_read->disconnect();
+
+  my $dbh_k_write = connect_kdb_write();
+
+  $sql    = "UPDATE workflow SET ";
+  $sql   .= "WorkflowName=?, ";
+  $sql   .= "WorkflowType=?, ";
+  $sql   .= "WorkflowNote=?, ";
+  $sql   .= "IsActive=? ";
+  $sql   .= "WHERE WorkflowId=?";
+
+  my $sth = $dbh_k_write->prepare($sql);
+  $sth->execute( $workflow_name, $workflow_type, $workflow_note, $is_active, $workflow_id );
+
+  if ( $dbh_k_write->err() ) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $self->logger->debug("WorkflowId: $workflow_id updated");
+  $sth->finish();
+  $dbh_k_write->disconnect();
+
+  my $info_msg_aref = [ { 'Message' => "Workflow ($workflow_id) has been successfully updated." } ];
+
+  return {
+    'Error'     => 0,
+    'Data'      => { 'Info' => $info_msg_aref, },
+    'ExtraData' => 0
+  };
+}
+
+sub del_workflow_runmode {
+
+=pod del_workflow_gadmin_HELP_START
+{
+"OperationName" : "Delete workflow",
+"Description": "Delete workflow if it is not used and it does not have any definition.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 1,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='Workflow (3) has been successfully deleted.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'Workflow (4) has been successfully deleted.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='WorkflowId (7): not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'WorkflowId (7): not found.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing workflow id."}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my ($self) = @_;
+
+  my $data_for_postrun_href = {};
+
+  my $workflow_id  = $self->param('id');
+
+  my $dbh_k_read   = connect_kdb_read();
+
+  my $is_workflow_id_exist = record_existence( $dbh_k_read, 'workflow', 'WorkflowId', $workflow_id );
+
+  if ( !$is_workflow_id_exist ) {
+
+    my $err_msg = "WorkflowId ($workflow_id): not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (record_existence($dbh_k_read, 'trial', 'CurrentWorkflowId', $workflow_id)) {
+
+    my $err_msg = "Workflow ($workflow_id): is used in trial.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (record_existence($dbh_k_read, 'workflowdef', 'WorkflowId', $workflow_id)) {
+
+    my $err_msg = "Workflow ($workflow_id): has definitions.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh_k_read->disconnect();
+
+  my $dbh_k_write = connect_kdb_write();
+
+  my $sql = "DELETE FROM workflow WHERE WorkflowId=?";
+  my $sth = $dbh_k_write->prepare($sql);
+  $sth->execute($workflow_id);
+
+  if ( $dbh_k_write->err() ) {
+
+    my $err_msg = "Unexpected Error.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $self->logger->debug("WorkflowId: $workflow_id deleted");
+  $sth->finish();
+  $dbh_k_write->disconnect();
+
+  my $info_msg_aref = [ { 'Message' => "Workflow ($workflow_id) has been successfully deleted." } ];
+
+  return {
+    'Error'     => 0,
+    'Data'      => { 'Info' => $info_msg_aref, },
+    'ExtraData' => 0
+  };
+}
+
+sub list_workflow {
+
+  my $self           = $_[0];
+  my $extra_attr_yes = $_[1];
+  my $sql            = $_[2];
+
+  my $where_para_aref = [];
+
+  if (defined $_[3]) {
+
+    $where_para_aref = $_[3];
+  }
+
+  my $count = 0;
+  while ($sql =~ /\?/g) {
+
+    $count += 1;
+  }
+
+  if ( scalar(@{$where_para_aref}) != $count ) {
+
+    my $msg = 'Number of arguments does not match with ';
+    $msg   .= 'number of SQL parameter.';
+    return (1, $msg, []);
+  }
+
+  my $err = 0;
+  my $msg = '';
+
+  my $data_aref = [];
+
+  my $dbh = connect_kdb_read();
+
+  ($err, $msg, $data_aref) = read_data($dbh, $sql, $where_para_aref);
+
+  if ($err) {
+
+    return ($err, $msg, []);
+  }
+
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  my $extra_attr_workflow_data = [];
+
+  my $workflow_id_aref      = [];
+
+  my $workflow_def_lookup   = {};
+
+  my $chk_id_err        = 0;
+  my $chk_id_msg        = '';
+  my $used_id_href      = {};
+  my $not_used_id_href  = {};
+
+  if ($extra_attr_yes) {
+
+    for my $workflow_row (@{$data_aref}) {
+
+      push(@{$workflow_id_aref}, $workflow_row->{'WorkflowId'});
+    }
+
+    if (scalar(@{$workflow_id_aref}) > 0) {
+
+      my $def_sql = 'SELECT * FROM workflowdef WHERE WorkflowId IN (' . join(',', @{$workflow_id_aref}) . ')';
+
+      my ($wf_def_err, $wf_def_msg, $wf_def_data) = read_data($dbh, $def_sql, []);
+
+      if ($wf_def_err) {
+
+        return ($wf_def_err, $wf_def_msg, []);
+      }
+
+      for my $wf_def_row (@{$wf_def_data}) {
+
+        my $wf_id = $wf_def_row->{'WorkflowId'};
+
+        if (defined $workflow_def_lookup->{$wf_id}) {
+
+          my $wf_def_aref = $workflow_def_lookup->{$wf_id};
+          push(@{$wf_def_aref}, $wf_def_row);
+          $workflow_def_lookup->{$wf_id} = $wf_def_aref;
+        }
+        else {
+
+          $workflow_def_lookup->{$wf_id} = [$wf_def_row];
+        }
+      }
+
+      my $chk_table_aref = [{'TableName' => 'workflowdef', 'FieldName' => 'WorkflowId'},
+                            {'TableName' => 'trial', 'FieldName' => 'CurrentWorkflowId'}
+          ];
+
+      ($chk_id_err, $chk_id_msg,
+       $used_id_href, $not_used_id_href) = id_existence_bulk($dbh, $chk_table_aref, $workflow_id_aref);
+
+      if ($chk_id_err) {
+
+        $self->logger->debug("Check id existence error: $chk_id_msg");
+        $err = 1;
+        $msg = $chk_id_msg;
+
+        return ($err, $msg, []);
+      }
+    }
+
+    for my $workflow_row (@{$data_aref}) {
+
+      my $workflow_id = $workflow_row->{'WorkflowId'};
+
+      if (defined $workflow_def_lookup->{$workflow_id}) {
+
+        my $wf_def_data = $workflow_def_lookup->{$workflow_id};
+
+        my $wf_def_aref = [];
+
+        for my $wf_def_info (@{$wf_def_data}) {
+
+          if ($gadmin_status eq '1') {
+
+            my $wf_def_id = $wf_def_info->{'WorkflowdefId'};
+
+            $wf_def_info->{'remove'} = "remove/workflowdef/$wf_def_id";
+          }
+
+          push(@{$wf_def_aref}, $wf_def_info);
+        }
+
+        $workflow_row->{'workflowdef'} = $wf_def_aref;
+      }
+
+      if ($gadmin_status eq '1') {
+
+        $workflow_row->{'addDef'} = "workflow/$workflow_id/add/definition";
+      }
+
+      push(@{$extra_attr_workflow_data}, $workflow_row);
+    }
+  }
+  else {
+
+    $extra_attr_workflow_data = $data_aref;
+  }
+
+  $dbh->disconnect();
+
+  return ($err, $msg, $extra_attr_workflow_data);
+}
+
+sub list_workflow_runmode {
+
+=pod list_workflow_HELP_START
+{
+"OperationName" : "List workflow",
+"Description": "List all available workflow in the system dictionary.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Workflow WorkflowTypeName='Workflow - 9681075' IsActive='0' addDef='workflow/6/add/definition' WorkflowType='145' WorkflowNote='' WorkflowName='Workflow_8667712' WorkflowId='6' /><RecordMeta TagName='Workflow' /></DATA>",
+"SuccessMessageJSON": "{'Workflow' : [{'WorkflowTypeName' : 'Workflow - 9681075', 'WorkflowType' : '145', 'WorkflowNote' : null, 'IsActive' : '0', 'WorkflowName' : 'Workflow_8667712', 'addDef' : 'workflow/6/add/definition', 'WorkflowId' : '6'}], 'RecordMeta' : [{'TagName' : 'Workflow'}]}",
+"ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
+"ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self  = shift;
+
+  my $data_for_postrun_href = {};
+
+  my $sql = 'SELECT workflow.*, generaltype.TypeName AS WorkflowTypeName FROM workflow ';
+  $sql   .= 'LEFT JOIN generaltype ON workflow.WorkflowType = generaltype.TypeId ';
+  $sql   .= 'ORDER BY WorkflowId DESC';
+
+  my ($read_wf_err, $read_wf_msg, $wf_data) = $self->list_workflow(1, $sql);
+
+  if ($read_wf_err) {
+
+    $self->logger->debug($read_wf_msg);
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Workflow'   => $wf_data,
+                                           'RecordMeta' => [{'TagName' => 'Workflow'}],
   };
 
+  return $data_for_postrun_href;
+}
+
+sub get_workflow_runmode {
+
+=pod get_workflow_HELP_START
+{
+"OperationName" : "Get workflow",
+"Description": "Get detailed information about workflow specified by id.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Workflow WorkflowTypeName='Workflow - 4466097' WorkflowType='142' WorkflowNote='' WorkflowName='Workflow_0239750' IsActive='0' WorkflowId='1' addDef='workflow/1/add/definition' /><RecordMeta TagName='Workflow' /></DATA>",
+"SuccessMessageJSON": "{'Workflow' : [{'WorkflowTypeName' : 'Workflow - 4466097', 'WorkflowType' : '142', 'WorkflowNote' : null, 'IsActive' : '0', 'WorkflowName' : 'Workflow_0239750', 'addDef' : 'workflow/1/add/definition', 'WorkflowId' : '1'}], 'RecordMeta' : [{'TagName' : 'Workflow'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='WorkflowId (11): not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'WorkflowId (11): not found.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing workflow id."}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self  = shift;
+
+  my $workflow_id = $self->param('id');
+  my $data_for_postrun_href = {};
+
+  my $dbh = connect_kdb_read();
+  my $workflow_exist = record_existence($dbh, 'workflow', 'WorkflowId', $workflow_id);
+  $dbh->disconnect();
+
+  if (!$workflow_exist) {
+
+    my $err_msg = "WorkflowId ($workflow_id): not found.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $sql = 'SELECT workflow.*, generaltype.TypeName AS WorkflowTypeName FROM workflow ';
+  $sql   .= 'LEFT JOIN generaltype ON workflow.WorkflowType = generaltype.TypeId ';
+  $sql   .= 'WHERE WorkflowId=?';
+
+  my ($read_workflow_err, $read_workflow_msg, $workflow_data) = $self->list_workflow(1, $sql, [$workflow_id]);
+
+  if ($read_workflow_err) {
+
+    $self->logger->debug($read_workflow_msg);
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Workflow'       => $workflow_data,
+                                           'RecordMeta'     => [{'TagName' => 'Workflow'}],
+                                          };
+
+  return $data_for_postrun_href;
+}
+
+sub add_workflow_def_runmode {
+
+=pod add_workflow_def_gadmin_HELP_START
+{
+"OperationName" : "Add workflow definition",
+"Description": "Add workflow definition.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 1,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"KDDArTModule": "main",
+"KDDArTTable": "workflow",
+"SkippedField": ["WorkflowId"],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><ReturnId Value='1' ParaName='WorkflowdefId' /><Info Message='Workflowdef (1) has been added successfully.' /></DATA>",
+"SuccessMessageJSON": "{'ReturnId' : [{'Value' : '2', 'ParaName' : 'WorkflowdefId'}], 'Info' : [{'Message' : 'Workflowdef (2) has been added successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='WorkflowId (11): not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'WorkflowId (11): not found.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing workflow id."}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my ($self) = @_;
+  my $query  = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  my $workflow_id  = $self->param('id');
+
+  # Generic required static field checking
+
+  my $dbh_read = connect_kdb_read();
+
+  my $skip_field = {'WorkflowId' => 1,
+                    'StepOrder'  => 1,
+                   };
+
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'workflowdef', $skip_field);
+
+  if ($chk_sfield_err) {
+
+    $self->logger->debug($chk_sfield_msg);
+
+    return $for_postrun_href;
+  }
+
+  $dbh_read->disconnect();
+
+  # Finish generic required static field checking
+
+  my $dbh_write   = connect_kdb_write();
+
+  my $is_workflow_id_exist = record_existence( $dbh_write, 'workflow', 'WorkflowId', $workflow_id );
+
+  if ( !$is_workflow_id_exist ) {
+
+    my $err_msg = "WorkflowId ($workflow_id): not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $step_name = $query->param('StepName');
+
+  my $sql = 'SELECT WorkflowdefId FROM workflowdef WHERE WorkflowId=? AND StepName=?';
+
+  my ($r_wf_def_id, $db_wf_def_id) = read_cell($dbh_write, $sql, [$workflow_id, $step_name]);
+
+  if ($r_wf_def_id) {
+
+    my $err_msg = "Unexpected Error.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (length($db_wf_def_id) > 0) {
+
+    my $err_msg = "StepName ($step_name): already exists.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'StepName' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $step_order = 0;
+
+  if (defined $query->param('StepOrder')) {
+
+    if (length($query->param('StepOrder')) > 0) {
+
+      $step_order = $query->param('StepOrder');
+    }
+  }
+
+  my ($int_err, $int_err_href) = check_integer_href( {'StepOrder' => $step_order} );
+
+  if ($int_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$int_err_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $step_note = undef;
+
+  if (defined $query->param('StepNote')) {
+
+    if (length($query->param('StepNote')) > 0) {
+
+      $step_note = $query->param('StepNote');
+    }
+  }
+
+  $sql  = 'INSERT INTO workflowdef SET ';
+  $sql .= 'WorkflowId=?, ';
+  $sql .= 'StepName=?, ';
+  $sql .= 'StepOrder=?, ';
+  $sql .= 'StepNote=?';
+
+  my $sth = $dbh_write->prepare($sql);
+  $sth->execute( $workflow_id, $step_name, $step_order, $step_note );
+
+  my $workflow_def_id = -1;
+  if (!$dbh_write->err()) {
+
+    $workflow_def_id = $dbh_write->last_insert_id(undef, undef, 'workflowdef', 'WorkflowdefId');
+    $self->logger->debug("WorkflowId: $workflow_id");
+  }
+  else {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+  $sth->finish();
+
+  $dbh_write->disconnect();
+
+  my $info_msg_aref  = [{'Message' => "Workflowdef ($workflow_def_id) has been added successfully."}];
+  my $return_id_aref = [{'Value' => "$workflow_def_id", 'ParaName' => 'WorkflowdefId'}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'      => $info_msg_aref,
+                                           'ReturnId'  => $return_id_aref,
+  };
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub update_workflow_def_runmode {
+
+=pod update_workflow_def_gadmin_HELP_START
+{
+"OperationName" : "Update workflow definition",
+"Description": "Update workflow definition details specified by id.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 1,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"KDDArTModule": "main",
+"KDDArTTable": "workflowdef",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='Workflowdef (3) has been successfully updated.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'Workflowdef (3) has been successfully updated.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Workflowdef (21): not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Workflowdef (21): not found.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing workflowdef id"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self  = $_[0];
+  my $query = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  # Generic required static field checking
+
+  my $dbh_read = connect_kdb_read();
+
+  my $skip_field = {'WorkflowId' => 1,
+                    'StepOrder'  => 1,
+                   };
+
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'workflowdef', $skip_field);
+
+  if ($chk_sfield_err) {
+
+    $self->logger->debug($chk_sfield_msg);
+
+    return $for_postrun_href;
+  }
+
+  $dbh_read->disconnect();
+
+  # Finish generic required static field checking
+
+  my $workflow_def_id    = $self->param('id');
+  my $step_name          = $query->param('StepName');
+
+  my $dbh_k_read = connect_kdb_read();
+
+  my $step_order = read_cell_value($dbh_k_read, 'workflowdef', 'StepOrder', 'WorkflowdefId', $workflow_def_id);
+
+  my $step_note  = read_cell_value($dbh_k_read, 'workflowdef', 'StepNote', 'WorkflowdefId', $workflow_def_id);
+
+  if (length($step_note) == 0) {
+
+    $step_note = undef;
+  }
+
+  if (defined $query->param('StepOrder')) {
+
+    if (length($query->param('StepOrder')) > 0) {
+
+      $step_order = $query->param('StepOrder');
+    }
+  }
+
+  if (defined $query->param('StepNote')) {
+
+    if (length($query->param('StepNote')) > 0) {
+
+      $step_note = $query->param('StepNote');
+    }
+  }
+
+  if (!record_existence($dbh_k_read, 'workflowdef', 'WorkflowdefId', $workflow_def_id)) {
+
+    my $err_msg = "Workflowdef ($workflow_def_id): not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $workflow_id = read_cell_value($dbh_k_read, 'workflowdef', 'WorkflowId', 'WorkflowdefId', $workflow_def_id);
+
+  my $sql = 'SELECT WorkflowdefId FROM workflowdef WHERE StepName=? AND WorkflowId=? AND WorkflowdefId<>?';
+
+  my ($r_wf_def_err, $db_wf_def_id) = read_cell($dbh_k_read, $sql, [$step_name, $workflow_id, $workflow_def_id]);
+
+  if ($r_wf_def_err) {
+
+    my $err_msg = "Unexpected Error.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (length($db_wf_def_id) > 0) {
+
+    my $err_msg = "StepName ($step_name) already exists.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'StepName' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh_k_read->disconnect();
+
+  my $dbh_k_write = connect_kdb_write();
+
+  $sql    = "UPDATE workflowdef SET ";
+  $sql   .= "StepName=?, ";
+  $sql   .= "StepOrder=?, ";
+  $sql   .= "StepNote=? ";
+  $sql   .= "WHERE WorkflowdefId=?";
+
+  my $sth = $dbh_k_write->prepare($sql);
+  $sth->execute( $step_name, $step_order, $step_note, $workflow_def_id );
+
+  if ( $dbh_k_write->err() ) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $self->logger->debug("WorkflowdefId: $workflow_def_id updated");
+  $sth->finish();
+  $dbh_k_write->disconnect();
+
+  my $info_msg_aref = [ { 'Message' => "Workflowdef ($workflow_def_id) has been successfully updated." } ];
+
+  return {
+    'Error'     => 0,
+    'Data'      => { 'Info' => $info_msg_aref, },
+    'ExtraData' => 0
+  };
+}
+
+sub list_workflow_def {
+
+  my $self            = shift;
+  my $extra_attr_yes  = shift;
+  my $where_clause    = qq{};
+  $where_clause       = shift;
+
+  if (length($where_clause) > 0) {
+
+    my $count = 0;
+    while ($where_clause =~ /\?/g) {
+
+      $count += 1;
+    }
+
+    if ( scalar(@_) != $count ) {
+
+      my $msg = 'Number of arguments does not match with ';
+      $msg   .= 'number of SQL parameter.';
+      return (1, $msg, []);
+    }
+  }
+
+  my $dbh = connect_kdb_read();
+
+  my $sql = 'SELECT * FROM workflowdef ';
+  $sql   .= $where_clause;
+  $sql   .= ' ORDER BY WorkflowdefId DESC';
+
+  my $sth = $dbh->prepare($sql);
+  # parameters provided by the caller
+  # for example, ('WHERE FieldA=?', '1')
+  $sth->execute(@_);
+
+  my $err = 0;
+  my $msg = '';
+  my $wf_def_data = [];
+
+  if ( !$dbh->err() ) {
+
+    my $array_ref = $sth->fetchall_arrayref({});
+
+    if ( !$sth->err() ) {
+
+      $wf_def_data = $array_ref;
+    }
+    else {
+
+      $err = 1;
+      $msg = 'Unexpected error';
+      $self->logger->debug('Err: ' . $dbh->errstr());
+    }
+  }
+  else {
+
+    $err = 1;
+    $msg = 'Unexpected error';
+    $self->logger->debug('Err: ' . $dbh->errstr());
+  }
+
+  $sth->finish();
+
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  my $extra_attr_wf_def_data = [];
+
+  if ($extra_attr_yes && ($gadmin_status eq '1')) {
+
+    my $wf_def_id_aref = [];
+
+    for my $row (@{$wf_def_data}) {
+
+      push(@{$wf_def_id_aref}, $row->{'WorkflowdefId'});
+    }
+
+    my $chk_table_aref = [{'TableName' => 'trialworkflow', 'FieldName' => 'WorkflowdefId'}];
+
+    my ($chk_id_err, $chk_id_msg,
+        $used_id_href, $not_used_id_href) = id_existence_bulk($dbh, $chk_table_aref, $wf_def_id_aref);
+
+    if ($chk_id_err) {
+
+      $self->logger->debug("Check id existence error: $chk_id_msg");
+      $err = 1;
+      $msg = $chk_id_msg;
+
+      return ($err, $msg, []);
+    }
+
+    for my $row (@{$wf_def_data}) {
+
+      my $wf_def_id = $row->{'WorkflowdefId'};
+      $row->{'update'}   = "update/workflowdef/$wf_def_id";
+
+      if ($not_used_id_href->{$wf_def_id}) {
+
+        $row->{'delete'}   = "delete/workflowdef/$wf_def_id";
+      }
+
+      push(@{$extra_attr_wf_def_data}, $row);
+    }
+  }
+  else {
+
+    $extra_attr_wf_def_data = $wf_def_data;
+  }
+
+  $dbh->disconnect();
+
+  return ($err, $msg, $extra_attr_wf_def_data);
+}
+
+sub list_workflow_def_runmode {
+
+=pod list_workflow_def_HELP_START
+{
+"OperationName" : "List workflow definition",
+"Description": "List workflow definition for specified workflow id.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><RecordMeta TagName='Workflowdef' /><Workflowdef WorkflowdefId='3' StepName='Step_7960440' StepNote='UPDATE - Testing framework' delete='delete/workflowdef/3' update='update/workflowdef/3' WorkflowId='8' StepOrder='1' /></DATA>",
+"SuccessMessageJSON": "{'RecordMeta' : [{'TagName' : 'Workflowdef'}], 'Workflowdef' : [{'delete' : 'delete/workflowdef/3', 'update' : 'update/workflowdef/3', 'StepNote' : 'UPDATE - Testing framework', 'StepName' : 'Step_7960440', 'WorkflowdefId' : '3', 'StepOrder' : '1', 'WorkflowId' : '8'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Workflow (4): not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Workflow (4): not found.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing workflow id"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self        = shift;
+  my $workflow_id = $self->param('id');
+
+  my $data_for_postrun_href = {};
+
+  my $dbh = connect_kdb_read();
+
+  if (!record_existence($dbh, 'workflow', 'WorkflowId', $workflow_id)) {
+
+    my $err_msg = "Workflow ($workflow_id): not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh->disconnect();
+
+  my ($r_wf_def_err, $r_wf_def_msg, $wf_def_data) = $self->list_workflow_def(1, 'WHERE WorkflowId=?', $workflow_id);
+
+  if ($r_wf_def_err) {
+
+    $self->logger->debug($r_wf_def_msg);
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Workflowdef' => $wf_def_data,
+                                           'RecordMeta'  => [{'TagName' => 'Workflowdef'}],
+  };
+
+  return $data_for_postrun_href;
+}
+
+sub get_workflow_def_runmode {
+
+=pod get_workflow_def_HELP_START
+{
+"OperationName" : "Get workflow definition",
+"Description": "Get detailed information about workflow definition specified by id.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><RecordMeta TagName='Workflowdef' /><Workflowdef delete='delete/workflowdef/3' WorkflowdefId='3' StepName='Step_7960440' StepNote='UPDATE - Testing framework' update='update/workflowdef/3' WorkflowId='8' StepOrder='1' /></DATA>",
+"SuccessMessageJSON": "{'RecordMeta' : [{'TagName' : 'Workflowdef'}], 'Workflowdef' : [{'delete' : 'delete/workflowdef/3', 'update' : 'update/workflowdef/3', 'StepNote' : 'UPDATE - Testing framework', 'StepName' : 'Step_7960440', 'WorkflowdefId' : '3', 'StepOrder' : '1', 'WorkflowId' : '8'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='WorkflowdefId (6): not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'WorkflowdefId (6): not found.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing workflowdef id."}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self  = shift;
+
+  my $workflow_def_id       = $self->param('id');
+  my $data_for_postrun_href = {};
+
+  my $dbh = connect_kdb_read();
+  my $workflow_def_exist = record_existence($dbh, 'workflowdef', 'WorkflowdefId', $workflow_def_id);
+  $dbh->disconnect();
+
+  if (!$workflow_def_exist) {
+
+    my $err_msg = "WorkflowdefId ($workflow_def_id): not found.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my ($r_wf_def_err, $r_wf_def_msg, $wf_def_data) = $self->list_workflow_def(1, 'WHERE WorkflowdefId=?', $workflow_def_id);
+
+  if ($r_wf_def_err) {
+
+    $self->logger->debug($r_wf_def_msg);
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Workflowdef'    => $wf_def_data,
+                                           'RecordMeta'     => [{'TagName' => 'Workflowdef'}],
+                                          };
+
+  return $data_for_postrun_href;
+}
+
+sub del_workflow_def_runmode {
+
+=pod del_workflow_def_gadmin_HELP_START
+{
+"OperationName" : "Delete workflow definition",
+"Description": "Delete workflow definition if it is not used.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 1,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='Workflowdef (3) has been successfully deleted.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'Workflowdef (6) has been successfully deleted.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='WorkflowdefId (8): not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'WorkflowdefId (8): not found.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing workflowdef id."}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my ($self) = @_;
+
+  my $data_for_postrun_href = {};
+
+  my $workflow_def_id  = $self->param('id');
+
+  my $dbh_k_read   = connect_kdb_read();
+
+  my $is_workflow_def_id_exist = record_existence( $dbh_k_read, 'workflowdef', 'WorkflowdefId', $workflow_def_id );
+
+  if ( !$is_workflow_def_id_exist ) {
+
+    my $err_msg = "WorkflowdefId ($workflow_def_id): not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (record_existence($dbh_k_read, 'trialworkflow', 'WorkflowdefId', $workflow_def_id)) {
+
+    my $err_msg = "Workflowdef ($workflow_def_id): is used in trialworkflow.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh_k_read->disconnect();
+
+  my $dbh_k_write = connect_kdb_write();
+
+  my $sql = "DELETE FROM workflowdef WHERE WorkflowdefId=?";
+  my $sth = $dbh_k_write->prepare($sql);
+  $sth->execute($workflow_def_id);
+
+  if ( $dbh_k_write->err() ) {
+
+    my $err_msg = "Unexpected Error.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $self->logger->debug("WorkflowdefId: $workflow_def_id deleted");
+  $sth->finish();
+  $dbh_k_write->disconnect();
+
+  my $info_msg_aref = [ { 'Message' => "Workflowdef ($workflow_def_id) has been successfully deleted." } ];
+
+  return {
+    'Error'     => 0,
+    'Data'      => { 'Info' => $info_msg_aref, },
+    'ExtraData' => 0
+  };
+}
+
+sub get_user_preference_runmode {
+
+=pod get_user_preference_HELP_START
+{
+"OperationName" : "Get User Preference",
+"Description": "Get user preference regarding, for example, field list, field description and so on.",
+"AuthRequired": 1,
+"GroupRequired": 0,
+"GroupAdminRequired": 0,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "",
+"SuccessMessageJSON": "",
+"ErrorMessageXML": [{}],
+"ErrorMessageJSON": [{}],
+"HTTPParameter": [{"Name": "EntityName", "Required": 0, "Description": "Filtering parameter for the name of entity to which the user preference applies."}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self  = $_[0];
+  my $query = $self->query();
+
+  my $entity_name = '';
+
+  if (defined $query->param('EntityName')) {
+
+    if (length($query->param('EntityName')) > 0) {
+
+      $entity_name = $query->param('EntityName');
+    }
+  }
+
+  my $data_for_postrun_href = {};
+
+  my $user_id = $self->authen->user_id();
+
+  my $dbh = connect_kdb_read();
+
+  my $user_pref_json_txt = read_cell_value($dbh, 'systemuser', 'UserPreference', 'UserId', $user_id);
+
+  $self->logger->debug("User pref json txt: $user_pref_json_txt");
+
+  my $user_pref_aref = [];
+
+  if (length($user_pref_json_txt) > 0) {
+
+    my $user_pref_href = {};
+
+    eval {
+
+      $user_pref_href = decode_json($user_pref_json_txt);
+    };
+
+    if ( !($@) ) {
+
+      $self->logger->debug($user_pref_href->{'genotype'});
+
+      if (length($entity_name) > 0) {
+
+        if (defined $user_pref_href->{$entity_name}) {
+
+          push(@{$user_pref_aref}, {$entity_name => $user_pref_href->{$entity_name}});
+        }
+      }
+      else {
+
+        push(@{$user_pref_aref}, $user_pref_href);
+      }
+    }
+    else {
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  $dbh->disconnect();
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'UserPreference'  => $user_pref_aref,
+                                           'RecordMeta'      => [{'TagName' => 'UserPreference'}],
+  };
+  $data_for_postrun_href->{'JSONONLY'}  = 1;
+
+  return $data_for_postrun_href;
+}
+
+sub update_user_preference_runmode {
+
+=pod update_user_preference_HELP_START
+{
+"OperationName" : "Update User Preference",
+"Description": "Update user preference regarding, for example, field list, field description and so on.",
+"AuthRequired": 1,
+"GroupRequired": 0,
+"GroupAdminRequired": 0,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "",
+"SuccessMessageJSON": "",
+"ErrorMessageXML": [{}],
+"ErrorMessageJSON": [{}],
+"HTTPParameter": [{"Name": "UserPreference", "Required": 1, "Description": "Hash JSON string for the user preference"}, {"Name": "EntityName", "Required": 1, "Description": "Name of entity to which the user preference applies."}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self  = $_[0];
+  my $query = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  my $user_id = $self->authen->user_id();
+
+  my $user_pref_json_txt = $query->param('UserPreference');
+  my $entity_name        = lc($query->param('EntityName'));
+
+  my ($missing_err, $missing_href) = check_missing_href( {'UserPreference' => $user_pref_json_txt,
+                                                          'EntityName'     => $entity_name,
+                                                         } );
+
+  if ($missing_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  if ($entity_name != /\w+/) {
+
+    my $err_msg = "EntityName ($entity_name): invalid character.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'EntityName' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $user_pref_href = {};
+
+  eval {
+
+    $user_pref_href = decode_json($user_pref_json_txt);
+  };
+
+  if ( $@ ) {
+
+    my $err_msg = "Invalid JSON string";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'UserPreference' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $dbh_write = connect_kdb_write();
+
+  my $db_user_pref_json_txt = read_cell_value($dbh_write, 'systemuser', 'UserPreference', 'UserId', $user_id);
+
+  my $db_user_pref_href = {};
+
+  if (length($db_user_pref_json_txt) > 0) {
+
+    eval {
+
+      $db_user_pref_href = decode_json($db_user_pref_json_txt);
+    };
+
+    if ( $@ ) {
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  $db_user_pref_href->{$entity_name} = $user_pref_href;
+
+  my $final_json_txt = '';
+
+  eval {
+
+    $final_json_txt = encode_json($db_user_pref_href);
+  };
+
+  if ( $@ ) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $sql = 'UPDATE systemuser SET ';
+  $sql   .= 'UserPreference=? ';
+  $sql   .= 'WHERE UserId=?';
+
+  my $sth = $dbh_write->prepare($sql);
+  $sth->execute($final_json_txt, $user_id);
+
+  if ($dbh_write->err()) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sth->finish();
+
+  $dbh_write->disconnect();
+
+  my $info_msg_aref = [{'Message' => "User preference for user ($user_id) on entity ($entity_name) been updated successfully."}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'      => $info_msg_aref};
   $data_for_postrun_href->{'ExtraData'} = 0;
 
   return $data_for_postrun_href;

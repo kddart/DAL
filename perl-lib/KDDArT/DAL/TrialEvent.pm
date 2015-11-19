@@ -1,5 +1,7 @@
-#$Id: TrialEvent.pm 785 2014-09-02 06:23:12Z puthick $
+#$Id: TrialEvent.pm 1030 2015-10-22 02:05:45Z puthick $
 #$Author: puthick $
+
+# Copyright (c) 2015, Diversity Arrays Technology, All rights reserved.
 
 # COPYRIGHT AND LICENSE
 # 
@@ -15,9 +17,8 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 
-# Author    : Puthick Hok, Rakesh Kumar Shardiwal
-# Version   : 2.2.5 build 795
-# Created   : 19/05/2012
+# Author    : Puthick Hok
+# Version   : 2.3.0 build 1040
 
 package KDDArT::DAL::TrialEvent;
 
@@ -55,15 +56,15 @@ sub setup {
   __PACKAGE__->authen->check_content_type_runmodes(':all');
   __PACKAGE__->authen->check_rand_runmodes('add_trialevent',
                                            'update_trialevent',
-                                           'del_trialevent',
+                                           'del_trialevent_gadmin',
       );
   __PACKAGE__->authen->count_session_request_runmodes(':all');
   
   __PACKAGE__->authen->check_signature_runmodes('add_trialevent',
                                                 'update_trialevent',
-                                                'del_trialevent',
+                                                'del_trialevent_gadmin',
       );
-  __PACKAGE__->authen->check_gadmin_runmodes();
+  __PACKAGE__->authen->check_gadmin_runmodes('del_trialevent_gadmin');
   __PACKAGE__->authen->check_sign_upload_runmodes();
 
   my $logger = get_logger();
@@ -81,16 +82,16 @@ sub setup {
 
   $logger->level($DEBUG);
   $self->{logger} = $logger;
-  
+
   $self->authen->config( LOGIN_URL => '' );
   $self->session_config( CGI_SESSION_OPTIONS => [ "driver:File", $self->query, { Directory => $SESSION_STORAGE_PATH } ], );
-  
+
   $self->run_modes(
-    'add_trialevent'    => 'add_trialevent_runmode',
-    'update_trialevent' => 'update_trialevent_runmode',
-    'get_trialevent'    => 'get_trialevent_runmode',
-    'list_trialevent'   => 'list_trialevent_runmode',
-    'del_trialevent'    => 'del_trialevent_runmode',
+    'add_trialevent'           => 'add_trialevent_runmode',
+    'update_trialevent'        => 'update_trialevent_runmode',
+    'get_trialevent'           => 'get_trialevent_runmode',
+    'list_trialevent'          => 'list_trialevent_runmode',
+    'del_trialevent_gadmin'    => 'del_trialevent_runmode',
       );
 }
 
@@ -160,13 +161,20 @@ sub list_trialevent {
     my $gadmin_status = $self->authen->gadmin_status();
 
     for my $row (@{$trialevent_data}) {
-    
-      if ($gadmin_status eq '1') {
+
+      my $trial_perm = $row->{'UltimatePerm'};
+
+      if ( ($trial_perm & $WRITE_PERM) == $WRITE_PERM ) {
 
         my $trialevent_id = $row->{'TrialEventId'};
         $row->{'update'} = "update/trialevent/$trialevent_id";
-        $row->{'delete'} = "delete/trialevent/$trialevent_id";
+
+        if ($gadmin_status eq '1') {
+
+          $row->{'delete'} = "delete/trialevent/$trialevent_id";
+        }
       }
+
       push(@{$extra_attr_trialevent_data}, $row);
     }
   }
@@ -230,7 +238,7 @@ sub list_trialevent_runmode {
     my $perm_sql  = "SELECT $perm_str AS UltimatePermission ";
     $perm_sql    .= 'FROM trial ';
     $perm_sql    .= 'WHERE LOWER(TrialId)=?';
-  
+
     my ($read_err, $permission) = read_cell($dbh, $perm_sql, [$trial_id]);
 
     if ( ($permission & $READ_PERM) != $READ_PERM ) {
@@ -245,28 +253,31 @@ sub list_trialevent_runmode {
     push(@{$where_args}, $trial_id);
   }
 
-  my $field_list = ['trialevent.*', 'VCol*', 'trial.TrialId', 'trial.TrialName',
+  my $field_list = ['trialevent.*', 'VCol*', 'trial.TrialId', 'trial.TrialName', 'generalunit.UnitName',
                     "$perm_str AS UltimatePerm",
                     'generaltype.TypeName AS EventTypeName',
                     'systemuser.UserName AS OperatorUserName',
       ];
-  
+
   my $other_join = ' LEFT JOIN trial ON trialevent.TrialId = trial.TrialId ';
   $other_join   .= ' LEFT JOIN generaltype ON trialevent.EventTypeId = generaltype.TypeId ';
   $other_join   .= ' LEFT JOIN systemuser ON trialevent.OperatorId = systemuser.UserId ';
+  $other_join   .= ' LEFT JOIN generalunit ON trialevent.UnitId = generalunit.UnitId ';
 
   my ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_sql($dbh, $field_list, 'trialevent',
                                                                         'TrialEventId', $other_join);
-  
-  $sql .= " HAVING (UltimatePerm & $READ_PERM) = $READ_PERM ";
 
   if (defined $trial_id) {
 
-    $sql .= " AND trial.TrialId=? ";
+    $sql =~ s/GROUP BY/ WHERE (($perm_str & $READ_PERM) = $READ_PERM) AND trial.TrialId=? GROUP BY /;
+  }
+  else {
+
+    $sql =~ s/GROUP BY/ WHERE ($perm_str & $READ_PERM) = $READ_PERM GROUP BY /;
   }
 
   $sql .= " ORDER BY trialevent.TrialEventId DESC";
-  
+
   $dbh->disconnect();
 
   if ($vcol_err) {
@@ -285,7 +296,7 @@ sub list_trialevent_runmode {
   if ($read_trialevent_err) {
 
     $self->logger->debug($read_trialevent_msg);
-    
+
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
@@ -346,7 +357,7 @@ sub get_trialevent_runmode {
   my $perm_sql  = "SELECT $perm_str AS UltimatePermission ";
   $perm_sql    .= 'FROM trial ';
   $perm_sql    .= 'WHERE LOWER(TrialId)=?';
-  
+
   my ($read_err, $permission) = read_cell($dbh, $perm_sql, [$trial_id]);
 
   if ( ($permission & $READ_PERM) != $READ_PERM ) {
@@ -358,22 +369,23 @@ sub get_trialevent_runmode {
     return $data_for_postrun_href;
   }
 
-  my $field_list = ['trialevent.*', 'VCol*', 'trial.TrialName',
+  my $field_list = ['trialevent.*', 'VCol*', 'trial.TrialName', 'generalunit.UnitName',
                     "$perm_str AS UltimatePerm",
                     'generaltype.TypeName AS EventTypeName',
                     'systemuser.UserName AS OperatorUserName',
       ];
-  
+
   my $other_join = ' LEFT JOIN trial ON trialevent.TrialId = trial.TrialId ';
   $other_join   .= ' LEFT JOIN generaltype ON trialevent.EventTypeId = generaltype.TypeId ';
   $other_join   .= ' LEFT JOIN systemuser ON trialevent.OperatorId = systemuser.UserId ';
+  $other_join   .= ' LEFT JOIN generalunit ON trialevent.UnitId = generalunit.UnitId ';
 
   my ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_sql($dbh, $field_list, 'trialevent',
                                                                         'TrialEventId', $other_join);
-  
-  $sql .= " HAVING trialevent.TrialEventId=? AND (UltimatePerm & $READ_PERM) = $READ_PERM ";
+
+  $sql  =~ s/GROUP BY/ WHERE trialevent.TrialEventId=? AND ($perm_str & $READ_PERM) = $READ_PERM GROUP BY /;
   $sql .= " ORDER BY trialevent.TrialEventId DESC";
-  
+
   $dbh->disconnect();
 
   if ($vcol_err) {
@@ -392,7 +404,7 @@ sub get_trialevent_runmode {
   if ($read_trialevent_err) {
 
     $self->logger->debug($read_trialevent_msg);
-    
+
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
@@ -410,7 +422,7 @@ sub get_trialevent_runmode {
 
 sub del_trialevent_runmode {
 
-=pod del_trialevent_HELP_START
+=pod del_trialevent_gadmin_HELP_START
 {
 "OperationName" : "Delete trial event",
 "Description": "Delete trial event specified by id.",
@@ -430,7 +442,7 @@ sub del_trialevent_runmode {
 
   my ( $self )      = @_;
   my $trialevent_id = $self->param('id');
-  
+
   my $dbh = connect_kdb_read();
 
   my $trial_id = read_cell_value($dbh, 'trialevent', 'TrialId', 'TrialEventId', $trialevent_id);
@@ -449,7 +461,7 @@ sub del_trialevent_runmode {
   $sql  = "SELECT $perm_str AS UltimatePermission ";
   $sql .= 'FROM trial ';
   $sql .= 'WHERE LOWER(TrialId)=?';
-  
+
   my ($read_err, $permission) = read_cell($dbh, $sql, [$trial_id]);
 
   if ( ($permission & $READ_WRITE_PERM) != $READ_WRITE_PERM ) {
@@ -459,7 +471,7 @@ sub del_trialevent_runmode {
   }
 
   $dbh->disconnect();
-  
+
   my $dbh_k_write = connect_kdb_write();
 
   $sql    = "DELETE FROM trialeventfactor WHERE TrialEventId=?";
@@ -479,13 +491,13 @@ sub del_trialevent_runmode {
 
     return $self->_set_error();
   }
-  
+
   $self->logger->debug("TrialEventId: $trialevent_id deleted");
   $sth->finish();
   $dbh_k_write->disconnect();
-  
+
   my $info_msg_aref = [ { 'Message' => "TrialEventId ($trialevent_id) has been successfully deleted." } ];
-  
+
   return {
     'Error'     => 0,
     'Data'      => { 'Info' => $info_msg_aref, },
@@ -518,7 +530,7 @@ sub add_trialevent_runmode {
 =cut
 
   my $self = $_[0];
-  
+
   my $trialevent_trialid   = $self->param('trialid');
   my $query                = $self->query();
 
@@ -532,50 +544,24 @@ sub add_trialevent_runmode {
                     'OperatorId' => 1,
   };
 
-  my ($get_scol_err, $get_scol_msg, $scol_data, $pkey_data) = get_static_field($dbh_read, 'trialevent');
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'trialevent', $skip_field);
 
-  if ($get_scol_err) {
+  if ($chk_sfield_err) {
 
-    $self->logger->debug("Get static field info failed: $get_scol_msg");
-    
-    my $err_msg = "Unexpected Error.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+    $self->logger->debug($chk_sfield_msg);
 
-    return $data_for_postrun_href;
-  }
-
-  my $required_field_href = {};
-
-  for my $static_field (@{$scol_data}) {
-
-    my $field_name = $static_field->{'Name'};
-    
-    if ($skip_field->{$field_name}) { next; }
-
-    if ($static_field->{'Required'} == 1) {
-
-      $required_field_href->{$field_name} = $query->param($field_name);
-    }
+    return $for_postrun_href;
   }
 
   $dbh_read->disconnect();
 
-  my ($missing_err, $missing_href) = check_missing_href( $required_field_href );
-
-  if ($missing_err) {
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
-
-    return $data_for_postrun_href;
-  }
-
   # Finish generic required static field checking
-  
+
   my $trialevent_typeid           = $query->param('EventTypeId');
   my $trialevent_trialevent_value = $query->param('TrialEventValue');
   my $trialevent_trialevent_date  = $query->param('TrialEventDate');
+  my $unit_id                     = $query->param('UnitId');
 
   my $trialevent_trialevent_note  = '';
 
@@ -585,7 +571,7 @@ sub add_trialevent_runmode {
   }
 
   my $trialevent_operatorid       = $self->authen->user_id();
-  
+
   my ( $te_date_err, $te_date_href ) = check_dt_href( { 'TrialEventDate' => $trialevent_trialevent_date } );
 
   if ($te_date_err) {
@@ -595,7 +581,7 @@ sub add_trialevent_runmode {
 
     return $data_for_postrun_href;
   }
-  
+
   my $dbh_k_write = connect_kdb_write();
 
   if (!type_existence($dbh_k_write, 'trialevent', $trialevent_typeid)) {
@@ -603,6 +589,15 @@ sub add_trialevent_runmode {
     my $err_msg = "EventTypeId ($trialevent_typeid): not found or inactive.";
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'EventTypeId' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (!record_existence($dbh_k_write, 'generalunit', 'UnitId', $unit_id)) {
+
+    my $err_msg = "UnitId ($unit_id): not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'UnitId' => $err_msg}]};
 
     return $data_for_postrun_href;
   }
@@ -630,7 +625,7 @@ sub add_trialevent_runmode {
     if ( ($trial_permission & $READ_WRITE_PERM) != $READ_WRITE_PERM ) {
 
       my $err_msg = "TrialId ($trialevent_trialid): permission denied.";
-      
+
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
@@ -639,7 +634,7 @@ sub add_trialevent_runmode {
   }
 
   # Get the virtual col from the factor table
-  
+
   my $vcol_sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength ";
   $vcol_sql   .= "FROM factor WHERE TableNameOfFactor='trialeventfactor'";
 
@@ -677,20 +672,21 @@ sub add_trialevent_runmode {
     $vcol_maxlen_msg = $vcol_maxlen_msg . ' longer than maximum length.';
     return $self->_set_error($vcol_maxlen_msg);
   }
-  
+
   my $insert_statement = "
         INSERT INTO trialevent SET
             EventTypeId=?,
             TrialId=?,
-            OperatorId=?,   
+            UnitId=?,
+            OperatorId=?,
             TrialEventValue=?,
             TrialEventDate=?,
             TrialEventNote=?
     ";
 
   my $sth = $dbh_k_write->prepare($insert_statement);
-  $sth->execute( $trialevent_typeid, $trialevent_trialid, $trialevent_operatorid, $trialevent_trialevent_value,
-                 $trialevent_trialevent_date, $trialevent_trialevent_note );
+  $sth->execute( $trialevent_typeid, $trialevent_trialid, $unit_id, $trialevent_operatorid,
+                 $trialevent_trialevent_value, $trialevent_trialevent_date, $trialevent_trialevent_note );
 
   if ( $dbh_k_write->err() ) {
 
@@ -702,7 +698,7 @@ sub add_trialevent_runmode {
   $self->logger->debug("TrialEventId: $trialevent_id");
   $sth->finish();
   $dbh_k_write->disconnect();
-  
+
   my $success = $self->_add_factor( $trialevent_id, $vcol_data );
 
   if ( !$success ) {
@@ -760,44 +756,17 @@ sub update_trialevent_runmode {
                     'OperatorId' => 1,
   };
 
-  my ($get_scol_err, $get_scol_msg, $scol_data, $pkey_data) = get_static_field($dbh_read, 'trialevent');
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'trialevent', $skip_field);
 
-  if ($get_scol_err) {
+  if ($chk_sfield_err) {
 
-    $self->logger->debug("Get static field info failed: $get_scol_msg");
-    
-    my $err_msg = "Unexpected Error.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+    $self->logger->debug($chk_sfield_msg);
 
-    return $data_for_postrun_href;
-  }
-
-  my $required_field_href = {};
-
-  for my $static_field (@{$scol_data}) {
-
-    my $field_name = $static_field->{'Name'};
-    
-    if ($skip_field->{$field_name}) { next; }
-
-    if ($static_field->{'Required'} == 1) {
-
-      $required_field_href->{$field_name} = $query->param($field_name);
-    }
+    return $for_postrun_href;
   }
 
   $dbh_read->disconnect();
-
-  my ($missing_err, $missing_href) = check_missing_href( $required_field_href );
-
-  if ($missing_err) {
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
-
-    return $data_for_postrun_href;
-  }
 
   # Finish generic required static field checking
 
@@ -829,7 +798,7 @@ sub update_trialevent_runmode {
   if ( ($trial_permission & $READ_WRITE_PERM) != $READ_WRITE_PERM ) {
 
     my $err_msg = "TrialId ($trial_id): permission denied.";
-    
+
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
@@ -839,6 +808,8 @@ sub update_trialevent_runmode {
   my $trialevent_typeid           = $query->param('EventTypeId');
   my $trialevent_trialevent_value = $query->param('TrialEventValue');
   my $trialevent_trialevent_date  = $query->param('TrialEventDate');
+  my $unit_id                     = $query->param('UnitId');
+
   my $trialevent_trialevent_note  = '';
 
   if (defined $query->param('TrialEventNote')) {
@@ -855,7 +826,17 @@ sub update_trialevent_runmode {
 
     return $data_for_postrun_href;
   }
-  
+
+  if (!record_existence($dbh, 'generalunit', 'UnitId', $unit_id)) {
+
+    my $err_msg = "UnitId ($unit_id): not found.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'UnitId' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
   my ( $te_date_err, $te_date_href ) = check_dt_href( { 'TrialEventDate' => $trialevent_trialevent_date } );
 
   if ($te_date_err) {
@@ -867,7 +848,7 @@ sub update_trialevent_runmode {
   }
 
   # Get the virtual col from the factor table
-  
+
   my $vcol_sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength ";
   $vcol_sql   .= "FROM factor WHERE TableNameOfFactor='trialeventfactor'";
 
@@ -915,6 +896,7 @@ sub update_trialevent_runmode {
   $sql = "
         UPDATE trialevent SET
             EventTypeId=?,
+            UnitId=?,
             TrialEventValue=?,
             TrialEventDate=?,
             TrialEventNote=?
@@ -922,7 +904,7 @@ sub update_trialevent_runmode {
     ";
 
   my $sth = $dbh_k_write->prepare($sql);
-  $sth->execute( $trialevent_typeid, $trialevent_trialevent_value,
+  $sth->execute( $trialevent_typeid, $unit_id, $trialevent_trialevent_value,
                  $trialevent_trialevent_date, $trialevent_trialevent_note, $trialevent_id
       );
 
@@ -942,9 +924,9 @@ sub update_trialevent_runmode {
 
   $sth->finish();
   $dbh_k_write->disconnect();
-  
+
   my $info_msg_aref  = [ { 'Message' => "TrialEventId ($trialevent_id) has been updated successfully." } ];
-  
+
   return {
     'Error' => 0,
     'Data'  => {
@@ -970,10 +952,10 @@ sub _set_error {
 sub _add_factor {
 
   my ( $self, $trialevent_id, $vcol_data ) = @_;
-  
+
   my $query       = $self->query();
   my $dbh_k_write = connect_kdb_write();
-  
+
   for my $vcol_id ( keys( %{$vcol_data} ) ) {
 
     my $factor_value = $query->param( 'VCol_' . "$vcol_id" );
@@ -988,9 +970,9 @@ sub _add_factor {
             ";
       my $factor_sth = $dbh_k_write->prepare($sql);
       $factor_sth->execute( $vcol_id, $trialevent_id, $factor_value );
-      
+
       if ( $dbh_k_write->err() ) {
-        
+
         # Return undef if any error occur
         return undef;
       }
@@ -998,7 +980,7 @@ sub _add_factor {
     }
   }
   $dbh_k_write->disconnect();
-  
+
   # Return true on success
   return 1;
 }

@@ -6,7 +6,7 @@
   <INPUT ParaName="TraitDescription" Value="Trait used for automatic testing" />
   <INPUT ParaName="TraitDataType" Value="INTEGER" />
   <INPUT ParaName="TraitValueMaxLength" Value="20" />
-  <INPUT ParaName="TraitUnit" Value="sth" />
+  <INPUT ParaName="UnitId" Value="sth" />
   <INPUT ParaName="IsTraitUsedForAnalysis" Value="0" />
   <INPUT ParaName="TraitValRule" Value="boolex(x &gt; 0 and x &lt; 500)" />
   <INPUT ParaName="TraitValRuleErrMsg" Value="invalid value" />

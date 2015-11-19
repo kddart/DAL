@@ -1,8 +1,0 @@
-<TestCase>
-  <CaseInfo Description="List Layer Attribute Valuetype" TargetURL="list/layerattrib/valuetype" Type="BLOCKING" />
-  <Match Attr="StatusCode" Value="200" />
-  <Match Attr="COUNT" Tag="valuetype" TargetDataType="MULTI" Value="boolex(x&gt;0)" />
-  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
-  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
-  <RunInfo Success="1" Time="1409792289" />
-</TestCase>

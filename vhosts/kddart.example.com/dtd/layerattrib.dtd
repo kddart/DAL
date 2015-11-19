@@ -3,7 +3,8 @@
 <!ELEMENT layerattrib EMPTY >
 <!ATTLIST layerattrib colname CDATA #REQUIRED >
 <!ATTLIST layerattrib colsize NMTOKEN #REQUIRED >
-<!ATTLIST layerattrib coltype NMTOKEN #REQUIRED >
+<!ATTLIST layerattrib coltype CDATA #REQUIRED >
 <!ATTLIST layerattrib colunits CDATA #REQUIRED >
-<!ATTLIST layerattrib validation CDATA #REQUIRED >
-<!ATTLIST layerattrib valuetype NMTOKEN #REQUIRED >
+<!ATTLIST layerattrib validation CDATA #IMPLIED >
+<!ATTLIST layerattrib unitid NMTOKEN #REQUIRED >
+

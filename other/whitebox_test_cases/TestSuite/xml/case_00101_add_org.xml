@@ -7,6 +7,6 @@
   <Match Attr="ParaName" Tag="ReturnId" Value="OrganisationId" />
   <Parent CaseFile="./xml/case_00201_login_testuser.xml" Order="1" />
   <Parent CaseFile="./xml/case_00203_switch4testu.xml" Order="2" />
-  <ReturnId ParaName="OrganisationId" Value="45" />
+  
   
 </TestCase>

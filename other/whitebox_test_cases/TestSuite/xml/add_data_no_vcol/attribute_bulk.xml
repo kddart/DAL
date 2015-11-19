@@ -1,4 +1,4 @@
 <DATA>
-  <layerattrib colname="Temperature Bulk" coltype="Temperature" colsize="30" colunits="degree c" valuetype="0" validation=".*" />
-  <layerattrib colname="Humidity Bulk" coltype="Humidity" colsize="20" colunits="degree c" valuetype="0" validation=".*" />
+  <layerattrib colname="Temperature_Bulk" coltype="Temperature" colsize="30" colunits="degree c" unitid="|:REPLACEunitid:|" />
+  <layerattrib colname="Humidity_Bulk" coltype="Humidity" colsize="20" colunits="degree c" unitid="|:REPLACEunitid:|" validation=".*" />
 </DATA>

@@ -12,6 +12,9 @@ use Digest::HMAC_SHA1 qw(hmac_sha1 hmac_sha1_hex);
 use Digest::MD5 qw(md5 md5_hex md5_base64);
 use XML::XSLT;
 use JSON::XS;
+use Cwd;
+
+# Copyright (c) 2015, Diversity Arrays Technology, All rights reserved.
 
 # COPYRIGHT AND LICENSE
 # 
@@ -28,7 +31,7 @@ use JSON::XS;
 # GNU General Public License for more details.
 
 # Author    : Puthick Hok
-# Version   : 2.2.5 build 795
+# Version   : 2.3.0 build 1040
 
 our @ISA      = qw(Exporter);
 our @EXPORT   = qw(get_write_token switch_group standard_request add_record
@@ -39,13 +42,13 @@ our @EXPORT   = qw(get_write_token switch_group standard_request add_record
 
 my $dal_base_url_file = 'dal_base_url.conf';
 
-our $SESSION_TIME_SECOND  = 1200;
+our $SESSION_TIME_SECOND  = 300;
 
 our $ACCEPT_HEADER_LOOKUP = {'JSON' => 'application/json',
                              'XML'  => 'text/xml',
                            };
 
-our $HTTP_TIME_OUT        = 600;
+our $HTTP_TIME_OUT        = 6000;
 
 sub make_dal_url {
 
@@ -378,6 +381,8 @@ sub is_match {
 
         if (uc($attr_name) eq 'COUNT') {
 
+          my $data_item;
+
           if (ref $data_ref->{$tag_name} eq 'ARRAY') {
 
             $data_item = scalar(@{$data_ref->{$tag_name}});
@@ -410,7 +415,7 @@ sub is_match {
               next;
             }
 
-            $data_item = $data->{$attr_name};
+            my $data_item = $data->{$attr_name};
 
             my $match_data_err = match_data($match_con, $data_item, $logger);
 
@@ -503,6 +508,327 @@ sub match_data {
   }
 
   return $err;
+}
+
+sub get_case_parameter {
+
+  my $input_aref = $_[0];
+  my $logger     = $_[1];
+
+  my $parameter = {};
+
+  for my $input_href (@{$input_aref}) {
+
+    my $para_name = '';
+    my $para_val  = '';
+
+    if (defined $input_href->{'ParaName'}) {
+
+      $para_name = $input_href->{'ParaName'};
+    }
+    else {
+
+      if ($input_href->{'Virtual'}) {
+
+        if (defined $input_href->{'SrcName'}) {
+
+          my $src_name_case_file = $input_href->{'SrcName'};
+          my $src_name_case_data_ref = XMLin($src_name_case_file, ForceArray => 1);
+
+          if (defined $input_href->{'SrcNameAttribute'}) {
+
+            my $src_name_attribute = $input_href->{'SrcNameAttribute'};
+
+            if (defined $src_name_case_data_ref->{'ReturnId'}->[0]->{$src_name_attribute}) {
+
+              $para_name = $src_name_case_data_ref->{'ReturnId'}->[0]->{$src_name_attribute};
+            }
+            else {
+
+              $logger->debug("SrcNameAttribute is missing in $src_name_case_file");
+              die "$src_name_case_file missing SrcNameAttribute";
+            }
+          }
+          else {
+
+            my $src_name_prefix = 'VCol_';
+
+            if (defined $input_href->{'PrefixName'}) {
+
+              $src_name_prefix = $input_href->{'PrefixName'};
+            }
+
+            if (defined $src_name_case_data_ref->{'ReturnId'}) {
+
+              my $vcol_id = $src_name_case_data_ref->{'ReturnId'}->[0]->{'Value'};
+              $para_name = "$src_name_prefix" . "$vcol_id";
+            }
+            else {
+
+              $logger->debug("$case_file: virtual column id missing");
+              die "$case_file: virtual column id missing";
+            }
+          }
+        }
+        else {
+
+          $logger->debug("$case_file: src file for virtual column name missing");
+          die "$case_file: src file for virtual column name missing";
+        }
+      }
+    }
+
+    if (defined $input_href->{'Value'}) {
+
+      $para_val  = $input_href->{'Value'};
+    }
+    else {
+
+      if (defined $input_href->{'SrcValue'}) {
+
+        my $src_case_file = $input_href->{'SrcValue'};
+
+        #print "Src case file: $src_case_file\n";
+
+        my $src_case_data_ref = XMLin($src_case_file, ForceArray => 1);
+
+        if (defined $src_case_data_ref->{'ReturnId'}->[0]->{'Value'}) {
+
+          $para_val = $src_case_data_ref->{'ReturnId'}->[0]->{'Value'};
+        }
+        else {
+
+          $logger->debug("$case_file: $para_name source case $src_case_file value not found");
+          die "$case_file: $para_name source case $src_case_file value not found";
+        }
+      }
+
+      if (defined $input_href->{'SrcFile'}) {
+
+        my $src_file = $input_href->{'SrcFile'};
+
+        if (-r $src_file) {
+
+          $para_name = 'uploadfile';
+
+          # Proccess condition
+
+          if ($input_href->{'Process'}) {
+
+            my $main_tag = $input_href->{'ParaName'};
+
+            my $src_file_ref = XMLin($src_file, ForceArray => 1);
+            for (my $i = 0; $i < scalar(@{$src_file_ref->{$main_tag}}); ++$i) {
+
+              my $src_file_rec = $src_file_ref->{$main_tag}->[$i];
+              if (defined $src_file_rec->{'SrcValue'}) {
+
+                my $src_val_file = $src_file_rec->{'SrcValue'};
+                my $src_val_ref = XMLin($src_val_file, ForceArray => 1);
+
+                my $target_para_name = '';
+
+                if (defined $src_file_rec->{'ParaName'}) {
+
+                  $target_para_name = $src_file_rec->{'ParaName'};
+                  $src_file_rec->{$target_para_name} = $src_val_ref->{'ReturnId'}->[0]->{'Value'};
+                  delete($src_file_rec->{'ParaName'});
+                  delete($src_file_rec->{'SrcValue'});
+
+                  $src_file_ref->{$main_tag}->[$i] = $src_file_rec;
+                }
+                else {
+
+                  $logger->debug("$case_file: undefined ParaName in $src_file");
+                }
+              }
+              else {
+
+                $logger->debug("$case_file: undefined SrcValue in $src_file");
+              }
+
+              if (defined $src_file_rec->{'NextLevelProccessTag'}) {
+
+                my $next_l_proc_tagname = $src_file_rec->{'NextLevelProccessTag'};
+                my $next_l_recs         = $src_file_rec->{$next_l_proc_tagname};
+
+                my $new_next_l_recs = [];
+
+                for (my $j = 0; $j < scalar(@{$next_l_recs}); $j++) {
+
+                  my $next_l_rec = $next_l_recs->[$j];
+
+                  if (defined $next_l_rec->{'SrcValue'}) {
+
+                    my $next_l_src_val_file = $next_l_rec->{'SrcValue'};
+                    my $next_l_src_val_ref  = XMLin($next_l_src_val_file, ForceArray => 1);
+
+                    my $next_l_target_para_name = '';
+
+                    if (defined $next_l_rec->{'ParaName'}) {
+
+                      $next_l_target_para_name                = $next_l_rec->{'ParaName'};
+                      $next_l_rec->{$next_l_target_para_name} = $next_l_src_val_ref->{'ReturnId'}->[0]->{'Value'};
+                      delete($next_l_rec->{'ParaName'});
+                      delete($next_l_rec->{'SrcValue'});
+                    }
+                    else {
+
+                      $logger->debug("$case_file: undefined ParaName in $src_file");
+                      die "$case_file: undefined ParaName in $src_file";
+                    }
+                  }
+
+                  push(@{$new_next_l_recs}, $next_l_rec);
+                }
+
+                delete($src_file_rec->{'NextLevelProccessTag'});
+                $src_file_rec->{$next_l_proc_tagname} = $new_next_l_recs;
+              }
+            }
+
+            $para_val = XMLout($src_file_ref, RootName => 'DATA');
+            $logger->debug("Processed XML output: $para_val");
+          }
+          else {
+
+            # instead of reading the file, pass the file path and other para in a hash if DirectReplacement="1"
+
+            if ($input_href->{'DirectReplacement'}) {
+
+              if ($input_href->{'DirectReplacement'} eq '1') {
+
+                if ( !(defined $input_href->{'HeaderRow'}) ) {
+
+                  die "$case_file: $para_name source xml file $src_file with direct replacement set without header row.";
+                }
+
+                $para_val = {'FilePath' => $src_file, 'HeaderRow' => $input_href->{'HeaderRow'}};
+              }
+              else {
+
+                $para_val  = read_file($src_file);
+              }
+            }
+            else {
+
+              $para_val  = read_file($src_file);
+            }
+          }
+        }
+        else {
+
+          $logger->debug("$case_file: $para_name source file $src_file not readable.");
+          die "$case_file: $para_name source file $src_file not readable.";
+        }
+      }
+
+      if ($input_href->{'Transform'}) {
+
+        if (!(defined $input_href->{'SrcXML'})) {
+
+          $logger->debug("$case_file: $para_name source xml file not defined for transformation.");
+          die "$case_file: $para_name source xml file not defined for transformation.";
+        }
+
+        if (!(defined $input_href->{'XSL'})) {
+
+          $logger->debug("$case_file: $para_name XSL defined for transformation.");
+          die "$case_file: $para_name XSL file not defined for transformation.";
+        }
+
+        my $src_xml_file = $input_href->{'SrcXML'};
+        my $xsl_file     = $input_href->{'XSL'};
+
+        if (!(-r $src_xml_file)) {
+
+          $logger->debug("$case_file: $para_name source xml file $src_xml_file not readable.");
+          die "$case_file: $para_name source xml file $src_xml_file not readable.";
+        }
+
+        if (!(-r $xsl_file)) {
+
+          $logger->debug("$case_file: $para_name XSL file $xsl_file not readable.");
+          die "$case_file: $para_name XSL file $xsl_file not readable.";
+        }
+
+        my $src_file_ref = XMLin($src_xml_file, ForceArray => 1);
+        for my $level1_key (keys(%{$src_file_ref})) {
+
+          #print "Level1 key: $level1_key\n";
+
+          my $level1_aref = $src_file_ref->{$level1_key};
+          for my $level1_ref (@{$level1_aref}) {
+
+            for my $level2_key (keys(%{$level1_ref})) {
+
+              #print "Level2 key: $level2_key\n";
+              my $level2_aref = $level1_ref->{$level2_key};
+
+              for my $level2_ref (@{$level2_aref}) {
+
+                if (defined $level2_ref->{'SrcValue'}) {
+
+                  my $src_value_file = $level2_ref->{'SrcValue'};
+
+                  #print "Level2 key: $level2_key | source value file: $src_value_file\n";
+                  my $src_value_ref = XMLin($src_value_file, ForceArray => 1);
+
+                  if (!(defined $level2_ref->{'ParaName'})) {
+
+                    $logger->debug("$case_file: $para_name source value file $src_value_file undefined ParaName.");
+                    die "$case_file: $para_name source value file $src_value_file undefined ParaName.";
+                  }
+
+                  my $target_para_name = $level2_ref->{'ParaName'};
+                  $level2_ref->{$target_para_name} = $src_value_ref->{'ReturnId'}->[0]->{'Value'};
+                  delete($level2_ref->{'ParaName'});
+                  delete($level2_ref->{'SrcValue'});
+                }
+              }
+            }
+          }
+        }
+
+        my $p_src_xml_file = $src_xml_file;
+        $p_src_xml_file =~ s/\.xml/_p\.xml/;
+
+        #print "Prcessed source xml file: $p_src_xml_file\n";
+
+        XMLout($src_file_ref, OutputFile => $p_src_xml_file, RootName => 'DATA');
+
+        my $xslt = XML::XSLT->new($xsl_file, warnings => 1);
+        my $transofrm_result = $xslt->transform($p_src_xml_file);
+
+        $para_name = 'uploadfile';
+        $para_val  = $xslt->toString();
+
+        print "Para val: $para_val\n";
+      }
+
+      if ($input_href->{'Random'}) {
+
+        my $input_val_prefix = '';
+
+        if (defined $input_href->{'PrefixVal'}) {
+
+          $input_val_prefix = $input_href->{'PrefixVal'};
+        }
+
+        my $rand_str = random_regex('\d\d\d\d\d\d\d');
+        $para_val = "${input_val_prefix}$rand_str";
+      }
+    }
+
+    if ((defined $input_href->{'ParaName'}) && $input_href->{'ParaName'} eq 'FactorName') {
+
+      $tcase_data_ref->{'FactorName'} = [{'Value' => "$para_val"}];
+    }
+
+    $parameter->{$para_name} = $para_val;
+  }
+
+  return $parameter;
 }
 
 sub standard_request {
@@ -618,6 +944,7 @@ sub add_record_upload {
   my $atomic_data   = q{};
   my $para_order    = q{};
   my $sending_param = [];
+
   for my $param_name (keys(%{$parameter})) {
 
     if ($excl_para_name->{$param_name}) {
@@ -634,24 +961,92 @@ sub add_record_upload {
 
   my $start_time = [gettimeofday()];
 
-  my $upload_content  = $parameter->{'uploadfile'};
+  my $upload_file_md5 = '';
 
-  while($upload_content =~ /\|:(\w+):\|?/ ) {
+  if (ref($parameter->{'uploadfile'}) eq 'HASH') {
 
-    my $para_name = $1;
-    my $para_val  = $parameter->{$para_name};
-    $upload_content =~ s/\|:${para_name}:\|/${para_val}/;
+    my $header_row = $parameter->{'uploadfile'}->{'HeaderRow'} + 1;
+    my $file_path  = $parameter->{'uploadfile'}->{'FilePath'};
+
+    my $sed_cmd    = qq|sed -n '${header_row}p' $file_path|;
+
+    my $old_header = `$sed_cmd`;
+    my $new_header = $old_header;
+
+    while($new_header =~ /\|:(\w+):\|?/ ) {
+
+      my $para_name = $1;
+      my $para_val  = $parameter->{$para_name};
+      $new_header   =~ s/\|:${para_name}:\|/${para_val}/;
+    }
+
+    $logger->debug("OLD HEADER: $old_header");
+    $logger->debug("NEW HEADER: $new_header");
+
+    my @file_path_split = split('/', $file_path);
+
+    my $file_name = $file_path_split[-1];
+
+    my $new_file_name = 'newfile_' . random_regex('\d\d\d\d\d\d\d') . '_' . $file_name;
+
+    my $last_path_element = scalar(@file_path_split) - 2;
+
+    my $just_path = join('/', @file_path_split[0..$last_path_element]);
+
+    my $upload_file_path = cwd() . '/' . $just_path . '/' . $new_file_name;
+
+    my $before_header_row = $header_row - 1;
+
+    $sed_cmd = qq|sed -n '1,${before_header_row}'p $file_path > $upload_file_path|;
+
+    my $cmd_result = `$sed_cmd`;
+
+    $logger->debug("RESULT OF $sed_cmd : $cmd_result");
+
+    $cmd_result = `echo -n "$new_header" >> $upload_file_path`;
+
+    my $next_line_number = $header_row + 1;
+
+    $sed_cmd = qq|sed -n '$next_line_number,\$'p $file_path >> $upload_file_path|;
+
+    $cmd_result = `$sed_cmd`;
+
+    $logger->debug("RESULT OF $sed_cmd : $cmd_result");
+
+    open(my $upload_fh, "$upload_file_path");
+
+    my $md5_engine = Digest::MD5->new();
+    $md5_engine->addfile($upload_fh);
+
+    close($upload_fh);
+
+    $upload_file_md5 = $md5_engine->hexdigest();
+
+    push(@{$sending_param}, 'uploadfile' => [$upload_file_path]);
+  }
+  else {
+
+    my $upload_content  = $parameter->{'uploadfile'};
+
+    while($upload_content =~ /\|:(\w+):\|?/ ) {
+
+      my $para_name = $1;
+      my $para_val  = $parameter->{$para_name};
+      $upload_content =~ s/\|:${para_name}:\|/${para_val}/;
+    }
+
+    $upload_file_md5 = md5_hex($upload_content);
+
+    push(@{$sending_param}, 'uploadfile'     => [undef, 'uploadfile', Content => $upload_content]);
+
+    $logger->debug("Submitted upload file: $upload_content");
   }
 
   my $elapsed_time_replace = tv_interval($start_time);
   $logger->debug("Finish replacing upload file: $elapsed_time_replace (seconds)");
 
-  $logger->debug("Submitted upload file: $upload_content");
-
   my $elapsed_time = tv_interval($start_time);
   $logger->debug("Finish replacing upload file and print: $elapsed_time (seconds)");
-
-  my $upload_file_md5 = md5_hex($upload_content);
 
   my $data2sign = q{};
   $data2sign   .= "$url";
@@ -663,7 +1058,6 @@ sub add_record_upload {
 
   my $signature = hmac_sha1_hex($data2sign, $write_token);
 
-  push(@{$sending_param}, 'uploadfile'     => [undef, 'uploadfile', Content => $upload_content]);
   push(@{$sending_param}, 'rand_num'       => "$rand_num");
   push(@{$sending_param}, 'url'            => "$url");
   push(@{$sending_param}, 'signature'      => "$signature");
@@ -868,240 +1262,7 @@ sub run_test_case {
     run_test_case($case_file, $case_force, $logger);
   }
 
-  my $parameter = {};
-
-  for my $input_href (@{$tcase_data_ref->{'INPUT'}}) {
-
-    my $para_name = '';
-    my $para_val  = '';
-
-    if (defined $input_href->{'ParaName'}) {
-
-      $para_name = $input_href->{'ParaName'};
-    }
-    else {
-
-      if ($input_href->{'Virtual'}) {
-
-        if (defined $input_href->{'SrcName'}) {
-
-          my $src_name_case_file = $input_href->{'SrcName'};
-          my $src_name_case_data_ref = XMLin($src_name_case_file, ForceArray => 1);
-          my $src_name_prefix = 'VCol_';
-
-          if (defined $input_href->{'PrefixName'}) {
-
-            $src_name_prefix = $input_href->{'PrefixName'};
-          }
-
-          if (defined $src_name_case_data_ref->{'ReturnId'}) {
-
-            my $vcol_id = $src_name_case_data_ref->{'ReturnId'}->[0]->{'Value'};
-            $para_name = "$src_name_prefix" . "$vcol_id";
-          }
-          else {
-
-            $logger->debug("$case_file: virtual column id missing");
-            die "$case_file: virtual column id missing";
-          }
-        }
-        else {
-
-          $logger->debug("$case_file: src file for virtual column name missing");
-          die "$case_file: src file for virtual column name missing";
-        }
-      }
-    }
-
-    if (defined $input_href->{'Value'}) {
-
-      $para_val  = $input_href->{'Value'};
-    }
-    else {
-
-      if (defined $input_href->{'SrcValue'}) {
-
-        my $src_case_file = $input_href->{'SrcValue'};
-
-        #print "Src case file: $src_case_file\n";
-
-        my $src_case_data_ref = XMLin($src_case_file, ForceArray => 1);
-
-        if (defined $src_case_data_ref->{'ReturnId'}->[0]->{'Value'}) {
-
-          $para_val = $src_case_data_ref->{'ReturnId'}->[0]->{'Value'};
-        }
-        else {
-
-          $logger->debug("$case_file: $para_name source case $src_case_file value not found");
-          die "$case_file: $para_name source case $src_case_file value not found";
-        }
-      }
-
-      if (defined $input_href->{'SrcFile'}) {
-
-        my $src_file = $input_href->{'SrcFile'};
-
-        if (-r $src_file) {
-
-          $para_name = 'uploadfile';
-
-          if ($input_href->{'Process'}) {
-
-            my $main_tag = $input_href->{'ParaName'};
-
-            my $src_file_ref = XMLin($src_file, ForceArray => 1);
-            for (my $i = 0; $i < scalar(@{$src_file_ref->{$main_tag}}); ++$i) {
-
-              my $src_file_rec = $src_file_ref->{$main_tag}->[$i];
-              if (defined $src_file_rec->{'SrcValue'}) {
-
-                my $src_val_file = $src_file_rec->{'SrcValue'};
-                my $src_val_ref = XMLin($src_val_file, ForceArray => 1);
-
-                my $target_para_name = '';
-
-                if (defined $src_file_rec->{'ParaName'}) {
-
-                  $target_para_name = $src_file_rec->{'ParaName'};
-                  $src_file_rec->{$target_para_name} = $src_val_ref->{'ReturnId'}->[0]->{'Value'};
-                  delete($src_file_rec->{'ParaName'});
-                  delete($src_file_rec->{'SrcValue'});
-
-                  $src_file_ref->{$main_tag}->[$i] = $src_file_rec;
-                }
-                else {
-
-                  $logger->debug("$case_file: undefined ParaName in $src_file");
-                  die "$case_file: undefined ParaName in $src_file";
-                }
-              }
-              else {
-
-                $logger->debug("$case_file: undefined SrcValue in $src_file");
-                die "$case_file: undefined SrcValue in $src_file";
-              }
-            }
-
-            $para_val = XMLout($src_file_ref, RootName => 'DATA');
-            $logger->debug("Processed XML output: $para_val");
-          }
-          else {
-
-            $para_val  = read_file($src_file);
-          }
-        }
-        else {
-
-          $logger->debug("$case_file: $para_name source file $src_file not readable.");
-          die "$case_file: $para_name source file $src_file not readable.";
-        }
-      }
-
-      if ($input_href->{'Transform'}) {
-
-        if (!(defined $input_href->{'SrcXML'})) {
-
-          $logger->debug("$case_file: $para_name source xml file not defined for transformation.");
-          die "$case_file: $para_name source xml file not defined for transformation.";
-        }
-
-        if (!(defined $input_href->{'XSL'})) {
-
-          $logger->debug("$case_file: $para_name XSL defined for transformation.");
-          die "$case_file: $para_name XSL file not defined for transformation.";
-        }
-
-        my $src_xml_file = $input_href->{'SrcXML'};
-        my $xsl_file     = $input_href->{'XSL'};
-
-        if (!(-r $src_xml_file)) {
-
-          $logger->debug("$case_file: $para_name source xml file $src_xml_file not readable.");
-          die "$case_file: $para_name source xml file $src_xml_file not readable.";
-        }
-
-        if (!(-r $xsl_file)) {
-
-          $logger->debug("$case_file: $para_name XSL file $xsl_file not readable.");
-          die "$case_file: $para_name XSL file $xsl_file not readable.";
-        }
-
-        my $src_file_ref = XMLin($src_xml_file, ForceArray => 1);
-        for my $level1_key (keys(%{$src_file_ref})) {
-
-          #print "Level1 key: $level1_key\n";
-
-          my $level1_aref = $src_file_ref->{$level1_key};
-          for my $level1_ref (@{$level1_aref}) {
-
-            for my $level2_key (keys(%{$level1_ref})) {
-
-              #print "Level2 key: $level2_key\n";
-              my $level2_aref = $level1_ref->{$level2_key};
-
-              for my $level2_ref (@{$level2_aref}) {
-
-                if (defined $level2_ref->{'SrcValue'}) {
-
-                  my $src_value_file = $level2_ref->{'SrcValue'};
-
-                  #print "Level2 key: $level2_key | source value file: $src_value_file\n";
-                  my $src_value_ref = XMLin($src_value_file, ForceArray => 1);
-
-                  if (!(defined $level2_ref->{'ParaName'})) {
-
-                    $logger->debug("$case_file: $para_name source value file $src_value_file undefined ParaName.");
-                    die "$case_file: $para_name source value file $src_value_file undefined ParaName.";
-                  }
-
-                  my $target_para_name = $level2_ref->{'ParaName'};
-                  $level2_ref->{$target_para_name} = $src_value_ref->{'ReturnId'}->[0]->{'Value'};
-                  delete($level2_ref->{'ParaName'});
-                  delete($level2_ref->{'SrcValue'});
-                }
-              }
-            }
-          }
-        }
-
-        my $p_src_xml_file = $src_xml_file;
-        $p_src_xml_file =~ s/\.xml/_p\.xml/;
-
-        #print "Prcessed source xml file: $p_src_xml_file\n";
-
-        XMLout($src_file_ref, OutputFile => $p_src_xml_file, RootName => 'DATA');
-
-        my $xslt = XML::XSLT->new($xsl_file, warnings => 1);
-        my $transofrm_result = $xslt->transform($p_src_xml_file);
-
-        $para_name = 'uploadfile';
-        $para_val  = $xslt->toString();
-
-        print "Para val: $para_val\n";
-      }
-
-      if ($input_href->{'Random'}) {
-
-        my $input_val_prefix = '';
-
-        if (defined $input_href->{'PrefixVal'}) {
-
-          $input_val_prefix = $input_href->{'PrefixVal'};
-        }
-
-        my $rand_str = random_regex('\d\d\d\d\d\d\d');
-        $para_val = "${input_val_prefix}$rand_str";
-      }
-    }
-
-    if ((defined $input_href->{'ParaName'}) && $input_href->{'ParaName'} eq 'FactorName') {
-
-      $tcase_data_ref->{'FactorName'} = [{'Value' => "$para_val"}];
-    }
-
-    $parameter->{$para_name} = $para_val;
-  }
+  my $parameter = get_case_parameter($tcase_data_ref->{'INPUT'}, $logger);
 
   my $url = $tcase_data_ref->{'CaseInfo'}->[0]->{'TargetURL'};
 
@@ -1452,6 +1613,7 @@ sub is_the_same {
 sub delete_test_record {
 
   my $case_file = $_[0];
+  my $logger    = $_[1];
 
   my $browser  = LWP::UserAgent->new();
 
@@ -1484,6 +1646,14 @@ sub delete_test_record {
 
     my $return_id = $tcase_data_ref->{'ReturnId'}->[0]->{'Value'};
     my $url       = $delete_ref->{'TargetURL'};
+
+    my $case_parameter = get_case_parameter($tcase_data_ref->{'INPUT'}, $logger);
+
+    for my $para_name (keys(%{$case_parameter})) {
+
+      my $para_val  = $case_parameter->{$para_name};
+      $url =~ s/:${para_name}/${para_val}/;
+    }
 
     $url =~ s/:\w+(\/?)/${return_id}$1/;
 

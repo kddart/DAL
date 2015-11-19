@@ -3,6 +3,12 @@
   <Delete TargetURL="delete/specimengroup/:SpecimenGroupId" />
   <INPUT ParaName="SpecimenGroupName" PrefixVal="SpecimenGroup_" Random="1" />
   <INPUT ParaName="SpecimenGroupTypeId" SrcValue="xml/add_data_no_vcol/case_00368_add_specimengroup_type.xml" />
+  <INPUT ParaName="SpecimenGroupStatus" SrcValue="xml/add_data_no_vcol/case_00483_add_specimen_group_status.xml" />
+  <INPUT ParaName="SpecimenGroupCreated" Value="2015-08-07" />
+  <INPUT ParaName="AccessGroupId" SrcValue="xml/add_data_no_vcol/owngroup.xml" />
+  <INPUT ParaName="OwnGroupPerm" Value="7" />
+  <INPUT ParaName="AccessGroupPerm" Value="5" />
+  <INPUT ParaName="OtherPerm" Value="0" />
   <INPUT ParaName="specimengroupentry" Process="1" SrcFile="xml/add_data_no_vcol/specimengroup.xml" />
   <Match Attr="StatusCode" Value="200" />
   <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
@@ -12,6 +18,7 @@
   <Parent CaseFile="xml/add_data_no_vcol/case_00368_add_specimengroup_type.xml" Order="3" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00114_add_specimen1.xml" Order="4" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00115_add_specimen2.xml" Order="5" />
-  <ReturnId ParaName="SpecimenGroupId" Value="1" />
-  <RunInfo Success="1" Time="1409792240" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00483_add_specimen_group_status.xml" Order="6" />
+  <ReturnId ParaName="SpecimenGroupId" Value="3" />
+  <RunInfo Success="1" Time="1444283029" />
 </TestCase>

@@ -2,14 +2,16 @@
   <CaseInfo CustomMethod="add_record" Description="Update Pedigree" TargetURL="update/pedigree/:PedigreeId" Type="BLOCKING" />
   <Delete TargetURL="delete/pedigree/:PedigreeId" />
   <INPUT ParaName="PedigreeId" SrcValue="xml/add_data_no_vcol/case_00217_add_pedigree.xml" />
-  <INPUT ParaName="SpecimenId" Value="31" />
+  <INPUT ParaName="SpecimenId" SrcValue="xml/add_data_no_vcol/case_00218_add_spec4pedigree_1.xml" />
   <INPUT ParaName="ParentSpecimenId" SrcValue="xml/add_data_no_vcol/case_00219_add_spec4pedigree_2.xml" />
-  <INPUT ParaName="ParentType" Value="312" />
+  <INPUT ParaName="ParentType" SrcValue="xml/add_data_no_vcol/case_00343_add_parent_type.xml" />
   <INPUT ParaName="SelectionReason" Value="Test" />
   <Match Attr="StatusCode" Value="200" />
   <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
   <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Force="1" Order="1" />
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00219_add_spec4pedigree_2.xml" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00343_add_parent_type.xml" Force="1" Order="4" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00218_add_spec4pedigree_1.xml" Force="1" Order="5" />
   
 </TestCase>

@@ -11,6 +11,6 @@
   <Match Attr="ParaName" Tag="ReturnId" Value="DesignTypeId" />
   <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
-  <ReturnId ParaName="DesignTypeId" Value="5" />
-  <RunInfo Success="1" Time="1409792410" />
+  <ReturnId ParaName="DesignTypeId" Value="20" />
+  <RunInfo Success="1" Time="1444192240" />
 </TestCase>

@@ -9,6 +9,6 @@
   <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Order="2" />
   <Parent CaseFile="xml/add_data_vcol/case_01008_add_vcol_organisation.xml" Order="3" />
-  <ReturnId ParaName="OrganisationId" Value="14" />
+  
   
 </TestCase>

@@ -1,10 +1,24 @@
-#$Id: Session.pm 312 2012-03-13 00:58:56Z puthick $
+#$Id: Session.pm 927 2015-06-22 07:39:51Z puthick $
 #$Author: puthick $
 
-# Copyright (c) 2014, Diversity Arrays Technology Pty Ltd
+# Copyright (c) 2015, Diversity Arrays Technology, All rights reserved.
+
+# COPYRIGHT AND LICENSE
+# 
+# Copyright (C) 2014 by Diversity Arrays Technology Pty Ltd
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
 
 # Author    : Puthick Hok
-# Created   : 02/06/2010
+# Version   : 2.3.0 build 1040
 
 package KDDArT::DAL::Session;
 
@@ -16,7 +30,8 @@ BEGIN {
 
   my ($volume, $current_dir, $file) = File::Spec->splitpath(__FILE__);
 
-  $main::kddart_base_dir = "${current_dir}../../..";
+  my @current_dir_part = split('/perl-lib/KDDArT/DAL/', $current_dir);
+  $main::kddart_base_dir = $current_dir_part[0];
 }
 
 use lib "$main::kddart_base_dir/perl-lib";
@@ -111,25 +126,25 @@ sub clear {
     my $cgisession_cookie = $q->cookie(
             -name      => "$cookie_name",
             -values    => '',
-            -expires   => '-1d',
+            -expires   => '+10y',
         );
 
     my $kddart_cookie = $q->cookie(
             -name      => 'KDDArT_RANDOM_NUMBER',
             -values    => '',
-            -expires   => '-1d',
+            -expires   => '+10y',
         );
 
     my $kddart_download_cookie = $q->cookie(
             -name      => 'KDDArT_DOWNLOAD',
             -values    => '',
-            -expires   => '-1d',
+            -expires   => '+10y',
         );
 
     my $kddart_download_sess_cookie = $q->cookie(
             -name      => 'KDDArT_DOWNLOAD_SESSID',
             -values    => '',
-            -expires   => '-1d',
+            -expires   => '+10y',
         );
 
     $cgiapp->header_add(-cookie => [$cgisession_cookie,

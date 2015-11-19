@@ -25,6 +25,6 @@
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Order="2" />
   <Parent CaseFile="xml/add_data_vcol/case_00105_add_genus.xml" Order="3" />
   <Parent CaseFile="xml/add_data_vcol/case_00103_add_vcol_geno.xml" Order="4" />
-  <ReturnId ParaName="GenotypeId" Value="1163" />
+  
   
 </TestCase>

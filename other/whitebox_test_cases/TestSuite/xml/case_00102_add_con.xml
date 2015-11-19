@@ -5,17 +5,17 @@
   <INPUT ParaName="ContactLastName" PrefixVal="User-" Random="1" />
   <INPUT ParaName="ContactFirstName" Value="Testing" />
   <INPUT ParaName="ContactAcronym" Value="TU" />
-  <INPUT ParaName="ContactAddress" Value="1 Wilf Crane Crescent Yarralumla ACT 2600 Australia" />
+  <INPUT ParaName="ContactAddress" Value="7 Your Street Suburb Postcode 777 Country" />
   <INPUT ParaName="CountryCode" Value="AU" />
   <INPUT ParaName="ContactTelephone" Value="+61 2 6122 7335" />
   <INPUT ParaName="ContactMobile" Value="04 12345678" />
-  <INPUT ParaName="ContactEMail" Value="admin@example.com" />
+  <INPUT ParaName="ContactEMail" Value="testuser@kddart.example.com" />
   <Match Attr="StatusCode" Value="200" />
   <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
   <Match Attr="ParaName" Tag="ReturnId" Value="ContactId" />
   <Parent CaseFile="xml/case_00201_login_testuser.xml" Order="1" />
   <Parent CaseFile="xml/case_00203_switch4testu.xml" Order="2" />
   <Parent CaseFile="xml/case_00101_add_org.xml" Order="3" />
-  <ReturnId ParaName="ContactId" Value="73" />
+  
   
 </TestCase>

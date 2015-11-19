@@ -1,10 +1,10 @@
 <TestCase>
-  <CaseInfo Description="Get Item Unit" TargetURL="get/itemunit/:ItemUnitId" Type="BLOCKING" />
-  <INPUT ParaName="ItemUnitId" SrcValue="xml/add_data_no_vcol/case_00225_add_item_unit.xml" />
+  <CaseInfo Description="Get Item Unit" TargetURL="get/generalunit/:UnitId" Type="BLOCKING" />
+  <INPUT ParaName="UnitId" SrcValue="xml/add_data_no_vcol/case_00225_add_item_unit.xml" />
   <Match Attr="StatusCode" Value="200" />
-  <Match Attr="COUNT" Tag="ItemUnit" TargetDataType="MULTI" Value="boolex(x&gt;0)" />
+  <Match Attr="COUNT" Tag="Unit" TargetDataType="MULTI" Value="boolex(x&gt;0)" />
   <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00225_add_item_unit.xml" Order="3" />
-  <RunInfo Success="1" Time="1409792188" />
+  <RunInfo Success="1" Time="1443160504" />
 </TestCase>

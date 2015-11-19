@@ -16,5 +16,5 @@
   <Parent CaseFile="xml/add_data_no_vcol/case_00356_add_spec2import_pedi_1.xml" Order="3" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00357_add_spec2import_pedi_2.xml" Order="4" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00343_add_parent_type.xml" Order="5" />
-  <RunInfo Success="0" Time="0" />
+  
 </TestCase>

@@ -3,11 +3,10 @@
   <INPUT ParaName="StorageId" SrcValue="xml/add_data_no_vcol/case_00222_add_storage.xml" />
   <INPUT ParaName="StorageBarcode" PrefixVal="S_" Random="1" />
   <INPUT ParaName="StorageLocation" Value="Non existing" />
-  <INPUT ParaName="StorageParentId" Value="0" />
   <INPUT ParaName="StorageDetails" Value="Testing" />
   <Match Attr="StatusCode" Value="200" />
   <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
   <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
-  <RunInfo Success="1" Time="1409792164" />
+  <RunInfo Success="0" Time="0" />
 </TestCase>

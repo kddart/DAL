@@ -1,5 +1,6 @@
 <TestCase>
   <CaseInfo CustomMethod="add_record_upload" Description="Add Multimedia for Genotype" TargetURL="genotype/:GenotypeId/add/multimedia" Type="BLOCKING" />
+  <Delete TargetURL="delete/multimedia/:MultimediaId" />
   <INPUT ParaName="GenotypeId" SrcValue="xml/add_data_no_vcol/case_00104_add_geno.xml" />
   <INPUT ParaName="FileType" SrcValue="xml/add_data_no_vcol/case_00401_add_filetype.xml" />
   <INPUT ParaName="uploadfile" SrcFile="xml/add_data_no_vcol/kardinal.jpg" />
@@ -10,6 +11,6 @@
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00104_add_geno.xml" Order="3" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00401_add_filetype.xml" Order="4" />
-  <ReturnId ParaName="MultimediaId" Value="1" />
-  <RunInfo Success="1" Time="1409792245" />
+  <ReturnId ParaName="MultimediaId" Value="16" />
+  <RunInfo Success="1" Time="1443160581" />
 </TestCase>

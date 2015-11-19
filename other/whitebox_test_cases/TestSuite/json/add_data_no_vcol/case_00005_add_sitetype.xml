@@ -6,6 +6,6 @@
   <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
   <Parent CaseFile="json/login_testuser/case_00201_login_testuser.xml" Order="1" />
   <Parent CaseFile="json/login_testuser/case_00203_switch4testu.xml" Order="2" />
-  <ReturnId ParaName="SiteTypeId" Value="9" />
+  
   
 </TestCase>

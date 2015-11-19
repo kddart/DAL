@@ -9,6 +9,5 @@
   <Parent CaseFile="xml/add_data_no_vcol/case_00324_add_item_group.xml" Order="3" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00330_add_item4add_item2group.xml" Order="4" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00329_add_item2group.xml" Force="1" Order="5" />
-  <ReturnId ParaName="ItemGroupId" Value="4" />
-  <RunInfo Success="1" Time="1409792350" />
+  <RunInfo Success="1" Time="1443160943" />
 </TestCase>

@@ -2,6 +2,7 @@
   <CaseInfo CustomMethod="add_record" Description="Update Trial Event" TargetURL="update/trialevent/:TrialEventId" Type="BLOCKING" />
   <Delete TargetURL="delete/trialevent/:TrialEventId" />
   <INPUT ParaName="TrialEventId" SrcValue="xml/add_data_no_vcol/case_00337_add_trialevent.xml" />
+  <INPUT ParaName="UnitId" SrcValue="xml/add_data_no_vcol/case_00225_add_item_unit.xml" />
   <INPUT ParaName="EventTypeId" SrcValue="xml/add_data_no_vcol/case_00338_add_trialevent_type.xml" />
   <INPUT ParaName="TrialEventValue" Value="TEST" />
   <INPUT ParaName="TrialEventDate" Value="2012-08-16" />
@@ -11,5 +12,6 @@
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00337_add_trialevent.xml" Order="3" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00338_add_trialevent_type.xml" Order="4" />
-  <RunInfo Success="1" Time="1409792129" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00225_add_item_unit.xml" Order="5" />
+  <RunInfo Success="1" Time="1443160438" />
 </TestCase>

@@ -1,13 +1,16 @@
 <TestCase>
-  <CaseInfo CustomMethod="add_record" Description="Add Item Unit" TargetURL="add/itemunit" Type="BLOCKING" />
-  <Delete TargetURL="delete/itemunit/:ItemUnitId" />
-  <INPUT ParaName="ItemUnitName" PrefixVal="U_" Random="1" />
-  <INPUT ParaName="GramsConversionMultiplier" Value="1" />
+  <CaseInfo CustomMethod="add_record" Description="Add Item Unit" TargetURL="add/generalunit" Type="BLOCKING" />
+  <Delete TargetURL="delete/generalunit/:UnitId" />
+  <INPUT ParaName="UnitName" PrefixVal="U_" Random="1" />
+  <INPUT ParaName="UseByItem" Value="0" />
+  <INPUT ParaName="UseByTrait" Value="0" />
+  <INPUT ParaName="UseByTrialEvent" Value="0" />
+  <INPUT ParaName="UseBylayerattrib" Value="0" />
   <Match Attr="StatusCode" Value="200" />
   <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
-  <Match Attr="ParaName" Tag="ReturnId" Value="ItemUnitId" />
+  <Match Attr="ParaName" Tag="ReturnId" Value="UnitId" />
   <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
-  <ReturnId ParaName="ItemUnitId" Value="3" />
-  <RunInfo Success="1" Time="1409792162" />
+  <ReturnId ParaName="UnitId" Value="37" />
+  <RunInfo Success="1" Time="1444952697" />
 </TestCase>

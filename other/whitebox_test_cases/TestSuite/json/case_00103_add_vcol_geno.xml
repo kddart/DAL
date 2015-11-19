@@ -11,6 +11,6 @@
   <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
   <Parent CaseFile="./json/case_00201_login_testuser.xml" Force="1" Order="1" />
   <Parent CaseFile="./json/case_00203_switch4testu.xml" Force="1" Order="2" />
-  <ReturnId ParaName="FactorId" Value="1978" />
+  
   
 </TestCase>

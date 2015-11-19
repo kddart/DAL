@@ -1,5 +1,7 @@
-#$Id: Contact.pm 785 2014-09-02 06:23:12Z puthick $
+#$Id: Contact.pm 1016 2015-10-08 06:06:28Z puthick $
 #$Author: puthick $
+
+# Copyright (c) 2015, Diversity Arrays Technology, All rights reserved.
 
 # COPYRIGHT AND LICENSE
 # 
@@ -16,8 +18,7 @@
 # GNU General Public License for more details.
 
 # Author    : Puthick Hok
-# Version   : 2.2.5 build 795
-# Created   : 02/06/2010
+# Version   : 2.3.0 build 1040
 
 package KDDArT::DAL::Contact;
 
@@ -129,7 +130,7 @@ sub list_organisation_advanced_runmode {
 "ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
 "ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
 "URLParameter": [{"ParameterName": "nperpage", "Description": "Number of records in a page for pagination"}, {"ParameterName": "num", "Description": "The page number of the pagination"}],
-"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database filed name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "FieldList", "Description": "Comma separated value of wanted fields."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases."}],
+"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database field name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "FieldList", "Description": "Comma separated value of wanted fields."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases."}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
@@ -161,7 +162,7 @@ sub list_organisation_advanced_runmode {
   }
 
   my $filtering_csv = '';
-  
+
   if (defined $query->param('Filtering')) {
 
     $filtering_csv = $query->param('Filtering');
@@ -178,7 +179,7 @@ sub list_organisation_advanced_runmode {
 
   my $dbh = connect_kdb_read();
   my $field_list = ['organisation.*', 'VCol*'];
-  
+
   my ($vcol_err, $trouble_vcol, $sql, $vcol_list, $vcolf_part) = generate_factor_sql($dbh, $field_list, 'organisation',
                                                                                      'OrganisationId', '');
 
@@ -210,15 +211,37 @@ sub list_organisation_advanced_runmode {
     return $data_for_postrun_href;
   }
 
-  my $sample_org_aref = $sam_org_data;
+  my $sample_data_aref = $sam_org_data;
 
-  my @field_list_all = keys(%{$sample_org_aref->[0]});
+  my @field_list_all;
 
-  # no field return, it means no record. error prevention
-  if (scalar(@field_list_all) == 0) {
-    
-    push(@field_list_all, '*');
+  if (scalar(@{$sample_data_aref}) == 1) {
+
+    @field_list_all = keys(%{$sample_data_aref->[0]});
   }
+  else {
+
+    $self->logger->debug("It reaches here");
+    my ($sfield_err, $sfield_msg, $sfield_data, $pkey_data) = get_static_field($dbh, 'organisation');
+
+    if ($sfield_err) {
+
+      $self->logger->debug("Get static field failed: $sfield_msg");
+      return $self->_set_error();
+    }
+
+    for my $sfield_rec (@{$sfield_data}) {
+
+      push(@field_list_all, $sfield_rec->{'Name'});
+    }
+
+    for my $pkey_field (@{$pkey_data}) {
+
+      push(@field_list_all, $pkey_field);
+    }
+  }
+
+  $self->logger->debug("Field list all: " . join(',', @field_list_all));
 
   my $final_field_list = \@field_list_all;
 
@@ -634,19 +657,30 @@ sub update_organisation_runmode {
   my $org_id    = $self->param('id');
 
   my $query     = $self->query();
-  my $org_name  = $query->param('OrganisationName');
 
   my $data_for_postrun_href = {};
 
-  my ($missing_err, $missing_href) = check_missing_href( { 'OrganisationName' => $org_name } );
+  # Generic required static field checking
 
-  if ($missing_err) {
+  my $dbh_read = connect_kdb_read();
 
-    $data_for_postrun_href->{'Error'}       = 1;
-    $data_for_postrun_href->{'Data'}        = {'Error' => [$missing_href]};
+  my $skip_field = {};
 
-    return $data_for_postrun_href;
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'organisation', $skip_field);
+
+  if ($chk_sfield_err) {
+
+    $self->logger->debug($chk_sfield_msg);
+
+    return $for_postrun_href;
   }
+
+  $dbh_read->disconnect();
+
+  # Finish generic required static field checking
+
+  my $org_name  = $query->param('OrganisationName');
 
   my $dbh = connect_kdb_write();
 
@@ -839,12 +873,12 @@ sub list_contact_advanced_runmode {
 "GroupAdminRequired": 0,
 "SignatureRequired": 0,
 "AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "FILTERING"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Pagination Page='22' NumOfRecords='22' NumOfPages='22' NumPerPage='1' /><Contact ContactTelephone='02 6122 7300' ContactFirstName='Diversity' Longitude='' ContactMobile='' ContactAddress='University of Canberra' ContactLastName='Arrays' ContactAcronym='' OrganisationId='1' Latitude='' contactlocation='' ContactId='1' OrganisationName='Diversity Arrays Technology Pty Ltd' ContactEMail='admin@example.com' update='update/contact/1' /><RecordMeta TagName='Contact' /></DATA>",
-"SuccessMessageJSON": "{'Pagination' : [{'NumOfRecords' : '22','NumOfPages' : 22,'NumPerPage' : '1','Page' : '22'}],'Contact' : [{'Longitude' : null,'ContactFirstName' : 'Diversity','ContactTelephone' : '02 6122 7300','ContactMobile' : '','ContactAddress' : 'University of Canberra','ContactLastName' : 'Arrays','ContactAcronym' : '','contactlocation' : null,'Latitude' : null,'OrganisationId' : '1','ContactId' : '1','update' : 'update/contact/1','ContactEMail' : 'admin@example.com','OrganisationName' : 'Diversity Arrays Technology Pty Ltd'}],'VCol' : [],'RecordMeta' : [{'TagName' : 'Contact'}]}",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Pagination Page='22' NumOfRecords='22' NumOfPages='22' NumPerPage='1' /><Contact ContactTelephone='02 6122 7300' ContactFirstName='Diversity' Longitude='' ContactMobile='' ContactAddress='Building 3, Level D, University of Canberra, Kirinari St. Bruce ACT 2617' ContactLastName='Arrays' ContactAcronym='' OrganisationId='1' Latitude='' contactlocation='' ContactId='1' OrganisationName='Diversity Arrays Technology Pty Ltd' ContactEMail='dart-it@diversityarrays.com' update='update/contact/1' /><RecordMeta TagName='Contact' /></DATA>",
+"SuccessMessageJSON": "{'Pagination' : [{'NumOfRecords' : '22','NumOfPages' : 22,'NumPerPage' : '1','Page' : '22'}],'Contact' : [{'Longitude' : null,'ContactFirstName' : 'Diversity','ContactTelephone' : '02 6122 7300','ContactMobile' : '','ContactAddress' : 'Building 3, Level D, University of Canberra, Kirinari St. Bruce ACT 2617','ContactLastName' : 'Arrays','ContactAcronym' : '','contactlocation' : null,'Latitude' : null,'OrganisationId' : '1','ContactId' : '1','update' : 'update/contact/1','ContactEMail' : 'dart-it@diversityarrays.com','OrganisationName' : 'Diversity Arrays Technology Pty Ltd'}],'VCol' : [],'RecordMeta' : [{'TagName' : 'Contact'}]}",
 "ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
 "ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
 "URLParameter": [{"ParameterName": "nperpage", "Description": "Number of records in a page for pagination"}, {"ParameterName": "num", "Description": "The page number of the pagination"}],
-"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database filed name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "FieldList", "Description": "Comma separated value of wanted fields."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases."}],
+"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database field name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "FieldList", "Description": "Comma separated value of wanted fields."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases."}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
@@ -873,7 +907,7 @@ sub list_contact_advanced_runmode {
   }
 
   my $filtering_csv = '';
-  
+
   if (defined $query->param('Filtering')) {
 
     $filtering_csv = $query->param('Filtering');
@@ -897,7 +931,7 @@ sub list_contact_advanced_runmode {
     my $err_msg = "Problem with virtual column ($trouble_vcol) containing space.";
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-    
+
     return $data_for_postrun_href;
   }
 
@@ -916,15 +950,37 @@ sub list_contact_advanced_runmode {
     return $data_for_postrun_href;
   }
 
-  my $sample_contact_aref = $sam_contact_data;
+  my $sample_data_aref = $sam_contact_data;
 
-  my @field_list_all = keys(%{$sample_contact_aref->[0]});
+  my @field_list_all;
 
-  # no field return, it means no record. error prevention
-  if (scalar(@field_list_all) == 0) {
-    
-    push(@field_list_all, '*');
+  if (scalar(@{$sample_data_aref}) == 1) {
+
+    @field_list_all = keys(%{$sample_data_aref->[0]});
   }
+  else {
+
+    $self->logger->debug("It reaches here");
+    my ($sfield_err, $sfield_msg, $sfield_data, $pkey_data) = get_static_field($dbh, 'contact');
+
+    if ($sfield_err) {
+
+      $self->logger->debug("Get static field failed: $sfield_msg");
+      return $self->_set_error();
+    }
+
+    for my $sfield_rec (@{$sfield_data}) {
+
+      push(@field_list_all, $sfield_rec->{'Name'});
+    }
+
+    for my $pkey_field (@{$pkey_data}) {
+
+      push(@field_list_all, $pkey_field);
+    }
+  }
+
+  $self->logger->debug("Field list all: " . join(',', @field_list_all));
 
   my $final_field_list     = \@field_list_all;
   my $sql_field_list       = [];
@@ -944,7 +1000,7 @@ sub list_contact_advanced_runmode {
     }
 
     $final_field_list = $sel_field_list;
-   
+
     if ($filtering_csv =~ /OrganisationId/) {
 
       push(@{$final_field_list}, 'OrganisationId');
@@ -1406,44 +1462,16 @@ sub add_contact_runmode {
 
   my $skip_field = {};
 
-  my ($get_scol_err, $get_scol_msg, $scol_data, $pkey_data) = get_static_field($dbh_read, 'contact');
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read, 'contact', $skip_field);
 
-  if ($get_scol_err) {
+  if ($chk_sfield_err) {
 
-    $self->logger->debug("Get static field info failed: $get_scol_msg");
-    
-    my $err_msg = "Unexpected Error.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+    $self->logger->debug($chk_sfield_msg);
 
-    return $data_for_postrun_href;
-  }
-
-  my $required_field_href = {};
-
-  for my $static_field (@{$scol_data}) {
-
-    my $field_name = $static_field->{'Name'};
-    
-    if ($skip_field->{$field_name}) { next; }
-
-    if ($static_field->{'Required'} == 1) {
-
-      $required_field_href->{$field_name} = $query->param($field_name);
-    }
+    return $for_postrun_href;
   }
 
   $dbh_read->disconnect();
-
-  my ($missing_err, $missing_href) = check_missing_href( $required_field_href );
-
-  if ($missing_err) {
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
-
-    return $data_for_postrun_href;
-  }
 
   # Finish generic required static field checking
 
@@ -1464,14 +1492,14 @@ sub add_contact_runmode {
 
     $address = $query->param('ContactAddress');
   }
-  
+
   my $telephone       = '';
 
   if (defined $query->param('ContactTelephone')) {
 
     $telephone = $query->param('ContactTelephone');
   }
-  
+
   my $mobile          = '';
 
   if (defined $query->param('ContactMobile')) {
@@ -1503,7 +1531,7 @@ sub add_contact_runmode {
 
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [$wkt_err_href]};
-      
+
       return $data_for_postrun_href;
     }
   }
@@ -1689,17 +1717,27 @@ sub add_organisation_runmode {
 
   my $data_for_postrun_href = {};
 
-  my $org_name = $query->param('OrganisationName');
+  # Generic required static field checking
 
-  my ($missing_err, $missing_href) = check_missing_href( { 'OrganisationName' => $org_name } );
+  my $dbh_read = connect_kdb_read();
 
-  if ($missing_err) {
+  my $skip_field = {};
 
-    $data_for_postrun_href->{'Error'}       = 1;
-    $data_for_postrun_href->{'Data'}        = {'Error' => [$missing_href]};
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'organisation', $skip_field);
 
-    return $data_for_postrun_href;
+  if ($chk_sfield_err) {
+
+    $self->logger->debug($chk_sfield_msg);
+
+    return $for_postrun_href;
   }
+
+  $dbh_read->disconnect();
+
+  # Finish generic required static field checking
+
+  my $org_name = $query->param('OrganisationName');
 
   my $dbh_k_write = connect_kdb_write();
 
@@ -2098,44 +2136,16 @@ sub update_contact_runmode {
 
   my $skip_field = {};
 
-  my ($get_scol_err, $get_scol_msg, $scol_data, $pkey_data) = get_static_field($dbh_read, 'contact');
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read, 'contact', $skip_field);
 
-  if ($get_scol_err) {
+  if ($chk_sfield_err) {
 
-    $self->logger->debug("Get static field info failed: $get_scol_msg");
-    
-    my $err_msg = "Unexpected Error.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+    $self->logger->debug($chk_sfield_msg);
 
-    return $data_for_postrun_href;
-  }
-
-  my $required_field_href = {};
-
-  for my $static_field (@{$scol_data}) {
-
-    my $field_name = $static_field->{'Name'};
-    
-    if ($skip_field->{$field_name}) { next; }
-
-    if ($static_field->{'Required'} == 1) {
-
-      $required_field_href->{$field_name} = $query->param($field_name);
-    }
+    return $for_postrun_href;
   }
 
   $dbh_read->disconnect();
-
-  my ($missing_err, $missing_href) = check_missing_href( $required_field_href );
-
-  if ($missing_err) {
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
-
-    return $data_for_postrun_href;
-  }
 
   # Finish generic required static field checking
 
@@ -2434,8 +2444,8 @@ sub get_contact_runmode {
 "GroupAdminRequired": 0,
 "SignatureRequired": 0,
 "AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Contact ContactTelephone='02 6122 7300' ContactFirstName='Diversity' Longitude='' ContactMobile='' ContactAddress='University of Canberra' ContactLastName='Arrays' ContactAcronym='' OrganisationId='1' Latitude='' contactlocation='' ContactId='1' OrganisationName='Diversity Arrays Technology Pty Ltd' ContactEMail='admin@example.com' update='update/contact/1' /><RecordMeta TagName='Contact' /></DATA>",
-"SuccessMessageJSON": "{'Contact' : [{'Longitude' : null,'ContactFirstName' : 'Diversity','ContactTelephone' : '02 6122 7300','ContactMobile' : '','ContactAddress' : 'University of Canberra','ContactLastName' : 'Arrays','ContactAcronym' : '','contactlocation' : null,'Latitude' : null,'OrganisationId' : '1','ContactId' : '1','update' : 'update/contact/1','ContactEMail' : 'admin@example.com','OrganisationName' : 'Diversity Arrays Technology Pty Ltd'}],'VCol' : [],'RecordMeta' : [{'TagName' : 'Contact'}]}",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Contact ContactTelephone='02 6122 7300' ContactFirstName='Diversity' Longitude='' ContactMobile='' ContactAddress='Building 3, Level D, University of Canberra, Kirinari St. Bruce ACT 2617' ContactLastName='Arrays' ContactAcronym='' OrganisationId='1' Latitude='' contactlocation='' ContactId='1' OrganisationName='Diversity Arrays Technology Pty Ltd' ContactEMail='dart-it@diversityarrays.com' update='update/contact/1' /><RecordMeta TagName='Contact' /></DATA>",
+"SuccessMessageJSON": "{'Contact' : [{'Longitude' : null,'ContactFirstName' : 'Diversity','ContactTelephone' : '02 6122 7300','ContactMobile' : '','ContactAddress' : 'Building 3, Level D, University of Canberra, Kirinari St. Bruce ACT 2617','ContactLastName' : 'Arrays','ContactAcronym' : '','contactlocation' : null,'Latitude' : null,'OrganisationId' : '1','ContactId' : '1','update' : 'update/contact/1','ContactEMail' : 'dart-it@diversityarrays.com','OrganisationName' : 'Diversity Arrays Technology Pty Ltd'}],'VCol' : [],'RecordMeta' : [{'TagName' : 'Contact'}]}",
 "ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='ContactId (25): not found.' /></DATA>"}],
 "ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'ContactId (25): not found.'}]}"}],
 "URLParameter": [{"ParameterName": "id", "Description": "Existing ContactId"}],

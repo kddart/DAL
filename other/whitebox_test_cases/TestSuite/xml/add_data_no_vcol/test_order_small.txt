@@ -14,7 +14,6 @@ xml/add_data_no_vcol/case_00116_add_specimen3.xml
 xml/add_data_no_vcol/case_00117_add_specimen4.xml
 xml/add_data_no_vcol/case_00118_add_designtype.xml
 xml/add_data_no_vcol/case_00119_add_treatment.xml
-xml/add_data_no_vcol/case_00200_add_unitposition.xml
 xml/add_data_no_vcol/case_00339_add_trialtype.xml
 xml/add_data_no_vcol/case_00007_add_trial.xml
 xml/add_data_no_vcol/case_00358_add_trialunit.xml
@@ -37,7 +36,6 @@ xml/add_data_no_vcol/case_00308_add_item_type.xml
 xml/add_data_no_vcol/case_00309_add_item_state.xml
 xml/add_data_no_vcol/case_00310_add_item.xml
 xml/add_data_no_vcol/case_00345_add_layer.xml
-xml/add_data_no_vcol/case_00346_add_valuetype.xml
 xml/add_data_no_vcol/case_00347_add_layer_attribute_tem.xml
 xml/add_data_no_vcol/case_00348_add_layer_attribute_hum.xml
 xml/add_data_no_vcol/case_00350_add_device_type_wst.xml

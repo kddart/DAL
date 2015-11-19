@@ -1,5 +1,7 @@
-#$Id: Transformation.pm 785 2014-09-02 06:23:12Z puthick $
+#$Id: Transformation.pm 1028 2015-10-21 07:39:52Z puthick $
 #$Author: puthick $
+
+# Copyright (c) 2015, Diversity Arrays Technology, All rights reserved.
 
 # COPYRIGHT AND LICENSE
 # 
@@ -16,12 +18,12 @@
 # GNU General Public License for more details.
 
 # Author    : Puthick Hok
-# Version   : 2.2.5 build 795
-# Created   : 02/06/2010
+# Version   : 2.3.0 build 1040
 
 package KDDArT::DAL::Transformation;
 
 use strict;
+no strict 'refs';
 use warnings;
 
 BEGIN {
@@ -29,7 +31,8 @@ BEGIN {
 
   my ($volume, $current_dir, $file) = File::Spec->splitpath(__FILE__);
 
-  $main::kddart_base_dir = "${current_dir}../../..";
+  my @current_dir_part = split('/perl-lib/KDDArT/DAL/', $current_dir);
+  $main::kddart_base_dir = $current_dir_part[0];
 }
 
 use lib "$main::kddart_base_dir/perl-lib";
@@ -39,6 +42,7 @@ use base qw(CGI::Application);
 use Log::Log4perl qw(get_logger :levels);
 use JSON::XS;
 use Hash::Merge qw( merge );
+use CGI::Application::Plugin::Config::Simple;
 
 sub cgiapp_init {
 
@@ -53,9 +57,9 @@ sub cgiapp_init {
         );
 
     my $layout = Log::Log4perl::Layout::PatternLayout->new("[%d] [%H] [%X{client_ip}] [%p] [%F{1}:%L] [%M] [%m]%n");
-    
+
     $app->layout($layout);
-    
+
     $logger->add_appender($app);
   }
   $logger->level($DEBUG);
@@ -63,6 +67,101 @@ sub cgiapp_init {
   $self->{logger} = $logger;
 
   $self->logger->debug("Initialising Transformation");
+
+  $self->logger->debug("CFG FILE: $CFG_FILE_PATH");
+
+  if (-e $CFG_FILE_PATH) {
+
+    if (-r $CFG_FILE_PATH) {
+
+      $self->config_file($CFG_FILE_PATH);
+
+      # Load configuration file
+
+      my $config_hash = $self->config_param();
+
+      my @block_param_list = keys(%{$config_hash});
+
+      foreach my $block_param (@block_param_list) {
+
+        #$self->logger->debug("BLOCK: $block_param");
+
+        my $param_val = $config_hash->{$block_param};
+
+        if ($block_param =~ /(\w+)\.(.*)/) {
+
+          my $block_name = $1;
+          my $param_name = $2;
+
+          #$self->logger->debug("BLOCK NAME: $block_name - PARAM NAME: $param_name - PARAM VALUE: $param_val");
+
+          if (defined $${block_name}) {
+
+            # use plain text variable referencing
+            my $variable_data_type = ref $${block_name};
+            #$self->logger->debug("Variable data type: $variable_data_type");
+
+            my $local_val = '';
+
+            if ($variable_data_type eq 'HASH') {
+
+              # need   no strict 'refs' to work
+
+              #$self->logger->debug("Base DIR: " . $main::kddart_base_dir);
+
+              if (defined $${block_name}->{"$main::kddart_base_dir/$param_name"}) {
+
+                $local_val = $${block_name}->{"$main::kddart_base_dir/$param_name"};
+
+                #$self->logger->debug("Block local before replacement: $local_val");
+
+                if ($local_val eq 'FROM CFG_FILE') {
+
+                  $${block_name}->{"$main::kddart_base_dir/$param_name"} = $param_val;
+                }
+              }
+              else {
+
+                $${block_name}->{"$main::kddart_base_dir/$param_name"} = $param_val;
+              }
+            }
+            elsif (length($variable_data_type) == 0) {
+
+              if (defined $${block_name}) {
+
+                $local_val = $${block_name};
+
+                if ($local_val eq 'FROM CFG_FILE') {
+
+                  $${block_name} = $param_val;
+                }
+              }
+              else {
+
+                $${block_name} = $param_val;
+              }
+            }
+            else {
+
+              $self->logger->debug("Variable data type: $variable_data_type for $block_name UNSUPPORTED");
+            }
+          }
+          else {
+
+            $self->logger->debug("$block_name is undefined.");
+          }
+        }
+      }
+    }
+    else {
+
+      $self->logger->debug("Config file $CFG_FILE_PATH : NOT READABLE");
+    }
+  }
+  else {
+
+    $self->logger->debug("Config file $CFG_FILE_PATH : NOT FOUND");
+  }
 }
 
 sub cgiapp_postrun {
@@ -116,6 +215,11 @@ sub cgiapp_postrun {
     $content_type = $self->authen->get_content_type();
   }
 
+  if (defined $complex_pass_data->{'JSONONLY'}) {
+
+    $content_type = 'JSON';
+  }
+
   $self->logger->debug("Content type: $content_type");
 
   my $transform_data = {};
@@ -131,7 +235,7 @@ sub cgiapp_postrun {
   my $is_err = 0;
 
   if (length($content_type) == 0) {
-    
+
     $content_type = 'XML';
   }
   else {
@@ -173,9 +277,9 @@ sub cgiapp_postrun {
 
         my $user_id = $self->authen->user_id();
         my ($list_group_err, $list_group_msg, $group_data) = $self->authen->list_group($user_id);
-        
+
         if (!$list_group_err) {
-  
+
           my $grp_transform_data = $hash_merger->merge({'SystemGroup' => $group_data}, $transform_data);
           $transform_data = $grp_transform_data;
 
@@ -242,7 +346,7 @@ sub cgiapp_postrun {
       $self->logger->debug("Output contains null character at the start!!!");
     }
   }
-	
+
   #$self->logger->debug("Output text: $output_text");
 
   $$output_ref = $output_text;
@@ -275,7 +379,7 @@ sub json_transformation {
   my $json_encoder = JSON::XS->new();
   $json_encoder->pretty(1);
   #$json_encoder->utf8(1);
-  
+
   # utf8 does not work for Polish and Spanish
   $json_encoder->latin1(1);
 
@@ -312,18 +416,18 @@ sub xml_transformation {
     else {
 
       if (length($xsl) > 0) {
-        
+
         $this_xml_content = arrayref2xml($transform_data->{$xml_tag}, $xml_tag, $xsl);
       }
       else {
-        
+
         $this_xml_content = arrayref2xml($transform_data->{$xml_tag}, $xml_tag);
       }
     }
-    
+
     $xml_content = merge_xml($this_xml_content, $xml_content);
   }
-    
+
   return $xml_content;
 }
 
@@ -398,7 +502,7 @@ sub geojson_transformation {
       $feature_href->{'geometry'}   = $geojson_href;
       $feature_href->{'type'}       = 'Feature';
       $feature_href->{'properties'} = { 'name' => $feature_name, 'id' => $feature_id};
-      
+
       push(@{$gjson_transform_data->{'features'}}, $feature_href);
     }
   }
@@ -406,7 +510,7 @@ sub geojson_transformation {
   my $json_encoder = JSON::XS->new();
   $json_encoder->pretty(1);
   #$json_encoder->utf8(1);
-  
+
   # utf8 does not work for Polish and Spanish
   $json_encoder->latin1(1);
 

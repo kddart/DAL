@@ -1,5 +1,7 @@
-#$Id: Genotype.pm 790 2014-09-03 06:43:00Z puthick $
+#$Id: Genotype.pm 1016 2015-10-08 06:06:28Z puthick $
 #$Author: puthick $
+
+# Copyright (c) 2015, Diversity Arrays Technology, All rights reserved.
 
 # COPYRIGHT AND LICENSE
 # 
@@ -16,8 +18,7 @@
 # GNU General Public License for more details.
 
 # Author    : Puthick Hok
-# Version   : 2.2.5 build 795
-# Created   : 02/06/2010
+# Version   : 2.3.0 build 1040
 
 package KDDArT::DAL::Genotype;
 
@@ -259,53 +260,26 @@ sub add_genotype_runmode {
 
   my $skip_field = {'OwnGroupId' => 1};
 
-  my ($get_scol_err, $get_scol_msg, $scol_data, $pkey_data) = get_static_field($dbh_read, 'genotype');
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'genotype', $skip_field);
 
-  if ($get_scol_err) {
+  if ($chk_sfield_err) {
 
-    $self->logger->debug("Get static field info failed: $get_scol_msg");
-    
-    my $err_msg = "Unexpected Error.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+    $self->logger->debug($chk_sfield_msg);
 
-    return $data_for_postrun_href;
-  }
-
-  my $required_field_href = {};
-
-  for my $static_field (@{$scol_data}) {
-
-    my $field_name = $static_field->{'Name'};
-    
-    if ($skip_field->{$field_name}) { next; }
-
-    if ($static_field->{'Required'} == 1) {
-
-      $required_field_href->{$field_name} = $query->param($field_name);
-    }
+    return $for_postrun_href;
   }
 
   $dbh_read->disconnect();
-
-  my ($missing_err, $missing_href) = check_missing_href( $required_field_href );
-
-  if ($missing_err) {
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
-
-    return $data_for_postrun_href;
-  }
 
   # Finish generic required static field checking
 
   my $genotype_name       = $query->param('GenotypeName');
   my $genus_id            = $query->param('GenusId');
-  
+
   my $origin_id           = $query->param('OriginId');
   my $can_publish         = $query->param('CanPublishGenotype');
-  
+
   my $access_group        = $query->param('AccessGroupId');
   my $own_perm            = $query->param('OwnGroupPerm');
   my $access_perm         = $query->param('AccessGroupPerm');
@@ -515,7 +489,7 @@ sub add_genotype_runmode {
 
         return $data_for_postrun_href;
       }
-    
+
       $factor_sth->finish();
     }
   }
@@ -555,22 +529,31 @@ sub add_genus_runmode {
 =cut
 
   my $self  = shift;
+  my $query = $self->query();
 
   my $data_for_postrun_href = {};
 
-  my $query = $self->query();
+  # Generic required static field checking
+
+  my $dbh_read = connect_kdb_read();
+
+  my $skip_field = {};
+
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'genus', $skip_field);
+
+  if ($chk_sfield_err) {
+
+    $self->logger->debug($chk_sfield_msg);
+
+    return $for_postrun_href;
+  }
+
+  $dbh_read->disconnect();
+
+  # Finish generic required static field checking
 
   my $genus_name = $query->param('GenusName');
-
-  my ($missing_err, $missing_href) = check_missing_href( {'GenusName' => $genus_name} );
-
-  if ($missing_err) {
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
-
-    return $data_for_postrun_href;
-  }
 
   my $dbh_k_write = connect_kdb_write();
 
@@ -707,7 +690,7 @@ sub list_genus {
     }
 
     for my $row (@{$genus_data}) {
-      
+
       my $genus_id = $row->{'GenusId'};
       $row->{'update'}   = "update/genus/$genus_id";
 
@@ -715,7 +698,7 @@ sub list_genus {
 
         $row->{'delete'}   = "delete/genus/$genus_id";
       }
-    
+
       push(@{$extra_attr_genus_data}, $row);
     }
   }
@@ -784,7 +767,7 @@ sub list_genotype {
 
         $group_id_href->{$row->{'OwnGroupId'}} = 1;
       }
-        
+
       if (defined $row->{'AccessGroupId'}) {
 
         $group_id_href->{$row->{'AccessGroupId'}} = 1;
@@ -842,10 +825,7 @@ sub list_genotype {
         }
       }
 
-      my $chk_table_aref = [{'TableName' => 'genotype', 'FieldName' => 'GenotypeId'},
-                            {'TableName' => 'trialmean', 'FieldName' => 'GenotypeId'},
-                            {'TableName' => 'metgroupegv', 'FieldName' => 'GenotypeId'}
-          ];
+      my $chk_table_aref = [{'TableName' => 'genotype', 'FieldName' => 'GenotypeId'}];
 
       ($chk_id_err, $chk_id_msg,
        $used_id_href, $not_used_id_href) = id_existence_bulk($dbh, $chk_table_aref, $geno_id_aref);
@@ -931,7 +911,7 @@ sub list_genotype {
           $row->{'chgOwner'} = "genotype/$geno_id/change/owner";
 
           if ( $not_used_id_href->{$geno_id} ) {
-            
+
             $row->{'delete'}   = "delete/genotype/$geno_id";
           }
         }
@@ -944,7 +924,7 @@ sub list_genotype {
 
     $extra_attr_geno_data = $data_aref;
   }
-    
+
   $dbh->disconnect();
 
   return ($err, $msg, $extra_attr_geno_data);
@@ -1127,44 +1107,17 @@ sub add_specimen_runmode {
 
   my $skip_field = {};
 
-  my ($get_scol_err, $get_scol_msg, $scol_data, $pkey_data) = get_static_field($dbh_read, 'specimen');
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'specimen', $skip_field);
 
-  if ($get_scol_err) {
+  if ($chk_sfield_err) {
 
-    $self->logger->debug("Get static field info failed: $get_scol_msg");
-    
-    my $err_msg = "Unexpected Error.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+    $self->logger->debug($chk_sfield_msg);
 
-    return $data_for_postrun_href;
-  }
-
-  my $required_field_href = {};
-
-  for my $static_field (@{$scol_data}) {
-
-    my $field_name = $static_field->{'Name'};
-    
-    if ($skip_field->{$field_name}) { next; }
-
-    if ($static_field->{'Required'} == 1) {
-
-      $required_field_href->{$field_name} = $query->param($field_name);
-    }
+    return $for_postrun_href;
   }
 
   $dbh_read->disconnect();
-
-  my ($missing_err, $missing_href) = check_missing_href( $required_field_href );
-
-  if ($missing_err) {
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
-
-    return $data_for_postrun_href;
-  }
 
   # Finish generic required static field checking
 
@@ -1175,7 +1128,7 @@ sub add_specimen_runmode {
   my $is_active             = '';
   my $pedigree              = '';
   my $selection_history     = '';
-  my $filial_generation     = '';
+  my $filial_generation     = undef;
 
   my $chk_int_href = {};
   if ( length($query->param('IsActive')) > 0 ) {
@@ -1199,7 +1152,7 @@ sub add_specimen_runmode {
 
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [$int_err_href]};
-    
+
     return $data_for_postrun_href;
   }
 
@@ -1278,7 +1231,7 @@ sub add_specimen_runmode {
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'SpecimenName' => $err_msg}]};
 
-    return $data_for_postrun_href;
+    return $data_for_postrun_href; 
   }
 
   $dbh_k_read->disconnect();
@@ -1299,7 +1252,7 @@ sub add_specimen_runmode {
   eval {
 
     local $XML::Checker::FAIL = sub {
-      
+
       my $code = shift;
       my $err_str = XML::Checker::error_string ($code, @_);
       $self->logger->debug("XML Parsing ERR: $code : $err_str");
@@ -1341,7 +1294,7 @@ sub add_specimen_runmode {
 
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-      
+
       return $data_for_postrun_href;
     }
   }
@@ -1372,7 +1325,7 @@ sub add_specimen_runmode {
 
         $data_for_postrun_href->{'Error'} = 1;
         $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-      
+
         return $data_for_postrun_href;
       }
     }
@@ -1405,7 +1358,7 @@ sub add_specimen_runmode {
 
     my $perm_err_msg = '';
     $perm_err_msg   .= "Permission denied: Group ($group_id) and Genotype ($trouble_geno_id_str).";
-    
+
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $perm_err_msg}]};
 
@@ -1471,7 +1424,7 @@ sub add_specimen_runmode {
 
       if (length($geno_info->{'GenotypeSpecimenType'}) > 0) {
 
-        my $geno_spec_type = $geno_info->{'GenotypeSpecimenType'};
+        $geno_spec_type = $geno_info->{'GenotypeSpecimenType'};
       }
     }
 
@@ -1497,9 +1450,6 @@ sub add_specimen_runmode {
 
   my $info_msg_aref  = [{'Message' => "Specimen ($specimen_id) has been added successfully."}];
   my $return_id_aref = [{'Value' => "$specimen_id", 'ParaName' => 'SpecimenId'}];
-
-  my $info_xml      = arrayref2xml($info_msg_aref, 'Info');
-  my $return_id_xml = arrayref2xml($return_id_aref, 'ReturnId');
 
   $data_for_postrun_href->{'Error'}     = 0;
   $data_for_postrun_href->{'Data'}      = {'Info'      => $info_msg_aref,
@@ -1584,7 +1534,7 @@ sub list_specimen {
       $geno_specimen_sql   .= 'WHERE genotypespecimen.SpecimenId IN (' . join(',', @{$spec_id_aref}) . ')';
 
       $self->logger->debug("GENO_SPECIMEN_SQL: $geno_specimen_sql");
-    
+
       my ($geno_specimen_err, $geno_specimen_msg, $geno_specimen_data) = read_data($dbh, $geno_specimen_sql, []);
 
       if ($geno_specimen_err) {
@@ -1722,7 +1672,7 @@ sub list_specimen {
         $specimen_row->{'addGenotype'} = "specimen/${specimen_id}/add/genotype";
 
         if ( $not_used_id_href->{$specimen_id} ) {
-          
+
           $specimen_row->{'delete'}   = "delete/specimen/$specimen_id";
         }
       }
@@ -1733,6 +1683,7 @@ sub list_specimen {
 
   $dbh->disconnect();
 
+  # max_nb_genotype is used by the export specimen runmode so that it knows how many genotype columns to create
   return ($err, $msg, \@extra_attr_specimen_data, $max_nb_genotype);
 }
 
@@ -1754,7 +1705,7 @@ sub list_specimen_advanced_runmode {
 "ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
 "ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
 "URLParameter": [{"ParameterName": "nperpage", "Description": "Number of records in a page for pagination"}, {"ParameterName": "num", "Description": "The page number of the pagination"}],
-"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database filed name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "FieldList", "Description": "Comma separated value of wanted fields."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases."}],
+"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database field name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "FieldList", "Description": "Comma separated value of wanted fields."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases."}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
@@ -1783,7 +1734,7 @@ sub list_specimen_advanced_runmode {
   }
 
   my $filtering_csv = '';
-  
+
   if (defined $query->param('Filtering')) {
 
     $filtering_csv = $query->param('Filtering');
@@ -1864,15 +1815,37 @@ sub list_specimen_advanced_runmode {
     return $data_for_postrun_href;
   }
 
-  my $sample_specimen_aref = $sam_specimen_data;
+  my $sample_data_aref = $sam_specimen_data;
 
-  my @field_list_all = keys(%{$sample_specimen_aref->[0]});
+  my @field_list_all;
 
-  # no field return, it means no record. error prevention
-  if (scalar(@field_list_all) == 0) {
-    
-    push(@field_list_all, '*');
+  if (scalar(@{$sample_data_aref}) == 1) {
+
+    @field_list_all = keys(%{$sample_data_aref->[0]});
   }
+  else {
+
+    $self->logger->debug("It reaches here");
+    my ($sfield_err, $sfield_msg, $sfield_data, $pkey_data) = get_static_field($dbh, 'specimen');
+
+    if ($sfield_err) {
+
+      $self->logger->debug("Get static field failed: $sfield_msg");
+      return $self->_set_error();
+    }
+
+    for my $sfield_rec (@{$sfield_data}) {
+
+      push(@field_list_all, $sfield_rec->{'Name'});
+    }
+
+    for my $pkey_field (@{$pkey_data}) {
+
+      push(@field_list_all, $pkey_field);
+    }
+  }
+
+  $self->logger->debug("Field list all: " . join(',', @field_list_all));
 
   my $final_field_list = \@field_list_all;
 
@@ -1983,9 +1956,9 @@ sub list_specimen_advanced_runmode {
     $self->logger->debug("SQL Count time: $sql_count_time");
 
     if ($paged_id_err == 1) {
-    
+
       $self->logger->debug($paged_id_msg);
-    
+
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
@@ -1993,7 +1966,7 @@ sub list_specimen_advanced_runmode {
     }
 
     if ($paged_id_err == 2) {
-      
+
       $page = 0;
     }
 
@@ -2210,44 +2183,17 @@ sub update_genotype_runmode {
                      'OtherPerm'       => 1,
   };
 
-  my ($get_scol_err, $get_scol_msg, $scol_data, $pkey_data) = get_static_field($dbh_read, 'genotype');
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'genotype', $skip_field);
 
-  if ($get_scol_err) {
+  if ($chk_sfield_err) {
 
-    $self->logger->debug("Get static field info failed: $get_scol_msg");
-    
-    my $err_msg = "Unexpected Error.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+    $self->logger->debug($chk_sfield_msg);
 
-    return $data_for_postrun_href;
-  }
-
-  my $required_field_href = {};
-
-  for my $static_field (@{$scol_data}) {
-
-    my $field_name = $static_field->{'Name'};
-    
-    if ($skip_field->{$field_name}) { next; }
-
-    if ($static_field->{'Required'} == 1) {
-
-      $required_field_href->{$field_name} = $query->param($field_name);
-    }
+    return $for_postrun_href;
   }
 
   $dbh_read->disconnect();
-
-  my ($missing_err, $missing_href) = check_missing_href( $required_field_href );
-
-  if ($missing_err) {
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
-
-    return $data_for_postrun_href;
-  }
 
   # Finish generic required static field checking
 
@@ -2293,7 +2239,7 @@ sub update_genotype_runmode {
   my $sql = "SELECT $perm_str As UltimatePerm ";
   $sql   .= 'FROM genotype ';
   $sql   .= 'WHERE GenotypeId=?';
-  
+
   my $sth = $dbh_k_read->prepare($sql);
   $sth->execute($genotype_id);
 
@@ -2327,7 +2273,7 @@ sub update_genotype_runmode {
 
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [$int_err_href]};
-    
+
     return $data_for_postrun_href;
   }
 
@@ -2529,44 +2475,17 @@ sub update_specimen_runmode {
 
   my $skip_field = {};
 
-  my ($get_scol_err, $get_scol_msg, $scol_data, $pkey_data) = get_static_field($dbh_read, 'specimen');
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'specimen', $skip_field);
 
-  if ($get_scol_err) {
+  if ($chk_sfield_err) {
 
-    $self->logger->debug("Get static field info failed: $get_scol_msg");
-    
-    my $err_msg = "Unexpected Error.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+    $self->logger->debug($chk_sfield_msg);
 
-    return $data_for_postrun_href;
-  }
-
-  my $required_field_href = {};
-
-  for my $static_field (@{$scol_data}) {
-
-    my $field_name = $static_field->{'Name'};
-    
-    if ($skip_field->{$field_name}) { next; }
-
-    if ($static_field->{'Required'} == 1) {
-
-      $required_field_href->{$field_name} = $query->param($field_name);
-    }
+    return $for_postrun_href;
   }
 
   $dbh_read->disconnect();
-
-  my ($missing_err, $missing_href) = check_missing_href( $required_field_href );
-
-  if ($missing_err) {
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
-
-    return $data_for_postrun_href;
-  }
 
   # Finish generic required static field checking
 
@@ -2620,6 +2539,11 @@ sub update_specimen_runmode {
   my $pedigree              = read_cell_value($dbh_k_read, 'specimen', 'Pedigree', 'SpecimenId', $specimen_id);
   my $selection_history     = read_cell_value($dbh_k_read, 'specimen', 'SelectionHistory', 'SpecimenId', $specimen_id);
   my $filial_generation     = read_cell_value($dbh_k_read, 'specimen', 'FilialGeneration', 'SpecimenId', $specimen_id);
+
+  if (length($filial_generation) == 0) {
+
+    $filial_generation = undef;
+  }
 
   my $chk_int_href = {};
   if ( length($query->param('IsActive')) > 0 ) {
@@ -2935,13 +2859,12 @@ sub add_genotype_to_specimen_runmode {
 
   my $genotype_id = $query->param('GenotypeId');
 
-  my ($missing_err, $missing_msg) = check_missing_value( {'GenotypeId' => $genotype_id} );
+  my ($missing_err, $missing_href) = check_missing_href( {'GenotypeId' => $genotype_id} );
 
   if ($missing_err) {
 
-    $missing_msg .= ' missing.';
     $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $missing_msg}]};
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
 
     return $data_for_postrun_href;
   }
@@ -3187,44 +3110,17 @@ sub add_genotype_alias_runmode {
 
   my $skip_field = {'GenotypeId' => 1};
 
-  my ($get_scol_err, $get_scol_msg, $scol_data, $pkey_data) = get_static_field($dbh_read, 'genotypealias');
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'genotypealias', $skip_field);
 
-  if ($get_scol_err) {
+  if ($chk_sfield_err) {
 
-    $self->logger->debug("Get static field info failed: $get_scol_msg");
-    
-    my $err_msg = "Unexpected Error.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+    $self->logger->debug($chk_sfield_msg);
 
-    return $data_for_postrun_href;
-  }
-
-  my $required_field_href = {};
-
-  for my $static_field (@{$scol_data}) {
-
-    my $field_name = $static_field->{'Name'};
-    
-    if ($skip_field->{$field_name}) { next; }
-
-    if ($static_field->{'Required'} == 1) {
-
-      $required_field_href->{$field_name} = $query->param($field_name);
-    }
+    return $for_postrun_href;
   }
 
   $dbh_read->disconnect();
-
-  my ($missing_err, $missing_href) = check_missing_href( $required_field_href );
-
-  if ($missing_err) {
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
-
-    return $data_for_postrun_href;
-  }
 
   # Finish generic required static field checking
 
@@ -3385,44 +3281,17 @@ sub update_genotype_alias_runmode {
 
   my $skip_field = {'GenotypeId' => 1};
 
-  my ($get_scol_err, $get_scol_msg, $scol_data, $pkey_data) = get_static_field($dbh_read, 'genotypealias');
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'genotypealias', $skip_field);
 
-  if ($get_scol_err) {
+  if ($chk_sfield_err) {
 
-    $self->logger->debug("Get static field info failed: $get_scol_msg");
-    
-    my $err_msg = "Unexpected Error.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+    $self->logger->debug($chk_sfield_msg);
 
-    return $data_for_postrun_href;
-  }
-
-  my $required_field_href = {};
-
-  for my $static_field (@{$scol_data}) {
-
-    my $field_name = $static_field->{'Name'};
-    
-    if ($skip_field->{$field_name}) { next; }
-
-    if ($static_field->{'Required'} == 1) {
-
-      $required_field_href->{$field_name} = $query->param($field_name);
-    }
+    return $for_postrun_href;
   }
 
   $dbh_read->disconnect();
-
-  my ($missing_err, $missing_href) = check_missing_href( $required_field_href );
-
-  if ($missing_err) {
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
-
-    return $data_for_postrun_href;
-  }
 
   # Finish generic required static field checking
 
@@ -3641,7 +3510,7 @@ sub list_genotype_alias_advanced_runmode {
 "ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
 "ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
 "URLParameter": [{"ParameterName": "nperpage", "Description": "Number of records in a page for pagination"}, {"ParameterName": "num", "Description": "The page number of the pagination"}],
-"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database filed name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "FieldList", "Description": "Comma separated value of wanted fields."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases."}],
+"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database field name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "FieldList", "Description": "Comma separated value of wanted fields."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases."}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
@@ -3672,7 +3541,7 @@ sub list_genotype_alias_advanced_runmode {
   }
 
   my $filtering_csv = '';
-  
+
   if (defined $query->param('Filtering')) {
 
     $filtering_csv = $query->param('Filtering');
@@ -3756,15 +3625,37 @@ sub list_genotype_alias_advanced_runmode {
     return $data_for_postrun_href;
   }
 
-  my $sample_alias_aref = $sam_alias_data;
+  my $sample_data_aref = $sam_alias_data;
 
-  my @field_list_all = keys(%{$sample_alias_aref->[0]});
+  my @field_list_all;
 
-  # no field return, it means no record. error prevention
-  if (scalar(@field_list_all) == 0) {
-    
-    push(@field_list_all, '*');
+  if (scalar(@{$sample_data_aref}) == 1) {
+
+    @field_list_all = keys(%{$sample_data_aref->[0]});
   }
+  else {
+
+    $self->logger->debug("It reaches here");
+    my ($sfield_err, $sfield_msg, $sfield_data, $pkey_data) = get_static_field($dbh, 'genotypealias');
+
+    if ($sfield_err) {
+
+      $self->logger->debug("Get static field failed: $sfield_msg");
+      return $self->_set_error();
+    }
+
+    for my $sfield_rec (@{$sfield_data}) {
+
+      push(@field_list_all, $sfield_rec->{'Name'});
+    }
+
+    for my $pkey_field (@{$pkey_data}) {
+
+      push(@field_list_all, $pkey_field);
+    }
+  }
+
+  $self->logger->debug("Field list all: " . join(',', @field_list_all));
 
   my $final_field_list = \@field_list_all;
 
@@ -4054,23 +3945,33 @@ sub update_genus_runmode {
 =cut
 
   my $self      = shift;
+  my $query     = $self->query();
+
   my $genus_id  = $self->param('id');
 
   my $data_for_postrun_href = {};
 
-  my $query      = $self->query();
-  my $genus_name = $query->param('GenusName');
+  # Generic required static field checking
 
-  my ($missing_err, $missing_msg) = check_missing_value( { 'GenusName' => $genus_name } );
+  my $dbh_read = connect_kdb_read();
 
-  if ($missing_err) {
+  my $skip_field = {};
 
-    $missing_msg .= ' missing.';
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $missing_msg}]};
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'genus', $skip_field);
 
-    return $data_for_postrun_href;
+  if ($chk_sfield_err) {
+
+    $self->logger->debug($chk_sfield_msg);
+
+    return $for_postrun_href;
   }
+
+  $dbh_read->disconnect();
+
+  # Finish generic required static field checking
+
+  my $genus_name = $query->param('GenusName');
 
   my $dbh = connect_kdb_write();
 
@@ -4224,24 +4125,31 @@ sub add_trait2genotype_runmode {
 
   my $data_for_postrun_href = {};
 
-  my $trait_id    = $query->param('TraitId');
-  my $trait_value = $query->param('TraitValue');   
-
-  my ($missing_err, $missing_msg) = check_missing_value( { 'TraitId'         => $trait_id,
-                                                           'TraitValue'      => $trait_value,
-                                                         } );
-
-  if ($missing_err) {
-
-    $missing_msg .= ' missing.';
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $missing_msg}]};
-
-    return $data_for_postrun_href;
-  }
+  # Generic required static field checking
 
   my $dbh_read = connect_kdb_read();
-  
+
+  my $skip_field = {'GenotypeId' => 1};
+
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'genotypetrait', $skip_field);
+
+  if ($chk_sfield_err) {
+
+    $self->logger->debug($chk_sfield_msg);
+
+    return $for_postrun_href;
+  }
+
+  $dbh_read->disconnect();
+
+  # Finish generic required static field checking
+
+  my $trait_id    = $query->param('TraitId');
+  my $trait_value = $query->param('TraitValue');
+
+  $dbh_read = connect_kdb_read();
+
   my $group_id  = $self->authen->group_id();
   my $gadmin_status = $self->authen->gadmin_status();
   my $perm_str  = permission_phrase($group_id, 0, $gadmin_status);
@@ -4257,7 +4165,7 @@ sub add_trait2genotype_runmode {
     my $err_msg = "Genotype ($geno_id): not found.";
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-      
+
     return $data_for_postrun_href;
   }
   else {
@@ -4267,7 +4175,7 @@ sub add_trait2genotype_runmode {
       my $err_msg = "Genotype ($geno_id): permission denied.";
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-      
+
       return $data_for_postrun_href;
     }
   }
@@ -4633,20 +4541,31 @@ sub update_genotype_trait_runmode {
 
   my $data_for_postrun_href = {};
 
-  my $trait_value   = $query->param('TraitValue');
-
-  my ($missing_err, $missing_msg) = check_missing_value( { 'TraitValue' => $trait_value } );
-
-  if ($missing_err) {
-
-    $missing_msg .= ' missing.';
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $missing_msg}]};
-
-    return $data_for_postrun_href;
-  }
+  # Generic required static field checking
 
   my $dbh_read = connect_kdb_read();
+
+  my $skip_field = {'GenotypeId' => 1,
+                    'TraitId'    => 1,
+                   };
+
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'genotypetrait', $skip_field);
+
+  if ($chk_sfield_err) {
+
+    $self->logger->debug($chk_sfield_msg);
+
+    return $for_postrun_href;
+  }
+
+  $dbh_read->disconnect();
+
+  # Finish generic required static field checking
+
+  my $trait_value   = $query->param('TraitValue');
+
+  $dbh_read = connect_kdb_read();
 
   my $sql = 'SELECT GenotypeId ';
   $sql   .= 'FROM genotypetrait ';
@@ -4860,53 +4779,41 @@ sub add_specimen_group_runmode {
 
   my $dbh_read = connect_kdb_read();
 
-  my $skip_field = {};
+  my $skip_field = {'OwnGroupId'           => 1};
 
-  my ($get_scol_err, $get_scol_msg, $scol_data, $pkey_data) = get_static_field($dbh_read, 'specimengroup');
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'specimengroup', $skip_field);
 
-  if ($get_scol_err) {
+  if ($chk_sfield_err) {
 
-    $self->logger->debug("Get static field info failed: $get_scol_msg");
-    
-    my $err_msg = "Unexpected Error.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+    $self->logger->debug($chk_sfield_msg);
 
-    return $data_for_postrun_href;
-  }
-
-  my $required_field_href = {};
-
-  for my $static_field (@{$scol_data}) {
-
-    my $field_name = $static_field->{'Name'};
-    
-    if ($skip_field->{$field_name}) { next; }
-
-    if ($static_field->{'Required'} == 1) {
-
-      $required_field_href->{$field_name} = $query->param($field_name);
-    }
+    return $for_postrun_href;
   }
 
   $dbh_read->disconnect();
-
-  my ($missing_err, $missing_href) = check_missing_href( $required_field_href );
-
-  if ($missing_err) {
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
-
-    return $data_for_postrun_href;
-  }
 
   # Finish generic required static field checking
 
   my $specimen_group_name         = $query->param('SpecimenGroupName');
   my $specimen_group_type         = $query->param('SpecimenGroupTypeId');
+  my $date_created                = $query->param('SpecimenGroupCreated');
+  my $access_group                = $query->param('AccessGroupId');
+  my $own_perm                    = $query->param('OwnGroupPerm');
+  my $access_perm                 = $query->param('AccessGroupPerm');
+  my $other_perm                  = $query->param('OtherPerm');
 
-  my $specimen_group_note = '';
+  my $specimen_group_status       = undef;
+
+  if (defined $query->param('SpecimenGroupStatus')) {
+
+    if (length($query->param('SpecimenGroupStatus')) > 0) {
+
+      $specimen_group_status = $query->param('SpecimenGroupStatus');
+    }
+  }
+
+  my $specimen_group_note         = undef;
 
   if (length($query->param('SpecimenGroupNote')) > 0) {
 
@@ -4933,6 +4840,66 @@ sub add_specimen_group_runmode {
     return $data_for_postrun_href;
   }
 
+  if (defined $specimen_group_status) {
+
+    if (!type_existence($dbh_write, 'specimengroupstatus', $specimen_group_status)) {
+
+      my $err_msg = "SpecimenGroupStatus ($specimen_group_status): not found or active.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'SpecimenGroupStatus' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  my $access_grp_existence = record_existence($dbh_write, 'systemgroup', 'SystemGroupId', $access_group);
+
+  if (!$access_grp_existence) {
+
+    my $err_msg = "AccessGroup ($access_group) does not exist.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'AccessGroupId' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if ( ($own_perm > 7 || $own_perm < 0) ) {
+
+    my $err_msg = "OwnGroupPerm ($own_perm) is invalid.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'OwnGroupPerm' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if ( ($access_perm > 7 || $access_perm < 0) ) {
+
+    my $err_msg = "AccessGroupPerm ($access_perm) is invalid.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'AccessGroupPerm' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if ( ($other_perm > 7 || $other_perm < 0) ) {
+
+    my $err_msg = "OtherPerm ($other_perm) is invalid.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'OtherPerm' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my ($date_err, $date_href) = check_dt_href( {'SpecimenGroupCreated' => $date_created} );
+
+  if ($date_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$date_href]};
+
+    return $data_for_postrun_href;
+  }
+
   my $specimen_info_xml_file = $self->authen->get_upload_file();
   my $specimen_info_dtd_file = $self->get_specimen_group_dtd_file();
 
@@ -4943,7 +4910,7 @@ sub add_specimen_group_runmode {
   eval {
 
     local $XML::Checker::FAIL = sub {
-      
+
       my $code = shift;
       my $err_str = XML::Checker::error_string ($code, @_);
       $self->logger->debug("XML Parsing ERR: $code : $err_str");
@@ -4965,7 +4932,7 @@ sub add_specimen_group_runmode {
     return $data_for_postrun_href;
   }
 
-  my $group_id  = $self->authen->group_id();
+  my $group_id      = $self->authen->group_id();
   my $gadmin_status = $self->authen->gadmin_status();
 
   my $specimen_info_xml  = read_file($specimen_info_xml_file);
@@ -5079,12 +5046,20 @@ sub add_specimen_group_runmode {
   }
 
   my $sql = 'INSERT INTO specimengroup SET ';
+  $sql   .= 'SpecimenGroupStatus=?, ';
   $sql   .= 'SpecimenGroupTypeId=?, ';
   $sql   .= 'SpecimenGroupName=?, ';
-  $sql   .= 'SpecimenGroupNote=?';
+  $sql   .= 'SpecimenGroupNote=?, ';
+  $sql   .= 'SpecimenGroupCreated=?, ';
+  $sql   .= 'OwnGroupId=?, ';
+  $sql   .= 'OwnGroupPerm=?, ';
+  $sql   .= 'AccessGroupId=?, ';
+  $sql   .= 'AccessGroupPerm=?, ';
+  $sql   .= 'OtherPerm=?';
 
   my $sth = $dbh_write->prepare($sql);
-  $sth->execute($specimen_group_type, $specimen_group_name, $specimen_group_note);
+  $sth->execute($specimen_group_status, $specimen_group_type, $specimen_group_name, $specimen_group_note,
+               $date_created, $group_id, $own_perm, $access_group, $access_perm, $other_perm);
 
   if ($dbh_write->err()) {
 
@@ -5169,14 +5144,36 @@ sub list_specimen_group {
   my @extra_attr_specimen_group_data;
 
   my $spec_grp_id_aref = [];
-  
-  my $spec_lookup      = {};
+
+  my $group_id_href    = {};
+
+  my $group_lookup      = {};
+  my $spec_lookup       = {};
 
   if ($extra_attr_yes) {
 
     for my $specimen_group_row (@{$data_aref}) {
 
       push(@{$spec_grp_id_aref}, $specimen_group_row->{'SpecimenGroupId'});
+
+      if (defined $specimen_group_row->{'OwnGroupId'}) {
+
+        $group_id_href->{$specimen_group_row->{'OwnGroupId'}} = 1;
+      }
+
+      if (defined $specimen_group_row->{'AccessGroupId'}) {
+
+        $group_id_href->{$specimen_group_row->{'AccessGroupId'}} = 1;
+      }
+    }
+
+    if (scalar(keys(%{$group_id_href})) > 0) {
+
+      my $group_sql    = 'SELECT SystemGroupId, SystemGroupName FROM systemgroup ';
+      $group_sql      .= 'WHERE SystemGroupId IN (' . join(',', keys(%{$group_id_href})) . ')';
+
+      $self->logger->debug("GROUP_SQL: $group_sql");
+      $group_lookup = $dbh->selectall_hashref($group_sql, 'SystemGroupId');
     }
 
     if (scalar(@{$spec_grp_id_aref}) > 0) {
@@ -5211,9 +5208,26 @@ sub list_specimen_group {
     }
   }
 
+  my $perm_lookup  = {'0' => 'None',
+                      '1' => 'Link',
+                      '2' => 'Write',
+                      '3' => 'Write/Link',
+                      '4' => 'Read',
+                      '5' => 'Read/Link',
+                      '6' => 'Read/Write',
+                      '7' => 'Read/Write/Link',
+                     };
+
   for my $specimen_group_row (@{$data_aref}) {
 
     my $specimen_group_id = $specimen_group_row->{'SpecimenGroupId'};
+
+    my $own_grp_id   = $specimen_group_row->{'OwnGroupId'};
+    my $acc_grp_id   = $specimen_group_row->{'AccessGroupId'};
+    my $own_perm     = $specimen_group_row->{'OwnGroupPerm'};
+    my $acc_perm     = $specimen_group_row->{'AccessGroupPerm'};
+    my $oth_perm     = $specimen_group_row->{'OtherPerm'};
+    my $ulti_perm    = $specimen_group_row->{'UltimatePerm'};
 
     if ($extra_attr_yes) {
 
@@ -5225,23 +5239,44 @@ sub list_specimen_group {
         for my $specimen_info (@{$specimen_id_aref}) {
 
           my $specimen_id = $specimen_info->{'SpecimenId'};
-          $specimen_info->{'removeSpecimen'} = "specimengroup/${specimen_group_id}/remove/specimen/$specimen_id";
+
+          if ( ($ulti_perm & $READ_WRITE_PERM) == $READ_WRITE_PERM ) {
+
+            $specimen_info->{'removeSpecimen'} = "specimengroup/${specimen_group_id}/remove/specimen/$specimen_id";
+          }
 
           push(@{$specimen_aref}, $specimen_info);
         }
         $specimen_group_row->{'Specimen'} = $specimen_aref;
+
+        $specimen_group_row->{'OwnGroupName'}          = $group_lookup->{$own_grp_id}->{'SystemGroupName'};
+        $specimen_group_row->{'AccessGroupName'}       = $group_lookup->{$acc_grp_id}->{'SystemGroupName'};
+        $specimen_group_row->{'OwnGroupPermission'}    = $perm_lookup->{$own_perm};
+        $specimen_group_row->{'AccessGroupPermission'} = $perm_lookup->{$acc_perm};
+        $specimen_group_row->{'OtherPermission'}       = $perm_lookup->{$oth_perm};
+        $specimen_group_row->{'UltimatePermission'}    = $perm_lookup->{$ulti_perm};
       }
 
-      if ($gadmin_status eq '1') {
+      if (($ulti_perm & $READ_WRITE_PERM) == $READ_WRITE_PERM) {
 
-        $specimen_group_row->{'update'}   = "update/specimengroup/$specimen_group_id";
+        $specimen_group_row->{'update'}      = "update/specimengroup/$specimen_group_id";
         $specimen_group_row->{'addSpecimen'} = "specimengroup/${specimen_group_id}/add/specimen";
-        $specimen_group_row->{'delete'}   = "delete/specimengroup/$specimen_group_id";
+      }
+
+      if ($own_grp_id == $group_id) {
+
+        $specimen_group_row->{'chgPerm'} = "specimengroup/${specimen_group_id}/change/permission";
+
+        if ($gadmin_status eq '1') {
+
+          $specimen_group_row->{'chgOwner'} = "specimengroup/${specimen_group_id}/change/owner";
+          $specimen_group_row->{'delete'}   = "delete/specimengroup/$specimen_group_id";
+        }
       }
     }
     push(@extra_attr_specimen_group_data, $specimen_group_row);
   }
- 
+
   $dbh->disconnect();
 
   return ($err, $msg, \@extra_attr_specimen_group_data);
@@ -5263,7 +5298,7 @@ sub list_specimen_group_advanced_runmode {
 "ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
 "ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
 "URLParameter": [{"ParameterName": "nperpage", "Description": "Number of records in a page for pagination"}, {"ParameterName": "num", "Description": "The page number of the pagination"}],
-"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database filed name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "FieldList", "Description": "Comma separated value of wanted fields."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases."}],
+"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database field name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "FieldList", "Description": "Comma separated value of wanted fields."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases."}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
@@ -5284,10 +5319,14 @@ sub list_specimen_group_advanced_runmode {
   }
 
   $self->logger->debug("Page number: $page");
-  
+
   my $field_list_csv = $query->param('FieldList') ? $query->param('FieldList') : '';
   my $filtering_csv  = $query->param('Filtering') ? $query->param('Filtering') : '';
   my $sorting        = $query->param('Sorting')   ? $query->param('Sorting')   : '';
+
+  my $group_id = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+  my $perm_str = permission_phrase($group_id, 0, $gadmin_status, 'specimengroup');
 
   my $data_for_postrun_href = {};
 
@@ -5305,18 +5344,44 @@ sub list_specimen_group_advanced_runmode {
     return $data_for_postrun_href;
   }
 
-  my @field_list_all = keys( %{$samp_spec_grp_data->[0]} );
+  my $dbh = connect_kdb_read();
 
-  # no field return, it means no record. error prevention
-  if (scalar(@field_list_all) == 0) {
+  my $sample_data_aref = $samp_spec_grp_data;
 
-    push(@field_list_all, '*');
+  my @field_list_all;
+
+  if (scalar(@{$sample_data_aref}) == 1) {
+
+    @field_list_all = keys(%{$sample_data_aref->[0]});
   }
+  else {
+
+    $self->logger->debug("It reaches here");
+    my ($sfield_err, $sfield_msg, $sfield_data, $pkey_data) = get_static_field($dbh, 'specimengroup');
+
+    if ($sfield_err) {
+
+      $self->logger->debug("Get static field failed: $sfield_msg");
+      return $self->_set_error();
+    }
+
+    for my $sfield_rec (@{$sfield_data}) {
+
+      push(@field_list_all, $sfield_rec->{'Name'});
+    }
+
+    for my $pkey_field (@{$pkey_data}) {
+
+      push(@field_list_all, $pkey_field);
+    }
+  }
+
+  $self->logger->debug("Field list all: " . join(',', @field_list_all));
 
   my $final_field_list = \@field_list_all;
 
   $self->logger->debug("Final field list: " . join(',', @{$final_field_list}));
-  
+
   if ( length($field_list_csv) > 0 ) {
 
     my ( $sel_field_err, $sel_field_msg, $sel_field_list ) = parse_selected_field( $field_list_csv,
@@ -5333,26 +5398,80 @@ sub list_specimen_group_advanced_runmode {
     $final_field_list = $sel_field_list;
   }
 
-  my $join = '';
+  my $field_lookup = {};
+  for my $fd_name (@{$final_field_list}) {
+
+    $field_lookup->{$fd_name} = 1;
+  }
+
+  my $join = ' LEFT JOIN specimengroupentry ON specimengroup.SpecimenGroupId = specimengroupentry.SpecimenGroupId ';
 
   for my $field (@{$final_field_list}) {
 
     if ($field eq 'SpecimenGroupTypeId') {
 
       push(@{$final_field_list}, 'generaltype.TypeName AS SpecimenGroupTypeName');
-      $join = ' LEFT JOIN generaltype ON specimengroup.SpecimenGroupTypeId = generaltype.TypeId';
+      $join .= ' LEFT JOIN generaltype ON specimengroup.SpecimenGroupTypeId = generaltype.TypeId';
+    }
+
+    if ($field eq 'SpecimenGroupStatus') {
+
+      push(@{$final_field_list}, 'generaltypestatus.TypeName AS SpecimenGroupStatusName');
+      $join .= ' LEFT JOIN generaltype AS generaltypestatus ON specimengroup.SpecimenGroupStatus = generaltypestatus.TypeId';
     }
   }
 
+  my $compulsory_perm_fields = ['OwnGroupId',
+                                'AccessGroupId',
+                                'OwnGroupPerm',
+                                'AccessGroupPerm',
+                                'OtherPerm',
+                               ];
+
+  for my $com_fd_name (@{$compulsory_perm_fields}) {
+
+    if (length($field_lookup->{$com_fd_name}) == 0) {
+
+      push(@{$final_field_list}, $com_fd_name);
+    }
+  }
+
+  if ($filtering_csv =~ /SpecimenId/) {
+
+    push(@{$final_field_list}, 'SpecimenId');
+  }
+
+  my $field_name2table_name  = { 'SpecimenId' => 'specimengroupentry' };
+  my $validation_func_lookup = {};
+
+  push(@{$final_field_list}, "$perm_str AS UltimatePerm");
+
   $self->logger->debug("Final field list: " . join(',', @{$final_field_list}));
 
-  $sql  = 'SELECT ' . join(',', @{$final_field_list}) . ' ';
+  my @sql_field_list;
+
+  for my $field_name (@{$final_field_list}) {
+
+    if ($field_name ne 'SpecimenId') {
+
+      push(@sql_field_list, $field_name);
+    }
+  }
+
+  $sql  = 'SELECT ' . join(',', @sql_field_list) . ' ';
+
+  # SpecimenGroupId is ambiguous so it needs a table name at the front
+
+  $sql =~ s/SpecimenGroupId/specimengroup.SpecimenGroupId/;
+
   $sql .= "FROM specimengroup $join ";
 
-  my $dbh = connect_kdb_read();
-
-  my ( $filter_err, $filter_msg, $filter_phrase, $where_arg ) = parse_filtering('SpecimenGroupId', 'specimengroup',
-                                                                                $filtering_csv, $final_field_list );
+  my ( $filter_err, $filter_msg, $filter_phrase, $where_arg ) = parse_filtering('SpecimenGroupId',
+                                                                                'specimengroup',
+                                                                                $filtering_csv,
+                                                                                $final_field_list,
+                                                                                $validation_func_lookup,
+                                                                                $field_name2table_name);
   if ($filter_err) {
 
     $self->logger->debug("Parse filtering failed: $filter_msg");
@@ -5367,12 +5486,12 @@ sub list_specimen_group_advanced_runmode {
   my $filter_where_phrase = '';
   if (length($filter_phrase) > 0) {
 
-    $filter_where_phrase = " WHERE $filter_phrase ";
+    $filter_where_phrase = " AND $filter_phrase ";
   }
 
-  my $filtering_exp = $filter_where_phrase;
+  my $filtering_exp = " WHERE (($perm_str) & $READ_PERM) = $READ_PERM $filter_where_phrase ";
 
-  $sql .= " $filter_where_phrase ";
+  $sql .= " $filtering_exp ";
 
   my $pagination_aref = [];
   my $paged_limit_clause = '';
@@ -5385,22 +5504,26 @@ sub list_specimen_group_advanced_runmode {
     if ($int_err) {
 
       $int_err_msg .= ' not integer.';
-      
+
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $int_err_msg}]};
 
       return $data_for_postrun_href;
     }
 
-    my ( $paged_id_err, $paged_id_msg, $nb_records,
-         $nb_pages, $limit_clause, $sql_count_time ) = get_paged_filter($dbh,
-                                                                        $nb_per_page,
-                                                                        $page,
-                                                                        'specimengroup',
-                                                                        'SpecimenGroupId',
-                                                                        $filtering_exp,
-                                                                        $where_arg
-             );
+    my $count_sql = "SELECT COUNT(DISTINCT specimengroup.SpecimenGroupId) ";
+    $count_sql   .= "FROM specimengroup ";
+    $count_sql   .= "LEFT JOIN specimengroupentry ON specimengroup.SpecimenGroupId = specimengroupentry.SpecimenGroupId ";
+    $count_sql   .= "$filtering_exp";
+
+    $self->logger->debug("COUNT SQL: $count_sql");
+
+    my ($paged_id_err, $paged_id_msg, $nb_records,
+        $nb_pages, $limit_clause, $sql_count_time) = get_paged_filter_sql($dbh,
+                                                                          $nb_per_page,
+                                                                          $page,
+                                                                          $count_sql,
+                                                                          $where_arg);
 
     $self->logger->debug("SQL Count time: $sql_count_time");
 
@@ -5428,6 +5551,8 @@ sub list_specimen_group_advanced_runmode {
   }
 
   $dbh->disconnect();
+
+  $sql  =~ s/SELECT/SELECT DISTINCT /;
 
   my ( $sort_err, $sort_msg, $sort_sql ) = parse_sorting( $sorting, $final_field_list );
 
@@ -5467,7 +5592,7 @@ sub list_specimen_group_advanced_runmode {
 
     return $data_for_postrun_href;
   }
-  
+
   $data_for_postrun_href->{'Error'}     = 0;
   $data_for_postrun_href->{'Data'}      = {'SpecimenGroup' => $spec_grp_data,
                                            'Pagination'    => $pagination_aref,
@@ -5515,12 +5640,34 @@ sub get_specimen_group_runmode {
     return $data_for_postrun_href;
   }
 
+  my $group_id      = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+  my $perm_str      = permission_phrase($group_id, 0, $gadmin_status, 'specimengroup');
+
+  my $sql = "SELECT $perm_str as UltimatePerm ";
+  $sql   .= "FROM specimengroup ";
+  $sql   .= "WHERE SpecimenGroupId=?";
+
+  my ($r_spec_grp_err, $spec_grp_perm) = read_cell($dbh, $sql, [$specimen_grp_id]);
+
+  if ( ($spec_grp_perm & $READ_PERM) != $READ_PERM ) {
+
+    my $err_msg = "SpecimenGroup ($specimen_grp_id): permission denied.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
   $dbh->disconnect();
 
-  my $sql = 'SELECT specimengroup.*, generaltype.TypeName AS SpecimenGroupTypeName ';
+  $sql    = 'SELECT specimengroup.*, generaltype.TypeName AS SpecimenGroupTypeName, ';
+  $sql   .= 'generaltypestatus.TypeName AS SpecimenGroupStatus, ';
+  $sql   .= "$perm_str AS UltimatePerm ";
   $sql   .= 'FROM specimengroup LEFT JOIN generaltype ON ';
   $sql   .= 'specimengroup.SpecimenGroupTypeId = generaltype.TypeId ';
-  $sql   .= 'WHERE SpecimenGroupId=?';
+  $sql   .= 'LEFT JOIN generaltype AS generaltypestatus ON specimengroup.SpecimenGroupStatus = generaltypestatus.TypeId ';
+  $sql   .= "WHERE (($perm_str) & $READ_PERM) = $READ_PERM AND SpecimenGroupId=?";
 
   my ($specimen_grp_err, $specimen_grp_msg, $specimen_grp_data) = $self->list_specimen_group(1, $sql, [$specimen_grp_id]);
 
@@ -5572,46 +5719,25 @@ sub update_specimen_group_runmode {
 
   my $dbh_read = connect_kdb_read();
 
-  my $skip_field = {};
+  my $skip_field = { 'OwnGroupId'           => 1,
+                     'AccessGroupId'        => 1,
+                     'OwnGroupPerm'         => 1,
+                     'AccessGroupPerm'      => 1,
+                     'OtherPerm'            => 1,
+                     'SpecimenGroupCreated' => 1,
+                   };
 
-  my ($get_scol_err, $get_scol_msg, $scol_data, $pkey_data) = get_static_field($dbh_read, 'specimengroup');
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'specimengroup', $skip_field);
 
-  if ($get_scol_err) {
+  if ($chk_sfield_err) {
 
-    $self->logger->debug("Get static field info failed: $get_scol_msg");
-    
-    my $err_msg = "Unexpected Error.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+    $self->logger->debug($chk_sfield_msg);
 
-    return $data_for_postrun_href;
-  }
-
-  my $required_field_href = {};
-
-  for my $static_field (@{$scol_data}) {
-
-    my $field_name = $static_field->{'Name'};
-    
-    if ($skip_field->{$field_name}) { next; }
-
-    if ($static_field->{'Required'} == 1) {
-
-      $required_field_href->{$field_name} = $query->param($field_name);
-    }
+    return $for_postrun_href;
   }
 
   $dbh_read->disconnect();
-
-  my ($missing_err, $missing_href) = check_missing_href( $required_field_href );
-
-  if ($missing_err) {
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
-
-    return $data_for_postrun_href;
-  }
 
   # Finish generic required static field checking
 
@@ -5622,6 +5748,35 @@ sub update_specimen_group_runmode {
   if (!$specimen_grp_exist) {
 
     my $err_msg = "SpecimenGroup ($specimen_grp_id) not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $group_id      = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+  my $perm_str      = permission_phrase($group_id, 0, $gadmin_status);
+
+  my $sql = "SELECT $perm_str As UltimatePerm ";
+  $sql   .= 'FROM specimengroup ';
+  $sql   .= 'WHERE SpecimenGroupId=?';
+
+  my ($r_perm_err, $spec_grp_perm) = read_cell($dbh_write, $sql, [$specimen_grp_id]);
+
+  if ($r_perm_err) {
+
+    $self->logger->debug("Read specimen group permission failed.");
+    my $err_msg = "Unexpected Error.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if ( ($spec_grp_perm & $READ_WRITE_PERM) != $READ_WRITE_PERM ) {
+
+    my $err_msg = "SpecimenGroup ($specimen_grp_id): permission denied.";
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
@@ -5663,14 +5818,48 @@ sub update_specimen_group_runmode {
     }
   }
 
-  my $sql = 'UPDATE specimengroup SET ';
+  my $specimen_group_status = read_cell_value($dbh_write, 'specimengroup', 'SpecimenGroupStatus',
+                                              'SpecimenGroupId', $specimen_grp_id);
+
+  if (length($specimen_group_status) == 0) {
+
+    $specimen_group_status = undef;
+  }
+
+  if (defined $query->param('SpecimenGroupStatus')) {
+
+    if (length($query->param('SpecimenGroupStatus')) > 0) {
+
+      $specimen_group_status = $query->param('SpecimenGroupStatus');
+    }
+  }
+
+  if (defined $specimen_group_status) {
+
+    if (!type_existence($dbh_write, 'specimengroupstatus', $specimen_group_status)) {
+
+      my $err_msg = "SpecimenGroupStatus ($specimen_group_status): not found or active.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'SpecimenGroupStatus' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  my $cur_dt = DateTime->now( time_zone => $TIMEZONE );
+  $cur_dt = DateTime::Format::MySQL->format_datetime($cur_dt);
+
+  $sql    = 'UPDATE specimengroup SET ';
+  $sql   .= 'SpecimenGroupStatus=?, ';
+  $sql   .= 'SpecimenGroupTypeId=?, ';
   $sql   .= 'SpecimenGroupName=?, ';
   $sql   .= 'SpecimenGroupNote=?, ';
-  $sql   .= 'SpecimenGroupTypeId=? ';
+  $sql   .= 'SpecimenGroupLastUpdate=? ';
   $sql   .= 'WHERE SpecimenGroupId=?';
 
   my $sth = $dbh_write->prepare($sql);
-  $sth->execute($specimen_group_name, $specimen_group_note, $specimen_group_type_id, $specimen_grp_id);
+  $sth->execute($specimen_group_status, $specimen_group_type_id, $specimen_group_name, $specimen_group_note,
+                $cur_dt, $specimen_grp_id);
 
   if ($dbh_write->err()) {
 
@@ -5731,7 +5920,36 @@ sub remove_specimen_from_specimen_group_runmode {
     return $data_for_postrun_href;
   }
 
-  my $sql = 'SELECT Count(*) ';
+  my $group_id      = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+  my $perm_str      = permission_phrase($group_id, 0, $gadmin_status);
+
+  my $sql = "SELECT $perm_str As UltimatePerm ";
+  $sql   .= 'FROM specimengroup ';
+  $sql   .= 'WHERE SpecimenGroupId=?';
+
+  my ($r_perm_err, $spec_grp_perm) = read_cell($dbh_write, $sql, [$specimen_grp_id]);
+
+  if ($r_perm_err) {
+
+    $self->logger->debug("Read specimen group permission failed.");
+    my $err_msg = "Unexpected Error.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if ( ($spec_grp_perm & $READ_WRITE_PERM) != $READ_WRITE_PERM ) {
+
+    my $err_msg = "SpecimenGroup ($specimen_grp_id): permission denied.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sql    = 'SELECT Count(*) ';
   $sql   .= 'FROM specimengroupentry ';
   $sql   .= 'WHERE SpecimenGroupId=? AND SpecimenId=?';
 
@@ -5928,7 +6146,7 @@ sub list_genotype_advanced_runmode {
 "ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
 "ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
 "URLParameter": [{"ParameterName": "nperpage", "Description": "Number of records in a page for pagination"}, {"ParameterName": "num", "Description": "The page number of the pagination"}],
-"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database filed name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "FieldList", "Description": "Comma separated value of wanted fields."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases."}],
+"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database field name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "FieldList", "Description": "Comma separated value of wanted fields."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases."}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
@@ -5960,7 +6178,7 @@ sub list_genotype_advanced_runmode {
   }
 
   my $filtering_csv = '';
-  
+
   if (defined $query->param('Filtering')) {
 
     $filtering_csv = $query->param('Filtering');
@@ -6016,7 +6234,7 @@ sub list_genotype_advanced_runmode {
 
   my $dbh = connect_kdb_read();
   my $field_list = ['genotype.*', 'VCol*'];
-  
+
   my ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_sql($dbh, $field_list, 'genotype',
                                                                         'GenotypeId', '');
 
@@ -6048,14 +6266,37 @@ sub list_genotype_advanced_runmode {
     return $data_for_postrun_href;
   }
 
-  my $sample_geno_aref = $sam_geno_data;
+  my $sample_data_aref = $sam_geno_data;
 
-  my @field_list_all = keys(%{$sample_geno_aref->[0]});
+  my @field_list_all;
 
-  # no field return, it means no record. error prevention
-  if (scalar(@field_list_all) == 0) {
-    
-    push(@field_list_all, '*');
+  if (scalar(@{$sample_data_aref}) == 1) {
+
+    @field_list_all = keys(%{$sample_data_aref->[0]});
+  }
+  else {
+
+    my ($sfield_err, $sfield_msg, $sfield_data, $pkey_data) = get_static_field($dbh, 'genotype');
+
+    if ($sfield_err) {
+
+      $self->logger->debug("Get static field failed: $sfield_msg");
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    for my $sfield_rec (@{$sfield_data}) {
+
+      push(@field_list_all, $sfield_rec->{'Name'});
+    }
+
+    for my $pkey_field (@{$pkey_data}) {
+
+      push(@field_list_all, $pkey_field);
+    }
   }
 
   my $final_field_list = \@field_list_all;
@@ -6139,7 +6380,7 @@ sub list_genotype_advanced_runmode {
   }
 
   my $filtering_exp = " WHERE (($perm_str) & $READ_PERM) = $READ_PERM $filter_where_phrase ";
-  
+
   my $pagination_aref    = [];
   my $paged_limit_clause = '';
   my $paged_limit_elapsed;
@@ -6162,7 +6403,7 @@ sub list_genotype_advanced_runmode {
     $self->logger->debug("Filtering expression: $filtering_exp");
 
     my $paged_limit_start_time = [gettimeofday()];
-   
+
     my ($pg_id_err, $pg_id_msg, $nb_records,
         $nb_pages, $limit_clause, $rcount_time) = get_paged_filter($dbh,
                                                                    $nb_per_page,
@@ -6177,9 +6418,9 @@ sub list_genotype_advanced_runmode {
     $self->logger->debug("SQL Row count time: $rcount_time");
 
     if ($pg_id_err == 1) {
-    
+
       $self->logger->debug($pg_id_msg);
-    
+
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
@@ -6187,7 +6428,7 @@ sub list_genotype_advanced_runmode {
     }
 
     if ($pg_id_err == 2) {
-      
+
       $page = 0;
     }
 
@@ -6303,6 +6544,35 @@ sub add_specimen2specimen_group_runmode {
     return $data_for_postrun_href;
   }
 
+  my $group_id      = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+  my $perm_str      = permission_phrase($group_id, 0, $gadmin_status);
+
+  my $sql = "SELECT $perm_str As UltimatePerm ";
+  $sql   .= 'FROM specimengroup ';
+  $sql   .= 'WHERE SpecimenGroupId=?';
+
+  my ($r_perm_err, $spec_grp_perm) = read_cell($dbh_write, $sql, [$specimen_grp_id]);
+
+  if ($r_perm_err) {
+
+    $self->logger->debug("Read specimen group permission failed.");
+    my $err_msg = "Unexpected Error.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if ( ($spec_grp_perm & $READ_WRITE_PERM) != $READ_WRITE_PERM ) {
+
+    my $err_msg = "SpecimenGroup ($specimen_grp_id): permission denied.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
   my $specimen_info_xml_file = $self->authen->get_upload_file();
   my $specimen_info_dtd_file = $self->get_specimen_group_dtd_file();
 
@@ -6313,7 +6583,7 @@ sub add_specimen2specimen_group_runmode {
   eval {
 
     local $XML::Checker::FAIL = sub {
-      
+
       my $code = shift;
       my $err_str = XML::Checker::error_string ($code, @_);
       $self->logger->debug("XML Parsing ERR: $code : $err_str");
@@ -6334,9 +6604,6 @@ sub add_specimen2specimen_group_runmode {
 
     return $data_for_postrun_href;
   }
-
-  my $group_id  = $self->authen->group_id();
-  my $gadmin_status = $self->authen->gadmin_status();
 
   my $specimen_info_xml  = read_file($specimen_info_xml_file);
   my $specimen_info_aref = xml2arrayref($specimen_info_xml, 'specimengroupentry');
@@ -6510,7 +6777,7 @@ sub add_specimen2specimen_group_runmode {
 
   my $specimengroupentry_row_str = join(',', @specimengroupentry_row);
 
-  my $sql = 'INSERT INTO specimengroupentry ';
+  $sql    = 'INSERT INTO specimengroupentry ';
   $sql   .= '(SpecimenGroupId, SpecimenId, SpecimenNote) ';
   $sql   .= "VALUES $specimengroupentry_row_str";
 
@@ -6800,7 +7067,7 @@ sub del_specimen_group_runmode {
 
   my $self       = shift;
   my $specimengroup_id = $self->param('id');
-  
+
   my $data_for_postrun_href = {};
 
   my $dbh_k_read = connect_kdb_read();
@@ -6810,6 +7077,19 @@ sub del_specimen_group_runmode {
   if (!$specimengroup_exist) {
 
     my $err_msg = "SpecimenGroup ($specimengroup_id) not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $own_group_id = read_cell_value($dbh_k_read, 'specimengroup', 'OwnGroupId', 'SpecimenGroupId', $specimengroup_id);
+
+  my $group_id = $self->authen->group_id();
+
+  if ($group_id != $own_group_id) {
+
+    my $err_msg = "SpecimenGroup ($specimengroup_id): permission denied.";
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
@@ -7113,8 +7393,8 @@ sub import_genotype_csv_runmode {
 "GroupAdminRequired": 0,
 "SignatureRequired": 1,
 "AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><ReturnIdFile xml='http://kddart.example.com/data/admin/import_genotype_csv_return_id_172.xml' /><Info Message='43 genotypes have been inserted successfully. Total number of VCol records: 0. Time taken in seconds: 0.131511.' /></DATA>",
-"SuccessMessageJSON": "{'ReturnIdFile' : [{'json' : 'http://kddart.example.com/data/admin/import_genotype_csv_return_id_236.json'}],'Info' : [{'Message' : '1 genotypes have been inserted successfully. Total number of VCol records: 0. Time taken in seconds: 0.094262.'}]}",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><ReturnIdFile xml='http://kddart-d.diversityarrays.com/data/admin/import_genotype_csv_return_id_172.xml' /><Info Message='43 genotypes have been inserted successfully. Total number of VCol records: 0. Time taken in seconds: 0.131511.' /></DATA>",
+"SuccessMessageJSON": "{'ReturnIdFile' : [{'json' : 'http://kddart-d.diversityarrays.com/data/admin/import_genotype_csv_return_id_236.json'}],'Info' : [{'Message' : '1 genotypes have been inserted successfully. Total number of VCol records: 0. Time taken in seconds: 0.094262.'}]}",
 "ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Row (43): genus (41) not found.' /></DATA>"}],
 "ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Row (43): genus (41) not found.'}]}"}],
 "RequiredUpload": 1,
@@ -7312,7 +7592,7 @@ sub import_genotype_csv_runmode {
       }
 
       my $maxlen_chk_href = {};
-      
+
       for my $vcol_name (keys(%{$vcol_len_info})) {
 
         $maxlen_chk_href->{$vcol_name} = $data_row->{$vcol_name};
@@ -7326,7 +7606,7 @@ sub import_genotype_csv_runmode {
         return $self->_set_error($vcol_maxlen_msg);
       }
 
-      my $geno_name = $data_row->{'GenotypeName'};
+      my $geno_name = trim($data_row->{'GenotypeName'});
       my $genus_id  = $data_row->{'GenusId'};
 
       $unique_genus->{$genus_id} = $row_counter;
@@ -7378,7 +7658,7 @@ sub import_genotype_csv_runmode {
     #$self->logger->debug("Smallest num: $smallest_num");
     #$self->logger->debug("I: $i");
   }
-  
+
   my $check_genus_sql = 'SELECT GenusId FROM genus WHERE GenusId IN (' . join(',', keys(%{$unique_genus})) . ')';
   my $genus_data      = $dbh_write->selectall_hashref($check_genus_sql, 'GenusId');
 
@@ -7430,7 +7710,7 @@ sub import_genotype_csv_runmode {
 
       my $data_row = $data_aref->[$j];
 
-      my $geno_name      = $dbh_write->quote($data_row->{'GenotypeName'});
+      my $geno_name      = $dbh_write->quote(trim($data_row->{'GenotypeName'}));
       my $genus_id       = $data_row->{'GenusId'};
       my $species_name   = '';
 
@@ -7455,7 +7735,7 @@ sub import_genotype_csv_runmode {
 
         $geno_color      = $dbh_write->quote($data_row->{'GenotypeColor'});
       }
-      
+
       my $geno_note      = '';
 
       if (defined $data_row->{'GenotypeNote'}) {
@@ -7473,7 +7753,7 @@ sub import_genotype_csv_runmode {
 
     chop($geno_name_where); # remove the last comma
     chop($bulk_sql);        # remove excessive trailling comma
-    
+
     my $nrows_inserted = $dbh_write->do($bulk_sql);
 
     if ($dbh_write->err()) {
@@ -7519,7 +7799,7 @@ sub import_genotype_csv_runmode {
             $bulk_vcol_sql .= "($geno_id,$vcol_id,$factor_value),";
           }
         }
-      
+
         $j += 1;
       }
 
@@ -7528,7 +7808,7 @@ sub import_genotype_csv_runmode {
         chop($bulk_vcol_sql);        # remove excessive trailling comma
 
         $self->logger->debug("Bulk insert for VCol: $bulk_vcol_sql");
-    
+
         my $nrows_vcol_inserted = $dbh_write->do($bulk_vcol_sql);
 
         if ($dbh_write->err()) {
@@ -7583,7 +7863,7 @@ sub import_genotype_csv_runmode {
       #$self->logger->debug("New Genotype Name: $n_geno_name");
       #$self->logger->debug("DB GenusID: $db_genus_id");
       #$self->logger->debug("GenusId file: " . $unique_genotype->{lc($n_geno_name)});
-      
+
       if ($unique_genotype->{lc($n_geno_name)} == $db_genus_id) {
 
         push(@{$just_inserted_id_data}, $new_geno_rec);
@@ -7603,7 +7883,7 @@ sub import_genotype_csv_runmode {
   }
 
   if (length($content_type) == 0) {
-    
+
     $content_type = 'xml';
   }
   else {
@@ -7679,11 +7959,11 @@ sub export_genotype_runmode {
 "GroupAdminRequired": 0,
 "SignatureRequired": 0,
 "AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "FILTERING"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='Time taken in seconds: 0.043529.' /><OutputFile csv='http://kddart.example.com/data/admin/export_genotype_37fc0d4c85c74d3775f1786e86c906e7.csv' /></DATA>",
-"SuccessMessageJSON": "{'Info' : [{'Message' : 'Time taken in seconds: 0.026635.'}],'OutputFile' : [{'csv' : 'http://kddart.example.com/data/admin/export_genotype_37fc0d4c85c74d3775f1786e86c906e7.csv'}]}",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='Time taken in seconds: 0.043529.' /><OutputFile csv='http://kddart-d.diversityarrays.com/data/admin/export_genotype_37fc0d4c85c74d3775f1786e86c906e7.csv' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'Time taken in seconds: 0.026635.'}],'OutputFile' : [{'csv' : 'http://kddart-d.diversityarrays.com/data/admin/export_genotype_37fc0d4c85c74d3775f1786e86c906e7.csv'}]}",
 "ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
 "ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
-"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database filed name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "FieldList", "Description": "Comma separated value of wanted fields."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases."}],
+"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database field name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "FieldList", "Description": "Comma separated value of wanted fields."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases."}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
@@ -7980,8 +8260,8 @@ sub import_specimen_csv_runmode {
 "GroupAdminRequired": 0,
 "SignatureRequired": 1,
 "AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><ReturnIdFile xml='http://kddart.example.com/data/admin/import_specimen_csv_return_id_234.xml' /><Info Message='2 specimens have been inserted successfully. Total number of VColrecords: 0. Time taken in seconds: 0.049178.' /></DATA>",
-"SuccessMessageJSON": "{'ReturnIdFile' : [{'json' : 'http://kddart.example.com/data/admin/import_specimen_csv_return_id_200.json'}],'Info' : [{'Message' : '2 specimens have been inserted successfully. Total number of VCol records: 0. Time taken in seconds: 0.170086.'}]}",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><ReturnIdFile xml='http://kddart-d.diversityarrays.com/data/admin/import_specimen_csv_return_id_234.xml' /><Info Message='2 specimens have been inserted successfully. Total number of VColrecords: 0. Time taken in seconds: 0.049178.' /></DATA>",
+"SuccessMessageJSON": "{'ReturnIdFile' : [{'json' : 'http://kddart-d.diversityarrays.com/data/admin/import_specimen_csv_return_id_200.json'}],'Info' : [{'Message' : '2 specimens have been inserted successfully. Total number of VCol records: 0. Time taken in seconds: 0.170086.'}]}",
 "ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Row (43): BreedingMethod (41) not found.' /></DATA>"}],
 "ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Row (43): BreedingMethod (41) not found.'}]}"}],
 "RequiredUpload": 1,
@@ -8219,7 +8499,7 @@ sub import_specimen_csv_runmode {
 
         $int_chk_href->{'FilialGeneration'} = $data_row->{'FilialGeneration'};
       }
-      
+
       my ($int_id_err, $int_id_msg) = check_integer_value( $int_chk_href );
 
       if ($int_id_err) {
@@ -8247,7 +8527,7 @@ sub import_specimen_csv_runmode {
       }
 
       my $maxlen_chk_href = {};
-      
+
       for my $vcol_name (keys(%{$vcol_len_info})) {
 
         $maxlen_chk_href->{$vcol_name} = $data_row->{$vcol_name};
@@ -8280,7 +8560,7 @@ sub import_specimen_csv_runmode {
 
         my $specimen_barcode = $data_row->{'SpecimenBarcode'};
         if ($unique_barcode_href->{$specimen_barcode}) {
-          
+
           my $err_msg = "Row ($row_counter): duplicate barcode ($specimen_barcode) in CSV.";
           return $self->_set_error($err_msg);
         }
@@ -8320,7 +8600,7 @@ sub import_specimen_csv_runmode {
         return $self->_set_error($geno_int_id_msg);
       }
 
-      $specimen_name = $dbh_write->quote($specimen_name);
+      $specimen_name = $dbh_write->quote(trim($specimen_name));
       $specimen_name_where .= "$specimen_name,";
 
       $j += 1;
@@ -8419,7 +8699,7 @@ sub import_specimen_csv_runmode {
           my $err_msg = 'Unexpected Error.';
           $data_for_postrun_href->{'Error'} = 1;
           $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-      
+
           return $data_for_postrun_href;
         }
 
@@ -8442,7 +8722,7 @@ sub import_specimen_csv_runmode {
 
           $data_for_postrun_href->{'Error'} = 1;
           $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-      
+
           return $data_for_postrun_href;
         }
       }
@@ -8456,7 +8736,7 @@ sub import_specimen_csv_runmode {
       if ( !$is_perm_ok ) {
 
         my $trouble_geno_id_str = join(',', @{$trouble_geno_id_aref});
-        
+
         my $start_row = $i + 1;
         my $end_row   = $smallest_num;
         my $err_msg = "Row ($start_row, $end_row): Genotype ($trouble_geno_id_str) permission denied.";
@@ -8521,7 +8801,7 @@ sub import_specimen_csv_runmode {
 
       my $data_row = $data_aref->[$j];
 
-      my $specimen_name      = $dbh_write->quote($data_row->{'SpecimenName'});
+      my $specimen_name      = $dbh_write->quote(trim($data_row->{'SpecimenName'}));
       my $breeding_method_id = $data_row->{'BreedingMethodId'};
 
       my $specimen_barcode = "''";
@@ -8575,7 +8855,7 @@ sub import_specimen_csv_runmode {
 
     chop($specimen_name_where); # remove the last comma
     chop($bulk_sql);            # remove excessive trailling comma
-    
+
     my $nrows_inserted = $dbh_write->do($bulk_sql);
 
     if ($dbh_write->err()) {
@@ -8616,7 +8896,7 @@ sub import_specimen_csv_runmode {
         my $geno_id = $data_row->{$geno_id_field};
         $insert_geno_spec_bulk_sql .= "($specimen_id,$geno_id),";
       }
-      
+
       $j += 1;
     }
 
@@ -8633,7 +8913,6 @@ sub import_specimen_csv_runmode {
 
       return $self->_set_error('Unexpected error.');
     }
-    
 
     if ($any_vcol_defined) {
 
@@ -8663,7 +8942,7 @@ sub import_specimen_csv_runmode {
             $bulk_vcol_sql .= "($specimen_id,$vcol_id,$factor_value),";
           }
         }
-      
+
         $j += 1;
       }
 
@@ -8672,7 +8951,7 @@ sub import_specimen_csv_runmode {
         chop($bulk_vcol_sql);        # remove excessive trailling comma
 
         $self->logger->debug("Bulk insert for VCol: $bulk_vcol_sql");
-    
+
         my $nrows_vcol_inserted = $dbh_write->do($bulk_vcol_sql);
 
         if ($dbh_write->err()) {
@@ -8707,7 +8986,7 @@ sub import_specimen_csv_runmode {
   }
 
   if (length($content_type) == 0) {
-    
+
     $content_type = 'xml';
   }
   else {
@@ -8721,9 +9000,9 @@ sub import_specimen_csv_runmode {
   my $export_data_path     = "${doc_root}/data/$username";
   my $return_id_filename   = $self->get_current_runmode() . "_return_id_${file_rand}.${content_type}";
   my $return_id_file       = "${export_data_path}/$return_id_filename";
-  
+
   if ( !(-e $export_data_path) ) {
-      
+
     mkdir($export_data_path);
   }
 
@@ -8798,24 +9077,54 @@ sub add_breedingmethod_runmode {
 
   my $data_for_postrun_href = {};
 
+  # Generic required static field checking
+
+  my $dbh_read = connect_kdb_read();
+
+  my $skip_field = {};
+
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'breedingmethod', $skip_field);
+
+  if ($chk_sfield_err) {
+
+    $self->logger->debug($chk_sfield_msg);
+
+    return $for_postrun_href;
+  }
+
+  $dbh_read->disconnect();
+
+  # Finish generic required static field checking
+
   my $breedingmethod_name = $query->param('BreedingMethodName');
-  my $breedingmethod_note = '';
+  my $breedingmethod_type = $query->param('BreedingMethodTypeId');
+
+  my $breedingmethod_acronym = undef;
+
+  if (defined $query->param('BreedingMethodAcronym')) {
+
+    if (length($query->param('BreedingMethodAcronym')) > 0) {
+
+      $breedingmethod_acronym = $query->param('BreedingMethodAcronym');
+    }
+  }
+
+  my $breedingmethod_note = undef;
 
   if (defined $query->param('BreedingMethodNote')) {
 
     $breedingmethod_note = $query->param('BreedingMethodNote');
   }
 
-  # Check for the required field
-  my ( $missing_err, $missing_href ) = check_missing_href( { 'BreedingMethodName' => $breedingmethod_name,
-                                                           } );
+  my $breedingmethod_symbol = undef;
 
-  if ( $missing_err ) {
+  if (defined $query->param('BreedingMethodSymbol')) {
 
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
+    if (length($query->param('BreedingMethodSymbol')) > 0) {
 
-    return $data_for_postrun_href;
+      $breedingmethod_symbol = $query->param('BreedingMethodSymbol');
+    }
   }
 
   my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength ";
@@ -8824,8 +9133,7 @@ sub add_breedingmethod_runmode {
 
   my $dbh_k_read = connect_kdb_read();
   my $vcol_data = $dbh_k_read->selectall_hashref($sql, 'FactorId');
-  $dbh_k_read->disconnect();
-  
+
   my $vcol_param_data        = {};
   my $vcol_len_info          = {};
   my $vcol_param_data_maxlen = {};
@@ -8852,7 +9160,7 @@ sub add_breedingmethod_runmode {
 
     return $data_for_postrun_href;
   }
-  
+
   my ( $vcol_maxlen_err, $vcol_maxlen_href ) = check_maxlen_href( $vcol_param_data_maxlen, $vcol_len_info );
 
   if ($vcol_maxlen_err) {
@@ -8863,14 +9171,51 @@ sub add_breedingmethod_runmode {
     return $data_for_postrun_href;
   }
 
+  my $bmeth_type_existence = type_existence($dbh_k_read, 'breedingmethod', $breedingmethod_type);
+
+  $dbh_k_read->disconnect();
+
+  if (!$bmeth_type_existence) {
+
+    my $err_msg = "BreedingMethodType ($breedingmethod_type) does not exist.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'BreedingMethodTypeId' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (record_existence($dbh_k_read, 'breedingmethod', 'BreedingMethodName', $breedingmethod_name)) {
+
+    my $err_msg = "BreedingMethodName ($breedingmethod_name) already exists.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'BreedingMethodName' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (defined $breedingmethod_acronym) {
+
+    if (record_existence($dbh_k_read, 'breedingmethod', 'BreedingMethodAcronym', $breedingmethod_acronym)) {
+
+      my $err_msg = "BreedingMethodAcronym ($breedingmethod_acronym) already exists.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'BreedingMethodAcronym' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
   my $dbh_k_write = connect_kdb_write();
-  
+
   $sql  = "INSERT INTO breedingmethod SET ";
+  $sql .= "BreedingMethodTypeId=?, ";
   $sql .= "BreedingMethodName=?, ";
-  $sql .= "BreedingMethodNote=?";
- 
+  $sql .= "BreedingMethodAcronym=?, ";
+  $sql .= "BreedingMethodNote=?, ";
+  $sql .= "BreedingMethodSymbol=?";
+
   my $sth = $dbh_k_write->prepare($sql);
-  $sth->execute( $breedingmethod_name, $breedingmethod_note );
+  $sth->execute( $breedingmethod_type, $breedingmethod_name, $breedingmethod_acronym, $breedingmethod_note, $breedingmethod_symbol );
 
   if ( $dbh_k_write->err() ) {
 
@@ -8880,7 +9225,7 @@ sub add_breedingmethod_runmode {
   my $breedingmethod_id = $dbh_k_write->last_insert_id( undef, undef, 'breedingmethod', 'BreedingMethodId' ) || -1;
   $self->logger->debug("BreedingMethodId: $breedingmethod_id");
   $sth->finish();
-  
+
   for my $vcol_id ( keys( %{$vcol_data} ) ) {
 
     my $factor_value = $query->param( 'VCol_' . "$vcol_id" );
@@ -9000,7 +9345,7 @@ sub list_breedingmethod {
     }
 
     if (scalar(@{$breedingmethod_id_aref}) > 0) {
-      
+
       my $chk_table_aref = [{'TableName' => 'specimen', 'FieldName' => 'BreedingMethodId'}];
 
       my ($chk_id_err, $chk_id_msg,
@@ -9070,9 +9415,9 @@ sub list_breedingmethod_runmode {
   my $data_for_postrun_href = {};
 
   my $dbh = connect_kdb_read();
-  my $field_list = ['*'];
-  
-  my $other_join = '';
+  my $field_list = ['breedingmethod.*', 'generaltype.TypeName AS BreedingMethodTypeName'];
+
+  my $other_join = ' LEFT JOIN generaltype ON breedingmethod.BreedingMethodTypeId = generaltype.TypeId ';
 
   my ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_sql($dbh, $field_list, 'breedingmethod',
                                                                         'BreedingMethodId', $other_join);
@@ -9102,7 +9447,7 @@ sub list_breedingmethod_runmode {
   if ($read_breed_meth_err) {
 
     $self->logger->debug($read_breed_meth_msg);
-    
+
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
@@ -9146,6 +9491,26 @@ sub update_breedingmethod_runmode {
 
   my $data_for_postrun_href = {};
 
+  # Generic required static field checking
+
+  my $dbh_read = connect_kdb_read();
+
+  my $skip_field = {};
+
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'breedingmethod', $skip_field);
+
+  if ($chk_sfield_err) {
+
+    $self->logger->debug($chk_sfield_msg);
+
+    return $for_postrun_href;
+  }
+
+  $dbh_read->disconnect();
+
+  # Finish generic required static field checking
+
   my $dbh_k_read = connect_kdb_read();
   my $breedingmethod_exist = record_existence($dbh_k_read, 'breedingmethod',
                                               'BreedingmethodId', $breedingmethod_id);
@@ -9159,23 +9524,61 @@ sub update_breedingmethod_runmode {
     return $data_for_postrun_href;
   }
 
+  my $breedingmethod_type = $query->param('BreedingMethodTypeId');
   my $breedingmethod_name = $query->param('BreedingMethodName');
-  my $breedingmethod_note = read_cell_value($dbh_k_read, 'breedingmethod',
-                                            'BreedingMethodNote',
-                                            'BreedingMethodId',
-                                            $breedingmethod_id );
+
+  my $breedingmethod_note    = read_cell_value($dbh_k_read, 'breedingmethod',
+                                               'BreedingMethodNote',
+                                               'BreedingMethodId',
+                                               $breedingmethod_id );
+
+  if (length($breedingmethod_note) == 0) {
+
+    $breedingmethod_note = undef;
+  }
+
+  my $breedingmethod_acronym = read_cell_value($dbh_k_read, 'breedingmethod',
+                                               'BreedingMethodAcronym',
+                                               'BreedingMethodId',
+                                               $breedingmethod_id );
+
+  if (length($breedingmethod_acronym) == 0) {
+
+    $breedingmethod_acronym = undef;
+  }
+
+  my $breedingmethod_symbol  = read_cell_value($dbh_k_read, 'breedingmethod',
+                                               'BreedingMethodSymbol',
+                                               'BreedingMethodId',
+                                               $breedingmethod_id );
+
+  if (length($breedingmethod_symbol) == 0) {
+
+    $breedingmethod_symbol = undef;
+  }
+
+  if (defined $query->param('BreedingMethodAcronym')) {
+
+    if (length($query->param('BreedingMethodAcronym')) > 0) {
+
+      $breedingmethod_acronym = $query->param('BreedingMethodAcronym');
+    }
+  }
 
   if (defined $query->param('BreedingMethodNote')) {
 
-    $breedingmethod_note = $query->param('BreedingMethodNote');
+    if (length($query->param('BreedingMethodNote')) > 0) {
+
+      $breedingmethod_note = $query->param('BreedingMethodNote');
+    }
   }
 
-  # Check for the required field
-  my ( $missing_err, $missing_msg ) = check_missing_value( { 'BreedingMethodName' => $breedingmethod_name } );
+  if (defined $query->param('BreedingMethodSymbol')) {
 
-  if ( $missing_err ) {
-    $missing_msg .= ' missing.';
-    return $self->_set_error($missing_msg);
+    if (length($query->param('BreedingMethodSymbol')) > 0) {
+
+      $breedingmethod_symbol = $query->param('BreedingMethodSymbol');
+    }
   }
 
   my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength ";
@@ -9221,17 +9624,74 @@ sub update_breedingmethod_runmode {
     return $data_for_postrun_href;
   }
 
+  my $bmeth_type_existence = type_existence($dbh_k_read, 'breedingmethod', $breedingmethod_type);
+
+  if (!$bmeth_type_existence) {
+
+    my $err_msg = "BreedingMethodType ($breedingmethod_type) does not exist.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'BreedingMethodTypeId' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $chk_bmeth_name_sql = 'SELECT BreedingMethodId FROM breedingmethod WHERE BreedingMethodName=? AND BreedingMethodId <> ?';
+
+  my ($read_err, $db_bmeth_id) = read_cell($dbh_k_read, $chk_bmeth_name_sql, [$breedingmethod_id, $breedingmethod_name]);
+
+  if ($read_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (length($db_bmeth_id) > 0) {
+
+    my $err_msg = "BreedingMethodName ($breedingmethod_name): already exists.";
+    $data_for_postrun_href->{'Error'}       = 1;
+    $data_for_postrun_href->{'Data'}        = {'Error' => [{'BreedingMethodName' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $chk_bmeth_acro_sql = 'SELECT BreedingMethodId FROM breedingmethod WHERE BreedingMethodAcronym=? AND BreedingMethodId <> ?';
+
+  ($read_err, $db_bmeth_id) = read_cell($dbh_k_read, $chk_bmeth_name_sql, [$breedingmethod_id, $breedingmethod_name]);
+
+  if ($read_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (length($db_bmeth_id) > 0) {
+
+    my $err_msg = "BreedingMethodAcronym ($breedingmethod_acronym): already exists.";
+    $data_for_postrun_href->{'Error'}       = 1;
+    $data_for_postrun_href->{'Data'}        = {'Error' => [{'BreedingMethodAcronym' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
   $dbh_k_read->disconnect();
 
   my $dbh_k_write = connect_kdb_write();
 
   $sql  = "UPDATE breedingmethod SET ";
+  $sql .= "BreedingMethodTypeId=?, ";
   $sql .= "BreedingMethodName=?, ";
-  $sql .= "BreedingMethodNote=? ";
+  $sql .= "BreedingMethodAcronym=?, ";
+  $sql .= "BreedingMethodNote=?, ";
+  $sql .= "BreedingMethodSymbol=? ";
   $sql .= "WHERE BreedingMethodId=?";
- 
+
   my $sth = $dbh_k_write->prepare($sql);
-  $sth->execute( $breedingmethod_name, $breedingmethod_note, $breedingmethod_id );
+  $sth->execute( $breedingmethod_type, $breedingmethod_name, $breedingmethod_acronym,
+                 $breedingmethod_note, $breedingmethod_symbol, $breedingmethod_id );
 
   if ($dbh_k_write->err()) {
 
@@ -9252,28 +9712,28 @@ sub update_breedingmethod_runmode {
       $sql  = 'SELECT Count(*) ';
       $sql .= 'FROM breedingmethodfactor ';
       $sql .= 'WHERE BreedingMethodId=? AND FactorId=?';
-      
+
       my ($read_err, $count) = read_cell($dbh_k_write, $sql, [$breedingmethod_id, $vcol_id]);
 
       if (length($factor_value) > 0) {
 
         if ($count > 0) {
-        
+
           $sql  = 'UPDATE breedingmethodfactor SET ';
           $sql .= 'FactorValue=? ';
           $sql .= 'WHERE BreedingMethodId=? AND FactorId=?';
           my $factor_sth = $dbh_k_write->prepare($sql);
           $factor_sth->execute($factor_value, $breedingmethod_id, $vcol_id);
-          
+
           if ($dbh_k_write->err()) {
-        
+
             $self->logger->debug($dbh_k_write->errstr());
             $data_for_postrun_href->{'Error'} = 1;
             $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
             return $data_for_postrun_href;
           }
-          
+
           $factor_sth->finish();
         }
         else {
@@ -9284,16 +9744,16 @@ sub update_breedingmethod_runmode {
           $sql .= 'FactorValue=?';
           my $factor_sth = $dbh_k_write->prepare($sql);
           $factor_sth->execute($breedingmethod_id, $vcol_id, $factor_value);
-          
+
           if ($dbh_k_write->err()) {
-            
+
             $self->logger->debug($dbh_k_write->errstr());
             $data_for_postrun_href->{'Error'} = 1;
             $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
             return $data_for_postrun_href;
           }
-          
+
           $factor_sth->finish();
         }
       }
@@ -9306,9 +9766,9 @@ sub update_breedingmethod_runmode {
 
           my $factor_sth = $dbh_k_write->prepare($sql);
           $factor_sth->execute($breedingmethod_id, $vcol_id);
-      
+
           if ($dbh_k_write->err()) {
-        
+
             $self->logger->debug($dbh_k_write->errstr());
             $data_for_postrun_href->{'Error'} = 1;
             $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
@@ -9372,9 +9832,9 @@ sub get_breedingmethod_runmode {
     return $data_for_postrun_href;
   }
 
-  my $field_list = ['*'];
-  
-  my $other_join = '';
+  my $field_list = ['breedingmethod.*', 'generaltype.TypeName AS BreedingMethodTypeName'];
+
+  my $other_join = ' LEFT JOIN generaltype ON breedingmethod.BreedingMethodTypeId = generaltype.TypeId ';
 
   my ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_sql($dbh, $field_list, 'breedingmethod',
                                                                         'BreedingMethodId', $other_join);
@@ -9517,7 +9977,7 @@ sub import_pedigree_csv_runmode {
 
 =pod import_pedigree_csv_HELP_START
 {
-"OperationName" : "Import geneotypes",
+"OperationName" : "Import pedigree",
 "Description": "Import specimen pedigree information in bulk using csv file.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -9933,11 +10393,11 @@ sub export_specimen_runmode {
 "GroupAdminRequired": 0,
 "SignatureRequired": 0,
 "AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "FILTERING"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='Time taken in seconds: 0.08417.' /><OutputFile csv='http://kddart.example.com/data/admin/export_specimen_4a1d0104cd67f2f3a20a8b35afd26d9f.csv' /></DATA>",
-"SuccessMessageJSON": "{'Info' : [{'Message' : 'Time taken in seconds: 0.02813.'}],'OutputFile' : [{'csv' : 'http://kddart.example.com/data/admin/export_specimen_4a1d0104cd67f2f3a20a8b35afd26d9f.csv'}]}",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='Time taken in seconds: 0.08417.' /><OutputFile csv='http://kddart-d.diversityarrays.com/data/admin/export_specimen_4a1d0104cd67f2f3a20a8b35afd26d9f.csv' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'Time taken in seconds: 0.02813.'}],'OutputFile' : [{'csv' : 'http://kddart-d.diversityarrays.com/data/admin/export_specimen_4a1d0104cd67f2f3a20a8b35afd26d9f.csv'}]}",
 "ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
 "ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
-"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database filed name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "FieldList", "Description": "Comma separated value of wanted fields."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases."}],
+"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database field name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "FieldList", "Description": "Comma separated value of wanted fields."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases."}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
@@ -10300,11 +10760,11 @@ sub export_pedigree_runmode {
 "GroupAdminRequired": 0,
 "SignatureRequired": 0,
 "AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "FILTERING"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='Time taken in seconds: 0.02539.' /><OutputFile csv='http://kddart.example.com/data/admin/export_pedigree_d126d2a41c9a5e7170be8df05dbd0a14.csv' /></DATA>",
-"SuccessMessageJSON": "{'Info' : [{'Message' : 'Time taken in seconds: 0.022992.'}],'OutputFile' : [{'csv' : 'http://kddart.example.com/data/admin/export_pedigree_d126d2a41c9a5e7170be8df05dbd0a14.csv'}]}",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='Time taken in seconds: 0.02539.' /><OutputFile csv='http://kddart-d.diversityarrays.com/data/admin/export_pedigree_d126d2a41c9a5e7170be8df05dbd0a14.csv' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'Time taken in seconds: 0.022992.'}],'OutputFile' : [{'csv' : 'http://kddart-d.diversityarrays.com/data/admin/export_pedigree_d126d2a41c9a5e7170be8df05dbd0a14.csv'}]}",
 "ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
 "ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
-"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database filed name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "FieldList", "Description": "Comma separated value of wanted fields."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases."}],
+"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database field name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "FieldList", "Description": "Comma separated value of wanted fields."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases."}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
@@ -10510,6 +10970,26 @@ sub add_pedigree_runmode {
 
   my $data_for_postrun_href = {};
 
+  # Generic required static field checking
+
+  my $dbh_read = connect_kdb_read();
+
+  my $skip_field = {'OwnGroupId' => 1};
+
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'pedigree', $skip_field);
+
+  if ($chk_sfield_err) {
+
+    $self->logger->debug($chk_sfield_msg);
+
+    return $for_postrun_href;
+  }
+
+  $dbh_read->disconnect();
+
+  # Finish generic required static field checking
+
   my $specimen_id           = $query->param('SpecimenId');
   my $p_specimen_id         = $query->param('ParentSpecimenId');
   my $parent_type           = $query->param('ParentType');
@@ -10528,19 +11008,6 @@ sub add_pedigree_runmode {
 
     $nb_of_specimens = $query->param('NumberOfSpecimens');
     $chk_int_href->{'NumberOfSpecimens'} = $nb_of_specimens;
-  }
-
-  my ($missing_err, $missing_href) = check_missing_href( {'SpecimenId'       => $specimen_id,
-                                                          'ParentSpecimenId' => $p_specimen_id,
-                                                          'ParentType'       => $parent_type,
-                                                         } );
-
-  if ($missing_err) {
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
-
-    return $data_for_postrun_href;
   }
 
   my ($int_err, $int_err_href) = check_integer_href( $chk_int_href );
@@ -10697,6 +11164,26 @@ sub update_pedigree_runmode {
 
   my $data_for_postrun_href = {};
 
+  # Generic required static field checking
+
+  my $dbh_read = connect_kdb_read();
+
+  my $skip_field = {'OwnGroupId' => 1};
+
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'pedigree', $skip_field);
+
+  if ($chk_sfield_err) {
+
+    $self->logger->debug($chk_sfield_msg);
+
+    return $for_postrun_href;
+  }
+
+  $dbh_read->disconnect();
+
+  # Finish generic required static field checking
+
   my $dbh_write = connect_kdb_write();
 
   if (!record_existence($dbh_write, 'pedigree', 'PedigreeId', $pedigree_id)) {
@@ -10723,19 +11210,6 @@ sub update_pedigree_runmode {
 
     $nb_of_specimens = $query->param('NumberOfSpecimens');
     $chk_int_href->{'NumberOfSpecimens'} = $nb_of_specimens;
-  }
-
-  my ($missing_err, $missing_href) = check_missing_href( {'SpecimenId'       => $specimen_id,
-                                                          'ParentSpecimenId' => $p_specimen_id,
-                                                          'ParentType'       => $parent_type,
-                                                         } );
-
-  if ($missing_err) {
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
-
-    return $data_for_postrun_href;
   }
 
   my ($int_err, $int_err_href) = check_integer_href( $chk_int_href );
@@ -10945,44 +11419,17 @@ sub add_genpedigree_runmode {
 
   my $skip_field = {};
 
-  my ($get_scol_err, $get_scol_msg, $scol_data, $pkey_data) = get_static_field($dbh_read, 'genpedigree');
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'genpedigree', $skip_field);
 
-  if ($get_scol_err) {
+  if ($chk_sfield_err) {
 
-    $self->logger->debug("Get static field info failed: $get_scol_msg");
-    
-    my $err_msg = "Unexpected Error.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+    $self->logger->debug($chk_sfield_msg);
 
-    return $data_for_postrun_href;
-  }
-
-  my $required_field_href = {};
-
-  for my $static_field (@{$scol_data}) {
-
-    my $field_name = $static_field->{'Name'};
-    
-    if ($skip_field->{$field_name}) { next; }
-
-    if ($static_field->{'Required'} == 1) {
-
-      $required_field_href->{$field_name} = $query->param($field_name);
-    }
+    return $for_postrun_href;
   }
 
   $dbh_read->disconnect();
-
-  my ($missing_err, $missing_href) = check_missing_href( $required_field_href );
-
-  if ($missing_err) {
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
-
-    return $data_for_postrun_href;
-  }
 
   # Finish generic required static field checking
 
@@ -11604,7 +12051,7 @@ sub list_pedigree_advanced_runmode {
 "ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
 "ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
 "URLParameter": [{"ParameterName": "nperpage", "Description": "Number of records in a page for pagination"}, {"ParameterName": "num", "Description": "The page number of the pagination"}],
-"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database filed name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "FieldList", "Description": "Comma separated value of wanted fields."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases."}],
+"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database field name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "FieldList", "Description": "Comma separated value of wanted fields."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases."}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
@@ -11625,7 +12072,7 @@ sub list_pedigree_advanced_runmode {
   }
 
   $self->logger->debug("Page number: $page");
-  
+
   my $field_list_csv = $query->param('FieldList') ? $query->param('FieldList') : '';
   my $filtering_csv  = $query->param('Filtering') ? $query->param('Filtering') : '';
   my $sorting        = $query->param('Sorting')   ? $query->param('Sorting')   : '';
@@ -11639,25 +12086,51 @@ sub list_pedigree_advanced_runmode {
   if ($samp_pedigree_err) {
 
     $self->logger->debug($samp_pedigree_msg);
-    
+
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
     return $data_for_postrun_href;
   }
 
-  my @field_list_all = keys( %{$samp_pedigree_data->[0]} );
+  my $dbh = connect_kdb_read();
 
-  # no field return, it means no record. error prevention
-  if (scalar(@field_list_all) == 0) {
+  my $sample_data_aref = $samp_pedigree_data;
 
-    push(@field_list_all, '*');
+  my @field_list_all;
+
+  if (scalar(@{$sample_data_aref}) == 1) {
+
+    @field_list_all = keys(%{$sample_data_aref->[0]});
   }
+  else {
+
+    $self->logger->debug("It reaches here");
+    my ($sfield_err, $sfield_msg, $sfield_data, $pkey_data) = get_static_field($dbh, 'pedigree');
+
+    if ($sfield_err) {
+
+      $self->logger->debug("Get static field failed: $sfield_msg");
+      return $self->_set_error();
+    }
+
+    for my $sfield_rec (@{$sfield_data}) {
+
+      push(@field_list_all, $sfield_rec->{'Name'});
+    }
+
+    for my $pkey_field (@{$pkey_data}) {
+
+      push(@field_list_all, $pkey_field);
+    }
+  }
+
+  $self->logger->debug("Field list all: " . join(',', @field_list_all));
 
   my $final_field_list = \@field_list_all;
 
   $self->logger->debug("Final field list: " . join(',', @{$final_field_list}));
-  
+
   if ( length($field_list_csv) > 0 ) {
 
     my ( $sel_field_err, $sel_field_msg, $sel_field_list ) = parse_selected_field( $field_list_csv,
@@ -11689,8 +12162,6 @@ sub list_pedigree_advanced_runmode {
 
   $sql  = 'SELECT ' . join(',', @{$final_field_list}) . ' ';
   $sql .= "FROM pedigree $join ";
-
-  my $dbh = connect_kdb_read();
 
   my ( $filter_err, $filter_msg, $filter_phrase, $where_arg ) = parse_filtering('PedigreeId', 'pedigree',
                                                                                 $filtering_csv, $final_field_list );
@@ -11726,7 +12197,7 @@ sub list_pedigree_advanced_runmode {
     if ($int_err) {
 
       $int_err_msg .= ' not integer.';
-      
+
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $int_err_msg}]};
 
@@ -11834,7 +12305,7 @@ sub list_gen_pedigree_advanced_runmode {
 "ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
 "ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
 "URLParameter": [{"ParameterName": "nperpage", "Description": "Number of records in a page for pagination"}, {"ParameterName": "num", "Description": "The page number of the pagination"}],
-"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database filed name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "FieldList", "Description": "Comma separated value of wanted fields."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases."}],
+"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database field name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "FieldList", "Description": "Comma separated value of wanted fields."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases."}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
@@ -11855,10 +12326,12 @@ sub list_gen_pedigree_advanced_runmode {
   }
 
   $self->logger->debug("Page number: $page");
-  
+
   my $field_list_csv = $query->param('FieldList') ? $query->param('FieldList') : '';
   my $filtering_csv  = $query->param('Filtering') ? $query->param('Filtering') : '';
   my $sorting        = $query->param('Sorting')   ? $query->param('Sorting')   : '';
+
+  $self->logger->debug("Filtering CSV: $filtering_csv");
 
   my $data_for_postrun_href = {};
 
@@ -11869,25 +12342,51 @@ sub list_gen_pedigree_advanced_runmode {
   if ($samp_gen_pedigree_err) {
 
     $self->logger->debug($samp_gen_pedigree_msg);
-    
+
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
     return $data_for_postrun_href;
   }
 
-  my @field_list_all = keys( %{$samp_gen_pedigree_data->[0]} );
+  my $dbh = connect_kdb_read();
 
-  # no field return, it means no record. error prevention
-  if (scalar(@field_list_all) == 0) {
+  my $sample_data_aref = $samp_gen_pedigree_data;
 
-    push(@field_list_all, '*');
+  my @field_list_all;
+
+  if (scalar(@{$sample_data_aref}) == 1) {
+
+    @field_list_all = keys(%{$sample_data_aref->[0]});
   }
+  else {
+
+    $self->logger->debug("It reaches here");
+    my ($sfield_err, $sfield_msg, $sfield_data, $pkey_data) = get_static_field($dbh, 'genpedigree');
+
+    if ($sfield_err) {
+
+      $self->logger->debug("Get static field failed: $sfield_msg");
+      return $self->_set_error();
+    }
+
+    for my $sfield_rec (@{$sfield_data}) {
+
+      push(@field_list_all, $sfield_rec->{'Name'});
+    }
+
+    for my $pkey_field (@{$pkey_data}) {
+
+      push(@field_list_all, $pkey_field);
+    }
+  }
+
+  $self->logger->debug("Field list all: " . join(',', @field_list_all));
 
   my $final_field_list = \@field_list_all;
 
   $self->logger->debug("Final field list: " . join(',', @{$final_field_list}));
-  
+
   if ( length($field_list_csv) > 0 ) {
 
     my ( $sel_field_err, $sel_field_msg, $sel_field_list ) = parse_selected_field( $field_list_csv,
@@ -11912,15 +12411,13 @@ sub list_gen_pedigree_advanced_runmode {
 
       push(@{$final_field_list}, 'generaltype.TypeName AS GenParentTypeName');
       $join = ' LEFT JOIN generaltype ON genpedigree.GenParentType = generaltype.TypeId ';
-    } 
+    }
   }
 
   $self->logger->debug("Final field list: " . join(',', @{$final_field_list}));
 
   $sql  = 'SELECT ' . join(',', @{$final_field_list}) . ' ';
   $sql .= "FROM genpedigree $join ";
-
-  my $dbh = connect_kdb_read();
 
   my ( $filter_err, $filter_msg, $filter_phrase, $where_arg ) = parse_filtering('GenPedigreeId', 'genpedigree',
                                                                                 $filtering_csv, $final_field_list );
@@ -11956,7 +12453,7 @@ sub list_gen_pedigree_advanced_runmode {
     if ($int_err) {
 
       $int_err_msg .= ' not integer.';
-      
+
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $int_err_msg}]};
 
@@ -12025,7 +12522,7 @@ sub list_gen_pedigree_advanced_runmode {
 
   $sql .= " $paged_limit_clause ";
 
-  $self->logger->debug("Final list itemgroup SQL: $sql");
+  $self->logger->debug("Final list SQL: $sql");
 
   my ($gen_pedigree_err, $gen_pedigree_msg, $gen_pedigree_data) = $self->list_gen_pedigree(1, $sql, $where_arg);
 
@@ -12038,7 +12535,7 @@ sub list_gen_pedigree_advanced_runmode {
 
     return $data_for_postrun_href;
   }
-  
+
   $data_for_postrun_href->{'Error'}     = 0;
   $data_for_postrun_href->{'Data'}      = {'GenPedigree'   => $gen_pedigree_data,
                                            'Pagination'    => $pagination_aref,
@@ -12050,14 +12547,14 @@ sub list_gen_pedigree_advanced_runmode {
 
 sub get_specimen_group_dtd_file {
 
-  my $dtd_path = $DTD_PATH;
+  my $dtd_path = $ENV{DOCUMENT_ROOT} . '/' . $DTD_PATH;
 
   return "${dtd_path}/specimengroup.dtd";
 }
 
 sub get_genotype_specimen_dtd_file {
 
-  my $dtd_path = $DTD_PATH;
+  my $dtd_path = $ENV{DOCUMENT_ROOT} . '/' . $DTD_PATH;
 
   return "${dtd_path}/genotypespecimen.dtd";
 }

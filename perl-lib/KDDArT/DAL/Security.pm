@@ -1,7 +1,7 @@
-#$Id: Security.pm 785 2014-09-02 06:23:12Z puthick $
+#$Id: Security.pm 924 2015-06-05 08:05:21Z puthick $
 #$Author: puthick $
 
-# Copyright (c) 2014, Diversity Arrays Technology Pty Ltd
+# Copyright (c) 2015, Diversity Arrays Technology
 
 # Author    : Puthick Hok
 # Created   : 02/06/2010
@@ -28,6 +28,8 @@ package KDDArT::DAL::Security;
 
 use 5.006;
 use strict;
+use warnings;
+
 our $VERSION = '0.17';
 
 our %__CONFIG;
@@ -37,7 +39,8 @@ BEGIN {
 
   my ($volume, $current_dir, $file) = File::Spec->splitpath(__FILE__);
 
-  $main::kddart_base_dir = "${current_dir}../../..";
+  my @current_dir_part = split('/perl-lib/KDDArT/DAL/', $current_dir);
+  $main::kddart_base_dir = $current_dir_part[0];
 }
 
 use lib "$main::kddart_base_dir/perl-lib";
@@ -1577,7 +1580,7 @@ sub upload_2large_error_runmode {
   
   my $self = shift;
 
-  my $msg_aref = [{'Message' => 'File TOO large.'}];
+  my $msg_aref = [{'Message' => 'File could be TOO large or upload file missing with CGI error.'}];
 
   my $data_for_postrun_href = {};
 

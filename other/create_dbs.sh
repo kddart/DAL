@@ -12,10 +12,11 @@
 # database access configuration (user will be prompted for MySQL password during the run of the script)
 MYSQL_UNAME='root'
 PG_UNAME='postgres'
+MONETDB_UNAME='monetdb'
 DB_UNAME='kddart_dal'
 DB_HOST='localhost'
 # set your own postgres password as configured on your server
-DB_PASS=''
+DB_PASS='yourSecurePassword'
 
 handle_mysql() {
 
@@ -24,30 +25,84 @@ handle_mysql() {
     DB=$3
     SQL_FILE=$4
     DB_UNAME=$5
+    DB_HOST=$6
     
     echo "MySQL DB: $DB"
 
-    DB_EXIST=`mysql -u $MYSQL_UNAME --password=$PASS -e 'show databases;' | gawk '{print $1}' | grep "^$DB\$"`
+    DB_EXIST=`mysql -u $UNAME --password=$PASS -e 'show databases;' | gawk '{print $1}' | grep "^$DB\$"`
 
     echo "MySQL DB Status: $DB_EXIST"
 
     if [ ${#DB_EXIST} -gt 0 ]
     then
 	      echo "Drop $DB"
-	      mysql -u $MYSQL_UNAME --password=$PASS -e "drop database $DB;"
+	      mysql -u $UNAME --password=$PASS -e "drop database $DB;"
     fi
 
-    mysql -u $MYSQL_UNAME --password=$PASS -e "CREATE DATABASE \`$DB\`;"
+    mysql -u $UNAME --password=$PASS -e "CREATE DATABASE \`$DB\`;"
 
     #QUOTED_DB_UNAME="'"$DB_UNAME"'"
 
     #echo "Quoted Db Uname: $QUOTED_DB_UNAME"
     echo "DB: $DB | Username: $DB_UNAME | Host: $DB_HOST"
 
-    mysql $DB -u $MYSQL_UNAME --password=$PASS < $SQL_FILE
+    mysql $DB -u $UNAME --password=$PASS < $SQL_FILE
 
-    mysql -u $MYSQL_UNAME --password=$PASS -e "grant SELECT, INSERT, UPDATE, DELETE, CREATE ON $DB.* TO '$DB_UNAME'@'$DB_HOST';"
+    mysql -u $UNAME --password=$PASS -e "grant SELECT, INSERT, UPDATE, DELETE, CREATE ON $DB.* TO '$DB_UNAME'@'$DB_HOST';"
 
+}
+
+handle_monetdb() {
+
+    UNAME=$1
+    PASS=$2
+    DB=$3
+    SQL_FILE=$4
+    DB_UNAME=$5
+    DB_PASS=$6
+
+    export DOTMONETDBFILE="./.monetdbuser"
+    cat > ${DOTMONETDBFILE} << EOF
+user=$UNAME
+password=$PASS
+language=sql
+EOF
+
+    DB_EXIST_STATUS=`monetdb status $DB | grep "$DB"`
+
+    if [ ${#DB_EXIST_STATUS} -gt 0 ]
+    then
+
+        monetdb stop $DB
+        monetdb destroy $DB
+    fi
+
+    monetdb create $DB
+
+    monetdb release $DB
+
+    #echo "CREATE USER \"$DB_UNAME\" WITH PASSWORD '"$DB_PASS"' NAME 'DAL db user' SCHEMA \"sys\";" | mclient -d $DB
+
+    #echo "CREATE ROLE \"daladmin\" WITH ADMIN CURRENT_USER;" | mclient -d $DB
+
+    #echo "GRANT \"daladmin\" TO \"$DB_UNAME\" WITH ADMIN OPTION;" | mclient -d $DB
+
+    #echo "CREATE SCHEMA \"$DB\" AUTHORIZATION \"$DB_UNAME\";" | mclient -d $DB
+
+    #echo "ALTER USER \"$DB_UNAME\" SET SCHEMA \"$DB\";" | mclient -d $DB
+
+    #rm ${DOTMONETDBFILE} 
+
+    #export DOTMONETDBFILE="./.monetdbuser"
+    #cat > ${DOTMONETDBFILE} << EOF
+#user=$DB_UNAME
+#password=$DB_PASS
+#language=sql
+#EOF
+
+    mclient -d $DB < $SQL_FILE
+
+    rm ${DOTMONETDBFILE} 
 }
 
 if [ $# -lt 6 ]
@@ -82,6 +137,16 @@ stty echo
 
 echo
 
+echo -n "Password for $MONETDB_UNAME in MonetDB: "
+
+stty -echo
+
+read MDB_PASS
+
+stty echo
+
+echo
+
 POSTGRES_DB_EXIST=`psql -h $DB_HOST -l -U $PG_UNAME | gawk '{print $1}' | grep "^$PG_DBNAME\$"`
 
 if [ ${#POSTGRES_DB_EXIST} -gt 0 ]
@@ -95,7 +160,7 @@ fi
 
 MAIN_DB_EXIST=`mysql -u $MYSQL_UNAME --password=$MYSQL_PASS -e 'show databases;' | gawk '{print $1}' | grep "^$MAIN_DBNAME\$"`
 
-#echo "Main MySQL DB Status: $DB_EXIST"
+#echo "Main MySQL DB Status: $MAIN_DB_EXIST"
 
 if [ ${#MAIN_DB_EXIST} -gt 0 ]
 then
@@ -106,9 +171,11 @@ then
     fi
 fi
 
-MARKER_DB_EXIST=`mysql -u $MYSQL_UNAME --password=$MYSQL_PASS -e 'show databases;' | gawk '{print $1}' | grep "^$MARKER_DBNAME\$"`
+#echo "MARKER_DBNAME: $MARKER_DBNAME"
 
-#echo "Marker MySQL DB Status: $DB_EXIST"
+MARKER_DB_EXIST=`monetdb status $MARKER_DBNAME | grep "$MARKER_DBNAME"`
+
+#echo "Marker MySQL DB Status: $MARKER_DB_EXIST"
 
 if [ ${#MARKER_DB_EXIST} -gt 0 ]
 then
@@ -149,6 +216,11 @@ psql -h $DB_HOST -U $PG_UNAME -c "create user $DB_UNAME createdb password $QUOTE
 
 psql -h $DB_HOST -U $PG_UNAME -d $PG_DBNAME -f $PG_SQL
 
+for tbl in `psql -h $DB_HOST -U $PG_UNAME -qAt -c "select tablename from pg_tables where schemaname = 'public';" ${PG_DBNAME}` `psql -h $DB_HOST -U $PG_UNAME -qAt -c "select sequence_name from information_schema.sequences where sequence_schema = 'public';" ${PG_DBNAME}` `psql -h $DB_HOST -U $PG_UNAME -qAt -c "select table_name from information_schema.views where table_schema = 'public';" ${PG_DBNAME}` ;
+do
+	psql -h $DB_HOST -U $PG_UNAME -c "alter table \"$tbl\" owner to $DB_UNAME" -d $PG_DBNAME;
+done
+
 QUOTED_DB_UNAME="'"$DB_UNAME"'"
 
 MYSQL_DB_EXIST=`mysql -u $MYSQL_UNAME --password=$MYSQL_PASS -e "select User from mysql.user where User = $QUOTED_DB_UNAME;"`
@@ -162,7 +234,7 @@ fi
 echo "Create $DB_UNAME in MySQL"
 mysql -u $MYSQL_UNAME --password=$MYSQL_PASS -e "grant usage on *.* to '$DB_UNAME'@'$DB_HOST' IDENTIFIED BY '$DB_PASS';"
 
-handle_mysql $MYSQL_UNAME $MYSQL_PASS $MAIN_DBNAME $MAIN_SQL $DB_UNAME
-handle_mysql $MYSQL_UNAME $MYSQL_PASS $MARKER_DBNAME $MARKER_SQL $DB_UNAME
+handle_mysql $MYSQL_UNAME $MYSQL_PASS $MAIN_DBNAME $MAIN_SQL $DB_UNAME $DB_HOST
+handle_monetdb $MONETDB_UNAME $MDB_PASS $MARKER_DBNAME $MARKER_SQL $DB_UNAME $DB_PASS
 
 echo "Completed successfully!"

@@ -1,12 +1,12 @@
 <TestCase>
   <CaseInfo CustomMethod="add_record" Description="Add Treatment" TargetURL="add/treatment" Type="BLOCKING" />
   <Delete TargetURL="delete/treatment/:TreatmentId" />
-  <INPUT ParaName="TreatmentText" Value="Removing weeds" />
+  <INPUT ParaName="TreatmentText" PrefixVal="Removing weeds" Random="1" />
   <Match Attr="StatusCode" Value="200" />
   <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
   <Match Attr="ParaName" Tag="ReturnId" Value="TreatmentId" />
   <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
-  <ReturnId ParaName="TreatmentId" Value="7" />
-  <RunInfo Success="1" Time="1409792407" />
+  <ReturnId ParaName="TreatmentId" Value="6" />
+  <RunInfo Success="1" Time="1444777181" />
 </TestCase>

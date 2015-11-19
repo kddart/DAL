@@ -22,5 +22,5 @@
   <Parent CaseFile="xml/add_data_no_vcol/case_00208_add_breeding_method.xml" Order="3" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00106_add_geno1_4_specimen.xml" Force="1" Order="4" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00361_add_geno3.xml" Force="1" Order="5" />
-  <RunInfo Success="1" Time="1409792152" />
+  <RunInfo Success="1" Time="1443160469" />
 </TestCase>

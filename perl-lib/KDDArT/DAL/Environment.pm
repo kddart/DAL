@@ -1,5 +1,7 @@
-#$Id: Environment.pm 785 2014-09-02 06:23:12Z puthick $
+#$Id: Environment.pm 1030 2015-10-22 02:05:45Z puthick $
 #$Author: puthick $
+
+# Copyright (c) 2015, Diversity Arrays Technology, All rights reserved.
 
 # COPYRIGHT AND LICENSE
 # 
@@ -16,8 +18,7 @@
 # GNU General Public License for more details.
 
 # Author    : Puthick Hok
-# Version   : 2.2.5 build 795
-# Created   : 02/06/2010
+# Version   : 2.3.0 build 1040
 
 package KDDArT::DAL::Environment;
 
@@ -49,6 +50,8 @@ use DateTime;
 use Crypt::Random qw( makerandom );
 use DateTime;
 use DateTime::Format::Pg;
+use JSON::Validator;
+use JSON::XS qw(decode_json);
 
 sub setup {
 
@@ -70,10 +73,16 @@ sub setup {
                                            'import_layer_data_csv',
                                            'update_device_registration_gadmin',
                                            'del_device_registration_gadmin',
-                                           'add_layer_attrib_valuetype_gadmin',
-                                           'update_layer_attrib_valuetype_gadmin',
-                                           'del_layer_attrib_valuetype_gadmin',
                                            'update_layer',
+                                           'update_layer_attribute',
+                                           'del_layer_gadmin',
+                                           'del_layer_attribute_gadmin',
+                                           'add_layer2d_data',
+                                           'update_layer2d_data',
+                                           'del_layer2d_data_gadmin',
+                                           'add_layer_data',
+                                           'update_layer_data_gadmin',
+                                           'del_layer_data_gadmin',
       );
   __PACKAGE__->authen->count_session_request_runmodes(':all');
   __PACKAGE__->authen->check_signature_runmodes('register_device_gadmin',
@@ -83,19 +92,27 @@ sub setup {
                                                 'add_layer_attribute',
                                                 'update_device_registration_gadmin',
                                                 'del_device_registration_gadmin',
-                                                'add_layer_attrib_valuetype_gadmin',
-                                                'update_layer_attrib_valuetype_gadmin',
-                                                'del_layer_attrib_valuetype_gadmin',
                                                 'update_layer',
+                                                'update_layer_attribute',
+                                                'del_layer_gadmin',
+                                                'del_layer_attribute_gadmin',
+                                                'add_layer2d_data',
+                                                'update_layer2d_data',
+                                                'del_layer2d_data_gadmin',
+                                                'add_layer_data',
+                                                'update_layer_data_gadmin',
+                                                'del_layer_data_gadmin',
       );
   __PACKAGE__->authen->check_gadmin_runmodes('register_device_gadmin',
                                              'map_device_param_gadmin',
                                              'update_device_param_mapping_gadmin',
                                              'update_device_registration_gadmin',
                                              'del_device_registration_gadmin',
-                                             'add_layer_attrib_valuetype_gadmin',
-                                             'update_layer_attrib_valuetype_gadmin',
-                                             'del_layer_attrib_valuetype_gadmin',
+                                             'del_layer_gadmin',
+                                             'del_layer_attribute_gadmin',
+                                             'del_layer2d_data_gadmin',
+                                             'update_layer_data_gadmin',
+                                             'del_layer_data_gadmin',
       );
   __PACKAGE__->authen->check_sign_upload_runmodes('add_layer_n_attrib',
                                                   'log_environment_data',
@@ -111,27 +128,31 @@ sub setup {
     'update_device_param_mapping_gadmin'   => 'update_device_param_mapping_runmode',
     'log_environment_data'                 => 'log_environment_data_bulk_runmode',
     'list_layer_full'                      => 'list_layer_full_runmode',
-    'list_layer_short'                     => 'list_layer_short_runmode',
     'get_layer'                            => 'get_layer_runmode',
     'list_parameter_mapping_full'          => 'list_parameter_mapping_full_runmode',
-    'list_parameter_mapping_short'         => 'list_parameter_mapping_short_runmode',
     'list_dev_registration_full'           => 'list_dev_registration_full_runmode',
-    'list_dev_registration_short'          => 'list_dev_registration_short_runmode',
     'list_layer_attribute'                 => 'list_layer_attribute_runmode',
     'get_parameter_mapping'                => 'get_parameter_mapping_runmode',
     'add_layer_attribute'                  => 'add_layer_attribute_runmode',
     'add_layer_attribute_bulk'             => 'add_layer_attribute_bulk_runmode',
-    'list_layer_attrib_valuetype'          => 'list_layer_attrib_valuetype_runmode',
     'export_layer_data_shape'              => 'export_layer_data_shape_runmode',
     'import_layer_data_csv'                => 'import_layer_data_csv_bulk_runmode',
     'update_device_registration_gadmin'    => 'update_device_registration_runmode',
     'del_device_registration_gadmin'       => 'del_device_registration_runmode',
-    'add_layer_attrib_valuetype_gadmin'    => 'add_layer_attrib_valuetype_runmode',
-    'update_layer_attrib_valuetype_gadmin' => 'update_layer_attrib_valuetype_runmode',
-    'get_layer_attrib_valuetype'           => 'get_layer_attrib_valuetype_runmode',
-    'del_layer_attrib_valuetype_gadmin'    => 'del_layer_attrib_valuetype_runmode',
     'update_layer'                         => 'update_layer_runmode',
-      );
+    'update_layer_attribute'               => 'update_layer_attribute_runmode',
+    'del_layer_gadmin'                     => 'del_layer_runmode',
+    'del_layer_attribute_gadmin'           => 'del_layer_attribute_runmode',
+    'add_layer2d_data'                     => 'add_layer2d_data_runmode',
+    'update_layer2d_data'                  => 'update_layer2d_data_runmode',
+    'list_layer2d_data_advanced'           => 'list_layer2d_data_runmode',
+    'get_layer2d_data'                     => 'get_layer2d_data_runmode',
+    'del_layer2d_data_gadmin'              => 'del_layer2d_data_runmode',
+    'list_layer_data_advanced'             => 'list_layer_data_advanced_runmode',
+    'add_layer_data'                       => 'add_layer_data_runmode',
+    'update_layer_data_gadmin'             => 'update_layer_data_runmode',
+    'del_layer_data_gadmin'                => 'del_layer_data_runmode',
+    );
 
   my $logger = get_logger();
   Log::Log4perl::MDC->put('client_ip', $ENV{'REMOTE_ADDR'});
@@ -143,9 +164,9 @@ sub setup {
         );
 
     my $layout = Log::Log4perl::Layout::PatternLayout->new("[%d] [%H] [%X{client_ip}] [%p] [%F{1}:%L] [%M] [%m]%n");
-    
+
     $app->layout($layout);
-    
+
     $logger->add_appender($app);
   }
   $logger->level($DEBUG);
@@ -190,7 +211,46 @@ sub add_layer_n_attrib_runmode {
 
   my $data_for_postrun_href = {};
 
-  my $parent_layer              = $query->param('parent');
+  # Generic required static field checking
+
+  my $dbh_read = connect_gis_read();
+
+  my $skip_field = {'createuser'       => 1,
+                    'createtime'       => 1,
+                    'lastupdatetime'   => 1,
+                    'lastupdateuser'   => 1,
+                    'owngroupid'       => 1,
+                    'srid'             => 1,
+                   };
+
+  my $field_name_translation = {'layername' => 'name'};
+
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'layer', $skip_field,
+                                                                                $field_name_translation,
+                                                                               );
+
+  if ($chk_sfield_err) {
+
+    $self->logger->debug($chk_sfield_msg);
+
+    return $for_postrun_href;
+  }
+
+  $dbh_read->disconnect();
+
+  # Finish generic required static field checking
+
+  my $parent_layer              = undef;
+
+  if (defined $query->param('parent')) {
+
+    if (length($query->param('parent')) > 0) {
+
+      $parent_layer = $query->param('parent');
+    }
+  }
+
   my $layer_name                = $query->param('name');
 
   my $layer_type                = $query->param('layertype');
@@ -216,39 +276,20 @@ sub add_layer_n_attrib_runmode {
     $layer_srid = $query->param('srid');
   }
 
+  my $geometry_type = $query->param('geometrytype');
+
   my $access_group              = $query->param('accessgroupid');
   my $own_perm                  = $query->param('owngroupperm');
   my $access_perm               = $query->param('accessgroupperm');
   my $other_perm                = $query->param('otherperm');
-  
-  my ($missing_err, $missing_href) = check_missing_href( {'parent'          => $parent_layer,
-                                                          'name'            => $layer_name,
-                                                          'layertype'       => $layer_type,
-                                                          'iseditable'      => $is_editable,
-                                                          'srid'            => $layer_srid,
-                                                          'accessgroupid'   => $access_group,
-                                                          'owngroupperm'    => $own_perm,
-                                                          'accessgroupperm' => $access_perm,
-                                                          'otherperm'       => $other_perm,
-                                                         } );
-
-
-  if ($missing_err) {
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
-
-    return $data_for_postrun_href;
-  }
 
   my ($int_err, $int_msg_href) = check_integer_href( { 'srid'            => $layer_srid,
-                                                       'parent'          => $parent_layer,
                                                        'accessgroupid'   => $access_group,
                                                        'owngroupperm'    => $own_perm,
                                                        'accessgroupperm' => $access_perm,
                                                        'otherperm'       => $other_perm,
                                                      } );
-  
+
   if ($int_err) {
 
     $data_for_postrun_href->{'Error'} = 1;
@@ -258,12 +299,9 @@ sub add_layer_n_attrib_runmode {
   }
 
   my $layer_alias            = '';
-  my $geometry_type          = '';
   my $layer_description      = '';
 
   if ( length($query->param('alias')) > 0 ) { $layer_alias = $query->param('alias'); }
-
-  if ( length($query->param('geometrytype')) > 0 ) { $geometry_type = $query->param('geometrytype'); }
 
   if ( length($query->param('description')) > 0 ) { $layer_description = $query->param('description'); }
 
@@ -303,7 +341,7 @@ sub add_layer_n_attrib_runmode {
     return $data_for_postrun_href;
   }
 
-  if ( $parent_layer ne '0' ) {
+  if ( defined $parent_layer ) {
 
     my $parent_layer_existence = record_existence($dbh_gis_write, 'layer', 'id', $parent_layer);
 
@@ -358,8 +396,6 @@ sub add_layer_n_attrib_runmode {
     return $data_for_postrun_href;
   }
 
-  $dbh_k_read->disconnect();
-
   my $attribute_xml_file = $self->authen->get_upload_file();
   my $attribute_dtd_file = $self->get_layer_attribute_dtd_file();
 
@@ -372,7 +408,7 @@ sub add_layer_n_attrib_runmode {
   eval {
 
     local $XML::Checker::FAIL = sub {
-      
+
       my $code = shift;
       my $err_str = XML::Checker::error_string ($code, @_);
       $self->logger->debug("XML Parsing ERR: $code : $err_str");
@@ -394,35 +430,92 @@ sub add_layer_n_attrib_runmode {
     return $data_for_postrun_href;
   }
 
+  my ($get_scol_err, $get_scol_msg, $scol_data, $pkey_data) = get_static_field($dbh_gis_write, 'layerattrib');
+
+  if ($get_scol_err) {
+
+    $self->logger->debug("Get static field info failed: $get_scol_msg");
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
   my $attribute_xml  = read_file($attribute_xml_file);
   my $attribute_aref = xml2arrayref($attribute_xml, 'layerattrib');
 
+  my $colname_lookup = {};
+
   for my $layer_at (@{$attribute_aref}) {
 
-    my $val_type_id = $layer_at->{'valuetype'};
-    
-    if (!record_existence($dbh_gis_write, 'valuetype', 'id', $val_type_id)) {
+    my $colsize_info          = {};
+    my $chk_maxlen_field_href = {};
 
-      my $err_msg = "valuetype ($val_type_id) does not exist.";
+    for my $static_field (@{$scol_data}) {
+
+      my $field_name  = $static_field->{'Name'};
+      my $field_dtype = $static_field->{'DataType'};
+
+      if (lc($field_dtype) eq 'text') {
+
+        $colsize_info->{$field_name}           = $static_field->{'ColSize'};
+        $chk_maxlen_field_href->{$field_name}  = $layer_at->{$field_name};
+      }
+    }
+
+    my ($maxlen_err, $maxlen_msg) = check_maxlen($chk_maxlen_field_href, $colsize_info);
+
+    if ($maxlen_err) {
+
+      $maxlen_msg .= 'longer than its maximum length';
+
+      $data_for_postrun_href->{'Error'}       = 1;
+      $data_for_postrun_href->{'Data'}        = {'Error' => [{'Message' => $maxlen_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my $unit_id = $layer_at->{'unitid'};
+
+    if (!record_existence($dbh_k_read, 'generalunit', 'UnitId', $unit_id)) {
+
+      my $err_msg = "unidid ($unit_id): not found.";
 
       $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'parent' => $err_msg}]};
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
       return $data_for_postrun_href;
     }
 
     my $colname = $layer_at->{'colname'};
 
-    if ( !($colname =~ /[a-zA-Z0-9_]+/) ) {
+    if ( $colname !~ /^[a-zA-Z0-9_]+$/ ) {
 
       my $err_msg = "colname ($colname): invalid character.";
 
       $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'parent' => $err_msg}]};
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
       return $data_for_postrun_href;
     }
+
+    if ($colname_lookup->{lc($colname)}) {
+
+      my $err_msg = "colname ($colname): duplicate.";
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+    else {
+
+      $colname_lookup->{lc($colname)} = 1;
+    }
   }
+
+  $dbh_k_read->disconnect();
 
   my $sql = '';
   $sql   .= 'INSERT INTO layer ';
@@ -446,14 +539,14 @@ sub add_layer_n_attrib_runmode {
     for my $layer_at (@{$attribute_aref}) {
 
       $sql  = 'INSERT INTO layerattrib ';
-      $sql .= '(layer, colname, coltype, colsize, validation, colunits, valuetype) ';
+      $sql .= '(unitid, layer, colname, coltype, colsize, validation, colunits) ';
       $sql .= 'VALUES (?, ?, ?, ?, ?, ?, ?)';
 
       $sth = $dbh_gis_write->prepare($sql);
-      $sth->execute($layer_id, $layer_at->{'colname'},
+      $sth->execute($layer_at->{'unitid'}, $layer_id, lc($layer_at->{'colname'}),
                     $layer_at->{'coltype'}, $layer_at->{'colsize'},
                     $layer_at->{'validation'}, $layer_at->{'colunits'},
-                    $layer_at->{'valuetype'});
+                   );
 
       if ($dbh_gis_write->err()) {
 
@@ -469,8 +562,16 @@ sub add_layer_n_attrib_runmode {
 
     if (uc($layer_type) eq '2D' ) {
 
-      # this feature is not supported in version 2.1.
-      # it will be supported in the next version
+      my ($err_status, $postrun_href) = $self->mk_2d_layer_data_table($dbh_gis_write,
+                                                                      $geometry_type,
+                                                                      $layer_srid,
+                                                                      $layer_id
+                                                                     );
+
+      if ($err_status) {
+
+        return $postrun_href;
+      }
     }
     else {
 
@@ -479,13 +580,13 @@ sub add_layer_n_attrib_runmode {
           );
 
       my %geom_column = ("layer${layer_id}" => 'geometry');
-      
+
       my ($err_status, $postrun_href) = $self->mk_normal_layer_data_tables($dbh_gis_write,
                                                                            $geometry_type,
                                                                            $layer_srid,
                                                                            \%geo_data_tables,
                                                                            \%geom_column
-          );
+                                                                          );
 
       if ($err_status) {
 
@@ -543,7 +644,46 @@ sub add_layer_runmode {
 
   my $data_for_postrun_href = {};
 
-  my $parent_layer              = $query->param('parent');
+  # Generic required static field checking
+
+  my $dbh_read = connect_gis_read();
+
+  my $skip_field = {'createuser'       => 1,
+                    'createtime'       => 1,
+                    'lastupdatetime'   => 1,
+                    'lastupdateuser'   => 1,
+                    'owngroupid'       => 1,
+                    'srid'             => 1,
+                   };
+
+  my $field_name_translation = {'layername' => 'name'};
+
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'layer', $skip_field,
+                                                                                $field_name_translation,
+                                                                               );
+
+  if ($chk_sfield_err) {
+
+    $self->logger->debug($chk_sfield_msg);
+
+    return $for_postrun_href;
+  }
+
+  $dbh_read->disconnect();
+
+  # Finish generic required static field checking
+
+  my $parent_layer              = undef;
+
+  if (defined $query->param('parent')) {
+
+    if (length($query->param('parent')) > 0) {
+
+      $parent_layer = $query->param('parent');
+    }
+  }
+
   my $layer_name                = $query->param('name');
 
   my $layer_type                = $query->param('layertype');
@@ -569,39 +709,19 @@ sub add_layer_runmode {
     $layer_srid = $query->param('srid');
   }
 
+  my $geometry_type             = $query->param('geometrytype');
   my $access_group              = $query->param('accessgroupid');
   my $own_perm                  = $query->param('owngroupperm');
   my $access_perm               = $query->param('accessgroupperm');
   my $other_perm                = $query->param('otherperm');
-  
-  my ($missing_err, $missing_href) = check_missing_href( {'parent'          => $parent_layer,
-                                                          'name'            => $layer_name,
-                                                          'layertype'       => $layer_type,
-                                                          'iseditable'      => $is_editable,
-                                                          'srid'            => $layer_srid,
-                                                          'accessgroupid'   => $access_group,
-                                                          'owngroupperm'    => $own_perm,
-                                                          'accessgroupperm' => $access_perm,
-                                                          'otherperm'       => $other_perm,
-                                                         } );
-
-
-  if ($missing_err) {
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
-
-    return $data_for_postrun_href;
-  }
 
   my ($int_err, $int_msg_href) = check_integer_href( { 'srid'            => $layer_srid,
-                                                       'parent'          => $parent_layer,
                                                        'accessgroupid'   => $access_group,
                                                        'owngroupperm'    => $own_perm,
                                                        'accessgroupperm' => $access_perm,
                                                        'otherperm'       => $other_perm,
                                                      } );
-  
+
   if ($int_err) {
 
     $data_for_postrun_href->{'Error'} = 1;
@@ -611,12 +731,9 @@ sub add_layer_runmode {
   }
 
   my $layer_alias            = '';
-  my $geometry_type          = '';
   my $layer_description      = '';
 
   if ( length($query->param('alias')) > 0 ) { $layer_alias = $query->param('alias'); }
-
-  if ( length($query->param('geometrytype')) > 0 ) { $geometry_type = $query->param('geometrytype'); }
 
   if ( length($query->param('description')) > 0 ) { $layer_description = $query->param('description'); }
 
@@ -657,7 +774,7 @@ sub add_layer_runmode {
     return $data_for_postrun_href;
   }
 
-  if ( $parent_layer ne '0' ) {
+  if ( defined $parent_layer ) {
 
     my $parent_layer_existence = record_existence($dbh_gis_write, 'layer', 'id', $parent_layer);
 
@@ -750,8 +867,16 @@ sub add_layer_runmode {
 
     if (uc($layer_type) eq '2D' ) {
 
-      # this feature is not supported in version 2.1.
-      # it will be supported in the next version
+      my ($err_status, $postrun_href) = $self->mk_2d_layer_data_table($dbh_gis_write,
+                                                                      $geometry_type,
+                                                                      $layer_srid,
+                                                                      $layer_id
+                                                                     );
+
+      if ($err_status) {
+
+        return $postrun_href;
+      }
     }
     else {
 
@@ -760,7 +885,7 @@ sub add_layer_runmode {
           );
 
       my %geom_column = ("layer${layer_id}" => 'geometry');
-      
+
       my ($err_status, $postrun_href) = $self->mk_normal_layer_data_tables($dbh_gis_write,
                                                                            $geometry_type,
                                                                            $layer_srid,
@@ -798,47 +923,9 @@ sub add_layer_runmode {
   return $data_for_postrun_href;
 }
 
-sub xml_parse_failed {
-
-  my $self = shift;
-  my $code = shift;
-
-  if ($code < 300) {
-
-    my $err_str = XML::Checker::error_string($code, @_);
-    $err_str =~ s/XML::Checker ERROR\-//g;
-    die $err_str;
-  }
-}
-
-sub get_layer_attribute_dtd {
-
-  my $self = shift;
-
-  my $dtd = '';
-
-  my $dtd_file = $self->get_layer_attribute_dtd_file();
-
-  open(DTD_FH, "<$dtd_file");
-  while( my $line = <DTD_FH> ) {
-
-    $dtd .= $line;
-  }
-  close(DTD_FH);
-
-  return $dtd;
-}
-
-sub get_layer_attribute_dtd_file {
-
-  my $dtd_path = $DTD_PATH;
-
-  return "${dtd_path}/layerattrib.dtd";
-}
-
 sub get_environment_data_dtd_file {
 
-  my $dtd_path = $DTD_PATH;
+  my $dtd_path = $ENV{DOCUMENT_ROOT} . '/' . $DTD_PATH;
 
   return "${dtd_path}/enviro_data.dtd";
 }
@@ -869,20 +956,32 @@ sub register_device_runmode {
 
   my $data_for_postrun_href = {};
 
+  # Generic required static field checking
+
+  my $dbh_read = connect_kdb_read();
+
+  my $skip_field = {};
+
+  my $field_name_translation = {};
+
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'deviceregister', $skip_field,
+                                                                                $field_name_translation,
+                                                                               );
+
+  if ($chk_sfield_err) {
+
+    $self->logger->debug($chk_sfield_msg);
+
+    return $for_postrun_href;
+  }
+
+  $dbh_read->disconnect();
+
+  # Finish generic required static field checking
+
   my $device_id      = $query->param('DeviceId');
   my $device_type_id = $query->param('DeviceTypeId');
-
-  my ($missing_err, $missing_href) = check_missing_href( { 'DeviceId'     => $device_id,
-                                                           'DeviceTypeId' => $device_type_id,
-                                                         } );
-
-  if ($missing_err) {
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
-
-    return $data_for_postrun_href;
-  }
 
   $device_id = lc($device_id);
 
@@ -995,6 +1094,32 @@ sub update_device_registration_runmode {
 
   my $data_for_postrun_href = {};
 
+  # Generic required static field checking
+
+  my $dbh_read = connect_kdb_read();
+
+  my $skip_field = {'DeviceTypeId' => 1,
+                    'DeviceId'     => 1,
+                   };
+
+  my $field_name_translation = {};
+
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'deviceregister', $skip_field,
+                                                                                $field_name_translation,
+                                                                               );
+
+  if ($chk_sfield_err) {
+
+    $self->logger->debug($chk_sfield_msg);
+
+    return $for_postrun_href;
+  }
+
+  $dbh_read->disconnect();
+
+  # Finish generic required static field checking
+
   my $dbh_write = connect_kdb_write();
 
   my $reg_exist = record_existence($dbh_write, 'deviceregister', 'DeviceRegisterId', $reg_id);
@@ -1093,7 +1218,7 @@ sub map_device_param_runmode {
                                                           'deviceparam'   => $device_param_name,
                                                           'active'        => $active,
                                                          } );
-  
+
   if ($missing_err) {
 
     $data_for_postrun_href->{'Error'} = 1;
@@ -1155,6 +1280,18 @@ sub map_device_param_runmode {
   if (($effective_perm & $LINK_PERM) != $LINK_PERM) {
 
     my $err_msg = "Permission denied: layer ($layer_id).";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $layertype = read_cell_value($dbh_gis_write, 'layer', 'layertype', 'id', $layer_id);
+
+  if (uc($layertype) eq '2D') {
+
+    my $err_msg = "Layer ($layer_id) is a 2D layer.";
 
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
@@ -1347,6 +1484,18 @@ sub update_device_param_mapping_runmode {
     return $data_for_postrun_href;
   }
 
+  my $layertype = read_cell_value($dbh_gis_write, 'layer', 'layertype', 'id', $layer_id);
+
+  if (uc($layertype) eq '2D') {
+
+    my $err_msg = "Layer ($layer_id) is a 2D layer.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
   my $geometry_type = read_cell_value($dbh_gis_write, 'layer', 'geometrytype', 'id', $layer_id);
 
   if (length($geometry_type) > 0) {
@@ -1461,7 +1610,7 @@ sub log_environment_data_bulk_runmode {
   eval {
 
     local $XML::Checker::FAIL = sub {
-      
+
       my $code = shift;
       my $err_str = XML::Checker::error_string ($code, @_);
       $self->logger->debug("XML Parsing ERR: $code : $err_str");
@@ -1491,7 +1640,7 @@ sub log_environment_data_bulk_runmode {
   for my $env_entry_record (@{$env_data}) {
 
     my $device_id = lc($env_entry_record->{'deviceid'});
-    
+
     my $dev_param_data = {};
     if ($hierarchical_env_data->{$device_id}) {
 
@@ -1499,7 +1648,7 @@ sub log_environment_data_bulk_runmode {
     }
 
     my $param_name = $env_entry_record->{'param_name'};
-    
+
     my $param_val_aref = [];
     if ($dev_param_data->{$param_name}) {
 
@@ -1566,7 +1715,7 @@ sub log_environment_data_bulk_runmode {
 
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-      
+
       return $data_for_postrun_href;
     }
 
@@ -1581,12 +1730,12 @@ sub log_environment_data_bulk_runmode {
 
       $para_name = lc($para_name);
 
-      $sql  = 'SELECT layerattrib, layer, colsize, validation ';
-      $sql .= 'FROM datadevice LEFT JOIN ';
-      $sql .= 'layerattrib ON ';
-      $sql .= 'datadevice.layerattrib = layerattrib.id ';
+      $sql  = 'SELECT layerattrib, layer, colsize, validation, colname, layertype ';
+      $sql .= 'FROM datadevice LEFT JOIN layerattrib ';
+      $sql .= 'ON datadevice.layerattrib = layerattrib.id LEFT JOIN layer ';
+      $sql .= 'ON layerattrib.layer = layer.id ';
       $sql .= 'WHERE deviceid=? AND deviceparam=? and active=1';
-      
+
       $sth_gis = $dbh_gis_write->prepare($sql);
       $sth_gis->execute($dev_id, $para_name);
 
@@ -1617,15 +1766,23 @@ sub log_environment_data_bulk_runmode {
       my $actual_env_data = $this_dev_data->{$para_name};
       for my $row_aref (@{$attrib_id_aref}) {
 
-        my $attr_id  = $row_aref->[0];
-        my $layer_id = $row_aref->[1];
+        my $attr_id         = $row_aref->[0];
+        my $layer_id        = $row_aref->[1];
+        my $colname         = $row_aref->[4];
+        my $layertype       = $row_aref->[5];
 
         $layer_id_href->{$layer_id} = 1;
 
-        $attrib_info->{$attr_id} = $layer_id;
+        # Nov 2014 - attempting to log environment data to 2D table which needs colname and layertype.
+        # However, it turns out that it is unnecessary complex. So the idea of log sensor data (data with timestamp)
+        # was abandoned. However, colname and layertype were left here. layertype is later used in insert_data_into_layer 
+        # but no colname.
+
+        $attrib_info->{$attr_id} = [$layer_id, $colname, $layertype];
 
         my $attr_colsize    = $row_aref->[2];
         my $attr_validation = $row_aref->[3];
+
         for my $env_data_point (@{$actual_env_data}) {
 
           my $param_val = $env_data_point->[2];
@@ -1644,7 +1801,7 @@ sub log_environment_data_bulk_runmode {
           if (length($attr_validation) > 0) {
 
             if (!($param_val =~ /^$attr_validation$/)) {
-              
+
               my $invalid_err_msg = "device id, parameter name, parameter value, datetime ";
               $invalid_err_msg   .= "($dev_id, $para_name, $param_val, $env_dt) ";
               $invalid_err_msg   .= "contains parameter value ($param_val) is invalid with ";
@@ -1675,7 +1832,7 @@ sub log_environment_data_bulk_runmode {
 
     my $perm_err_msg = '';
     $perm_err_msg   .= "Permission denied: Group ($group_id) and layer ($trouble_layer_id_str).";
-    
+
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $perm_err_msg}]};
 
@@ -1706,7 +1863,7 @@ sub log_environment_data_bulk_runmode {
 
     my $non_point_layer_csv = join(',', @non_point_layer_list);
     my $err_msg = "Layer ($non_point_layer_csv): not POINT layer.";
-    
+
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
@@ -1716,135 +1873,13 @@ sub log_environment_data_bulk_runmode {
   # this loop is to save the data into the database. the previous
   # loop is for checking.
 
-  my $user_id = $self->authen->user_id();
-  my %affected_layer;
-
-  my $num_row_inserted = 0;
-
-  for my $dev_id (keys(%{$hierarchical_env_data})) {
-
-    if ($dev_id =~ /_DREG_DATA$/) { next; }
-
-    my $dev_reg_lng = $hierarchical_env_data->{"${dev_id}_DREG_DATA"}->[0];
-    my $dev_reg_lat = $hierarchical_env_data->{"${dev_id}_DREG_DATA"}->[1];
-
-    my $store_dev_reg_position = 0;
-
-    if ($dev_reg_lng == 0.0 && $dev_reg_lat == 0.0) {
-
-      $store_dev_reg_position = 1;
-    }
-
-    my $this_dev_data = $hierarchical_env_data->{$dev_id};
-    for my $para_name (keys(%{$this_dev_data})) {
-
-      if ($para_name =~ /_LATTR_INFO$/) { next; }
-      
-      my $actual_env_data = $this_dev_data->{$para_name};
-      my $at_info_href = $this_dev_data->{"${para_name}_LATTR_INFO"};
-
-      for my $at_id (keys(%{$at_info_href})) {
-
-        my $l_id = $at_info_href->{$at_id};
-        $affected_layer{$l_id} = 1;
-
-        my $bulk_sql = '';
-        $bulk_sql   .= "INSERT INTO layer${l_id}attrib ";
-        $bulk_sql   .= "(layerid,layerattrib,value,dt,systemuserid) ";
-        $bulk_sql   .= "VALUES ";
-
-        for my $env_data_point (@{$actual_env_data}) {
-
-          my $lng      = $env_data_point->[0];
-          my $lat      = $env_data_point->[1];
-          my $para_val = $env_data_point->[2];
-          my $para_dt  = $env_data_point->[3];
-
-          my $geo_obj_str = "ST_GeomFromText('POINT($lng $lat)', -1)";
-          my $within_str  = "ST_DWithin($geo_obj_str, geometry, $GIS_BUFFER_DISTANCE)";
-
-          $sql = "SELECT id from layer${l_id} WHERE $within_str LIMIT 1";
-          $sth_gis = $dbh_gis_write->prepare($sql);
-          $sth_gis->execute();
-
-          if ($dbh_gis_write->err()) {
-            
-            $data_for_postrun_href->{'Error'} = 1;
-            $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-            return $data_for_postrun_href;
-          }
-
-          my $layer_n_id = '';
-          $sth_gis->bind_col(1, \$layer_n_id);
-          $sth_gis->fetch();
-          $sth_gis->finish();
-          
-          if (length($layer_n_id) == 0) {
-
-            $sql = "INSERT INTO layer${l_id}(geometry) VALUES($geo_obj_str)";
-            $sth_gis = $dbh_gis_write->prepare($sql);
-            $sth_gis->execute();
-
-            if ($dbh_gis_write->err()) {
-              
-              $data_for_postrun_href->{'Error'} = 1;
-              $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-              
-              return $data_for_postrun_href;
-            }
-          
-            $layer_n_id = $dbh_gis_write->last_insert_id(undef, undef, "layer${l_id}", 'id');
-            $sth_gis->finish();
-          }
-
-          if ($store_dev_reg_position) {
-          
-            $sql  = 'UPDATE deviceregister SET ';
-            $sql .= 'Longitude=?, ';
-            $sql .= 'Latitude=? ';
-            $sql .= 'WHERE DeviceId=?';
-
-            $sth_k = $dbh_k_write->prepare($sql);
-            $sth_k->execute($lng, $lat, $dev_id);
-
-            if ($dbh_k_write->err()) {
-
-              $data_for_postrun_href->{'Error'} = 1;
-              $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-              return $data_for_postrun_href;
-            }
-
-            $store_dev_reg_position = 0;
-          } 
-
-          $bulk_sql .= "($layer_n_id,$at_id,'$para_val','$para_dt',$user_id),";
-          $num_row_inserted += 1;
-        }
-
-        chop($bulk_sql);   # remove excessive comma
-
-        $sth_gis = $dbh_gis_write->prepare($bulk_sql);
-        $sth_gis->execute();
-
-        if ($dbh_gis_write->err()) {
-
-          $data_for_postrun_href->{'Error'} = 1;
-          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-          return $data_for_postrun_href;
-        }
-        
-        $sth_gis->finish();
-        $bulk_sql = '';
-      }
-    }
-  }
+  my ($err_status, $num_row_inserted,
+      $affected_layer_aref, $postrun_data_href) = $self->insert_data_into_layer($dbh_k_write, $dbh_gis_write,
+                                                                                $hierarchical_env_data);
 
   my $insert_elapsed = tv_interval($insert_start_time);
 
-  my $affected_layer_id = join(',', keys(%affected_layer));
+  my $affected_layer_id = join(',', @{$affected_layer_aref});
 
   $dbh_k_write->disconnect();
   $dbh_gis_write->disconnect();
@@ -1877,6 +1912,11 @@ sub list_layer {
   ($err, $msg, $data_aref) = read_data($dbh, $sql, $where_para_aref);
 
   if ($err) {
+
+    return ($err, $msg, $data_aref);
+  }
+
+  if (scalar(@{$data_aref}) == 0) {
 
     return ($err, $msg, $data_aref);
   }
@@ -1960,7 +2000,7 @@ sub list_layer {
     if ($exten_attr_yes) {
 
       my $attrib_sql  = 'SELECT layer, id as layerattribid, colname, coltype, colsize, validation, ';
-      $attrib_sql    .= 'colunits, valuetype ';
+      $attrib_sql    .= 'colunits, unitid ';
       $attrib_sql    .= 'FROM layerattrib ';
       $attrib_sql    .= 'WHERE layer IN (' . join(',', @{$layer_id_aref}) . ')';
 
@@ -1974,7 +2014,7 @@ sub list_layer {
       for my $layerattr_rec (@{$layerattr_data}) {
 
         my $layer_id = $layerattr_rec->{'layer'};
-        
+
         if (defined $layerattrib_lookup->{$layer_id}) {
 
           my $layerattrib_aref = $layerattrib_lookup->{$layer_id};
@@ -1989,7 +2029,7 @@ sub list_layer {
         }
       }
     }
-    
+
     for my $row (@{$data_aref}) {
 
       my $layer_id       = $row->{'layerid'};
@@ -2027,7 +2067,7 @@ sub list_layer {
           $row->{'chgOwner'} = "layer/$layer_id/change/owner";
 
           if ( $not_used_id_href->{$layer_id}  ) {
-          
+
             $row->{'delete'}   = "delete/layer/$layer_id";
           }
         }
@@ -2042,7 +2082,7 @@ sub list_layer {
 
         $row->{'nrecord'} = $record_count;
         if ($record_count > 0) {
-        
+
           $row->{'download'} = 1;
         }
 
@@ -2077,68 +2117,10 @@ sub list_layer {
 
     $extra_attr_layer_data = $data_aref;
   }
-    
+
   $dbh->disconnect();
 
   return ($err, $msg, $extra_attr_layer_data);
-}
-
-sub list_layer_short_runmode {
-
-  my $self  = shift;
-
-  my $data_for_postrun_href = {};
-
-  my $permission = $self->param('perm');
-
-  if ( !($permission =~ /^\d{1}$/) ) {
-
-    my $err_msg = "Permission ($permission) is not a single digit number.";
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-    return $data_for_postrun_href;
-  }
-
-  if ( $permission < $LINK_PERM || $permission > $ALL_PERM ) {
-
-    my $err_msg = "Permission ($permission) is not between $LINK_PERM and $ALL_PERM.";
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-    return $data_for_postrun_href;
-  }
-
-  my $group_id = $self->authen->group_id();
-  my $gadmin_status = $self->authen->gadmin_status();
-  my $perm_str = permission_phrase($group_id, 1, $gadmin_status);
-
-  my $sql = 'SELECT id as layerid, name as layername, ';
-  $sql   .= "$perm_str AS ultimateperm ";
-  $sql   .= 'FROM layer ';
-  $sql   .= "WHERE (($perm_str) & $permission) = $permission";
-
-  my ($read_layer_err, $read_layer_msg, $layer_data_aref) = $self->list_layer(0, 0, $sql);
-
-  if ($read_layer_err) {
-
-    $self->logger->debug($read_layer_msg);
-    
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-    return $data_for_postrun_href;
-  }
-
-  $data_for_postrun_href->{'Error'}     = 0;
-  $data_for_postrun_href->{'Data'}      = {'layer'      => $layer_data_aref,
-                                           'RecordMeta' => [{'TagName' => 'layer'}],
-  };
-  $data_for_postrun_href->{'ExtraData'} = 0;
-
-  return $data_for_postrun_href;
 }
 
 sub list_layer_full_runmode {
@@ -2152,8 +2134,8 @@ sub list_layer_full_runmode {
 "GroupAdminRequired": 0,
 "SignatureRequired": 0,
 "AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><layer layername='Layer1' layerid='1' accessgroupperm='5' otherpermission='Read/Link' geometrytype='POLYGON' owngrouppermission='Read/Write/Link' accessgrouppermission='Read/Link' otherperm='5' addAttr='layer/1/add/attribute' nrecord='0' owngroupid='8' owngroupname='All' accessgroupid='0' parentlayername='' srid='4326' ultimateperm='7' owngroupperm='7' ultimatepermission='Read/Write/Link' description='Test layer about something silly1' accessgroupname='admin' parentlayer='0' alias='macadamia1' update='update/layer/1' layertype='Normal'><layerattrib colunits='unknown' layerattribid='3' colsize='24' coltype='VARCHAR' valuetype='1' colname='SomeAttribute' validation='' /></layer><RecordMeta TagName='layer' /></DATA>",
-"SuccessMessageJSON": "{'layer' : [ {'layername' : 'Layer1', 'accessgroupperm' : 5, 'layerid' : 1, 'otherpermission' : 'Read/Link', 'accessgrouppermission' : 'Read/Link', 'owngrouppermission' : 'Read/Write/Link', 'geometrytype' : 'POLYGON', 'otherperm' : 5, 'nrecord' : '0', 'addAttr' : 'layer/1/add/attribute', 'owngroupname' : 'All', 'owngroupid' : '8', 'accessgroupid' : '0', 'parentlayername' : null, 'srid' : '4326', 'ultimateperm' : 7, 'layerattrib' : [{'colsize' : '24', 'validation' : '', 'colname' : 'SomeAttribute', 'layerattribid' : 3, 'colunits' : 'unknown', 'coltype' : 'VARCHAR', 'valuetype' : '1'}], 'owngroupperm' : 7, 'ultimatepermission' : 'Read/Write/Link', 'description' : 'Test layer about something silly1', 'accessgroupname' : 'admin', 'parentlayer' : '0', 'update' : 'update/layer/1', 'alias' : 'macadamia1', 'layertype' : 'Normal'}], 'RecordMeta' : [{'TagName' : 'layer'}]}",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><layer layername='Layer - 6944742' accessgroupperm='5' lastupdateuser='0' owngrouppermission='Read/Write/Link' chgPerm='layer/13/change/permission' nrecord='0' owngroupname='admin' owngroupid='0' accessgroupid='0' parentlayername='' srid='4326' ultimateperm='7' createuser='0' ultimatepermission='Read/Write/Link' description='Created by the automatic test.' accessgroupname='admin' alias='' layertype='NORMAL' layerid='13' otherpermission='Read/Link' createtime='2015-09-29 06:19:04' geometrytype='POINT' accessgrouppermission='Read/Link' otherperm='5' addAttr='layer/13/add/attribute' iseditable='1' owngroupperm='7' chgOwner='layer/13/change/owner' lastupdatetime='2015-09-29 06:19:04' layermetadata='Created from the test framework' parentlayer='' update='update/layer/13'><layerattrib layerattribid='17' colsize='20' colunits='percentage' coltype='Humidity' colname='humidity_9246561' validation='' unitid='6' /></layer><RecordMeta TagName='layer' /></DATA>",
+"SuccessMessageJSON": "{'layer' : [{'layername' : 'Layer - 6944742', 'accessgroupperm' : 5, 'chgPerm' : 'layer/13/change/permission', 'owngrouppermission' : 'Read/Write/Link', 'lastupdateuser' : '0', 'nrecord' : '0', 'owngroupname' : 'admin', 'owngroupid' : '0', 'accessgroupid' : '0', 'parentlayername' : null, 'srid' : '4326', 'ultimateperm' : 7, 'createuser' : '0', 'ultimatepermission' : 'Read/Write/Link', 'description' : 'Created by the automatic test.', 'accessgroupname' : 'admin', 'alias' : '', 'layertype' : 'NORMAL', 'layerid' : 13, 'otherpermission' : 'Read/Link', 'createtime' : '2015-09-29 06:19:04', 'geometrytype' : 'POINT', 'accessgrouppermission' : 'Read/Link', 'otherperm' : 5, 'addAttr' : 'layer/13/add/attribute', 'iseditable' : 1, 'layerattrib' : [{'colunits' : 'percentage', 'colsize' : '20', 'layerattribid' : 17, 'coltype' : 'Humidity', 'validation' : null, 'colname' : 'humidity_9246561', 'unitid' : '6'}], 'owngroupperm' : 7, 'chgOwner' : 'layer/13/change/owner', 'lastupdatetime' : '2015-09-29 06:19:04', 'layermetadata' : 'Created from the test framework', 'parentlayer' : null, 'update' : 'update/layer/13'}], 'RecordMeta' : [{'TagName' : 'layer'}]}",
 "ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
 "ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
@@ -2170,10 +2152,24 @@ sub list_layer_full_runmode {
 
   my $sql = "SELECT layer.id as layerid, ";
   $sql   .= "layer.name as layername, ";
-  $sql   .= "layer.alias, layer.layertype, ";
-  $sql   .= "layer.srid, layer.geometrytype, layer.parent as parentlayer, ";
-  $sql   .= "layer.description, layer.owngroupid, layer.accessgroupid, layer.owngroupperm, ";
-  $sql   .= "layer.accessgroupperm, layer.otherperm, player.name as parentlayername, ";
+  $sql   .= "layer.alias, ";
+  $sql   .= "layer.layertype, ";
+  $sql   .= "layer.layermetadata, ";
+  $sql   .= "layer.iseditable, ";
+  $sql   .= "layer.createuser, ";
+  $sql   .= "layer.createtime, ";
+  $sql   .= "layer.lastupdateuser, ";
+  $sql   .= "layer.lastupdatetime, ";
+  $sql   .= "layer.srid, ";
+  $sql   .= "layer.geometrytype, ";
+  $sql   .= "layer.parent as parentlayer, ";
+  $sql   .= "layer.description, ";
+  $sql   .= "layer.owngroupid, ";
+  $sql   .= "layer.accessgroupid, ";
+  $sql   .= "layer.owngroupperm, ";
+  $sql   .= "layer.accessgroupperm, ";
+  $sql   .= "layer.otherperm, ";
+  $sql   .= "player.name as parentlayername, ";
   $sql   .= "$perm_str as ultimateperm ";
   $sql   .= "FROM layer LEFT JOIN layer as player ON layer.parent = player.id ";
   $sql   .= "WHERE (($perm_str) & $READ_PERM) = $READ_PERM ";
@@ -2184,7 +2180,7 @@ sub list_layer_full_runmode {
   if ($read_layer_err) {
 
     $self->logger->debug($read_layer_msg);
-    
+
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
@@ -2210,8 +2206,8 @@ sub get_layer_runmode {
 "GroupAdminRequired": 0,
 "SignatureRequired": 0,
 "AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><layer layername='Layer1' layerid='1' accessgroupperm='5' otherpermission='Read/Link' geometrytype='POLYGON' owngrouppermission='Read/Write/Link' accessgrouppermission='Read/Link' otherperm='5' addAttr='layer/1/add/attribute' nrecord='0' owngroupid='8' owngroupname='All' accessgroupid='0' parentlayername='' srid='4326' ultimateperm='7' owngroupperm='7' ultimatepermission='Read/Write/Link' description='Test layer about something silly1' accessgroupname='admin' parentlayer='0' alias='macadamia1' update='update/layer/1' layertype='Normal'><layerattrib colunits='unknown' layerattribid='3' colsize='24' coltype='VARCHAR' valuetype='1' colname='SomeAttribute' validation='' /></layer><RecordMeta TagName='layer' /></DATA>",
-"SuccessMessageJSON": "{ 'layer' : [{ 'layername' : 'Layer1', 'accessgroupperm' : 5, 'layerid' : 1, 'otherpermission' : 'Read/Link', 'accessgrouppermission' : 'Read/Link', 'owngrouppermission' : 'Read/Write/Link', 'geometrytype' : 'POLYGON', 'otherperm' : 5, 'nrecord' : '0', 'addAttr' : 'layer/1/add/attribute', 'owngroupname' : 'All', 'owngroupid' : '8', 'accessgroupid' : '0', 'parentlayername' : null, 'srid' : '4326', 'ultimateperm' : 7, 'layerattrib' : [{ 'colsize' : '24', 'validation' : '', 'colname' : 'SomeAttribute', 'layerattribid' : 3, 'colunits' : 'unknown', 'coltype' : 'VARCHAR', 'valuetype' : '1'} ], 'owngroupperm' : 7, 'ultimatepermission' : 'Read/Write/Link', 'description' : 'Test layer about something silly1', 'accessgroupname' : 'admin', 'parentlayer' : '0', 'update' : 'update/layer/1', 'alias' : 'macadamia1', 'layertype' : 'Normal'} ], 'RecordMeta' : [{ 'TagName' : 'layer'} ]}",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><layer layername='Layer - 6944742' accessgroupperm='5' lastupdateuser='0' owngrouppermission='Read/Write/Link' chgPerm='layer/13/change/permission' nrecord='0' owngroupname='admin' owngroupid='0' accessgroupid='0' parentlayername='' srid='4326' ultimateperm='7' createuser='0' ultimatepermission='Read/Write/Link' description='Created by the automatic test.' accessgroupname='admin' alias='' layertype='NORMAL' layerid='13' otherpermission='Read/Link' createtime='2015-09-29 06:19:04' geometrytype='POINT' accessgrouppermission='Read/Link' otherperm='5' addAttr='layer/13/add/attribute' iseditable='1' owngroupperm='7' chgOwner='layer/13/change/owner' lastupdatetime='2015-09-29 06:19:04' layermetadata='Created from the test framework' parentlayer='' update='update/layer/13'><layerattrib layerattribid='17' colsize='20' colunits='percentage' coltype='Humidity' colname='humidity_9246561' validation='' unitid='6' /></layer><RecordMeta TagName='layer' /></DATA>",
+"SuccessMessageJSON": "{'layer' : [{'layername' : 'Layer - 6944742', 'accessgroupperm' : 5, 'chgPerm' : 'layer/13/change/permission', 'owngrouppermission' : 'Read/Write/Link', 'lastupdateuser' : '0', 'nrecord' : '0', 'owngroupname' : 'admin', 'owngroupid' : '0', 'accessgroupid' : '0', 'parentlayername' : null, 'srid' : '4326', 'ultimateperm' : 7, 'createuser' : '0', 'ultimatepermission' : 'Read/Write/Link', 'description' : 'Created by the automatic test.', 'accessgroupname' : 'admin', 'alias' : '', 'layertype' : 'NORMAL', 'layerid' : 13, 'otherpermission' : 'Read/Link', 'createtime' : '2015-09-29 06:19:04', 'geometrytype' : 'POINT', 'accessgrouppermission' : 'Read/Link', 'otherperm' : 5, 'addAttr' : 'layer/13/add/attribute', 'iseditable' : 1, 'layerattrib' : [{'colunits' : 'percentage', 'colsize' : '20', 'layerattribid' : 17, 'coltype' : 'Humidity', 'validation' : null, 'colname' : 'humidity_9246561', 'unitid' : '6'}], 'owngroupperm' : 7, 'chgOwner' : 'layer/13/change/owner', 'lastupdatetime' : '2015-09-29 06:19:04', 'layermetadata' : 'Created from the test framework', 'parentlayer' : null, 'update' : 'update/layer/13'}], 'RecordMeta' : [{'TagName' : 'layer'}]}",
 "ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Layer (15) not found.' /></DATA>"}],
 "ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Layer (15) not found.'}]}"}],
 "URLParameter": [{"ParameterName": "id", "Description": "Existing layerid"}],
@@ -2244,10 +2240,24 @@ sub get_layer_runmode {
 
   my $sql = "SELECT layer.id as layerid, ";
   $sql   .= "layer.name as layername, ";
-  $sql   .= "layer.alias, layer.layertype, ";
-  $sql   .= "layer.srid, layer.geometrytype, layer.parent as parentlayer, ";
-  $sql   .= "layer.description, layer.owngroupid, layer.accessgroupid, layer.owngroupperm, ";
-  $sql   .= "layer.accessgroupperm, layer.otherperm, player.name as parentlayername, ";
+  $sql   .= "layer.alias, ";
+  $sql   .= "layer.layertype, ";
+  $sql   .= "layer.layermetadata, ";
+  $sql   .= "layer.iseditable, ";
+  $sql   .= "layer.createuser, ";
+  $sql   .= "layer.createtime, ";
+  $sql   .= "layer.lastupdateuser, ";
+  $sql   .= "layer.lastupdatetime, ";
+  $sql   .= "layer.srid, ";
+  $sql   .= "layer.geometrytype, ";
+  $sql   .= "layer.parent as parentlayer, ";
+  $sql   .= "layer.description, ";
+  $sql   .= "layer.owngroupid, ";
+  $sql   .= "layer.accessgroupid, ";
+  $sql   .= "layer.owngroupperm, ";
+  $sql   .= "layer.accessgroupperm, ";
+  $sql   .= "layer.otherperm, ";
+  $sql   .= "player.name as parentlayername, ";
   $sql   .= "$perm_str as ultimateperm ";
   $sql   .= "FROM layer LEFT JOIN layer as player ON layer.parent = player.id ";
   $sql   .= "WHERE (($perm_str) & $READ_PERM) = $READ_PERM ";
@@ -2322,48 +2332,6 @@ sub list_parameter_mapping {
   return ($err, $msg, $final_dev_mapping_data);
 }
 
-sub list_parameter_mapping_short_runmode {
-
-  my $self = shift;
-
-  my $data_for_postrun_href = {};
-
-  my $group_id = $self->authen->group_id();
-  my $gadmin_status = $self->authen->gadmin_status();
-  my $perm_str = permission_phrase($group_id, 1, $gadmin_status, 'layer');
-
-  my $sql = "SELECT deviceid, layerattrib, deviceparam, active, ";
-  $sql   .= "colname, layer, layer.name as layername, $perm_str as ultimateperm ";
-  $sql   .= "FROM datadevice LEFT JOIN layerattrib ON ";
-  $sql   .= "datadevice.layerattrib = layerattrib.id ";
-  $sql   .= "LEFT JOIN layer ON layerattrib.layer = layer.id ";
-  $sql   .= "WHERE (($perm_str) & $READ_PERM) = $READ_PERM ";
-
-  $self->logger->debug("SQL: $sql");
-
-  my ($para_mapping_err, $para_mapping_msg, $para_mapping_aref)  = $self->list_parameter_mapping(0, $sql);
-
-  if ($para_mapping_err) {
-
-    $self->logger->debug($para_mapping_msg);
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-    return $data_for_postrun_href;
-  }
-
-  my $rec_meta_aref = [{'TagName' => 'datadevice'}];
-
-  $data_for_postrun_href->{'Error'}     = 0;
-  $data_for_postrun_href->{'Data'}      = {'datadevice' => $para_mapping_aref,
-                                           'RecordMeta' => $rec_meta_aref,
-  };
-  $data_for_postrun_href->{'ExtraData'} = 0;
-
-  return $data_for_postrun_href;
-}
-
 sub list_parameter_mapping_full_runmode {
 
 =pod list_parameter_mapping_full_HELP_START
@@ -2427,7 +2395,7 @@ sub get_parameter_mapping_runmode {
 
 =pod get_parameter_mapping_HELP_START
 {
-"OperationName" : "Get mapped patameter",
+"OperationName" : "Get mapped parameter",
 "Description": "Return detailed information for mapped parameter to the GIS attribute and the specified device id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -2615,7 +2583,6 @@ sub list_dev_registration {
       return ($err, $msg, $data_aref);
     }
 
-    
     for my $dev_reg_row (@{$data_aref}) {
 
       my $reg_id   = $dev_reg_row->{'DeviceRegisterId'};
@@ -2625,7 +2592,7 @@ sub list_dev_registration {
       if (defined $dev_reg_row->{'DeviceId'}) {
 
         my $dev_id = $dev_reg_row->{'DeviceId'};
-        
+
         if ($not_used_id_item_href->{$reg_id} &&
             $not_used_id_ddevice_href->{$dev_id}) {
 
@@ -2693,41 +2660,6 @@ sub list_dev_registration_full_runmode {
   $data_for_postrun_href->{'Data'}  = {'DeviceRegistration' => $dev_reg_aref,
                                        'RecordMeta'         => $rec_meta_aref,
   };
-
-  return $data_for_postrun_href;
-}
-
-sub list_dev_registration_short_runmode {
-
-  my $self = shift;
-
-  my $data_for_postrun_href = {};
-
-  my $group_id = $self->authen->group_id();
-
-  my $sql = 'SELECT DeviceId ';
-  $sql   .= 'FROM deviceregister ';
-  $sql   .= 'ORDER BY DeviceRegisterId DESC';
-
-  my ($dev_reg_err, $dev_reg_msg, $dev_reg_aref)  = $self->list_dev_registration(0, $sql);
-
-  if ($dev_reg_err) {
-
-    $self->logger->debug($dev_reg_msg);
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-    return $data_for_postrun_href;
-  }
-
-  my $rec_meta_aref = [{'TagName' => 'DeviceRegistration'}];
-
-  $data_for_postrun_href->{'Error'}     = 0;
-  $data_for_postrun_href->{'Data'}      = {'DeviceRegistration' => $dev_reg_aref,
-                                           'RecordMeta'         => $rec_meta_aref,
-  };
-  $data_for_postrun_href->{'ExtraData'} = 0;
 
   return $data_for_postrun_href;
 }
@@ -2853,6 +2785,7 @@ sub add_layer_attribute_runmode {
 "AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
 "KDDArTModule": "environment",
 "KDDArTTable": "layerattrib",
+"SkippedField": ["layer"],
 "SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><ReturnId Value='21' ParaName='id' /><Info Message='Layer Attribute (21) has been added to Layer (9) successfully.' /></DATA>",
 "SuccessMessageJSON": "{'ReturnId' : [{'Value' : '22','ParaName' : 'id'}],'Info' : [{'Message' : 'Layer Attribute (22) has been added to Layer (8) successfully.'}]}",
 "ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Layer (10) does not exist.' /></DATA>"}],
@@ -2868,39 +2801,45 @@ sub add_layer_attribute_runmode {
 
   my $data_for_postrun_href = {};
 
+  # Generic required static field checking
+
+  my $dbh_read = connect_gis_read();
+
+  my $skip_field = {'layer'       => 1,
+                   };
+
+  my $field_name_translation = {};
+
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'layerattrib', $skip_field,
+                                                                                $field_name_translation,
+                                                                               );
+
+  if ($chk_sfield_err) {
+
+    $self->logger->debug($chk_sfield_msg);
+
+    return $for_postrun_href;
+  }
+
+  $dbh_read->disconnect();
+
+  # Finish generic required static field checking
+
   my $colname            = $query->param('colname');
   my $coltype            = $query->param('coltype');
   my $colsize            = $query->param('colsize');
   my $colunits           = $query->param('colunits');
-  my $valuetype          = $query->param('valuetype');
+  my $unit_id            = $query->param('unitid');
 
-  my ($missing_err, $missing_msg) = check_missing_value( { 'colname'     => $colname,
-                                                           'coltype'     => $coltype,
-                                                           'colsize'     => $colsize,
-                                                           'colunits'    => $colunits,
-                                                           'valuetype'   => $valuetype,
-                                                         } );
+  $colname = lc($colname);
 
-  if ($missing_err) {
+  my ($int_err, $int_href) = check_integer_href( { 'colsize' => $colsize } );
 
-    $missing_msg .= ' missing.';
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $missing_msg}]};
-
-    return $data_for_postrun_href;
-  }
-
-  my ($int_err, $int_msg) = check_integer_value( {
-                                                  'colsize'       => $colsize,
-                                                 } );
-  
   if ($int_err) {
 
-    $int_msg .= ' not an integer.';
-
     $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $int_msg}]};
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $int_href}]};
 
     return $data_for_postrun_href;
   }
@@ -2914,10 +2853,10 @@ sub add_layer_attribute_runmode {
   if ( !($colname =~ /^[a-zA-Z0-9_]+$/) ) {
 
     my $err_msg = "colname ($colname): invalid character.";
-    
+
     $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'parent' => $err_msg}]};
-    
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'colname' => $err_msg}]};
+
     return $data_for_postrun_href;
   }
 
@@ -2926,9 +2865,9 @@ sub add_layer_attribute_runmode {
 
   my $dbh_gis_write = connect_gis_write();
 
-  my $layer_existence = record_existence($dbh_gis_write, 'layer', 'id', $layer_id);
+  my $layer_type = read_cell_value($dbh_gis_write, 'layer', 'layertype', 'id', $layer_id);
 
-  if (!$layer_existence) {
+  if (length($layer_type) == 0) {
 
     my $err_msg = "Layer ($layer_id) does not exist.";
 
@@ -2938,17 +2877,44 @@ sub add_layer_attribute_runmode {
     return $data_for_postrun_href;
   }
 
-  my $valuetype_existence = record_existence($dbh_gis_write, 'valuetype', 'id', $valuetype);
+  my $sql = 'SELECT id from layerattrib WHERE layer=? AND colname=?';
 
-  if (!$valuetype_existence) {
+  my ($chk_colname_err, $layerattrib_id) = read_cell($dbh_gis_write, $sql, [$layer_id, $colname]);
 
-    my $err_msg = "valuetype ($valuetype) does not exist.";
+  if ($chk_colname_err) {
+
+    $self->logger->debug("Check if colname exists failed");
+    my $err_msg = "Unexpected Error.";
 
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
     return $data_for_postrun_href;
   }
+
+  if (length($layerattrib_id) > 0) {
+
+    my $err_msg = "colname ($colname) in layer ($layer_id): already exists.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'colname' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $dbh_k_read = connect_kdb_read();
+
+  if (!record_existence($dbh_k_read, 'generalunit', 'UnitId', $unit_id)) {
+
+    my $err_msg = "unitid ($unit_id): not found.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'unitid' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh_k_read->disconnect();
 
   my ($is_layer_ok, $trouble_layer_id_aref) = check_permission($dbh_gis_write, 'layer', 'id',
                                                                [$layer_id], $group_id, $gadmin_status,
@@ -2960,17 +2926,21 @@ sub add_layer_attribute_runmode {
     my $err_msg = "Permission denied: Group ($group_id) and Layer ($trouble_layer_id).";
 
     $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $missing_msg}]};
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
     return $data_for_postrun_href;
   }
 
-  my $sql = '';
-  $sql   .= 'INSERT INTO layerattrib (layer, colname, coltype, colsize, validation, colunits, valuetype) ';
+  if (length($validation) == 0) {
+
+    $validation = undef;
+  }
+
+  $sql    = 'INSERT INTO layerattrib (layer, colname, coltype, colsize, validation, colunits, unitid) ';
   $sql   .= 'VALUES (?, ?, ?, ?, ?, ?, ?)';
 
   my $sth = $dbh_gis_write->prepare($sql);
-  $sth->execute($layer_id, $colname, $coltype, $colsize, $validation, $colunits, $valuetype);
+  $sth->execute($layer_id, $colname, $coltype, $colsize, $validation, $colunits, $unit_id);
 
   if ($dbh_gis_write->err()) {
 
@@ -2983,424 +2953,24 @@ sub add_layer_attribute_runmode {
 
   my $l_attrib_id = $dbh_gis_write->last_insert_id(undef, undef, 'layerattrib', 'id');
 
+  if (uc($layer_type) eq '2D') {
+
+    my ($err_status, $postrun_href) = $self->add_layer2d_column($dbh_gis_write, $layer_id, [$colname]);
+
+    if ($err_status) {
+
+      return $postrun_href;
+    }
+  }
+
   $dbh_gis_write->disconnect();
 
   my $info_msg_aref  = [{'Message' => "Layer Attribute ($l_attrib_id) has been added to Layer ($layer_id) successfully."}];
-  my $return_id_aref = [{'Value' => "$l_attrib_id", 'ParaName' => 'id'}];
+  my $return_id_aref = [{'Value' => "$l_attrib_id", 'ParaName' => 'id', 'colname' => "$colname"}];
 
   $data_for_postrun_href->{'Error'}     = 0;
   $data_for_postrun_href->{'Data'}      = {'Info'     => $info_msg_aref,
                                            'ReturnId' => $return_id_aref,
-  };
-  $data_for_postrun_href->{'ExtraData'} = 0;
-
-  return $data_for_postrun_href;
-}
-
-sub list_layer_attrib_valuetype {
-
-  my $self              = $_[0];
-  my $extra_attr_yes    = $_[1];
-  my $sql               = $_[2];
-  my $where_para_aref   = $_[3];
-
-  my $err = 0;
-  my $msg = '';
-  my $data_aref = [];
-
-  my $dbh = connect_gis_read();
-
-  ($err, $msg, $data_aref) = read_data($dbh, $sql, $where_para_aref);
-
-  if ($err) {
-
-    return ($err, $msg, $data_aref);
-  }
-
-  my $final_valuetype_data = [];
-
-  my $gadmin_status = $self->authen->gadmin_status();
-
-  if ($extra_attr_yes && ($gadmin_status eq '1')) {
-
-    my $val_type_id_aref = [];
-
-    for my $valuetype_row (@{$data_aref}) {
-
-      push(@{$val_type_id_aref}, $valuetype_row->{'valuetypeid'});
-    }
-
-    my $chk_table_aref = [{'TableName' => 'layerattrib', 'FieldName' => 'valuetype'}];
-
-    my ($chk_id_err, $chk_id_msg,
-        $used_id_href, $not_used_id_href) = id_existence_bulk($dbh, $chk_table_aref, $val_type_id_aref);
-
-    if ($chk_id_err) {
-
-      $self->logger->debug("Check id existence error: $chk_id_msg");
-      $err = 1;
-      $msg = $chk_id_msg;
-    }
-
-    if ($err) {
-
-      return ($err, $msg, $data_aref);
-    }
-    
-    for my $valuetype_row (@{$data_aref}) {
-
-      my $valuetype_id   = $valuetype_row->{'valuetypeid'};
-
-      $valuetype_row->{'update'}  = "update/layerattrib/valuetype/$valuetype_id";
-
-      if ($not_used_id_href->{$valuetype_id}) {
-
-        $valuetype_row->{'delete'}  = "delete/layerattrib/valuetype/$valuetype_id";
-      }
-      
-      push(@{$final_valuetype_data}, $valuetype_row);
-    }
-  }
-  else {
-
-    $final_valuetype_data = $data_aref;
-  }
- 
-  $dbh->disconnect();
-
-  return ($err, $msg, $final_valuetype_data);
-}
-
-sub list_layer_attrib_valuetype_runmode {
-
-=pod list_layer_attrib_valuetype_HELP_START
-{
-"OperationName" : "List valuetype",
-"Description": "Return the list of value types available for layer attributes. Value type is a small dictionary of values for grouping the same type of layer attributes.",
-"AuthRequired": 1,
-"GroupRequired": 1,
-"GroupAdminRequired": 0,
-"SignatureRequired": 0,
-"AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><RecordMeta TagName='valuetype' /><valuetype valuetypeid='1' valuetypename='Numeric - 4640422' update='update/layerattrib/valuetype/1' /></DATA>",
-"SuccessMessageJSON": "{'RecordMeta' : [{'TagName' : 'valuetype'}], 'valuetype' : [{'valuetypeid' : '1','update' : 'update/layerattrib/valuetype/1','valuetypename' : 'Numeric - 4640422'}]}",
-"ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
-"ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
-"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
-}
-=cut
-
-  my $self = shift;
-
-  my $data_for_postrun_href = {};
-
-  my $sql = 'SELECT id as valuetypeid, name as valuetypename FROM valuetype';
-
-  my ($valuetype_err, $valuetype_msg, $valuetype_aref)  = $self->list_layer_attrib_valuetype(1, $sql);
-
-  if ($valuetype_err) {
-
-    $self->logger->debug($valuetype_msg);
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-    return $data_for_postrun_href;
-  }
-
-  my $rec_meta_aref = [{'TagName' => 'valuetype'}];
-
-  $data_for_postrun_href->{'Error'}     = 0;
-  $data_for_postrun_href->{'Data'}      = {'valuetype' => $valuetype_aref,
-                                           'RecordMeta'  => $rec_meta_aref,
-  };
-
-  return $data_for_postrun_href;
-}
-
-sub add_layer_attrib_valuetype_runmode {
-
-=pod add_layer_attrib_valuetype_gadmin_HELP_START
-{
-"OperationName" : "Add valuetype",
-"Description": "Add a new value type definition for layer attributes into the system.",
-"AuthRequired": 1,
-"GroupRequired": 1,
-"GroupAdminRequired": 1,
-"SignatureRequired": 1,
-"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
-"KDDArTModule": "environment",
-"KDDArTTable": "valuetype",
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><ReturnId Value='6' ParaName='id' /><Info Message='Valuetype (6) has been added successfully.' /></DATA>",
-"SuccessMessageJSON": "{'ReturnId' : [{'Value' : '7', 'ParaName' : 'id'}], 'Info' : [{'Message' : 'Valuetype (7) has been added successfully.'}]}",
-"ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
-"ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
-"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
-}
-=cut
-
-  my $self  = shift;
-  my $query = $self->query();
-
-  my $data_for_postrun_href = {};
-
-  my $type_name = $query->param('name');
-
-  my ($missing_err, $missing_msg) = check_missing_value( { 'name' => $type_name } );
-
-  if ($missing_err) {
-
-    $missing_msg .= ' missing.';
-
-    $data_for_postrun_href->{'Error'}       = 1;
-    $data_for_postrun_href->{'Data'}        = {'Error' => [{'Message' => $missing_msg}]};
-
-    return $data_for_postrun_href;
-  }
-
-  my $dbh_gis_write = connect_gis_write();
-
-  my $sql = 'INSERT INTO valuetype (name) VALUES (?)';
-
-  my $sth = $dbh_gis_write->prepare($sql);
-  $sth->execute($type_name);
-
-  my $valuetype_id = -1;
-  if (!$dbh_gis_write->err()) {
-
-    $valuetype_id = $dbh_gis_write->last_insert_id(undef, undef, 'valuetype', 'id');
-    $self->logger->debug("ValueTypeId: $valuetype_id");
-  }
-  else {
-
-    $data_for_postrun_href->{'Error'}       = 1;
-    $data_for_postrun_href->{'Data'}        = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-    return $data_for_postrun_href;
-  }
-  $sth->finish();
-
-  $dbh_gis_write->disconnect();
-  
-  my $info_msg_aref  = [{'Message' => "Valuetype ($valuetype_id) has been added successfully."}];
-  my $return_id_aref = [{'Value' => "$valuetype_id", 'ParaName' => 'id'}];
-
-  $data_for_postrun_href->{'Error'}     = 0;
-  $data_for_postrun_href->{'Data'}      = {'Info'     => $info_msg_aref,
-                                           'ReturnId' => $return_id_aref,
-  };
-  $data_for_postrun_href->{'ExtraData'} = 0;
-
-  return $data_for_postrun_href;
-}
-
-sub update_layer_attrib_valuetype_runmode {
-
-=pod update_layer_attrib_valuetype_gadmin_HELP_START
-{
-"OperationName" : "Update valuetype",
-"Description": "Update value type definition for layer attributes specified by id.",
-"AuthRequired": 1,
-"GroupRequired": 1,
-"GroupAdminRequired": 1,
-"SignatureRequired": 1,
-"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
-"KDDArTModule": "environment",
-"KDDArTTable": "valuetype",
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='Valuetype (6) has been added successfully.' /></DATA>",
-"SuccessMessageJSON": "{'Info' : [{'Message' : 'Valuetype (6) has been added successfully.'}]}",
-"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Valuetype (8) not found.' /></DATA>"}],
-"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Valuetype (8) not found.'}]}"}],
-"URLParameter": [{"ParameterName": "id", "Description": "Value type id"}],
-"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
-}
-=cut
-
-  my $self      = shift;
-  my $vtype_id  = $self->param('id');
-  my $query     = $self->query();
-
-  my $data_for_postrun_href = {};
-
-  my $type_name = $query->param('name');
-
-  my ($missing_err, $missing_msg) = check_missing_value( { 'name' => $type_name } );
-
-  if ($missing_err) {
-
-    $missing_msg .= ' missing.';
-
-    $data_for_postrun_href->{'Error'}       = 1;
-    $data_for_postrun_href->{'Data'}        = {'Error' => [{'Message' => $missing_msg}]};
-
-    return $data_for_postrun_href;
-  }
-
-  my $dbh_gis_write = connect_gis_write();
-
-  my $valuetype_exist = record_existence($dbh_gis_write, 'valuetype', 'id', $vtype_id);
-
-  if (!$valuetype_exist) {
-
-    $data_for_postrun_href->{'Error'}       = 1;
-    $data_for_postrun_href->{'Data'}        = {'Error' => [{'Message' => "Valuetype ($vtype_id) not found."}]};
-
-    return $data_for_postrun_href;
-  }
-
-  my $sql = 'UPDATE valuetype SET name=? WHERE id=?';
-
-  my $sth = $dbh_gis_write->prepare($sql);
-  $sth->execute($type_name, $vtype_id);
-
-  if ($dbh_gis_write->err()) {
-
-    $data_for_postrun_href->{'Error'}       = 1;
-    $data_for_postrun_href->{'Data'}        = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-    return $data_for_postrun_href;
-  }
-  $sth->finish();
-
-  $dbh_gis_write->disconnect();
-  
-  my $info_msg_aref  = [{'Message' => "Valuetype ($vtype_id) has been added successfully."}];
-
-  $data_for_postrun_href->{'Error'}     = 0;
-  $data_for_postrun_href->{'Data'}      = {'Info'     => $info_msg_aref,
-  };
-  $data_for_postrun_href->{'ExtraData'} = 0;
-
-  return $data_for_postrun_href;
-}
-
-sub get_layer_attrib_valuetype_runmode {
-
-=pod get_layer_attrib_valuetype_HELP_START
-{
-"OperationName" : "Get valuetype",
-"Description": "Return detailed definition of value type for layer attributes specified by id.",
-"AuthRequired": 1,
-"GroupRequired": 1,
-"GroupAdminRequired": 0,
-"SignatureRequired": 0,
-"AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><RecordMeta TagName='valuetype' /><valuetype valuetypeid='1' valuetypename='Numeric - 4640422' update='update/layerattrib/valuetype/1' /></DATA>",
-"SuccessMessageJSON": "{'RecordMeta' : [{'TagName' : 'valuetype'}], 'valuetype' : [{'valuetypeid' : '1', 'update' : 'update/layerattrib/valuetype/1', 'valuetypename' : 'Numeric - 4640422'}]}",
-"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Valuetype (8) not found.' /></DATA>"}],
-"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Valuetype (8) not found.'}]}"}],
-"URLParameter": [{"ParameterName": "id", "Description": "Value type id"}],
-"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
-}
-=cut
-
-  my $self     = shift;
-  my $vtype_id = $self->param('id');
-
-  my $data_for_postrun_href = {};
-
-  my $dbh = connect_gis_read();
-
-  if (!record_existence($dbh, 'valuetype', 'id', $vtype_id)) {
-
-    $data_for_postrun_href->{'Error'}       = 1;
-    $data_for_postrun_href->{'Data'}        = {'Error' => [{'Message' => "Valuetype ($vtype_id) not found."}]};
-
-    return $data_for_postrun_href;
-  }
-
-  $dbh->disconnect();
-
-  my $sql = 'SELECT id as valuetypeid, name as valuetypename FROM valuetype WHERE id=?';
-
-  my ($valuetype_err, $valuetype_msg, $valuetype_aref)  = $self->list_layer_attrib_valuetype(1, $sql, [$vtype_id]);
-
-  if ($valuetype_err) {
-
-    $self->logger->debug($valuetype_msg);
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-    return $data_for_postrun_href;
-  }
-
-  my $rec_meta_aref = [{'TagName' => 'valuetype'}];
-
-  $data_for_postrun_href->{'Error'}     = 0;
-  $data_for_postrun_href->{'Data'}      = {'valuetype' => $valuetype_aref,
-                                           'RecordMeta'  => $rec_meta_aref,
-  };
-  $data_for_postrun_href->{'ExtraData'} = 0;
-
-  return $data_for_postrun_href;
-}
-
-sub del_layer_attrib_valuetype_runmode {
-
-=pod del_layer_attrib_valuetype_gadmin_HELP_START
-{
-"OperationName" : "Delete valuetype",
-"Description": "Delete value type from the system specified by id. Value type can be deleted only if not attached to any lower level record.",
-"AuthRequired": 1,
-"GroupRequired": 1,
-"GroupAdminRequired": 0,
-"SignatureRequired": 1,
-"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='Valuetype (8) has been deleted successfully.' /></DATA>",
-"SuccessMessageJSON": "{'Info' : [{'Message' : 'Valuetype (9) has been deleted successfully.'}]}",
-"ErrorMessageXML": [{"IdUsed": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error id='Valuetype (5) is used in layerattrib.' /></DATA>"}],
-"ErrorMessageJSON": [{"IdUsed": "{'Error' : [{'id' : 'Valuetype (5) is used in layerattrib.'}]}"}],
-"URLParameter": [{"ParameterName": "id", "Description": "Existing layer attribute value type id."}],
-"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
-}
-=cut
-
-  my $self      = shift;
-  my $vtype_id  = $self->param('id');
-
-  my $data_for_postrun_href = {};
-
-  my $dbh_gis_write = connect_gis_write();
-
-  my $valuetype_exist = record_existence($dbh_gis_write, 'valuetype', 'id', $vtype_id);
-
-  if (!$valuetype_exist) {
-
-    $data_for_postrun_href->{'Error'}       = 1;
-    $data_for_postrun_href->{'Data'}        = {'Error' => [{'Message' => "Valuetype ($vtype_id) not found."}]};
-    
-    return $data_for_postrun_href;
-  }
-
-  if (record_existence($dbh_gis_write, 'layerattrib', 'valuetype', $vtype_id)) {
-
-    $data_for_postrun_href->{'Error'}       = 1;
-    $data_for_postrun_href->{'Data'}        = {'Error' => [{'id' => "Valuetype ($vtype_id) is used in layerattrib."}]};
-    
-    return $data_for_postrun_href;
-  }
-
-  my $sql = 'DELETE FROM valuetype WHERE id=?';
-
-  my $sth = $dbh_gis_write->prepare($sql);
-  $sth->execute($vtype_id);
-
-  if ($dbh_gis_write->err()) {
-
-    $data_for_postrun_href->{'Error'}       = 1;
-    $data_for_postrun_href->{'Data'}        = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-    return $data_for_postrun_href;
-  }
-  $sth->finish();
-
-  $dbh_gis_write->disconnect();
-  
-  my $info_msg_aref  = [{'Message' => "Valuetype ($vtype_id) has been deleted successfully."}];
-
-  $data_for_postrun_href->{'Error'}     = 0;
-  $data_for_postrun_href->{'Data'}      = {'Info'     => $info_msg_aref,
   };
   $data_for_postrun_href->{'ExtraData'} = 0;
 
@@ -3420,8 +2990,8 @@ sub add_layer_attribute_bulk_runmode {
 "AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
 "SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='Attribute(s) have been added to layer (9) successfully.' /></DATA>",
 "SuccessMessageJSON": "{'Info' : [{'Message' : 'Attribute(s) have been added to layer (8) successfully.'}]}",
-"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Valuetype (2) not found' /></DATA>"}],
-"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Valuetype (2) not found'}]}"}],
+"ErrorMessageXML": [{}],
+"ErrorMessageJSON": [{}],
 "RequiredUpload": 1,
 "UploadFileFormat": "XML",
 "UploadFileParameterName": "uploadfile",
@@ -3440,12 +3010,26 @@ sub add_layer_attribute_bulk_runmode {
 
   my $dbh_gis_write = connect_gis_write();
 
-  if (!record_existence($dbh_gis_write, 'layer', 'id', $layer_id)) {
+  my $layer_type = read_cell_value($dbh_gis_write, 'layer', 'layertype', 'id', $layer_id);
+
+  if (length($layer_type) == 0) {
 
     my $err_msg = "Layer ($layer_id) not found";
 
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my ($get_scol_err, $get_scol_msg, $scol_data, $pkey_data) = get_static_field($dbh_gis_write, 'layerattrib');
+
+  if ($get_scol_err) {
+
+    $self->logger->debug("Get static field info failed: $get_scol_msg");
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
 
     return $data_for_postrun_href;
   }
@@ -3462,7 +3046,7 @@ sub add_layer_attribute_bulk_runmode {
   eval {
 
     local $XML::Checker::FAIL = sub {
-      
+
       my $code = shift;
       my $err_str = XML::Checker::error_string ($code, @_);
       $self->logger->debug("XML Parsing ERR: $code : $err_str");
@@ -3487,45 +3071,141 @@ sub add_layer_attribute_bulk_runmode {
   my $attribute_xml  = read_file($attribute_xml_file);
   my $attribute_aref = xml2arrayref($attribute_xml, 'layerattrib');
 
+  my $sql = '';
+  my $colname_lookup = {};
+
+  my $dbh_k_read = connect_kdb_read();
+
   for my $layer_at (@{$attribute_aref}) {
 
-    my $vtype = $layer_at->{'valuetype'};
+    my $colsize_info          = {};
+    my $chk_maxlen_field_href = {};
 
-    if (!record_existence($dbh_gis_write, 'valuetype', 'id', $vtype)) {
+    for my $static_field (@{$scol_data}) {
 
-      my $err_msg = "Valuetype ($vtype) not found";
+      my $field_name  = $static_field->{'Name'};
+      my $field_dtype = $static_field->{'DataType'};
+
+      if (lc($field_dtype) eq 'text') {
+
+        $colsize_info->{$field_name}           = $static_field->{'ColSize'};
+        $chk_maxlen_field_href->{$field_name}  = $layer_at->{$field_name};
+      }
+    }
+
+    my ($maxlen_err, $maxlen_msg) = check_maxlen($chk_maxlen_field_href, $colsize_info);
+
+    if ($maxlen_err) {
+
+      $maxlen_msg .= 'longer than its maximum length';
+
+      $data_for_postrun_href->{'Error'}       = 1;
+      $data_for_postrun_href->{'Data'}        = {'Error' => [{'Message' => $maxlen_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my $unit_id = $layer_at->{'unitid'};
+
+    if (!record_existence($dbh_k_read, 'generalunit', 'UnitId', $unit_id)) {
+
+      my $err_msg = "unitid ($unit_id): not found";
 
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
       return $data_for_postrun_href;
     }
+
+    my $colname = $layer_at->{'colname'};
+
+    if ( $colname !~ /^[a-zA-Z0-9_]+$/ ) {
+
+      my $err_msg = "colname ($colname): invalid character.";
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    $sql = 'SELECT id FROM layerattrib WHERE layer=? AND colname=?';
+
+    my ($chk_colname_err, $layerattrib_id) = read_cell($dbh_gis_write, $sql, [$layer_id, $colname]);
+
+    if ($chk_colname_err) {
+
+      $self->logger->debug("Check if colname exists failed");
+      my $err_msg = "Unexpected Error.";
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    if (length($layerattrib_id) > 0) {
+
+      my $err_msg = "colname ($colname) in layer ($layer_id): already exists.";
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    if ($colname_lookup->{lc($colname)}) {
+
+      my $err_msg = "colname ($colname): duplicate.";
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+    else {
+
+      $colname_lookup->{lc($colname)} = 1;
+    }
   }
 
-  my $sql = '';
+  $dbh_k_read->disconnect();
+
   my $sth;
   for my $layer_at (@{$attribute_aref}) {
 
     $sql  = 'INSERT INTO layerattrib ';
-    $sql .= '(layer, colname, coltype, colsize, validation, colunits, valuetype) ';
+    $sql .= '(layer, colname, coltype, colsize, validation, colunits, unitid) ';
     $sql .= 'VALUES (?, ?, ?, ?, ?, ?, ?)';
 
     $sth = $dbh_gis_write->prepare($sql);
-    $sth->execute($layer_id, $layer_at->{'colname'},
+    $sth->execute($layer_id, lc($layer_at->{'colname'}),
                   $layer_at->{'coltype'}, $layer_at->{'colsize'},
                   $layer_at->{'validation'}, $layer_at->{'colunits'},
-                  $layer_at->{'valuetype'});
+                  $layer_at->{'unitid'});
 
     if ($dbh_gis_write->err()) {
 
       $self->logger->debug('INSERT Data to layerattrib table failed');
-      
+
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
       return $data_for_postrun_href;
     }
     $sth->finish();
+  }
+
+  if (uc($layer_type) eq '2D') {
+
+    my @colname_list = keys(%{$colname_lookup});
+
+    my ($err_status, $postrun_href) = $self->add_layer2d_column($dbh_gis_write, $layer_id, \@colname_list);
+
+    if ($err_status) {
+
+      return $postrun_href;
+    }
   }
 
   $dbh_gis_write->disconnect();
@@ -3550,8 +3230,8 @@ sub export_layer_data_shape_runmode {
 "GroupAdminRequired": 0,
 "SignatureRequired": 0,
 "AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "FILTERING"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><OutputFile shp='http://kddart.example.com/data/admin/export_1_6_1_4_3_7_2_5__68fe6e93f44f5120d599477caef61d6a.shp' csv='http://kddart.example.com/data/admin/export_1_6_1_4_3_7_2_5__68fe6e93f44f5120d599477caef61d6a.csv' dbf='http://kddart.example.com/data/admin/export_1_6_1_4_3_7_2_5__68fe6e93f44f5120d599477caef61d6a.dbf' shx='http://kddart.example.com/data/admin/export_1_6_1_4_3_7_2_5__68fe6e93f44f5120d599477caef61d6a.shx' /></DATA>",
-"SuccessMessageJSON": "{'OutputFile' : [{'shp' : 'http://kddart.example.com/data/admin/export_1_6_1_4_3_7_2_5__68fe6e93f44f5120d599477caef61d6a.shp','csv' : 'http://kddart.example.com/data/admin/export_1_6_1_4_3_7_2_5__68fe6e93f44f5120d599477caef61d6a.csv','dbf' : 'http://kddart.example.com/data/admin/export_1_6_1_4_3_7_2_5__68fe6e93f44f5120d599477caef61d6a.dbf','shx' : 'http://kddart.example.com/data/admin/export_1_6_1_4_3_7_2_5__68fe6e93f44f5120d599477caef61d6a.shx'}]}",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><OutputFile shp='http://kddart-d.diversityarrays.com/data/admin/export_1_6_1_4_3_7_2_5__68fe6e93f44f5120d599477caef61d6a.shp' csv='http://kddart-d.diversityarrays.com/data/admin/export_1_6_1_4_3_7_2_5__68fe6e93f44f5120d599477caef61d6a.csv' dbf='http://kddart-d.diversityarrays.com/data/admin/export_1_6_1_4_3_7_2_5__68fe6e93f44f5120d599477caef61d6a.dbf' shx='http://kddart-d.diversityarrays.com/data/admin/export_1_6_1_4_3_7_2_5__68fe6e93f44f5120d599477caef61d6a.shx' /></DATA>",
+"SuccessMessageJSON": "{'OutputFile' : [{'shp' : 'http://kddart-d.diversityarrays.com/data/admin/export_1_6_1_4_3_7_2_5__68fe6e93f44f5120d599477caef61d6a.shp','csv' : 'http://kddart-d.diversityarrays.com/data/admin/export_1_6_1_4_3_7_2_5__68fe6e93f44f5120d599477caef61d6a.csv','dbf' : 'http://kddart-d.diversityarrays.com/data/admin/export_1_6_1_4_3_7_2_5__68fe6e93f44f5120d599477caef61d6a.dbf','shx' : 'http://kddart-d.diversityarrays.com/data/admin/export_1_6_1_4_3_7_2_5__68fe6e93f44f5120d599477caef61d6a.shx'}]}",
 "ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
 "ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
 "HTTPParameter": [{"Required": 0, "Name": "AttributeIdCSV", "Description": "Comma separted value of wanted layer attribute id list"}, {"Required": 0, "Name": "TimeFrom", "Description": "The startting time of wanted layer data. It is inclusive."}, {"Required": 0, "Name": "TimeTo", "Description": "The ending time of wanted layer data. It is inclusive"}, {"Required": 0, "Name": "AOITopLeftLong", "Description": "Area of Interest longitude. Area of Interest parameters define a rectangular geographic area where wanted data were recorded. If data over an area of interest is wanted, all four parameter must be provided."}, {"Required": 0, "Name": "AOITopLeftLat", "Description": "Area of Interest latitude"}, {"Required": 0, "Name": "AOIBottomRightLong", "Description": "Area of Interest bottom right longitude"}, {"Required": 0, "Name": "AOIBottomRightLat", "Description": "Area of Interest bottom right latitude"}],
@@ -3613,8 +3293,8 @@ sub export_layer_data_shape_runmode {
 
       $time_filter .= " dt <= '$time_to' ";
     }
-  }  
-  
+  }
+
   my $all_aoi_present = 1;
   my $all_aoi_absent  = 1;
 
@@ -3647,9 +3327,9 @@ sub export_layer_data_shape_runmode {
                                                       'AOIBottomRightLong' => $aoi_bottomright_long,
                                                       'AOIBottomRightLat'  => $aoi_bottomright_lat,
                                                      });
-    
+
     if ($float_err ) {
-      
+
       $float_msg .= ' not compliant with the non-scientific floating point format.';
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $float_msg}]};
@@ -3692,6 +3372,18 @@ sub export_layer_data_shape_runmode {
 
       return $data_for_postrun_href;
     }
+  }
+
+  my $layertype = read_cell_value($dbh, 'layer', 'layertype', 'id', $layer_id);
+
+  if (uc($layertype) eq '2D') {
+
+    my $err_msg = "Layer ($layer_id) is 2D layer.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
   }
 
   $sql    = 'SELECT id, colname, colsize FROM layerattrib WHERE layer=?';
@@ -3774,7 +3466,7 @@ sub export_layer_data_shape_runmode {
 
   $sql .= " FROM layer${layer_id} LEFT JOIN layer${layer_id}attrib ON ";
   $sql .= " layer${layer_id}.id = layer${layer_id}attrib.layerid ";
-  $sql .= " GROUP BY layerid, dt, geometry ";  
+  $sql .= " GROUP BY layerid, dt, geometry ";
 
   my $having = '';
 
@@ -3795,7 +3487,7 @@ sub export_layer_data_shape_runmode {
     $aoi_polyring   .= "$aoi_bottomright_long $aoi_bottomright_lat, ";
     $aoi_polyring   .= "$aoi_topleft_long $aoi_bottomright_lat, ";
     $aoi_polyring   .= "$aoi_topleft_long $aoi_topleft_lat)";
-    
+
     my $aoi_polygon  = "ST_GeomFromText('POLYGON($aoi_polyring)')";
     $having .= " ST_Within(ST_GeomFromText(ST_AsText(geometry)), $aoi_polygon)";
   }
@@ -3804,7 +3496,7 @@ sub export_layer_data_shape_runmode {
 
     $sql .= " HAVING $having ";
   }
-  
+
   $sql .= " ORDER BY layerid, dt ASC ";
 
   $self->logger->debug("SQL: $sql");
@@ -3836,7 +3528,7 @@ sub export_layer_data_shape_runmode {
     $self->logger->debug("$lock_filename exists in $export_data_path");
     my $msg = 'Lockfile exists: either another process of this export is running or ';
     $msg   .= 'there was an unexpected error regarding clearing this lockfile.';
-    
+
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $msg}]};
 
@@ -3853,7 +3545,7 @@ sub export_layer_data_shape_runmode {
     $lockfile->remove();
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-    
+
     return $data_for_postrun_href;
   }
 
@@ -3898,11 +3590,11 @@ sub export_layer_data_shape_runmode {
 
     $lockfile->remove();
     my $msg_aref = [{'Message' => "Layer ($layer_id) has no POINT data."}];
-  
+
     $data_for_postrun_href->{'Error'}     = 0;
     $data_for_postrun_href->{'Data'}      = {'Info' => $msg_aref};
     $data_for_postrun_href->{'ExtraData'} = 0;
-    
+
     return $data_for_postrun_href;
   }
 
@@ -4018,10 +3710,22 @@ sub import_layer_data_csv_bulk_runmode {
   my ($perm_ok, $trouble_layer_aref) = check_permission($dbh_gis_read, 'layer', 'id',
                                                         [$layer_id], $group_id, $gadmin_status,
                                                         $LINK_PERM);
-  
+
   if (!$perm_ok) {
 
     my $err_msg = "Permission denied: Group ($group_id) and layer ($layer_id).";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $layertype = read_cell_value($dbh_gis_read, 'layer', 'layertype', 'id', $layer_id);
+
+  if (uc($layertype) eq '2D') {
+
+    my $err_msg = "Layer ($layer_id) is 2D layer.";
 
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
@@ -4034,7 +3738,7 @@ sub import_layer_data_csv_bulk_runmode {
   my $num_of_col = get_csvfile_num_of_col($data_csv_file);
 
   $self->logger->debug("Number of columns: $num_of_col");
-  
+
   my $matched_col    = {};
   my @matched_attrib;
 
@@ -4051,7 +3755,6 @@ sub import_layer_data_csv_bulk_runmode {
         if ($attrib_col >= $num_of_col) {
 
           my $msg = "Parameter ($attrib_para_name) is not consistent with the number of columns in the csv file.";
-          
 
           $data_for_postrun_href->{'Error'} = 1;
           $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $msg}]};
@@ -4067,7 +3770,6 @@ sub import_layer_data_csv_bulk_runmode {
       else {
 
         my $msg = "Parameter ($attrib_para_name) is not an integer specifying the column in the csv file.";
-        
 
         $data_for_postrun_href->{'Error'} = 1;
         $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $msg}]};
@@ -4080,7 +3782,6 @@ sub import_layer_data_csv_bulk_runmode {
   if (scalar(@matched_attrib) == 0) {
 
     my $msg = "No layer ($layer_id) attribute matched.";
-          
 
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $msg}]};
@@ -4095,7 +3796,7 @@ sub import_layer_data_csv_bulk_runmode {
   $sql .= "WHERE id IN ($attrib_id_csv)";
 
   $sth = $dbh_gis_read->prepare($sql);
-  
+
   $sth->execute();
 
   if ($dbh_gis_read->err()) {
@@ -4109,7 +3810,7 @@ sub import_layer_data_csv_bulk_runmode {
   my $attrib_validation = $sth->fetchall_hashref('id');
 
   my $geometry_type = read_cell_value($dbh_gis_read, 'layer', 'geometrytype', 'id', $layer_id);
-  
+
   $dbh_gis_read->disconnect();
 
   my $geometry_col  = $query->param('geometry');
@@ -4207,7 +3908,6 @@ sub import_layer_data_csv_bulk_runmode {
         if ( !($data_row->{$attr_para_name} =~ /$validation/ ) ) {
 
           my $attr_datatype_msg = "Row ($row_counter): [$attr_para_name, ] validation rule mismatched.";
-          
 
           $data_for_postrun_href->{'Error'} = 1;
           $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $attr_datatype_msg}]};
@@ -4257,7 +3957,7 @@ sub import_layer_data_csv_bulk_runmode {
       $sth->execute();
 
       if ($dbh_gis_write->err()) {
-              
+
         $data_for_postrun_href->{'Error'} = 1;
         $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
@@ -4446,6 +4146,37 @@ sub update_layer_runmode {
 
   my $data_for_postrun_href = {};
 
+  # Generic required static field checking
+
+  my $dbh_read = connect_gis_read();
+
+  my $skip_field = {'layertypetype'    => 1,
+                    'createuser'       => 1,
+                    'createtime'       => 1,
+                    'lastupdatetime'   => 1,
+                    'lastupdateuser'   => 1,
+                    'owngroupid'       => 1,
+                    'srid'             => 1,
+                   };
+
+  my $field_name_translation = {'layername' => 'name'};
+
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'layer', $skip_field,
+                                                                                $field_name_translation,
+                                                                               );
+
+  if ($chk_sfield_err) {
+
+    $self->logger->debug($chk_sfield_msg);
+
+    return $for_postrun_href;
+  }
+
+  $dbh_read->disconnect();
+
+  # Finish generic required static field checking
+
   my $dbh_write = connect_gis_write();
 
   if (!record_existence($dbh_write, 'layer', 'id', $layer_id)) {
@@ -4460,7 +4191,7 @@ sub update_layer_runmode {
 
   my $group_id = $self->authen->group_id();
   my $gadmin_status = $self->authen->gadmin_status();
-  
+
   my ($is_write_ok, $trouble_layer_id_aref) = check_permission($dbh_write, 'layer', 'id', [$layer_id],
                                                                $group_id, $gadmin_status, $READ_WRITE_PERM);
 
@@ -4474,14 +4205,33 @@ sub update_layer_runmode {
     return $data_for_postrun_href;
   }
 
-  my $parent_layer              = $query->param('parent');
+  my $parent_layer              = read_cell_value($dbh_write, 'layer', 'parent', 'id', $layer_id);
+
+  if (length($parent_layer) == 0) {
+
+    $parent_layer = undef;
+  }
+
+  if (defined $query->param('parent')) {
+
+    if (length($query->param('parent')) > 0) {
+
+      $parent_layer = $query->param('parent');
+    }
+  }
+
   my $layer_name                = $query->param('name');
 
   my $layer_mdata               = read_cell_value($dbh_write, 'layer', 'layermetadata', 'id', $layer_id);
 
+  if (length($layer_mdata) == 0) {
+
+    $layer_mdata = undef;
+  }
+
   if (defined $query->param('layermetadata')) {
 
-    if (scalar($query->param('layermetadata')) > 0) {
+    if (length($query->param('layermetadata')) > 0) {
 
       $layer_mdata               = $query->param('layermetadata');
     }
@@ -4491,39 +4241,30 @@ sub update_layer_runmode {
 
   my $layer_srid                = read_cell_value($dbh_write, 'layer', 'srid', 'id', $layer_id);
 
+  if (length($layer_srid) == 0) {
+
+    $layer_srid = undef;
+  }
+
   if (defined $query->param('srid')) {
 
-    if (scalar($query->param('srid')) > 0) {
+    if (length($query->param('srid')) > 0) {
 
       $layer_srid = $query->param('srid');
     }
   }
 
-  my ($missing_err, $missing_href) = check_missing_href( {'parent'          => $parent_layer,
-                                                          'name'            => $layer_name,
-                                                          'iseditable'      => $is_editable,
-                                                          'srid'            => $layer_srid,
-                                                         } );
+  if (length($layer_srid) > 0) {
 
+    my ($int_err, $int_msg_href) = check_integer_href( { 'srid'            => $layer_srid } );
 
-  if ($missing_err) {
+    if ($int_err) {
 
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [$int_msg_href]};
 
-    return $data_for_postrun_href;
-  }
-
-  my ($int_err, $int_msg_href) = check_integer_href( { 'srid'            => $layer_srid,
-                                                       'parent'          => $parent_layer
-                                                     } );
-  
-  if ($int_err) {
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$int_msg_href]};
-
-    return $data_for_postrun_href;
+      return $data_for_postrun_href;
+    }
   }
 
   my $layer_alias            = read_cell_value($dbh_write, 'layer', 'alias', 'id', $layer_id);
@@ -4543,7 +4284,7 @@ sub update_layer_runmode {
 
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-    
+
     return $data_for_postrun_href;
   }
 
@@ -4557,7 +4298,7 @@ sub update_layer_runmode {
     return $data_for_postrun_href;
   }
 
-  if ( $parent_layer ne '0' ) {
+  if ( defined $parent_layer ) {
 
     my $parent_layer_existence = record_existence($dbh_write, 'layer', 'id', $parent_layer);
 
@@ -4585,20 +4326,111 @@ sub update_layer_runmode {
     }
   }
 
+  my $db_layer_type = read_cell_value($dbh_write, 'layer', 'layertype', 'id', $layer_id);
+
+  my $chk_data_sql = '';
+
+  if (uc($db_layer_type) eq '2D') {
+
+    $chk_data_sql = "SELECT COUNT(*) FROM layer2d$layer_id";
+  }
+  else {
+
+    $chk_data_sql = "SELECT COUNT(*) FROM layer${layer_id}attrib";
+  }
+
+  my ($read_count_err, $nb_record) = read_cell($dbh_write, $chk_data_sql, []);
+
+  if ($read_count_err) {
+
+    $self->logger->debug("Check if colname exists failed");
+    my $err_msg = "Unexpected Error.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $layer_type = $db_layer_type;
+
+  if (defined $query->param('layertype')) {
+
+    if (length($query->param('layertype')) > 0) {
+
+      $layer_type = $query->param('layertype');
+
+      if ($nb_record > 0) {
+
+        if (uc($layer_type) ne uc($db_layer_type)) {
+
+          my $err_msg = "Layer ($layer_id) has data - layertype cannot be changed.";
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'layertype' => $err_msg}]};
+
+          return $data_for_postrun_href;
+        }
+      }
+    }
+  }
+
+  my $db_geometry_type = read_cell_value($dbh_write, 'layer', 'geometrytype', 'id', $layer_id);
+
+  my $ACCEPTABLE_GEOM_TYPE = { 'POINT'              => 1,
+                               'LINESTRING'         => 1,
+                               'POLYGON'            => 1,
+                               'MULTIPOINT'         => 1,
+                               'MULTILINESTRING'    => 1,
+                               'MULTIPOLYGON'       => 1,
+  };
+
+  my $geometry_type = $db_geometry_type;
+
+  if (defined $query->param('geometrytype')) {
+
+    if (length($query->param('geometrytype')) > 0) {
+
+      $geometry_type = $query->param('geometrytype');
+
+      if ( !($ACCEPTABLE_GEOM_TYPE->{uc($geometry_type)}) ) {
+
+        my $err_msg = "$geometry_type is unacceptable.";
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'geometrytype' => $err_msg}]};
+
+        return $data_for_postrun_href;
+      }
+
+      if ( $nb_record > 0 ) {
+
+        if (uc($layer_type) ne uc($db_layer_type)) {
+
+          my $err_msg = "Layer ($layer_id) has data - geometrytype cannot be changed.";
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'geometrytype' => $err_msg}]};
+
+          return $data_for_postrun_href;
+        }
+      }
+    }
+  }
+
   my $sql = '';
   $sql   .= 'UPDATE layer SET ';
   $sql   .= 'parent = ?, ';
   $sql   .= 'name = ?, ';
   $sql   .= 'alias = ?, ';
+  $sql   .= 'layertype = ?, ';
   $sql   .= 'layermetadata = ?, ';
   $sql   .= 'iseditable = ?, ';
   $sql   .= 'srid = ?, ';
+  $sql   .= 'geometrytype = ?, ';
   $sql   .= 'description = ? ';
   $sql   .= 'WHERE id=?';
 
   my $sth = $dbh_write->prepare($sql);
-  $sth->execute($parent_layer, $layer_name, $layer_alias, $layer_mdata,
-                $is_editable, $layer_srid, $layer_description, $layer_id);
+  $sth->execute($parent_layer, $layer_name, $layer_alias, $layer_type, $layer_mdata,
+                $is_editable, $layer_srid, $geometry_type, $layer_description, $layer_id);
 
   if ($dbh_write->err()) {
 
@@ -4610,6 +4442,120 @@ sub update_layer_runmode {
   }
 
   $sth->finish();
+
+  if (uc($layer_type) ne uc($db_layer_type)) {
+
+    if (uc($layer_type) eq '2D') {
+
+      my @drop_tname_list = ("layer$layer_id", "layer${layer_id}attrib");
+
+      foreach my $table_name (@drop_tname_list) {
+
+        $sql  = "DROP TABLE $table_name";
+
+        $sth = $dbh_write->prepare($sql);
+        $sth->execute();
+
+        if ($dbh_write->err()) {
+
+          $self->logger->debug("Drop table $table_name failed");
+
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+          return $data_for_postrun_href;
+        }
+
+        $sth->finish();
+      }
+
+      my ($err_status, $postrun_href) = $self->mk_2d_layer_data_table($dbh_write,
+                                                                      $geometry_type,
+                                                                      $layer_srid,
+                                                                      $layer_id
+                                                                     );
+
+      if ($err_status) {
+
+        return $postrun_href;
+      }
+    }
+    else {
+
+      my $table_name = "layer2d$layer_id";
+
+      $sql  = "DROP TABLE $table_name";
+
+      $sth = $dbh_write->prepare($sql);
+      $sth->execute();
+
+      if ($dbh_write->err()) {
+
+        $self->logger->debug("Drop table $table_name failed");
+
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+        return $data_for_postrun_href;
+      }
+
+      $sth->finish();
+
+      my %geo_data_tables = ("layer${layer_id}"        => 'layern',
+                             "layer${layer_id}attrib"  => 'layernattrib',
+          );
+
+      my %geom_column = ("layer${layer_id}" => 'geometry');
+
+      my ($err_status, $postrun_href) = $self->mk_normal_layer_data_tables($dbh_write,
+                                                                           $geometry_type,
+                                                                           $layer_srid,
+                                                                           \%geo_data_tables,
+                                                                           \%geom_column
+                                                                          );
+
+      if ($err_status) {
+
+        return $postrun_href;
+      }
+    }
+
+    # Creating new tables will use the latest geometrytype which $geometry_type;
+    # therefore, updating geometrytype is not necessary.
+
+    $db_geometry_type = $geometry_type;
+  }
+
+  if (uc($geometry_type) ne uc($db_geometry_type)) {
+
+    my $table_name = '';
+
+    if (uc($layer_type) eq '2D') {
+
+      $table_name = "layer2d$layer_id";
+    }
+    else {
+
+      $table_name = "layer$layer_id";
+    }
+
+    $sql  = "ALTER TABLE $table_name ALTER COLUMN geometry TYPE GEOGRAPHY($geometry_type, $layer_srid)";
+
+    $sth = $dbh_write->prepare($sql);
+    $sth->execute();
+
+    if ($dbh_write->err()) {
+
+      $self->logger->debug("Change geometry type to $geometry_type in $table_name failed");
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    $sth->finish();
+  }
 
   $dbh_write->disconnect();
 
@@ -4662,6 +4608,17 @@ sub mk_normal_layer_data_tables {
   my $data_for_postrun_href = {};
   my $err = 0;
 
+  if (length($geometry_type) == 0) {
+
+    $self->logger->debug("Geometry type empty");
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+    $err = 1;
+
+    return ($err, $data_for_postrun_href);
+  }
+
   for my $dest_geo_table (keys(%{$layer_data_table_lookup})) {
 
     my $src_geo_table = $layer_data_table_lookup->{$dest_geo_table};
@@ -4681,28 +4638,25 @@ sub mk_normal_layer_data_tables {
       return ($err, $data_for_postrun_href);
     }
 
-    if (length($geometry_type) > 0) {
+    if ($geometry_column_lookup->{$dest_geo_table}) {
 
-      if ($geometry_column_lookup->{$dest_geo_table}) {
+      my $alter_column = $geometry_column_lookup->{$dest_geo_table};
 
-        my $alter_column = $geometry_column_lookup->{$dest_geo_table};
+      $sql  = "ALTER TABLE $dest_geo_table ALTER COLUMN $alter_column TYPE ";
+      $sql .= "GEOGRAPHY($geometry_type, $layer_srid)";
 
-        $sql  = "ALTER TABLE $dest_geo_table ALTER COLUMN $alter_column TYPE ";
-        $sql .= "GEOGRAPHY($geometry_type, $layer_srid)";
-        
-        $sth = $dbh_gis_write->prepare($sql);
-        $sth->execute();
-        
-        if ($dbh_gis_write->err()) {
-          
-          $self->logger->debug("Changing geometry field in $dest_geo_table failed");
-          
-          $data_for_postrun_href->{'Error'} = 1;
-          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-          $err = 1;
-          
-          return ($err, $data_for_postrun_href);
-        }
+      $sth = $dbh_gis_write->prepare($sql);
+      $sth->execute();
+
+      if ($dbh_gis_write->err()) {
+
+        $self->logger->debug("Changing geometry field in $dest_geo_table failed");
+
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+        $err = 1;
+
+        return ($err, $data_for_postrun_href);
       }
     }
 
@@ -4716,24 +4670,24 @@ sub mk_normal_layer_data_tables {
     if ($dbh_gis_write->err()) {
 
       $self->logger->debug("Can't create sequence ${dest_geo_table}_id_seq");
-      
+
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
       $err = 1;
-      
+
       return ($err, $data_for_postrun_href);
     }
-    
+
     $sql  = "ALTER TABLE $dest_geo_table ";
     $sql .= "ALTER COLUMN id SET DEFAULT nextval('${dest_geo_table}_id_seq') ";
-    
+
     $sth = $dbh_gis_write->prepare($sql);
     $sth->execute();
-    
+
     if ($dbh_gis_write->err()) {
-      
+
       $self->logger->debug("Can't make ${dest_geo_table}.id an auto number.");
-      
+
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
       $err = 1;
@@ -4743,14 +4697,14 @@ sub mk_normal_layer_data_tables {
 
     $sql  = "ALTER TABLE $dest_geo_table ";
     $sql .= "ADD PRIMARY KEY (id)";
-    
+
     $sth = $dbh_gis_write->prepare($sql);
     $sth->execute();
-    
+
     if ($dbh_gis_write->err()) {
 
       $self->logger->debug("Can't make ${dest_geo_table}.id the primary key.");
-      
+
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
       $err = 1;
@@ -4763,15 +4717,15 @@ sub mk_normal_layer_data_tables {
     my ($gis_db_uname, ) = read_uname_pass($RPOSTGRES_UP_FILE->{$ENV{DOCUMENT_ROOT}});
 
     $self->logger->debug("GIS DB USERNAME: $gis_db_uname");
-    
+
     $sql = "GRANT ALL ON ${dest_geo_table}_id_seq TO $gis_db_uname";
     $sth = $dbh_gis_write->prepare($sql);
     $sth->execute();
-    
+
     if ($dbh_gis_write->err()) {
-      
+
       $self->logger->debug("GRANT ${dest_geo_table}_id_seq to $gis_db_uname failed");
-      
+
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
       $err = 1;
@@ -4782,38 +4736,3302 @@ sub mk_normal_layer_data_tables {
     $sql = "GRANT ALL ON $dest_geo_table TO $gis_db_uname";
     $sth = $dbh_gis_write->prepare($sql);
     $sth->execute();
-    
+
     if ($dbh_gis_write->err()) {
-      
+
       $self->logger->debug("GRANT $dest_geo_table to $gis_db_uname failed");
-      
+
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-      
-      return $data_for_postrun_href;
+      $err = 1;
+
+      return ($err, $data_for_postrun_href);
     }
-    
+
     if ($dest_geo_table =~ /layer\d+$/) {
-      
+
       $sql  = "CREATE INDEX ${dest_geo_table}_sp_index ON $dest_geo_table ";
       $sql .= "USING GIST(geometry)";
-      
+
       $sth = $dbh_gis_write->prepare($sql);
       $sth->execute();
-      
+
       if ($dbh_gis_write->err()) {
-        
+
         $self->logger->debug("Can't create a spatial index on $dest_geo_table");
-        
+
         $data_for_postrun_href->{'Error'} = 1;
         $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-        
-        return $data_for_postrun_href;
+        $err = 1;
+
+        return ($err, $data_for_postrun_href);
       }
     }
   }
 
   return ($err, $data_for_postrun_href);
+}
+
+sub mk_2d_layer_data_table {
+
+  my $self                    = $_[0];
+  my $dbh_gis_write           = $_[1];
+  my $geometry_type           = $_[2];
+  my $layer_srid              = $_[3];
+  my $layer_id                = $_[4];
+
+  my $sql = '';
+  my $sth;
+  my $data_for_postrun_href = {};
+  my $err = 0;
+
+  if (length($geometry_type) == 0) {
+
+    $self->logger->debug("Geometry type empty");
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+    $err = 1;
+
+    return ($err, $data_for_postrun_href);
+  }
+
+  my $dest_2d_table_name = "layer2d${layer_id}";
+  my $src_2d_table_name  = 'layer2dn';
+
+  $sql = "CREATE TABLE $dest_2d_table_name AS SELECT * FROM $src_2d_table_name WHERE 1=0";
+  $sth = $dbh_gis_write->prepare($sql);
+  $sth->execute();
+
+  if ($dbh_gis_write->err()) {
+
+    $self->logger->debug("Creating $dest_2d_table_name table failed");
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+    $err = 1;
+
+    return ($err, $data_for_postrun_href);
+  }
+
+  $sth->finish();
+
+  my $geometry_col_name = 'geometry';
+
+  $sql  = "ALTER TABLE $dest_2d_table_name ";
+  $sql .= "ALTER COLUMN $geometry_col_name TYPE GEOGRAPHY($geometry_type, $layer_srid)";
+
+  $sth = $dbh_gis_write->prepare($sql);
+  $sth->execute();
+
+  if ($dbh_gis_write->err()) {
+
+    $self->logger->debug("Changing geometry field in $dest_2d_table_name failed");
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+    $err = 1;
+
+    return ($err, $data_for_postrun_href);
+  }
+
+  $sth->finish();
+
+  $sql  = "ALTER TABLE $dest_2d_table_name ";
+  $sql .= "ALTER COLUMN $geometry_col_name SET NOT NULL";
+
+  $sth = $dbh_gis_write->prepare($sql);
+  $sth->execute();
+
+  if ($dbh_gis_write->err()) {
+
+    $self->logger->debug("Changing geometry field in $dest_2d_table_name to NOT NULL failed");
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+    $err = 1;
+
+    return ($err, $data_for_postrun_href);
+  }
+
+  $sth->finish();
+
+  $sql  = "CREATE SEQUENCE ${dest_2d_table_name}_id_seq START WITH 1 ";
+  $sql .= "INCREMENT BY 1 NO MAXVALUE NO MINVALUE CACHE 1 ";
+  $sql .= "OWNED BY ${dest_2d_table_name}.id";
+
+  $sth = $dbh_gis_write->prepare($sql);
+  $sth->execute();
+
+  if ($dbh_gis_write->err()) {
+
+    $self->logger->debug("Can't create sequence ${dest_2d_table_name}_id_seq");
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+    $err = 1;
+
+    return ($err, $data_for_postrun_href);
+  }
+
+  $sth->finish();
+
+  $sql  = "ALTER TABLE $dest_2d_table_name ";
+  $sql .= "ALTER COLUMN id SET DEFAULT nextval('${dest_2d_table_name}_id_seq') ";
+
+  $sth = $dbh_gis_write->prepare($sql);
+  $sth->execute();
+
+  if ($dbh_gis_write->err()) {
+
+    $self->logger->debug("Can't make ${dest_2d_table_name}.id an auto number.");
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+    $err = 1;
+
+    return ($err, $data_for_postrun_href);
+  }
+
+  $sth->finish();
+
+  $sql  = "ALTER TABLE $dest_2d_table_name ";
+  $sql .= "ADD PRIMARY KEY (id)";
+
+  $sth = $dbh_gis_write->prepare($sql);
+  $sth->execute();
+
+  if ($dbh_gis_write->err()) {
+
+    $self->logger->debug("Can't make ${dest_2d_table_name}.id the primary key.");
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+    $err = 1;
+
+    return ($err, $data_for_postrun_href);
+  }
+
+  $sth->finish();
+
+  $self->logger->debug("Reading POSTGRES Username");
+
+  my ($gis_db_uname, ) = read_uname_pass($RPOSTGRES_UP_FILE->{$ENV{DOCUMENT_ROOT}});
+
+  $self->logger->debug("GIS DB USERNAME: $gis_db_uname");
+
+  $sql = "GRANT ALL ON ${dest_2d_table_name}_id_seq TO $gis_db_uname";
+  $sth = $dbh_gis_write->prepare($sql);
+  $sth->execute();
+
+  if ($dbh_gis_write->err()) {
+
+    $self->logger->debug("GRANT ${dest_2d_table_name}_id_seq to $gis_db_uname failed");
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+    $err = 1;
+
+    return ($err, $data_for_postrun_href);
+  }
+
+  $sth->finish();
+
+  $sql = "GRANT ALL ON $dest_2d_table_name TO $gis_db_uname";
+  $sth = $dbh_gis_write->prepare($sql);
+  $sth->execute();
+
+  if ($dbh_gis_write->err()) {
+
+    $self->logger->debug("GRANT $dest_2d_table_name to $gis_db_uname failed");
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+    $err = 1;
+
+    return ($err, $data_for_postrun_href);
+  }
+
+  $sth->finish();
+
+  $sql  = "CREATE INDEX ${dest_2d_table_name}_sp_index ON $dest_2d_table_name ";
+  $sql .= "USING GIST(geometry)";
+
+  $sth = $dbh_gis_write->prepare($sql);
+  $sth->execute();
+
+  if ($dbh_gis_write->err()) {
+
+    $self->logger->debug("Can't create a spatial index on $dest_2d_table_name");
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+    $err = 1;
+
+    return ($err, $data_for_postrun_href);
+  }
+
+  $sth->finish();
+
+  $sql  = "ALTER TABLE $dest_2d_table_name ";
+  $sql .= "DROP COLUMN attributex";
+
+  $sth = $dbh_gis_write->prepare($sql);
+  $sth->execute();
+
+  if ($dbh_gis_write->err()) {
+
+    $self->logger->debug("Can't remove attributex from $dest_2d_table_name");
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+    $err = 1;
+
+    return ($err, $data_for_postrun_href);
+  }
+
+  $sth->finish();
+
+  $sql  = 'SELECT colname FROM layerattrib WHERE layer=?';
+
+  my ($read_colname_err, $read_colname_msg, $colname_data) = read_data($dbh_gis_write, $sql, [$layer_id]);
+
+  if ($read_colname_err) {
+
+    $self->logger->debug("Read colname from layerattrib failed: $read_colname_msg");
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+    $err = 1;
+
+    return ($err, $data_for_postrun_href);
+  }
+
+  if (scalar(@{$colname_data}) > 0) {
+
+    my @colname_list;
+
+    foreach my $colname_rec (@{$colname_data}) {
+
+      push(@colname_list, $colname_rec->{'colname'});
+    }
+
+    ($err, $data_for_postrun_href) = $self->add_layer2d_column($dbh_gis_write, $layer_id, \@colname_list);
+  }
+
+  return ($err, $data_for_postrun_href);
+}
+
+sub add_layer2d_column {
+
+  my $self                    = $_[0];
+  my $dbh_gis_write           = $_[1];
+  my $layer_id                = $_[2];
+  my $colname_aref            = $_[3];
+
+  my $sql = '';
+  my $sth;
+  my $data_for_postrun_href = {};
+  my $err = 0;
+
+  my $dest_2d_table_name = "layer2d${layer_id}";
+
+  foreach my $colname (@{$colname_aref}) {
+
+    if ($colname =~ /^\w+$/) {
+
+      $sql  = "ALTER TABLE $dest_2d_table_name ";
+      $sql .= "ADD COLUMN $colname CHARACTER VARYING(256) NOT NULL";
+
+      $self->logger->debug("SQL: $sql");
+
+      $sth = $dbh_gis_write->prepare($sql);
+      $sth->execute();
+
+      if ($dbh_gis_write->err()) {
+
+        $self->logger->debug("Can't add a new field ($colname) in $dest_2d_table_name");
+
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+        $err = 1;
+
+        return ($err, $data_for_postrun_href);
+      }
+
+      $sth->finish();
+
+      $sql = "CREATE INDEX layer${layer_id}_${colname}_index ON $dest_2d_table_name USING btree ($colname)";
+
+      $sth = $dbh_gis_write->prepare($sql);
+      $sth->execute();
+
+      if ($dbh_gis_write->err()) {
+
+        $self->logger->debug("Can't create an index for ($colname) in $dest_2d_table_name");
+
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+        $err = 1;
+
+        return ($err, $data_for_postrun_href);
+      }
+
+      $sth->finish();
+    }
+    else {
+
+      $self->logger->debug("colname ($colname): invalid");
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+      $err = 1;
+
+      return ($err, $data_for_postrun_href);
+    }
+  }
+
+  return ($err, $data_for_postrun_href);
+}
+
+sub update_layer_attribute_runmode {
+
+=pod update_layer_attribute_HELP_START
+{
+"OperationName" : "Update layer attribute",
+"Description": "Update the definition of layer attribute",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"KDDArTModule": "environment",
+"KDDArTTable": "layerattrib",
+"SkippedField": ["layer"],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='Layer attribute (18) has been updated successfully.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'Layer attribute (18) has been updated successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Layer attribute (83) not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Layer attribute (83) not found.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing layer attribute id"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self            = shift;
+  my $query           = $self->query();
+  my $layer_attrib_id = $self->param('id');
+
+  my $data_for_postrun_href = {};
+
+  my $dbh_write = connect_gis_write();
+
+  # Generic required static field checking
+
+  my $dbh_read = connect_gis_read();
+
+  my $skip_field = {'layer'       => 1,
+                   };
+
+  my $field_name_translation = {};
+
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'layerattrib', $skip_field,
+                                                                                $field_name_translation,
+                                                                               );
+
+  if ($chk_sfield_err) {
+
+    $self->logger->debug($chk_sfield_msg);
+
+    return $for_postrun_href;
+  }
+
+  $dbh_read->disconnect();
+
+  # Finish generic required static field checking
+
+  my $layer_id = read_cell_value($dbh_write, 'layerattrib', 'layer', 'id', $layer_attrib_id);
+
+  if (length($layer_id) == 0) {
+
+    my $err_msg = "Layer attribute ($layer_attrib_id) not found.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $group_id      = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  my ($is_write_ok, $trouble_layer_id_aref) = check_permission($dbh_write, 'layer', 'id', [$layer_id],
+                                                               $group_id, $gadmin_status, $READ_WRITE_PERM);
+
+  if (!$is_write_ok) {
+
+    my $err_msg = "Layer ($layer_id) permission denied.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $unit_id         = $query->param('unitid');
+  my $colname         = $query->param('colname');
+  my $coltype         = $query->param('coltype');
+  my $colsize         = $query->param('colsize');
+  my $colunits        = $query->param('colunits');
+
+  $colname = lc($colname);
+
+  my $validation = read_cell_value($dbh_write, 'layerattrib', 'validation', 'id', $layer_attrib_id);
+
+  if (defined $query->param('validation')) {
+
+    if (length($query->param('validation')) > 0) {
+
+      $validation = $query->param('validation');
+    }
+  }
+
+  my ($int_err, $int_href) = check_integer_href( { 'colsize' => $colsize } );
+
+  if ($int_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$int_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  if ( !($colname =~ /^[a-zA-Z0-9_]+$/) ) {
+
+    my $err_msg = "colname ($colname): invalid character.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'colname' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $sql = 'SELECT id from layerattrib WHERE layer=? AND colname=? AND id<>?';
+
+  my ($chk_colname_err, $layerattrib_id) = read_cell($dbh_write, $sql, [$layer_id, $colname, $layer_attrib_id]);
+
+  if ($chk_colname_err) {
+
+    $self->logger->debug("Check if colname exists failed");
+    my $err_msg = "Unexpected Error.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (length($layerattrib_id) > 0) {
+
+    my $err_msg = "colname ($colname) in layer ($layer_id): already exists.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'colname' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $dbh_k_read = connect_kdb_read();
+
+  if (!record_existence($dbh_k_read, 'generalunit', 'UnitId', $unit_id)) {
+
+    my $err_msg = "unitid ($unit_id): not found.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'unitid' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh_k_read->disconnect();
+
+  my $layer_type = read_cell_value($dbh_write, 'layer', 'layertype', 'id', $layer_id);
+
+  my $chk_data_sql = '';
+
+  if (uc($layer_type) eq '2D') {
+
+    $chk_data_sql = "SELECT COUNT(*) FROM layer2d$layer_id";
+  }
+  else {
+
+    $chk_data_sql = "SELECT COUNT(*) FROM layer${layer_id}attrib";
+  }
+
+  my ($read_count_err, $nb_record) = read_cell($dbh_write, $chk_data_sql, []);
+
+  if ($read_count_err) {
+
+    $self->logger->debug("Check if colname exists failed");
+    my $err_msg = "Unexpected Error.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $db_coltype = read_cell_value($dbh_write, 'layerattrib', 'coltype', 'id', $layer_attrib_id);
+
+  if (lc($coltype) ne lc($db_coltype)) {
+
+    if ($nb_record > 0) {
+
+      my $err_msg = "Layer ($layer_id) has data - coltype cannot be changed.";
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'coltype' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  my $db_colname = read_cell_value($dbh_write, 'layerattrib', 'colname', 'id', $layer_attrib_id);
+
+  if (lc($colname) ne lc($db_colname)) {
+
+    if (record_existence($dbh_write, 'datadevice', 'layerattrib', $layer_attrib_id)) {
+
+      my $err_msg = "Layer attribute ($layer_attrib_id) is mapped to a device.";
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'colname' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  if (length($validation) == 0) {
+
+    $validation = undef;
+  }
+
+  $sql  = 'UPDATE layerattrib SET ';
+  $sql .= 'unitid=?, ';
+  $sql .= 'colname=?, ';
+  $sql .= 'coltype=?, ';
+  $sql .= 'colsize=?, ';
+  $sql .= 'validation=?, ';
+  $sql .= 'colunits=? ';
+  $sql .= 'WHERE id=?';
+
+  my $sth = $dbh_write->prepare($sql);
+  $sth->execute($unit_id, $colname, $coltype, $colsize, $validation, $colunits, $layer_attrib_id);
+
+  if ($dbh_write->err()) {
+
+    $self->logger->debug("Update layerattrib record failed");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sth->finish();
+
+  if (uc($layer_type) eq '2D') {
+
+    if (lc($db_colname) ne lc($colname)) {
+
+      $sql  = "ALTER TABLE layer2d$layer_id ";
+      $sql .= "DROP COLUMN $db_colname";
+
+      $sth = $dbh_write->prepare($sql);
+      $sth->execute();
+
+      if ($dbh_write->err()) {
+
+        $self->logger->debug("Drop column ($db_colname) failed");
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+        return $data_for_postrun_href;
+      }
+
+      $sth->finish();
+
+      my ($err_status, $postrun_href) = $self->add_layer2d_column($dbh_write, $layer_id, [$colname]);
+
+      if ($err_status) {
+
+        return $postrun_href;
+      }
+    }
+  }
+
+  $dbh_write->disconnect();
+
+  my $info_msg_aref = [{'Message' => "Layer attribute ($layer_attrib_id) has been updated successfully."}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'     => $info_msg_aref};
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub del_layer_runmode {
+
+=pod del_layer_gadmin_HELP_START
+{
+"OperationName" : "Delete layer",
+"Description": "Delete layer definition and its data",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 1,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='Layer (16) has been deleted successfully.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'Layer (18) has been deleted successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Layer (17) not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Layer (17) not found.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing LayerId"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self        = shift;
+  my $query       = $self->query();
+  my $layer_id    = $self->param('id');
+
+  my $data_for_postrun_href = {};
+
+  my $dbh_write = connect_gis_write();
+
+  if (!record_existence($dbh_write, 'layer', 'id', $layer_id)) {
+
+    my $err_msg = "Layer ($layer_id) not found.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $group_id = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  my ($is_write_ok, $trouble_layer_id_aref) = check_permission($dbh_write, 'layer', 'id', [$layer_id],
+                                                               $group_id, $gadmin_status, $READ_WRITE_PERM);
+
+  if (!$is_write_ok) {
+
+    my $err_msg = "Layer ($layer_id) permission denied.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (record_existence($dbh_write, 'layer', 'parent', $layer_id)) {
+
+    my $err_msg = "Layer ($layer_id) is a parent layer.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $sql = 'SELECT deviceid FROM datadevice LEFT JOIN ';
+  $sql   .= 'layerattrib ON datadevice.layerattrib=layerattrib.id ';
+  $sql   .= 'WHERE layerattrib.layer=? LIMIT 1';
+
+  my ($chk_datadevice_err, $deviceid) = read_cell($dbh_write, $sql, [$layer_id]);
+
+  if ($chk_datadevice_err) {
+
+    $self->logger->debug("Checking datadevice failed");
+    my $err_msg = "Unexpected Error.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (length($deviceid) > 0) {
+
+    my $err_msg = "Layer ($layer_id) has device mapped to it.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $layer_type = read_cell_value($dbh_write, 'layer', 'layertype', 'id', $layer_id);
+
+  my @drop_table_list;
+
+  if (uc($layer_type) eq '2D') {
+
+    push(@drop_table_list, "layer2d$layer_id");
+  }
+  else {
+
+    push(@drop_table_list, "layer$layer_id");
+    push(@drop_table_list, "layer${layer_id}attrib");
+  }
+
+  my $sth;
+
+  foreach my $table_name (@drop_table_list) {
+
+    $sql  = "DROP TABLE $table_name";
+
+    $sth = $dbh_write->prepare($sql);
+    $sth->execute();
+
+    if ($dbh_write->err()) {
+
+      $self->logger->debug("Drop table $table_name failed");
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    $sth->finish();
+  }
+
+  $sql = 'DELETE FROM layerattrib WHERE layer=?';
+
+  $sth = $dbh_write->prepare($sql);
+  $sth->execute($layer_id);
+
+  if ($dbh_write->err()) {
+
+    $self->logger->debug("Delete records in layerattrib failed");
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sth->finish();
+
+  $sql = 'DELETE FROM layer WHERE id=?';
+
+  $sth = $dbh_write->prepare($sql);
+  $sth->execute($layer_id);
+
+  if ($dbh_write->err()) {
+
+    $self->logger->debug("Delete records in layer failed");
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sth->finish();
+
+  $dbh_write->disconnect();
+
+  my $info_msg_aref = [{'Message' => "Layer ($layer_id) has been deleted successfully."}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info' => $info_msg_aref};
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub del_layer_attribute_runmode {
+
+=pod del_layer_attribute_gadmin_HELP_START
+{
+"OperationName" : "Delete layer attribute",
+"Description": "Delete the definition of layer attribute and its data",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='Layer attribute (20) has been deleted successfully.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'Layer attribute (21) has been deleted successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Layer attribute (23) not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Layer attribute (23) not found.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing layer attribute id"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self            = shift;
+  my $query           = $self->query();
+  my $layer_attrib_id = $self->param('id');
+
+  my $data_for_postrun_href = {};
+
+  my $dbh_write = connect_gis_write();
+
+  my $layer_id = read_cell_value($dbh_write, 'layerattrib', 'layer', 'id', $layer_attrib_id);
+
+  if (length($layer_id) == 0) {
+
+    my $err_msg = "Layer attribute ($layer_attrib_id) not found.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $group_id      = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  my ($is_write_ok, $trouble_layer_id_aref) = check_permission($dbh_write, 'layer', 'id', [$layer_id],
+                                                               $group_id, $gadmin_status, $READ_WRITE_PERM);
+
+  if (!$is_write_ok) {
+
+    my $err_msg = "Layer ($layer_id) permission denied.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (record_existence($dbh_write, 'datadevice', 'layerattrib', $layer_attrib_id)) {
+
+    my $err_msg = "Layer attribute ($layer_attrib_id) is mapped to a device.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $layer_type = read_cell_value($dbh_write, 'layer', 'layertype', 'id', $layer_id);
+  my $colname    = read_cell_value($dbh_write, 'layerattrib', 'colname', 'id', $layer_attrib_id);
+
+  $colname = lc($colname);
+
+  my $sql;
+  my $sth;
+
+  if (uc($layer_type) eq '2D') {
+
+    $sql = "ALTER TABLE layer2d$layer_id DROP COLUMN $colname";
+
+    $sth = $dbh_write->prepare($sql);
+    $sth->execute();
+
+    if ($dbh_write->err()) {
+
+      $self->logger->debug("Drop column $colname in layer2d$layer_id failed");
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    $sth->finish();
+  }
+  else {
+
+    $sql = "DELETE FROM layer${layer_id}attrib WHERE layerattrib=?";
+
+    $sth = $dbh_write->prepare($sql);
+    $sth->execute($layer_attrib_id);
+
+    if ($dbh_write->err()) {
+
+      $self->logger->debug("Delete records from layer${layer_id}attrib failed");
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    $sth->finish();
+  }
+
+  $sql = 'DELETE FROM layerattrib WHERE id=?';
+
+  $sth = $dbh_write->prepare($sql);
+  $sth->execute($layer_attrib_id);
+
+  if ($dbh_write->err()) {
+
+    $self->logger->debug("Delete layer attribute record failed");
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sth->finish();
+
+  $dbh_write->disconnect();
+
+  my $info_msg_aref = [{'Message' => "Layer attribute ($layer_attrib_id) has been deleted successfully."}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info' => $info_msg_aref};
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub insert_data_into_layer {
+
+  my $self                    = $_[0];
+  my $dbh_k_write             = $_[1];
+  my $dbh_gis_write           = $_[2];
+  my $hierarchical_env_data   = $_[3];
+
+  my $err                        = 0;
+  my $num_row_inserted           = 0;
+  my $return_affected_layer_aref = [];
+  my $data_for_postrun_href      = {};
+
+  my $sql;
+  my $sth_gis;
+  my $sth_k;
+
+  my %affected_layer;
+
+  my $user_id = $self->authen->user_id();
+
+  for my $dev_id (keys(%{$hierarchical_env_data})) {
+
+    # Skip this because this key is refered to later
+    if ($dev_id =~ /_DREG_DATA$/) { next; }
+
+    my $dev_reg_lng = $hierarchical_env_data->{"${dev_id}_DREG_DATA"}->[0];
+    my $dev_reg_lat = $hierarchical_env_data->{"${dev_id}_DREG_DATA"}->[1];
+
+    my $store_dev_reg_position = 0;
+
+    if ($dev_reg_lng == 0.0 && $dev_reg_lat == 0.0) {
+
+      $store_dev_reg_position = 1;
+    }
+
+    my $this_dev_data = $hierarchical_env_data->{$dev_id};
+    for my $para_name (keys(%{$this_dev_data})) {
+
+      if ($para_name =~ /_LATTR_INFO$/) { next; }
+
+      my $actual_env_data = $this_dev_data->{$para_name};
+      my $at_info_href = $this_dev_data->{"${para_name}_LATTR_INFO"};
+
+      for my $at_id (keys(%{$at_info_href})) {
+
+        my $l_id      = $at_info_href->{$at_id}->[0];
+        my $layertype = $at_info_href->{$at_id}->[2];
+
+        if (uc($layertype) eq '2D') {
+
+          my $err_msg = "Layer ($l_id) is 2D layer - cannot accept timestamp data.";
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+          $err = 1;
+          $num_row_inserted = -1;
+
+          return ($err, $num_row_inserted, [], $data_for_postrun_href);
+        }
+
+        $affected_layer{$l_id} = 1;
+
+        my $bulk_sql = '';
+        $bulk_sql   .= "INSERT INTO layer${l_id}attrib ";
+        $bulk_sql   .= "(layerid,layerattrib,value,dt,systemuserid) ";
+        $bulk_sql   .= "VALUES ";
+
+        for my $env_data_point (@{$actual_env_data}) {
+
+          my $lng      = $env_data_point->[0];
+          my $lat      = $env_data_point->[1];
+          my $para_val = $env_data_point->[2];
+          my $para_dt  = $env_data_point->[3];
+
+          my $geo_obj_str = "ST_GeomFromText('POINT($lng $lat)', -1)";
+          my $within_str  = "ST_DWithin($geo_obj_str, geometry, $GIS_BUFFER_DISTANCE)";
+
+          $sql = "SELECT id from layer${l_id} WHERE $within_str LIMIT 1";
+          $sth_gis = $dbh_gis_write->prepare($sql);
+          $sth_gis->execute();
+
+          if ($dbh_gis_write->err()) {
+
+            $data_for_postrun_href->{'Error'} = 1;
+            $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+            $err = 1;
+            $num_row_inserted = -1;
+
+            return ($err, $num_row_inserted, [], $data_for_postrun_href);
+          }
+
+          my $layer_n_id = '';
+          $sth_gis->bind_col(1, \$layer_n_id);
+          $sth_gis->fetch();
+          $sth_gis->finish();
+
+          if (length($layer_n_id) == 0) {
+
+            $sql = "INSERT INTO layer${l_id}(geometry) VALUES($geo_obj_str)";
+            $sth_gis = $dbh_gis_write->prepare($sql);
+            $sth_gis->execute();
+
+            if ($dbh_gis_write->err()) {
+
+              $data_for_postrun_href->{'Error'} = 1;
+              $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+              $err = 1;
+              $num_row_inserted = -1;
+
+              return ($err, $num_row_inserted, [], $data_for_postrun_href);
+            }
+
+            $layer_n_id = $dbh_gis_write->last_insert_id(undef, undef, "layer${l_id}", 'id');
+            $sth_gis->finish();
+          }
+
+          if ($store_dev_reg_position) {
+
+            $sql  = 'UPDATE deviceregister SET ';
+            $sql .= 'Longitude=?, ';
+            $sql .= 'Latitude=? ';
+            $sql .= 'WHERE DeviceId=?';
+
+            $sth_k = $dbh_k_write->prepare($sql);
+            $sth_k->execute($lng, $lat, $dev_id);
+
+            if ($dbh_k_write->err()) {
+
+              $data_for_postrun_href->{'Error'} = 1;
+              $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+              $err = 1;
+              $num_row_inserted = -1;
+
+              return ($err, $num_row_inserted, [], $data_for_postrun_href);
+            }
+
+            $store_dev_reg_position = 0;
+          }
+
+          $bulk_sql .= "($layer_n_id,$at_id,'$para_val','$para_dt',$user_id),";
+          $num_row_inserted += 1;
+        }
+
+        chop($bulk_sql);   # remove excessive comma
+
+        $sth_gis = $dbh_gis_write->prepare($bulk_sql);
+        $sth_gis->execute();
+
+        if ($dbh_gis_write->err()) {
+
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+          $err = 1;
+          $num_row_inserted = -1;
+
+          return ($err, $num_row_inserted, [], $data_for_postrun_href);
+        }
+
+        $sth_gis->finish();
+        $bulk_sql = '';
+      }
+    }
+  }
+
+  my @affected_layer_list = keys(%affected_layer);
+
+  $return_affected_layer_aref = \@affected_layer_list;
+
+  return ($err, $num_row_inserted, $return_affected_layer_aref, $data_for_postrun_href);
+}
+
+sub add_layer2d_data_runmode {
+
+=pod add_layer2d_data_HELP_START
+{
+"OperationName" : "Add data to layer 2D",
+"Description": "",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><ReturnId Value='1' ParaName='id' /><Info Message='Layer 2D record has been added successfully.' /></DATA>",
+"SuccessMessageJSON": "{'ReturnId' : [{'Value' : '1', 'ParaName' : 'id'}], 'Info' : [{'Message' : 'Layer 2D record has been added successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Layer (72) not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Layer (72) not found.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing layer 2D id."}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self        = shift;
+  my $query       = $self->query();
+  my $layer_id    = $self->param('id');
+
+  my $data_for_postrun_href = {};
+
+  my $dbh_write = connect_gis_write();
+
+  my $layertype = read_cell_value($dbh_write, 'layer', 'layertype', 'id', $layer_id);
+
+  if (length($layertype) == 0) {
+
+    my $err_msg = "Layer ($layer_id) not found.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (uc($layertype) ne '2D') {
+
+    my $err_msg = "Layer ($layer_id) not 2D layer.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $group_id = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  my ($is_write_ok, $trouble_layer_id_aref) = check_permission($dbh_write, 'layer', 'id', [$layer_id],
+                                                               $group_id, $gadmin_status, $READ_WRITE_PERM);
+
+  if (!$is_write_ok) {
+
+    my $err_msg = "Layer ($layer_id) permission denied.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $geometry = $query->param('geometry');
+
+  my ($col_missing_err, $col_missing_href) = check_missing_href( { 'geometry' => $geometry } );
+
+  if ($col_missing_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$col_missing_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $geometry_type = read_cell_value($dbh_write, 'layer', 'geometrytype', 'id', $layer_id);
+
+  my ($is_wkt_err, $wkt_err_href) = is_valid_wkt_href($dbh_write, {'geometry' => $geometry}, uc($geometry_type));
+
+  if ($is_wkt_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$wkt_err_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $sql = 'SELECT colname, colsize, validation FROM layerattrib WHERE layer=?';
+
+  my ($r_col_def_err, $r_col_def_msg, $col_def_data) = read_data($dbh_write, $sql, [$layer_id]);
+
+  if ($r_col_def_err) {
+
+    $self->logger->debug("Read layer column definition failed: $r_col_def_msg");
+
+    my $err_msg = "Unexpected Error.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $col_param_data        = {};
+  my $col_len_info          = {};
+  my $col_param_data_maxlen = {};
+  my $col_validation_href   = {};
+
+  for my $col_def (@{$col_def_data}) {
+
+    my $col_param_name = $col_def->{'colname'};
+    my $col_value      = $query->param($col_param_name);
+
+    $col_param_data->{$col_param_name}        = $col_value;
+    $col_len_info->{$col_param_name}          = $col_def->{'colsize'};
+    $col_param_data_maxlen->{$col_param_name} = $col_value;
+    $col_validation_href->{$col_param_name}   = $col_def->{'validation'};
+  }
+
+  ($col_missing_err, $col_missing_href) = check_missing_href( $col_param_data );
+
+  if ($col_missing_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$col_missing_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  my ($col_maxlen_err, $col_maxlen_href) = check_maxlen_href($col_param_data_maxlen, $col_len_info);
+
+  if ($col_maxlen_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$col_maxlen_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  my @col_name_list     = ('geometry');
+  my @place_holder_list = ('ST_GeomFromText(?, -1)');
+  my @col_val_list      = ($geometry);
+
+  for my $colname (keys(%{$col_param_data})) {
+
+    my $col_value  = $col_param_data->{$colname};
+
+    if (defined $col_validation_href->{$colname}) {
+
+      my $validation = $col_validation_href->{$colname};
+
+      if ( $col_value !~ /$validation/ ) {
+
+        my $err_msg = "colname ($col_value): invalid.";
+
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+        return $data_for_postrun_href;
+      }
+    }
+
+    push(@col_name_list, $colname);
+    push(@col_val_list, $col_value);
+    push(@place_holder_list, '?');
+  }
+
+  my $col_name_csv      = join(',', @col_name_list);
+  my $place_holder_csv  = join(',', @place_holder_list);
+
+  $sql  = "INSERT INTO layer2d$layer_id ";
+  $sql .= "(${col_name_csv}) ";
+  $sql .= "VALUES (${place_holder_csv})";
+
+  my $sth = $dbh_write->prepare($sql);
+  $sth->execute(@col_val_list);
+
+  my $data_id = '';
+
+  if (!$dbh_write->err()) {
+
+    $data_id = $dbh_write->last_insert_id(undef, undef, "layer2d${layer_id}", 'id');
+  }
+  else {
+
+    $self->logger->debug("Add layer 2d record failed");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sth->finish();
+  $dbh_write->disconnect();
+
+  my $info_msg_aref  = [{'Message' => "Layer 2D record has been added successfully."}];
+  my $return_id_aref = [{'Value' => "$data_id", 'ParaName' => 'id'}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'     => $info_msg_aref,
+                                           'ReturnId' => $return_id_aref,
+  };
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub update_layer2d_data_runmode {
+
+=pod update_layer2d_data_HELP_START
+{
+"OperationName" : "Update a record in 2D layer",
+"Description": "",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='Layer 2D record (1) has been updated successfully.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'Layer 2D record (1) has been updated successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Layer (72) not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Layer (72) not found.'}]}"}],
+"URLParameter": [{"ParameterName": "layerid", "Description": "Existing layer 2D id."}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self        = shift;
+  my $query       = $self->query();
+  my $layer_id    = $self->param('layerid');
+  my $rec_id      = $self->param('recid');
+
+  my $data_for_postrun_href = {};
+
+  my $dbh_write = connect_gis_write();
+
+  my $layertype = read_cell_value($dbh_write, 'layer', 'layertype', 'id', $layer_id);
+
+  if (length($layertype) == 0) {
+
+    my $err_msg = "Layer ($layer_id) not found.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (uc($layertype) ne '2D') {
+
+    my $err_msg = "Layer ($layer_id) not 2D layer.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $group_id = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  my ($is_write_ok, $trouble_layer_id_aref) = check_permission($dbh_write, 'layer', 'id', [$layer_id],
+                                                               $group_id, $gadmin_status, $READ_WRITE_PERM);
+
+  if (!$is_write_ok) {
+
+    my $err_msg = "Layer ($layer_id) permission denied.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (!record_existence($dbh_write, "layer2d${layer_id}", 'id', $rec_id)) {
+
+    my $err_msg = "Record ($rec_id) not found in layer2d${layer_id}.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $geometry = $query->param('geometry');
+
+  my ($col_missing_err, $col_missing_href) = check_missing_href( { 'geometry' => $geometry } );
+
+  if ($col_missing_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$col_missing_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $geometry_type = read_cell_value($dbh_write, 'layer', 'geometrytype', 'id', $layer_id);
+
+  my ($is_wkt_err, $wkt_err_href) = is_valid_wkt_href($dbh_write, {'geometry' => $geometry}, uc($geometry_type));
+
+  if ($is_wkt_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$wkt_err_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $sql = 'SELECT colname, colsize, validation FROM layerattrib WHERE layer=?';
+
+  my ($r_col_def_err, $r_col_def_msg, $col_def_data) = read_data($dbh_write, $sql, [$layer_id]);
+
+  if ($r_col_def_err) {
+
+    $self->logger->debug("Read layer column definition failed: $r_col_def_msg");
+
+    my $err_msg = "Unexpected Error.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $col_param_data        = {};
+  my $col_len_info          = {};
+  my $col_param_data_maxlen = {};
+  my $col_validation_href   = {};
+
+  for my $col_def (@{$col_def_data}) {
+
+    my $col_param_name = $col_def->{'colname'};
+    my $col_value      = $query->param($col_param_name);
+
+    $col_param_data->{$col_param_name}        = $col_value;
+    $col_len_info->{$col_param_name}          = $col_def->{'colsize'};
+    $col_param_data_maxlen->{$col_param_name} = $col_value;
+    $col_validation_href->{$col_param_name}   = $col_def->{'validation'};
+  }
+
+  ($col_missing_err, $col_missing_href) = check_missing_href( $col_param_data );
+
+  if ($col_missing_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$col_missing_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  my ($col_maxlen_err, $col_maxlen_href) = check_maxlen_href($col_param_data_maxlen, $col_len_info);
+
+  if ($col_maxlen_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$col_maxlen_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  my @place_holder_val_list = ($geometry);
+
+  $sql  = "UPDATE layer2d${layer_id} SET ";
+  $sql .= "geometry = ?, ";
+
+  for my $colname (keys(%{$col_param_data})) {
+
+    my $col_value  = $col_param_data->{$colname};
+
+    if (defined $col_validation_href->{$colname}) {
+
+      my $validation = $col_validation_href->{$colname};
+
+      if ( $col_value !~ /$validation/ ) {
+
+        my $err_msg = "colname ($col_value): invalid.";
+
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+        return $data_for_postrun_href;
+      }
+    }
+
+    $sql .= "$colname = ? ,";
+
+    push(@place_holder_val_list, $col_value);
+  }
+
+  chop($sql);   # remove excess comma
+
+  $sql .= 'WHERE id=?';
+  push(@place_holder_val_list, $rec_id);
+
+  my $sth = $dbh_write->prepare($sql);
+  $sth->execute(@place_holder_val_list);
+
+  my $data_id = '';
+
+  if ($dbh_write->err()) {
+
+    $self->logger->debug("Update layer 2d record failed");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sth->finish();
+  $dbh_write->disconnect();
+
+  my $info_msg_aref  = [{'Message' => "Layer 2D record ($rec_id) has been updated successfully."}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'     => $info_msg_aref  };
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub list_layer2d_data_runmode {
+
+=pod list_layer2d_data_advanced_HELP_START
+{
+"OperationName" : "List records in 2D layer",
+"Description": "",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Pagination NumOfRecords='1' NumOfPages='1' Page='1' NumPerPage='10' /><LayerAttrib layerattribid='42' colsize='20' colunits='degree c' coltype='Temperature' colname='temperature_7175803' validation='' unitid='22' /><LayerAttrib layerattribid='43' colsize='20' colunits='percentage' coltype='Humidity' colname='hum_8050934' validation='' unitid='22' /><RecordMeta TagName='Layer2D' /><Layer2D recordid='1' temperature_7175803='34' hum_8050934='70' geometry='POLYGON((148.99658 -35.48192,149.2067 -35.48192,149.2067 -35.19626,148.99658 -35.19626,148.99658 -35.48192))' /></DATA>",
+"SuccessMessageJSON": "{'Pagination' : [{'NumOfRecords' : '1', 'NumOfPages' : 1, 'NumPerPage' : '10', 'Page' : '1'}], 'LayerAttrib' : [{'colunits' : 'degree c', 'colsize' : '20', 'layerattribid' : 42, 'coltype' : 'Temperature', 'validation' : null, 'colname' : 'temperature_7175803', 'unitid' : '22'},{'colunits' : 'percentage', 'colsize' : '20', 'layerattribid' : 43, 'coltype' : 'Humidity', 'validation' : null, 'colname' : 'hum_8050934', 'unitid' : '22'}], 'RecordMeta' : [{'TagName' : 'Layer2D'}], 'Layer2D' : [{'recordid' : 1, 'hum_8050934' : '70', 'temperature_7175803' : '34', 'geometry' : 'POLYGON((148.99658 -35.48192,149.2067 -35.48192,149.2067 -35.19626,148.99658 -35.19626,148.99658 -35.48192))'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Layer (44) not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Layer (44) not found.'}]}"}],
+"URLParameter": [{"ParameterName": "layerid", "Description": "Existing layer 2D id."}, {"ParameterName": "nperpage", "Description": "Number of records in a page for pagination"}, {"ParameterName": "num", "Description": "The page number of the pagination"}],
+"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database field name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "FieldList", "Description": "Comma separated value of wanted fields."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases."}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self        = shift;
+  my $query       = $self->query();
+  my $layer_id    = $self->param('layerid');
+
+  my $data_for_postrun_href = {};
+
+  my $pagination  = 0;
+  my $nb_per_page = -1;
+  my $page        = -1;
+
+  if ( (defined $self->param('nperpage')) && (defined $self->param('num')) ) {
+
+    $pagination = 1;
+    $nb_per_page = $self->param('nperpage');
+    $page        = $self->param('num');
+  }
+
+  my $field_list_csv = '';
+
+  if (defined $query->param('FieldList')) {
+
+    $field_list_csv = $query->param('FieldList');
+  }
+
+  my $filtering_csv = '';
+
+  if (defined $query->param('Filtering')) {
+
+    $filtering_csv = $query->param('Filtering');
+  }
+
+  my $sorting = '';
+
+  if (defined $query->param('Sorting')) {
+
+    $sorting = $query->param('Sorting');
+  }
+
+  my $dbh = connect_gis_read();
+
+  my $layertype = read_cell_value($dbh, 'layer', 'layertype', 'id', $layer_id);
+
+  if (length($layertype) == 0) {
+
+    my $err_msg = "Layer ($layer_id) not found.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (uc($layertype) ne '2D') {
+
+    my $err_msg = "Layer ($layer_id) not 2D layer.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $group_id = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  my ($is_read_ok, $trouble_layer_id_aref) = check_permission($dbh, 'layer', 'id', [$layer_id],
+                                                               $group_id, $gadmin_status, $READ_PERM);
+
+  if (!$is_read_ok) {
+
+    my $err_msg = "Layer ($layer_id) permission denied.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $sql = 'SELECT id as layerattribid, ';
+  $sql   .= 'unitid, ';
+  $sql   .= 'colname, ';
+  $sql   .= 'coltype, ';
+  $sql   .= 'colsize, ';
+  $sql   .= 'validation, ';
+  $sql   .= 'colunits ';
+  $sql   .= 'FROM layerattrib WHERE layer=?';
+
+  my ($r_col_def_err, $r_col_def_msg, $col_def_data) = read_data($dbh, $sql, [$layer_id]);
+
+  if ($r_col_def_err) {
+
+    $self->logger->debug("Read layer column definition failed: $r_col_def_msg");
+
+    my $err_msg = "Unexpected Error.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my @field_list_all;
+
+  for my $col_def (@{$col_def_data}) {
+
+    push(@field_list_all, $col_def->{'colname'});
+  }
+
+  my $final_field_list     = \@field_list_all;
+
+  if (length($field_list_csv) > 0) {
+
+    my ($sel_field_err, $sel_field_msg, $sel_field_list) = parse_selected_field($field_list_csv,
+                                                                                $final_field_list,
+                                                                                'id as recordid');
+
+    if ($sel_field_err) {
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $sel_field_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    $final_field_list = $sel_field_list;
+
+    push(@{$final_field_list}, 'ST_AsText(geometry) AS geometry');
+  }
+  else {
+
+    push(@{$final_field_list}, 'ST_AsText(geometry) AS geometry');
+    push(@{$final_field_list}, 'id as recordid');
+  }
+
+  my $final_field_csv = join(',', @{$final_field_list});
+
+  $sql = "SELECT $final_field_csv FROM layer2d$layer_id ";
+
+  my ($filter_err, $filter_msg, $filter_phrase, $where_arg) = parse_filtering('id',
+                                                                              "layer2d$layer_id",
+                                                                              $filtering_csv,
+                                                                              $final_field_list,
+                                                                              );
+
+  $self->logger->debug("Filter phrase: $filter_phrase");
+  $self->logger->debug("Where argument: " . join(',', @{$where_arg}));
+
+  if ($filter_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $filter_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $filter_where_phrase = '';
+  if (length($filter_phrase) > 0) {
+
+    $filter_where_phrase = " WHERE $filter_phrase ";
+  }
+
+  my $filtering_exp = $filter_where_phrase;
+
+  $sql .= " $filtering_exp ";
+
+  my $pagination_aref = [];
+  my $paged_limit_clause = '';
+
+  if ($pagination) {
+
+    my ($int_err, $int_err_msg) = check_integer_value( {'nperpage' => $nb_per_page,
+                                                        'num'      => $page
+                                                       });
+
+    if ($int_err) {
+
+      $int_err_msg .= ' not integer.';
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $int_err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my ($pg_id_err, $pg_id_msg, $nb_records,
+       $nb_pages, $limit_clause, $rcount_time) = get_paged_filter($dbh,
+                                                                  $nb_per_page,
+                                                                  $page,
+                                                                  "layer2d$layer_id",
+                                                                  'id',
+                                                                  $filtering_exp,
+                                                                  $where_arg);
+
+
+    $self->logger->debug("SQL Count time: $rcount_time");
+
+    if ($pg_id_err == 1) {
+
+      $self->logger->debug($pg_id_msg);
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    if ($pg_id_err == 2) {
+
+      $page = 0;
+    }
+
+    $pagination_aref = [{'NumOfRecords' => $nb_records,
+                         'NumOfPages'   => $nb_pages,
+                         'Page'         => $page,
+                         'NumPerPage'   => $nb_per_page,
+                        }];
+
+    $paged_limit_clause = $limit_clause;
+  }
+
+  my ($sort_err, $sort_msg, $sort_sql) = parse_sorting($sorting, $final_field_list);
+
+  if ($sort_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $sort_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (length($sort_sql) > 0) {
+
+    $sql .= " ORDER BY $sort_sql ";
+  }
+  else {
+
+    $sql .= ' ORDER BY id DESC';
+  }
+
+  $sql .= " $paged_limit_clause ";
+
+  $self->logger->debug("SQL: $sql");
+
+  $self->logger->debug('Where arg: ' . join(',', @{$where_arg}));
+
+  my ($read_layer2d_err, $read_layer2d_msg, $layer2d_data) = read_data($dbh, $sql, $where_arg);
+
+  if ($read_layer2d_err) {
+
+    $self->logger->debug("Read layer2d data for layer ($layer_id) failed: $read_layer2d_msg");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh->disconnect();
+
+  $data_for_postrun_href->{'Error'}     = 0;
+
+  $data_for_postrun_href->{'Data'}      = {'Layer2D'     => $layer2d_data,
+                                           'LayerAttrib' => $col_def_data,
+                                           'Pagination'  => $pagination_aref,
+                                           'RecordMeta'  => [{'TagName' => 'Layer2D'}],
+  };
+
+  return $data_for_postrun_href;
+}
+
+sub get_layer2d_data_runmode {
+
+=pod get_layer2d_data_HELP_START
+{
+"OperationName" : "Get a record in 2D layer",
+"Description": "",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><LayerAttrib layerattribid='42' colsize='20' colunits='degree c' coltype='Temperature' colname='temperature_7175803' validation='' unitid='22' /><LayerAttrib layerattribid='43' colsize='20' colunits='percentage' coltype='Humidity' colname='hum_8050934' validation='' unitid='22' /><RecordMeta TagName='Layer2D' /><Layer2D recordid='1' temperature_7175803='34' hum_8050934='70' geometry='POLYGON((148.99658 -35.48192,149.2067 -35.48192,149.2067 -35.19626,148.99658 -35.19626,148.99658 -35.48192))' /></DATA>",
+"SuccessMessageJSON": "{'LayerAttrib' : [{'colunits' : 'degree c', 'colsize' : '20', 'layerattribid' : 42, 'coltype' : 'Temperature', 'validation' : null, 'colname' : 'temperature_7175803', 'unitid' : '22'},{'colunits' : 'percentage', 'colsize' : '20', 'layerattribid' : 43, 'coltype' : 'Humidity', 'validation' : null, 'colname' : 'hum_8050934', 'unitid' : '22'}], 'RecordMeta' : [{'TagName' : 'Layer2D'}], 'Layer2D' : [{'recordid' : 1, 'hum_8050934' : '70', 'temperature_7175803' : '34', 'geometry' : 'POLYGON((148.99658 -35.48192,149.2067 -35.48192,149.2067 -35.19626,148.99658 -35.19626,148.99658 -35.48192))'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Layer (44) not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Layer (44) not found.'}]}"}],
+"URLParameter": [{"ParameterName": "layerid", "Description": "Existing layer 2D id."}, {"ParameterName": "recid", "Description": "Data record id."}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self        = shift;
+  my $query       = $self->query();
+  my $layer_id    = $self->param('layerid');
+  my $rec_id      = $self->param('recid');
+
+  my $data_for_postrun_href = {};
+
+  my $dbh = connect_gis_read();
+
+  my $layertype = read_cell_value($dbh, 'layer', 'layertype', 'id', $layer_id);
+
+  if (length($layertype) == 0) {
+
+    my $err_msg = "Layer ($layer_id) not found.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (uc($layertype) ne '2D') {
+
+    my $err_msg = "Layer ($layer_id) not 2D layer.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $group_id = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  my ($is_read_ok, $trouble_layer_id_aref) = check_permission($dbh, 'layer', 'id', [$layer_id],
+                                                               $group_id, $gadmin_status, $READ_PERM);
+
+  if (!$is_read_ok) {
+
+    my $err_msg = "Layer ($layer_id) permission denied.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (!record_existence($dbh, "layer2d${layer_id}", 'id', $rec_id)) {
+
+    my $err_msg = "Record ($rec_id) not found in layer2d${layer_id}.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $sql = 'SELECT id as layerattribid, ';
+  $sql   .= 'unitid, ';
+  $sql   .= 'colname, ';
+  $sql   .= 'coltype, ';
+  $sql   .= 'colsize, ';
+  $sql   .= 'validation, ';
+  $sql   .= 'colunits ';
+  $sql   .= 'FROM layerattrib WHERE layer=?';
+
+  my ($r_col_def_err, $r_col_def_msg, $col_def_data) = read_data($dbh, $sql, [$layer_id]);
+
+  if ($r_col_def_err) {
+
+    $self->logger->debug("Read layer column definition failed: $r_col_def_msg");
+
+    my $err_msg = "Unexpected Error.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my @field_list_all;
+
+  for my $col_def (@{$col_def_data}) {
+
+    push(@field_list_all, $col_def->{'colname'});
+  }
+
+  push(@field_list_all, 'ST_AsText(geometry) AS geometry');
+  push(@field_list_all, 'id as recordid');
+
+  my $field_list_csv = join(',', @field_list_all);
+
+  $sql  = "SELECT $field_list_csv FROM layer2d$layer_id ";
+  $sql .= "WHERE id=?";
+
+  my ($read_layer2d_err, $read_layer2d_msg, $layer2d_data) = read_data($dbh, $sql, [$rec_id]);
+
+  if ($read_layer2d_err) {
+
+    $self->logger->debug("Read layer2d data for layer ($layer_id) failed: $read_layer2d_msg");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh->disconnect();
+
+  $data_for_postrun_href->{'Error'}     = 0;
+
+  $data_for_postrun_href->{'Data'}      = {'Layer2D'     => $layer2d_data,
+                                           'LayerAttrib' => $col_def_data,
+                                           'RecordMeta'  => [{'TagName' => 'Layer2D'}],
+  };
+
+  return $data_for_postrun_href;
+}
+
+sub del_layer2d_data_runmode {
+
+=pod del_layer2d_data_gadmin_HELP_START
+{
+"OperationName" : "Delete a record in 2D layer",
+"Description": "",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 1,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='Record (1) in layer2d45 has been deleted successfully.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'Record (1) in layer2d47 has been deleted successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Record (1) not found in layer2d45.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Record (1) not found in layer2d45.'}]}"}],
+"URLParameter": [{"ParameterName": "layerid", "Description": "Existing layer 2D id."}, {"ParameterName": "recid", "Description": "Data record id"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self        = shift;
+  my $query       = $self->query();
+  my $layer_id    = $self->param('layerid');
+  my $rec_id      = $self->param('recid');
+
+  my $data_for_postrun_href = {};
+
+  my $dbh_write = connect_gis_write();
+
+  my $layertype = read_cell_value($dbh_write, 'layer', 'layertype', 'id', $layer_id);
+
+  if (length($layertype) == 0) {
+
+    my $err_msg = "Layer ($layer_id) not found.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (uc($layertype) ne '2D') {
+
+    my $err_msg = "Layer ($layer_id) not 2D layer.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $group_id = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  my ($is_write_ok, $trouble_layer_id_aref) = check_permission($dbh_write, 'layer', 'id', [$layer_id],
+                                                               $group_id, $gadmin_status, $READ_WRITE_PERM);
+
+  if (!$is_write_ok) {
+
+    my $err_msg = "Layer ($layer_id) permission denied.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (!record_existence($dbh_write, "layer2d${layer_id}", 'id', $rec_id)) {
+
+    my $err_msg = "Record ($rec_id) not found in layer2d${layer_id}.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $sql = "DELETE FROM layer2d$layer_id WHERE id=?";
+  my $sth = $dbh_write->prepare($sql);
+
+  $sth->execute($rec_id);
+
+  if ($dbh_write->err()) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sth->finish();
+
+  $dbh_write->disconnect();
+
+  my $info_msg_aref = [{'Message' => "Record ($rec_id) in layer2d$layer_id has been deleted successfully."}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info' => $info_msg_aref};
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub list_layer_data_advanced_runmode {
+
+=pod list_layer_data_advanced_HELP_START
+{
+"OperationName" : "List records in layer",
+"Description": "",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Pagination NumOfRecords='1414' NumOfPages='1414' Page='1' NumPerPage='1' /><Layer recordid='1414' layerattrib='44' value='24.21' dt='2010-11-23 23:00:00' systemuserid='0' layerattribname='temperature_0806866' geometry='POINT(149.094063 -35.30635)' /><RecordMeta TagName='Layer' /></DATA>",
+"SuccessMessageJSON": "{'Pagination' : [{'NumOfRecords' : '1414', 'NumOfPages' : 1414, 'NumPerPage' : '1', 'Page' : '1'}], 'Layer' : [{'systemuserid' : '0', 'dt' : '2010-11-23 23:00:00', 'value' : '24.21', 'layerattrib' : '44', 'recordid' : 1414, 'layerattribname' : 'temperature_0806866', 'geometry' : 'POINT(149.094063 -35.30635)'}], 'RecordMeta' : [{'TagName' : 'Layer'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Layer (72) not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Layer (72) not found.'}]}"}],
+"URLParameter": [{"ParameterName": "layerid", "Description": "Existing layer id."}, {"ParameterName": "nperpage", "Description": "Number of records in a page for pagination"}, {"ParameterName": "num", "Description": "The page number of the pagination"}],
+"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database field name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "FieldList", "Description": "Comma separated value of wanted fields."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases."}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self        = shift;
+  my $query       = $self->query();
+  my $layer_id    = $self->param('id');
+
+  my $data_for_postrun_href = {};
+
+  my $pagination  = 0;
+  my $nb_per_page = -1;
+  my $page        = -1;
+
+  if ( (defined $self->param('nperpage')) && (defined $self->param('num')) ) {
+
+    $pagination = 1;
+    $nb_per_page = $self->param('nperpage');
+    $page        = $self->param('num');
+  }
+
+  my $field_list_csv = '';
+
+  if (defined $query->param('FieldList')) {
+
+    $field_list_csv = $query->param('FieldList');
+  }
+
+  my $filtering_csv = '';
+
+  if (defined $query->param('Filtering')) {
+
+    $filtering_csv = $query->param('Filtering');
+  }
+
+  my $sorting = '';
+
+  if (defined $query->param('Sorting')) {
+
+    $sorting = $query->param('Sorting');
+  }
+
+  my $dbh = connect_gis_read();
+
+  my $layertype = read_cell_value($dbh, 'layer', 'layertype', 'id', $layer_id);
+
+  if (length($layertype) == 0) {
+
+    my $err_msg = "Layer ($layer_id) not found.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (uc($layertype) eq '2D') {
+
+    my $err_msg = "Layer ($layer_id):  2D layer.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $group_id = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  my ($is_read_ok, $trouble_layer_id_aref) = check_permission($dbh, 'layer', 'id', [$layer_id],
+                                                               $group_id, $gadmin_status, $READ_PERM);
+
+  if (!$is_read_ok) {
+
+    my $err_msg = "Layer ($layer_id) permission denied.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $final_field_list = [];
+
+  push(@{$final_field_list}, "layer${layer_id}attrib.id as recordid");
+  push(@{$final_field_list}, 'ST_AsText(geometry) AS geometry');
+  push(@{$final_field_list}, 'layerattrib');
+  push(@{$final_field_list}, 'layerattrib.colname AS layerattribname');
+  push(@{$final_field_list}, 'value');
+  push(@{$final_field_list}, 'dt');
+  push(@{$final_field_list}, 'systemuserid');
+
+  my ($filter_err, $filter_msg, $filter_phrase, $where_arg) = parse_filtering("id",
+                                                                              "layer${layer_id}attrib",
+                                                                              $filtering_csv,
+                                                                              $final_field_list,
+                                                                              );
+
+  $self->logger->debug("Filter phrase: $filter_phrase");
+  $self->logger->debug("Where argument: " . join(',', @{$where_arg}));
+
+  if ($filter_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $filter_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $filter_where_phrase = '';
+  if (length($filter_phrase) > 0) {
+
+    # We know that geometry is not in layer${layer_id}attrib table so
+    $filter_phrase =~ s/layer${layer_id}attrib\.//g;
+
+    $filter_where_phrase = " WHERE $filter_phrase ";
+  }
+
+  my $filtering_exp = $filter_where_phrase;
+
+  my $final_field_csv = join(',', @{$final_field_list});
+
+  my $sql = "SELECT $final_field_csv ";
+  $sql   .= "FROM layer${layer_id}attrib ";
+  $sql   .= "LEFT JOIN layer${layer_id} ON layer${layer_id}attrib.layerid = layer${layer_id}.id ";
+  $sql   .= "LEFT JOIN layerattrib ON layer${layer_id}attrib.layerattrib = layerattrib.id ";
+
+  $sql   .= " $filtering_exp ";
+
+  my $pagination_aref = [];
+  my $paged_limit_clause = '';
+
+  if ($pagination) {
+
+    my ($int_err, $int_err_msg) = check_integer_value( {'nperpage' => $nb_per_page,
+                                                        'num'      => $page
+                                                       });
+
+    if ($int_err) {
+
+      $int_err_msg .= ' not integer.';
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $int_err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    # need count_sql because geometry is not in layer${layer_id}attrib
+
+    my $count_sql = "SELECT COUNT(*) ";
+    $count_sql   .= "FROM layer${layer_id}attrib ";
+    $count_sql   .= "LEFT JOIN layer${layer_id} ON layer${layer_id}attrib.layerid = layer${layer_id}.id ";
+    $count_sql   .= "LEFT JOIN layerattrib ON layer${layer_id}attrib.layerattrib = layerattrib.id ";
+    $count_sql   .= "$filtering_exp";
+
+    my ($pg_id_err, $pg_id_msg, $nb_records,
+       $nb_pages, $limit_clause, $rcount_time) = get_paged_filter_sql($dbh,
+                                                                      $nb_per_page,
+                                                                      $page,
+                                                                      $count_sql,
+                                                                      $where_arg);
+
+
+    $self->logger->debug("SQL Count time: $rcount_time");
+
+    if ($pg_id_err == 1) {
+
+      $self->logger->debug($pg_id_msg);
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    if ($pg_id_err == 2) {
+
+      $page = 0;
+    }
+
+    $pagination_aref = [{'NumOfRecords' => $nb_records,
+                         'NumOfPages'   => $nb_pages,
+                         'Page'         => $page,
+                         'NumPerPage'   => $nb_per_page,
+                        }];
+
+    $paged_limit_clause = $limit_clause;
+  }
+
+  my ($sort_err, $sort_msg, $sort_sql) = parse_sorting($sorting, $final_field_list);
+
+  if ($sort_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $sort_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (length($sort_sql) > 0) {
+
+    $sql .= " ORDER BY $sort_sql ";
+  }
+  else {
+
+    $sql .= " ORDER BY layer${layer_id}attrib.id DESC";
+  }
+
+  $sql .= " $paged_limit_clause ";
+
+  $self->logger->debug("SQL: $sql");
+
+  $self->logger->debug('Where arg: ' . join(',', @{$where_arg}));
+
+  my ($read_layer_err, $read_layer_msg, $layer_data) = read_data($dbh, $sql, $where_arg);
+
+  if ($read_layer_err) {
+
+    $self->logger->debug("Read layer data for layer ($layer_id) failed: $read_layer_msg");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh->disconnect();
+
+  $data_for_postrun_href->{'Error'}     = 0;
+
+  $data_for_postrun_href->{'Data'}      = {'Layer'       => $layer_data,
+                                           'Pagination'  => $pagination_aref,
+                                           'RecordMeta'  => [{'TagName' => 'Layer'}],
+  };
+
+  return $data_for_postrun_href;
+}
+
+sub add_layer_data_runmode {
+
+=pod add_layer_data_HELP_START
+{
+"OperationName" : "Add data to layer",
+"Description": "Add data into layer from a JSON string or blob",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='Data of 2 records for attribute(s) (45,44) has been added into layer (43). ' /></DATA>",
+"SuccessMessageJSON": "{ 'Info' : [{ 'Message' : 'Data of 2 records for attribute(s) (45,44) has been added into layer (43). '} ]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Layer (72) not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Layer (72) not found.'}]}"}],
+"HTTPParameter": [{"Required": 1, "Name": "data", "Description": "JSON string or blob in a structure as the following: {'DATA': [{'layerattrib' : '44', 'value' : '24.69', 'dt' : '2010-11-23 19:00:00', 'geometry' : 'POINT(149.094063 -35.30635)'},{'layerattrib' : '45', 'value' : '46.88', 'dt' : '2010-11-23 19:00:00', 'geometry' : 'POINT(149.094063 -35.30635)'}]}. The value of layerattrib attribute is an attribute id in the layer specified in the id URL parameter."}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing layer id."}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self        = shift;
+  my $query       = $self->query();
+  my $layer_id    = $self->param('id');
+
+  my $err_if_exists = 0;
+
+  if (defined $query->param('error_if_exists')) {
+
+    if ($query->param('error_if_exists') eq '1') {
+
+      $err_if_exists = $query->param('error_if_exists');
+    }
+  }
+
+  my $data_for_postrun_href = {};
+
+  my $dbh_write = connect_gis_write();
+
+  my $layertype = read_cell_value($dbh_write, 'layer', 'layertype', 'id', $layer_id);
+
+  if (length($layertype) == 0) {
+
+    my $err_msg = "Layer ($layer_id) not found.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (uc($layertype) eq '2D') {
+
+    my $err_msg = "Layer ($layer_id): 2D layer.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $group_id = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  my ($is_write_ok, $trouble_layer_id_aref) = check_permission($dbh_write, 'layer', 'id', [$layer_id],
+                                                               $group_id, $gadmin_status, $READ_WRITE_PERM);
+
+  if (!$is_write_ok) {
+
+    my $err_msg = "Layer ($layer_id) permission denied.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $json_data_str = $query->param('data');
+
+  my ($missing_err, $missing_href) = check_missing_href( {'data' => $json_data_str } );
+
+  if ($missing_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $data_obj;
+
+  eval {
+
+    $data_obj = decode_json($json_data_str);
+  };
+
+  if ($@) {
+
+    my $err_msg = "Invalid json string.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'data' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $json_schema_file = $self->get_add_layer_data_json_schema_file();
+
+  my $json_schema = read_file($json_schema_file);
+
+  my $schema_obj;
+
+  eval {
+
+    $schema_obj = decode_json($json_schema);
+  };
+
+  if ($@) {
+
+    $self->logger->debug("Invalid JSON for the schema: $@");
+    my $err_msg = "Unexpected Error.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'data' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $validator = JSON::Validator->new();
+
+  $validator->schema($schema_obj);
+
+  my @errors = $validator->validate($data_obj);
+
+  if (scalar(@errors) > 0) {
+
+    my $err_msg = join(' ', @errors);
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $sql = 'SELECT layerattrib.id as layerattribid, layer.id as layerid, validation ';
+  $sql   .= 'FROM layerattrib LEFT JOIN layer ON layerattrib.layer = layer.id ';
+  $sql   .= 'WHERE layer.id=?';
+
+  my $sth = $dbh_write->prepare($sql);
+  $sth->execute($layer_id);
+
+  if ($dbh_write->err()) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $attrib_info_href = $sth->fetchall_hashref('layerattribid');
+
+  $sth->finish();
+
+  if (scalar(keys(%{$attrib_info_href})) == 0) {
+
+    my $err_msg = "Layer ($layer_id) does not have any attribute defined.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $geometry_type = read_cell_value($dbh_write, 'layer', 'geometrytype', 'id', $layer_id);
+
+  my $user_id = $self->authen->user_id();
+
+  my $data_aref = $data_obj->{'DATA'};
+
+  my @attrib_sql_row;
+  my $uniq_attrib_id_href = {};
+
+  for my $row (@{$data_aref}) {
+
+    my $attrib_id = $row->{'layerattrib'};
+
+    $uniq_attrib_id_href->{$attrib_id} = 1;
+
+    if ( !(defined $attrib_info_href->{$attrib_id}) ) {
+
+      my $err_msg = "layerattrib ($attrib_id): not found.";
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my $dt = $row->{'dt'};
+
+    my ($dt_err, $dt_msg) = check_dt_value( {'dt' => $dt} );
+
+    if ($dt_err) {
+
+      my $err_msg = "dt ($dt): not correct format (yyyy-mm-dd hh:mm:ss).";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my $geometry = $row->{'geometry'};
+
+    my ($is_wkt_err, $wkt_err_href) = is_valid_wkt_href($dbh_write,
+                                                        {'geometry' => $geometry},
+                                                        $geometry_type
+        );
+
+    if ($is_wkt_err) {
+
+      my $err_msg = "geometry ($geometry): is not a well known text of $geometry_type";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    if (length($attrib_info_href->{$layer_id}->{'validation'}) > 0) {
+
+      my $validation = $attrib_info_href->{$layer_id}->{'validation'};
+
+      my $value = $row->{'value'};
+
+      if ( $value !~ /$validation/ ) {
+
+        my $err_msg = "value ($value): not matched with validation rule ($validation).";
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+        return $data_for_postrun_href;
+      }
+    }
+
+    if ("$err_if_exists" eq '1') {
+
+      $sql  = "SELECT COUNT(layer${layer_id}attrib.id) ";
+      $sql .= "FROM layer${layer_id}attrib LEFT JOIN layer${layer_id} ON layer${layer_id}attrib.layerid = layer${layer_id}.id ";
+      $sql .= "WHERE dt='$dt' AND layerattrib=? AND ";
+      $sql .= "ST_DWithin(ST_GeomFromText('$geometry', -1), geometry, $GIS_BUFFER_DISTANCE)";
+
+      my ($r_count_err, $count) = read_cell($dbh_write, $sql, [$attrib_id]);
+
+      if ($r_count_err) {
+
+        $self->logger->debug("SQL: $sql : $count");
+
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+        return $data_for_postrun_href;
+      }
+
+      if ($count > 0) {
+
+        my $err_msg = "value for ( $attrib_id, Within('$geometry', '${GIS_BUFFER_DISTANCE}m') , '$dt' ): already exists.";
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+        return $data_for_postrun_href;
+      }
+    }
+
+    my $geometry_id = -1;
+
+    $sql  = "SELECT id ";
+    $sql .= "FROM layer${layer_id} WHERE geometry=ST_GeomFromText('$geometry', -1)";
+
+    my ($r_geo_id_err, $r_geo_msg, $db_geo_data) = read_data($dbh_write, $sql, []);
+
+    if ($r_geo_id_err) {
+
+      $self->logger->debug("Read geometry id failed: $r_geo_msg");
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    if (scalar(@{$db_geo_data}) > 0) {
+
+      $geometry_id = $db_geo_data->[0]->{'id'};
+    }
+    else {
+
+      $sql = "INSERT INTO layer${layer_id}(geometry) VALUES(ST_GeomFromText('$geometry', -1))";
+      $sth = $dbh_write->prepare($sql);
+      $sth->execute();
+
+      if ($dbh_write->err()) {
+
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+        return $data_for_postrun_href;
+      }
+
+      $geometry_id = $dbh_write->last_insert_id(undef, undef, "layer${layer_id}", 'id');
+      $sth->finish();
+    }
+
+    my $value = $row->{'value'};
+
+    push(@attrib_sql_row, qq|($geometry_id,$attrib_id,$value,'$dt',$user_id)|);
+  }
+
+  $sql  = "INSERT INTO layer${layer_id}attrib ";
+  $sql .= "(layerid,layerattrib,value,dt,systemuserid) ";
+  $sql .= "VALUES " . join(',', @attrib_sql_row);
+
+  $sth = $dbh_write->prepare($sql);
+  $sth->execute();
+
+  if ($dbh_write->err()) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sth->finish();
+
+  $dbh_write->disconnect();
+
+  my $attr_id_csv = join(',', keys(%{$uniq_attrib_id_href}));
+  my $nb_rec = scalar(@{$data_aref});
+
+  my $msg = "Data of $nb_rec records for attribute(s) ($attr_id_csv) has been added into layer ($layer_id). ";
+
+  my $info_msg_aref = [{'Message' => $msg}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info' => $info_msg_aref};
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub update_layer_data_runmode {
+
+=pod update_layer_data_gadmin_HELP_START
+{
+"OperationName" : "Update layer data",
+"Description": "Update layer data from a JSON string or blob. The record must exist or DAL will return an error.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='Data of 2 records with 2 unique record ID has been updated in layer (43).' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'Data of 2 records with 2 unique record ID has been updated in layer (43).'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='recordid (1910): not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'recordid (1910): not found.'}]}"}],
+"HTTPParameter": [{"Required": 1, "Name": "data", "Description": "JSON string or blob in a structure as the following: {'DATA': [{'recordid' : 1409, 'layerattrib' : '45', 'value' : '34.48', 'dt' : '2010-11-23 22:00:00', 'systemuserid' : '0', 'geometry' : 'POINT(149.094063 -35.30235)'},{'recordid' : 1910, 'layerattrib' : '44', 'value' : '40.98', 'dt' : '2010-11-23 22:00:00', 'systemuserid' : '0', 'geometry' : 'POINT(149.094063 -35.30335)'}]}."}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing layer id."}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self        = shift;
+  my $query       = $self->query();
+  my $layer_id    = $self->param('id');
+
+  my $data_for_postrun_href = {};
+
+  my $dbh_write = connect_gis_write();
+
+  my $layertype = read_cell_value($dbh_write, 'layer', 'layertype', 'id', $layer_id);
+
+  if (length($layertype) == 0) {
+
+    my $err_msg = "Layer ($layer_id) not found.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (uc($layertype) eq '2D') {
+
+    my $err_msg = "Layer ($layer_id): 2D layer.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $group_id = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  my ($is_write_ok, $trouble_layer_id_aref) = check_permission($dbh_write, 'layer', 'id', [$layer_id],
+                                                               $group_id, $gadmin_status, $READ_WRITE_PERM);
+
+  if (!$is_write_ok) {
+
+    my $err_msg = "Layer ($layer_id) permission denied.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $json_data_str = $query->param('data');
+
+  my ($missing_err, $missing_href) = check_missing_href( {'data' => $json_data_str } );
+
+  if ($missing_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $data_obj;
+
+  eval {
+
+    $data_obj = decode_json($json_data_str);
+  };
+
+  if ($@) {
+
+    my $err_msg = "Invalid json string.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'data' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $json_schema_file = $self->get_update_layer_data_json_schema_file();
+
+  my $json_schema = read_file($json_schema_file);
+
+  my $schema_obj;
+
+  eval {
+
+    $schema_obj = decode_json($json_schema);
+  };
+
+  if ($@) {
+
+    $self->logger->debug("Invalid JSON for the schema: $@");
+    my $err_msg = "Unexpected Error.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'data' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $validator = JSON::Validator->new();
+
+  $validator->schema($schema_obj);
+
+  my @errors = $validator->validate($data_obj);
+
+  if (scalar(@errors) > 0) {
+
+    my $err_msg = join(' ', @errors);
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $sql = 'SELECT layerattrib.id as layerattribid, layer.id as layerid, validation ';
+  $sql   .= 'FROM layerattrib LEFT JOIN layer ON layerattrib.layer = layer.id ';
+  $sql   .= 'WHERE layer.id=?';
+
+  my $sth = $dbh_write->prepare($sql);
+  $sth->execute($layer_id);
+
+  if ($dbh_write->err()) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $attrib_info_href = $sth->fetchall_hashref('layerattribid');
+
+  $sth->finish();
+
+  if (scalar(keys(%{$attrib_info_href})) == 0) {
+
+    my $err_msg = "Layer ($layer_id) does not have any attribute defined.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $geometry_type = read_cell_value($dbh_write, 'layer', 'geometrytype', 'id', $layer_id);
+
+  my $data_aref = $data_obj->{'DATA'};
+
+  my $uniq_id_href = {};
+
+  my $dbh_k_read = connect_kdb_read();
+
+  for my $row (@{$data_aref}) {
+
+    my $rec_id = $row->{'recordid'};
+
+    if (!record_existence($dbh_write, "layer${layer_id}attrib", "id", $rec_id)) {
+
+      my $err_msg = "recordid ($rec_id): not found.";
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    $uniq_id_href->{$rec_id} = 1;
+
+    my $attrib_id = $row->{'layerattrib'};
+
+    if ( !(defined $attrib_info_href->{$attrib_id}) ) {
+
+      my $err_msg = "layerattrib ($attrib_id): not found.";
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my $user_id = $row->{'systemuserid'};
+
+    if (!record_existence($dbh_k_read, 'systemuser', 'UserId', $user_id)) {
+
+      my $err_msg = "systemuserid ($user_id): not found.";
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my $dt = $row->{'dt'};
+
+    my ($dt_err, $dt_msg) = check_dt_value( {'dt' => $dt} );
+
+    if ($dt_err) {
+
+      my $err_msg = "dt ($dt): not correct format (yyyy-mm-dd hh:mm:ss).";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my $geometry = $row->{'geometry'};
+
+    my ($is_wkt_err, $wkt_err_href) = is_valid_wkt_href($dbh_write,
+                                                        {'geometry' => $geometry},
+                                                        $geometry_type
+                                                       );
+
+    if ($is_wkt_err) {
+
+      my $err_msg = "geometry ($geometry): is not a well known text of $geometry_type";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    if (length($attrib_info_href->{$layer_id}->{'validation'}) > 0) {
+
+      my $validation = $attrib_info_href->{$layer_id}->{'validation'};
+
+      my $value = $row->{'value'};
+
+      if ( $value !~ /$validation/ ) {
+
+        my $err_msg = "value ($value): not matched with validation rule ($validation).";
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+        return $data_for_postrun_href;
+      }
+    }
+
+    my $geometry_id = -1;
+
+    $sql  = "SELECT id ";
+    $sql .= "FROM layer${layer_id} WHERE geometry=ST_GeomFromText('$geometry', -1)";
+
+    my ($r_geo_id_err, $r_geo_msg, $db_geo_data) = read_data($dbh_write, $sql, []);
+
+    if ($r_geo_id_err) {
+
+      $self->logger->debug("Read geometry id failed: $r_geo_msg");
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    if (scalar(@{$db_geo_data}) > 0) {
+
+      $geometry_id = $db_geo_data->[0]->{'id'};
+    }
+    else {
+
+      $sql = "INSERT INTO layer${layer_id}(geometry) VALUES(ST_GeomFromText('$geometry', -1))";
+      $sth = $dbh_write->prepare($sql);
+      $sth->execute();
+
+      if ($dbh_write->err()) {
+
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+        return $data_for_postrun_href;
+      }
+
+      $geometry_id = $dbh_write->last_insert_id(undef, undef, "layer${layer_id}", 'id');
+      $sth->finish();
+    }
+
+    my $value = $row->{'value'};
+
+    $sql  = "UPDATE layer${layer_id}attrib SET ";
+    $sql .= "layerid=?, ";
+    $sql .= "layerattrib=?, ";
+    $sql .= "value=?, ";
+    $sql .= "dt=?, ";
+    $sql .= "systemuserid=? ";
+    $sql .= "WHERE id=?";
+
+    $sth = $dbh_write->prepare($sql);
+    $sth->execute($geometry_id, $attrib_id, $value, $dt, $user_id, $rec_id);
+
+    if ($dbh_write->err()) {
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    $sth->finish();
+  }
+
+  $dbh_k_read->disconnect();
+
+  $dbh_write->disconnect();
+
+  my $nb_uniq_id = scalar(keys(%{$uniq_id_href}));
+  my $nb_rec     = scalar(@{$data_aref});
+
+  my $msg = "Data of $nb_rec records with $nb_uniq_id unique record ID has been updated in layer ($layer_id).";
+
+  my $info_msg_aref = [{'Message' => $msg}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info' => $info_msg_aref};
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub del_layer_data_runmode {
+
+=pod del_layer_data_gadmin_HELP_START
+{
+"OperationName" : "Delete layer data",
+"Description": "Delete data from layer for a particular attribute, for an exact geometry position and from a starting datetime to an ending dattetime.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='16 records for layerattrib (45) from 2010-11-01 01:00:00 to 2010-11-09 17:00:00 in layer (43) have been deleted successfully.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : '16 records for layerattrib (44) from 2010-11-01 01:00:00 to 2010-11-09 17:00:00 in layer (43) have been deleted successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Layer (72) not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Layer (72) not found.'}]}"}],
+"HTTPParameter": [{"Required": 1, "Name": "geometry", "Description": "GIS Well Known text for the exact position of the data to be deleted from layer specified in the URL parameter"}, {"Required": 1, "Name": "layerattrib", "Description": "Layer attribute id of the data to be deleted from the layer specified in the URL parameter"}, {"Required": 1, "Name": "startdt", "Description": "Starting datetime in yyyy-mm-dd hh:mm:ss format of the data to be deleted from the layer specified in the URL parameter."}, {"Required": 1, "Name": "enddt", "Description": "Ending datetime in yyyy-mm-dd hh:mm:ss format of the data to be deleted from the layer specified in the URL parameter."}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing layer id."}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self        = shift;
+  my $query       = $self->query();
+  my $layer_id    = $self->param('id');
+
+  my $geometry    = $query->param('geometry');
+  my $attrib_id   = $query->param('layerattrib');
+  my $start_time  = $query->param('startdt');
+  my $end_time    = $query->param('enddt');
+
+  my $data_for_postrun_href = {};
+
+  my $dbh_write = connect_gis_write();
+
+  my $layertype = read_cell_value($dbh_write, 'layer', 'layertype', 'id', $layer_id);
+
+  if (length($layertype) == 0) {
+
+    my $err_msg = "Layer ($layer_id) not found.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (uc($layertype) eq '2D') {
+
+    my $err_msg = "Layer ($layer_id): 2D layer.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $group_id = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  my ($is_write_ok, $trouble_layer_id_aref) = check_permission($dbh_write, 'layer', 'id', [$layer_id],
+                                                               $group_id, $gadmin_status, $READ_WRITE_PERM);
+
+  if (!$is_write_ok) {
+
+    my $err_msg = "Layer ($layer_id) permission denied.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my ($missing_err, $missing_href) = check_missing_href( {'layerattrib' => $attrib_id,
+                                                          'startdt'     => $start_time,
+                                                          'enddt'       => $end_time,
+                                                          'geometry'    => $geometry,
+                                                         } );
+
+  if ($missing_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  my ($dt_err, $dt_href) = check_dt_value( {'startdt' => $start_time,
+                                            'enddt'   => $end_time
+                                           } );
+
+  if ($dt_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$dt_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $geometry_type = read_cell_value($dbh_write, 'layer', 'geometrytype', 'id', $layer_id);
+
+  my ($is_wkt_err, $wkt_err_href) = is_valid_wkt_href($dbh_write,
+                                                      {'geometry' => $geometry},
+                                                      $geometry_type
+                                                     );
+
+  if ($is_wkt_err) {
+
+    my $err_msg = "geometry ($geometry): is not a well known text of $geometry_type";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (!record_existence($dbh_write, "layer${layer_id}attrib", "layerattrib", $attrib_id)) {
+
+    my $err_msg = "layerattrib ($attrib_id): no data.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'layerattrib' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $geometry_id = -1;
+
+  my $sql  = qq|SELECT id |;
+  $sql    .= qq|FROM layer${layer_id} |;
+  $sql    .= qq|WHERE geometry=ST_GeomFromText('$geometry', -1)|;
+
+  my ($r_geo_id_err, $r_geo_msg, $db_geo_data) = read_data($dbh_write, $sql, []);
+
+  if ($r_geo_id_err) {
+
+    $self->logger->debug("Read geometry id failed: $r_geo_msg");
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (scalar(@{$db_geo_data}) == 1) {
+
+    $geometry_id = $db_geo_data->[0]->{'id'};
+  }
+  elsif (scalar(@{$db_geo_data}) == 0) {
+
+    my $err_msg = "geometry ($geometry): not found.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'geometry' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+  else {
+
+    my $err_msg = "geometry ($geometry): more than one object found.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'geometry' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sql    = qq|SELECT COUNT(id) |;
+  $sql   .= qq|FROM layer${layer_id}attrib |;
+  $sql   .= qq|WHERE layerattrib=? AND layerid=? AND dt>='$start_time' AND dt<='$end_time'|;
+
+  my ($r_count_err, $nb_rec) = read_cell($dbh_write, $sql, [$attrib_id, $geometry_id]);
+
+  if ($r_count_err) {
+
+    my $err_msg = "Unexpected Error.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if ($nb_rec == 0) {
+
+    my $err_msg = "Data for layerattrib($attrib_id) from $start_time to $end_time: not found.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sql  = qq|DELETE FROM layer${layer_id}attrib |;
+  $sql .= qq|WHERE layerattrib=? AND layerid=? AND dt>='$start_time' AND dt<='$end_time'|;
+
+  my $sth = $dbh_write->prepare($sql);
+  $sth->execute($attrib_id, $geometry_id);
+
+  if ($dbh_write->err()) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sth->finish();
+
+  $dbh_write->disconnect();
+
+  my $msg = "$nb_rec records for layerattrib ($attrib_id) from $start_time to $end_time in layer ($layer_id) ";
+  $msg   .= "have been deleted successfully.";
+
+  my $info_msg_aref = [{'Message' => $msg}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info' => $info_msg_aref};
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub xml_parse_failed {
+
+  my $self = shift;
+  my $code = shift;
+
+  if ($code < 300) {
+
+    my $err_str = XML::Checker::error_string($code, @_);
+    $err_str =~ s/XML::Checker ERROR\-//g;
+    die $err_str;
+  }
+}
+
+sub get_add_layer_data_json_schema_file {
+
+  my $json_schema_path = $ENV{DOCUMENT_ROOT} . '/' . $JSON_SCHEMA_PATH;
+
+  return "${json_schema_path}/addlayerdata.schema.json";
+}
+
+sub get_update_layer_data_json_schema_file {
+
+  my $json_schema_path = $ENV{DOCUMENT_ROOT} . '/' . $JSON_SCHEMA_PATH;
+
+  return "${json_schema_path}/updatelayerdata.schema.json";
+}
+
+sub get_layer_attribute_dtd {
+
+  my $self = shift;
+
+  my $dtd = '';
+
+  my $dtd_file = $self->get_layer_attribute_dtd_file();
+
+  open(DTD_FH, "<$dtd_file");
+  while( my $line = <DTD_FH> ) {
+
+    $dtd .= $line;
+  }
+  close(DTD_FH);
+
+  return $dtd;
+}
+
+sub get_layer_attribute_dtd_file {
+
+  my $dtd_path = $ENV{DOCUMENT_ROOT} . '/' . $DTD_PATH;
+
+  return "${dtd_path}/layerattrib.dtd";
 }
 
 sub logger {
