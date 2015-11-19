@@ -1,0 +1,16 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Update Specimen" TargetURL="update/specimen/_id" Type="BLOCKING" />
+  <Delete TargetURL="delete/specimen/_id" />
+  <INPUT ParaName="SpecimenBarcode" Value="0" />
+  <INPUT ParaName="IsActive" Value="0" />
+  <INPUT ParaName="Pedigree" Value="0" />
+  <INPUT ParaName="SelectionHistory" Value="0" />
+  <INPUT ParaName="FilialGeneration" Value="0" />
+  <Match Attr="StatusCode" Value="420" />
+  <Match Attr="BreedingMethodId" Tag="Error" Value="regex(missing)" />
+  <Match Attr="SpecimenName" Tag="Error" Value="regex(missing)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <ReturnId ParaName="SpecimenId" Value="5029" />
+  <RunInfo Success="1" Time="1444957662" />
+</TestCase>

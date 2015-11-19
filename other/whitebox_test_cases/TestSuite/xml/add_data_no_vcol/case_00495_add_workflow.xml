@@ -1,0 +1,15 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Add Workflow" TargetURL="add/workflow" Type="BLOCKING" />
+  <Delete TargetURL="delete/workflow/:WorkflowId" />
+  <INPUT ParaName="WorkflowName" PrefixVal="Workflow_" Random="1" />
+  <INPUT ParaName="WorkflowType" SrcValue="xml/add_data_no_vcol/case_00494_add_workflow_type.xml" />
+  <INPUT ParaName="IsActive" Value="0" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Match Attr="ParaName" Tag="ReturnId" Value="WorkflowId" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00494_add_workflow_type.xml" Order="3" />
+  <ReturnId ParaName="WorkflowId" Value="14" />
+  <RunInfo Success="1" Time="1440663596" />
+</TestCase>

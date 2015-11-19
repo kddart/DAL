@@ -1,0 +1,12 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Update Trait" TargetURL="update/trialtrait/_id" Type="BLOCKING" />
+  <Delete TargetURL="delete/trait/:TrialTraitId" />
+  <INPUT ParaName="UnitId" Value="0" />
+  <INPUT ParaName="TraitId" Value="1" />
+  <Match Attr="StatusCode" Value="420" />
+  <Match Attr="Compulsory" Tag="Error" Value="regex(missing)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <ReturnId ParaName="TrialTraitId" Value="3" />
+  <RunInfo Success="1" Time="1444866875" />
+</TestCase>

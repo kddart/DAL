@@ -1,0 +1,14 @@
+<TestCase>
+  <CaseInfo Description="List Layer2D Data" TargetURL="layer2d/:LayerId/list/data/:nperpage/page/:num" Type="BLOCKING" />
+  <INPUT ParaName="num" Value="1" />
+  <INPUT ParaName="nperpage" Value="50" />
+  <INPUT ParaName="LayerId" SrcValue="xml/add_data_no_vcol/case_00449_add_layer2d.xml" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="COUNT" Tag="Layer2D" TargetDataType="MULTI" Value="boolex(x&gt;0)" />
+  <Match Attr="TagName" Tag="RecordMeta" Value="Layer2D" />
+  <Match Attr="Page" Tag="Pagination" Value="1" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00458_add_layer2d_data.xml" Order="3" />
+  
+</TestCase>

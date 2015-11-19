@@ -1,0 +1,15 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Add a marker map" TargetURL="update/markermap/:MarkerMapId" Type="BLOCKING" />
+  <Delete TargetURL="delete/markermap/:MarkerMapId" />
+  <INPUT ParaName="MarkerMapId" SrcValue="xml/add_data_no_vcol/case_00464_add_marker_map.xml" />
+  <INPUT ParaName="MapName" PrefixVal="MarkerMap_to fail tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt" Random="1" />
+  <INPUT ParaName="MapType" SrcValue="xml/add_data_no_vcol/case_00465_add_markermap_type.xml" />
+  <INPUT ParaName="MapDescription" Value="Automatic testing" />
+  <Match Attr="StatusCode" Value="420" />
+  <Match Attr="MapName" Tag="Error" Value="regex(longer than)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00465_add_markermap_type.xml" Order="3" />
+  
+  
+</TestCase>

@@ -1,0 +1,12 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Update Unitposition" TargetURL="update/unitposition/:UnitPositionId" Type="BLOCKING" />
+  <Delete TargetURL="delete/unitposition/:UnitPositionId" />
+  <INPUT ParaName="UnitPositionId" SrcValue="xml/add_data_no_vcol/case_00200_add_unitposition.xml" />
+  <INPUT ParaName="UnitPositionText" Value="block01|row1|column1 (UPDATED) to fail tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt" />
+  <Match Attr="StatusCode" Value="420" />
+  <Match Attr="UnitPositionText" Tag="Error" Value="regex(longer than)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00200_add_unitposition.xml" Order="3" />
+  
+</TestCase>

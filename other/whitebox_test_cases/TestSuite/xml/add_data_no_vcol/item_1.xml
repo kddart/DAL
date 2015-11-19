@@ -1,0 +1,16 @@
+<DATA>
+<ROW>
+<ItemSourceId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/case_00102_add_con.xml" />
+<SpecimenId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/case_00446_add_specimen_1geno.xml" />
+<UnitId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/case_00225_add_item_unit.xml" />
+<ItemTypeId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/case_00308_add_item_type.xml" />
+<Amount Value="200" />
+</ROW>
+<ROW>
+<ItemSourceId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/case_00102_add_con.xml" />
+<SpecimenId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/case_00447_add_specimen_1geno_1.xml" />
+<UnitId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/case_00225_add_item_unit.xml" />
+<ItemTypeId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/case_00308_add_item_type.xml" />
+<Amount Value="200" />
+</ROW>
+</DATA>

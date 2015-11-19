@@ -1,0 +1,25 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Add Trial" TargetURL="add/trial" Type="BLOCKING" />
+  <Delete TargetURL="delete/trial/_id" />
+  <INPUT ParaName="triallocation" Value="0" />
+  <INPUT ParaName="ProjectId" Value="0" />
+  <INPUT ParaName="CurrentWorkflowId" Value="0" />
+  <INPUT ParaName="TrialEndDate" Value="Empty" />
+  <INPUT ParaName="TrialNote" Value="Empty" />
+  <Match Attr="StatusCode" Value="420" />
+  <Match Attr="TrialTypeId" Tag="Error" Value="regex(missing)" />
+  <Match Attr="SiteId" Tag="Error" Value="regex(missing)" />
+  <Match Attr="TrialName" Tag="Error" Value="regex(missing)" />
+  <Match Attr="TrialNumber" Tag="Error" Value="regex(missing)" />
+  <Match Attr="TrialAcronym" Tag="Error" Value="regex(missing)" />
+  <Match Attr="DesignTypeId" Tag="Error" Value="regex(missing)" />
+  <Match Attr="TrialManagerId" Tag="Error" Value="regex(missing)" />
+  <Match Attr="AccessGroupId" Tag="Error" Value="regex(missing)" />
+  <Match Attr="OwnGroupPerm" Tag="Error" Value="regex(missing)" />
+  <Match Attr="AccessGroupPerm" Tag="Error" Value="regex(missing)" />
+  <Match Attr="OtherPerm" Tag="Error" Value="regex(missing)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <ReturnId ParaName="TrialId" Value="5029" />
+  <RunInfo Success="1" Time="1444784528" />
+</TestCase>

@@ -1,0 +1,12 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Update Organisation" TargetURL="update/organisation/:OrganisationId" Type="BLOCKING" />
+  <Delete TargetURL="delete/organisation/:OrganisationId" />
+  <INPUT ParaName="OrganisationId" SrcValue="xml/add_data_no_vcol/case_00101_add_org.xml" />
+  <INPUT ParaName="OrganisationName" PrefixVal="Updated DArT Testing to fail ttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt" Random="1" />
+  <Match Attr="StatusCode" Value="420" />
+  <Match Attr="OrganisationName" Tag="Error" Value="regex(longer than)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  
+  
+</TestCase>

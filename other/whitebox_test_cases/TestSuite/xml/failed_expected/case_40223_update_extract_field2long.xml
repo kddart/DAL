@@ -1,0 +1,21 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Update Extract" TargetURL="update/extract/_id" Type="BLOCKING" />
+  <Delete TargetURL="delete/extract/:ExtractId" />
+  <INPUT ParaName="ParentExtractId" Value="1" />
+  <INPUT ParaName="PlateId" Value="0" />
+  <INPUT ParaName="GenotypeId" Value="2" />
+  <INPUT ParaName="WellRow" Value="AAAAA" />
+  <INPUT ParaName="WellCol" Value="55555" />
+  <INPUT ParaName="Quality" Value="BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB" />
+  <INPUT ParaName="Status" Value="AAAAAAAAAAAAAAAAAAAABBBBBBBBBBBBB" />
+  <INPUT ParaName="ItemGroupId" Value="2" />
+  <Match Attr="StatusCode" Value="420" />
+  <Match Attr="WellRow" Tag="Error" Value="regex(longer than)" />
+  <Match Attr="WellCol" Tag="Error" Value="regex(longer than)" />
+  <Match Attr="Status" Tag="Error" Value="regex(longer than)" />
+  <Match Attr="Quality" Tag="Error" Value="regex(longer than)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <ReturnId ParaName="ExtractId" Value="3" />
+  <RunInfo Success="1" Time="1444884549" />
+</TestCase>

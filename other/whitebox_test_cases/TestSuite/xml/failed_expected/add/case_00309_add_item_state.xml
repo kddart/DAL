@@ -1,0 +1,13 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Add Item State" TargetURL="add/type/state" Type="BLOCKING" />
+  <Delete TargetURL="delete/type/state/:TypeId" />
+  <INPUT ParaName="TypeName" PrefixVal="Good - tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt" Random="1" />
+  <INPUT ParaName="IsTypeActive" Value="1" /> 
+  <INPUT ParaName="IsFixed" Value="0" />
+  <Match Attr="StatusCode" Value="420" />
+  <Match Attr="TypeName" Tag="Error" Value="regex(longer than)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  
+  
+</TestCase>

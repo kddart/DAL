@@ -1,0 +1,5 @@
+<DATA>
+<ItemGroup StorageId="|:StorageId:|" ItemGroupName="|:ItemGroupName:|" ItemGroupNote="|:ItemGroupNote:|" ScaleId="|:ScaleId:|" ContainerTypeId="|:ContainerTypeId:|">
+<Item ItemStateId="|:ItemStateId:|" UnitId="|:UnitId:|" SpecimenId="|:SpecimenId:|" ItemBarcode="|:ItemBarcode:|" ItemTypeId="|:ItemTypeId:|" />
+</ItemGroup>
+</DATA>

@@ -1,0 +1,14 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Add Barcode Conf" TargetURL="add/barcodeconf" Type="NON-BLOCKING" />
+  <Delete TargetURL="delete/barcodeconf/:BarcodeConfId" />
+  <INPUT ParaName="SystemTable" Value="specimen" />
+  <INPUT ParaName="SystemField" Value="SpecimenBarcode" />
+  <INPUT ParaName="BarcodeCode" Value="EN-13_tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt" />
+  <INPUT ParaName="BarcodeDef" Value="Test" />
+  <Match Attr="StatusCode" Value="420" />
+  <Match Attr="BarcodeCode" Tag="Error" Value="regex(longer than)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  
+  
+</TestCase>

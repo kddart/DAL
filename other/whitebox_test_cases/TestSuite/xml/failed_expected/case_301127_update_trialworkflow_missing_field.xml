@@ -1,0 +1,12 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Update Trial Work Flow" TargetURL="update/trialworkflow/_id" Type="BLOCKING" />
+  <INPUT ParaName="CompleteBy" Value="0" />
+  <INPUT ParaName="ReminderAt" Value="Empty" />
+  <INPUT ParaName="ReminderTo" Value="empty" />
+  <INPUT ParaName="Note" Value="0" />
+  <Match Attr="StatusCode" Value="420" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <ReturnId ParaName="OrganisationId" Value="5029" />
+  <RunInfo Success="1" Time="1444957755" />
+</TestCase>

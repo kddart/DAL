@@ -1,0 +1,21 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Update Contact" TargetURL="update/contact/:ContactId" Type="BLOCKING" />
+  <Delete TargetURL="delete/contact/:ContactId" />
+  <INPUT ParaName="OrganisationId" SrcValue="xml/add_data_no_vcol/case_00101_add_org.xml" />
+  <INPUT ParaName="ContactId" SrcValue="xml/add_data_no_vcol/case_00102_add_con.xml" />
+  <INPUT ParaName="ContactLastName" PrefixVal="User to fail ttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt -" Random="1" />
+  <INPUT ParaName="ContactFirstName" Value="Testing" />
+  <INPUT ParaName="ContactAcronym" Value="TU" />
+  <INPUT ParaName="ContactAddress" Value="7 Your Street Suburb Postcode 777 Country" />
+  <INPUT ParaName="CountryCode" Value="AU" />
+  <INPUT ParaName="ContactTelephone" Value="+61262776277" />
+  <INPUT ParaName="ContactMobile" Value="04 12345678" />
+  <INPUT ParaName="ContactEMail" Value="testuser@kddart.example.com" />
+  <Match Attr="StatusCode" Value="420" />
+  <Match Attr="ContactLastName" Tag="Error" Value="regex(longer than)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00101_add_org.xml" Order="3" />
+  
+  
+</TestCase>

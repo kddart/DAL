@@ -1,0 +1,15 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Add Unit Conversion Rule" TargetURL="generalunit/:UnitId/add/conversionrule" Type="BLOCKING" />
+  <Delete TargetURL="delete/conversionrule/:ConversionRuleId" />
+  <INPUT ParaName="UnitId" SrcValue="xml/add_data_no_vcol/case_00225_add_item_unit.xml" />
+  <INPUT ParaName="ToUnitId" SrcValue="xml/add_data_no_vcol/case_00225_add_item_unit.xml" />
+  <INPUT ParaName="ConversionFormula" Value="1" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Match Attr="ParaName" Tag="ReturnId" Value="ConversionRuleId" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00225_add_item_unit.xml" Order="3" />
+  <ReturnId ParaName="ConversionRuleId" Value="2" />
+  <RunInfo Success="1" Time="1439795034" />
+</TestCase>

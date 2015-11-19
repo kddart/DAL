@@ -1,0 +1,46 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "id": "http://kddart.org",
+  "type": "object",
+  "properties": {
+    "DATA": {
+      "id": "http://kddart.org/DATA",
+      "type": "array",
+      "items": {
+        "oneOf": [ {
+          "id": "http://kddart.org/DATA/0",
+          "type": "object",
+          "properties": {
+            "layerattrib": {
+              "id": "http://kddart.org/DATA/0/layerattrib",
+              "type": "string"
+            },
+            "value": {
+              "id": "http://kddart.org/DATA/0/value",
+              "type": "string"
+            },
+            "dt": {
+              "id": "http://kddart.org/DATA/0/dt",
+              "type": "string"
+            },
+            "geometry": {
+              "id": "http://kddart.org/DATA/0/geometry",
+              "type": "string"
+            }
+          },
+          "required": [
+            "layerattrib",
+            "value",
+            "dt",
+            "geometry"
+          ],
+          "additionalProperties": false
+        } ]
+      },
+      "minItems": 1
+    }
+  },
+  "required": [
+    "DATA"
+  ]
+}

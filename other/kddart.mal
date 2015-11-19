@@ -1,0 +1,79 @@
+module kddart;
+
+command group_concat(b:bat[:oid,:str]):str
+address KDDARTgroup_concat 
+comment "Mal kddart";
+
+function group_concat(b:bat[:oid, :str]):str;
+
+       value := "";
+
+       barrier (h, t) := iterator.new(b);
+
+              value := value + t;
+
+              value := value + "";
+
+              redo (h, t) := iterator.next(b);
+
+       exit (h, t);
+
+       return value;
+
+end group_concat;
+
+ 
+
+function subgroup_concat(b:bat[:oid,:any_1],g:bat[:oid,:oid],e:bat[:oid,:any_2],skip_nils:bit) :bat[:oid,:str];
+
+       nw := aggr.count(e);
+
+       nl := calc.lng(nw);
+
+       bn := bat.new(:oid, :str, nl);
+
+ 
+
+       # check 'e' has some values - this is the list of group IDs in the head
+
+       # 'g' is the group to the data BAT head ID mapping
+
+       # 'b' is the data column BAT that we are aggregating over
+
+       barrier (grpid, t) := iterator.new(e);
+
+ 
+
+              # select GID from TID->GID map to get matching TIDs
+
+              TIDs := algebra.uselect(g,grpid);
+
+ 
+
+              # get DATA for matching TIDs
+
+              b_data := algebra.kintersect(b,TIDs);
+
+ 
+
+              # aggregate
+
+              grpval := group_concat(b_data);
+
+ 
+
+              # Store the result for this group
+
+              bat.insert(bn, grpid, grpval);
+
+ 
+
+              redo (grpid, t) := iterator.next(e);
+
+       exit (grpid, t);
+
+       return bn;
+
+ 
+
+end subgroup_concat;

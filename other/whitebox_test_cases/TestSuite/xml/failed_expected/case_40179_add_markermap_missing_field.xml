@@ -1,0 +1,15 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Add Marker Map" TargetURL="add/markermap" Type="BLOCKING" />
+  <Delete TargetURL="delete/markermap/:MarkerMapId" />
+  <INPUT ParaName="ModelRef" Value="hdhdhdhdhdhd" />
+  <INPUT ParaName="MapDescription" Value="Testing Data" />
+  <INPUT ParaName="MapSoftware" Value="Stata" />
+  <INPUT ParaName="MapParameters" Value="XYZ" />
+  <Match Attr="StatusCode" Value="420" />
+  <Match Attr="MapName" Tag="Error" Value="regex(missing)" />
+  <Match Attr="MapType" Tag="Error" Value="regex(missing)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <ReturnId ParaName="MarkerMapId" Value="3" />
+  <RunInfo Success="1" Time="1444705825" />
+</TestCase>

@@ -1,0 +1,14 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Update Trial Event" TargetURL="update/trialevent/_id" Type="BLOCKING" />
+  <Delete TargetURL="delete/conversionrule/:ConversionRuleId" />
+  <INPUT ParaName="TrialEventNote" Value="" />
+  <INPUT ParaName="TrialEventDate" Value="12-12-2014" />
+  <Match Attr="StatusCode" Value="420" />
+  <Match Attr="UnitId" Tag="Error" Value="regex(missing)" />
+  <Match Attr="EventTypeId" Tag="Error" Value="regex(missing)" />
+  <Match Attr="TrialEventValue" Tag="Error" Value="regex(missing)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <ReturnId ParaName="TrialEventId" Value="5029" />
+  <RunInfo Success="1" Time="1444873884" />
+</TestCase>

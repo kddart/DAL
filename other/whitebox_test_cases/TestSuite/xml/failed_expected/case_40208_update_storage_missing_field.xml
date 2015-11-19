@@ -1,0 +1,14 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Update Storage" TargetURL="update/storage/_id" Type="BLOCKING" />
+  <Delete TargetURL="delete/storage/:StorageId" />
+  <INPUT ParaName="StorageBarcode" Value="hdhdhdhdhdhd" />
+  <INPUT ParaName="StorageParentId" Value="2" />
+  <INPUT ParaName="StorageDetails" Value="Storage details" />
+  <INPUT ParaName="StorageNote" Value="Notes" />
+  <Match Attr="StatusCode" Value="420" />
+  <Match Attr="StorageLocation" Tag="Error" Value="regex(missing)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <ReturnId ParaName="StorageId" Value="3" />
+  <RunInfo Success="1" Time="1444871828" />
+</TestCase>

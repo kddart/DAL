@@ -1,0 +1,4 @@
+<DATA>
+  <layerattrib colname="humidity_Bulk" coltype="Temperature" colsize="30" colunits="degree c" valuetype="|:REPLACEvaluetype:|" validation=".*" />
+  <layerattrib colname="Humidity_Bulk" coltype="Humidity" colsize="20" colunits="degree c" valuetype="|:REPLACEvaluetype:|" validation=".*" />
+</DATA>

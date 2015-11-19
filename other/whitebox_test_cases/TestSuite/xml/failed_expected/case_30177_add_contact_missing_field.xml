@@ -1,0 +1,17 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Add Contact" TargetURL="add/contact" Type="BLOCKING" />
+  <Delete TargetURL="delete/contact/_id" />
+  <INPUT ParaName="ContactAcronym" Value="0" />
+  <INPUT ParaName="ContactAddress" Value="Empty" />
+  <INPUT ParaName="ContactTelephone" Value="empty" />
+  <INPUT ParaName="ContactMobile" Value="0" />
+  <INPUT ParaName="ContactEmail" Value="0" />
+  <Match Attr="StatusCode" Value="420" />
+  <Match Attr="ContactLastName" Tag="Error" Value="regex(missing)" />
+  <Match Attr="ContactFirstName" Tag="Error" Value="regex(missing)" />
+  <Match Attr="OrganisationId" Tag="Error" Value="regex(missing)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <ReturnId ParaName="OrganisationId" Value="5029" />
+  <RunInfo Success="1" Time="1444716434" />
+</TestCase>

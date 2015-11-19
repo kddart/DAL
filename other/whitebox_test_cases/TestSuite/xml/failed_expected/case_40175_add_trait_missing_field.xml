@@ -1,0 +1,26 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Add Trait" TargetURL="add/trait" Type="BLOCKING" />
+  <Delete TargetURL="delete/trait/:TraitId" />
+  <INPUT ParaName="TraitGroupTypeId" Value="0" />
+  <INPUT ParaName="OwnGroupId" Value="0" />
+  <Match Attr="StatusCode" Value="420" />
+  <Match Attr="UnitId" Tag="Error" Value="regex(missing)" />
+  <Match Attr="TraitName" Tag="Error" Value="regex(missing)" />
+  <Match Attr="TraitCaption" Tag="Error" Value="regex(missing)" />
+  <Match Attr="TraitDescription" Tag="Error" Value="regex(missing)" />
+  <Match Attr="TraitDataType" Tag="Error" Value="regex(missing)" />
+  <Match Attr="TraitValueMaxLength" Tag="Error" Value="regex(missing)" />
+  <Match Attr="IsTraitUsedForAnalysis" Tag="Error" Value="regex(missing)" />
+  <Match Attr="TraitValRule" Tag="Error" Value="regex(missing)" />
+  <Match Attr="TraitValRuleErrMsg" Tag="Error" Value="regex(missing)" />
+  <Match Attr="AccessGroupId" Tag="Error" Value="regex(missing)" />
+  <Match Attr="OwnGroupPerm" Tag="Error" Value="regex(missing)" />
+  <Match Attr="AccessGroupPerm" Tag="Error" Value="regex(missing)" />
+  <Match Attr="OtherPerm" Tag="Error" Value="regex(missing)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00397_add_item_unit4add_trait.xml" Force="1" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00424_add_traitgroup_type.xml" Force="1" Order="4" />
+  <ReturnId ParaName="TraitId" Value="3" />
+  <RunInfo Success="1" Time="1444777199" />
+</TestCase>

@@ -1,0 +1,20 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Update a Plate" TargetURL="update/plate/_id" Type="BLOCKING" />
+  <Delete TargetURL="delete/plate/:PlateId" />
+  <INPUT ParaName="PlateName" PrefixVal="Plate_" Random="1" Value="AAAAAAAA BBBBBBBBBBBBBBBBBBBBBBBBBBBBBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACCCCCC" />
+  <INPUT ParaName="PlateType" SrcValue="xml/add_data_no_vcol/case_00372_add_platetype.xml" />
+  <INPUT ParaName="PlateDescription" Value="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB" />
+  <INPUT ParaName="StorageId" Value="0" />
+  <INPUT ParaName="OperatorId" Value="0" />
+  <INPUT ParaName="DateCreated" Value="0" />
+  <INPUT ParaName="PlateWells" Value="0" />
+  <INPUT ParaName="PlateStatus" Value="SSSSSSSSSSSS    SSSSSSSSTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT" />
+  <Match Attr="StatusCode" Value="420" />
+  <Match Attr="PlateName" Tag="Error" Value="regex(longer than)" />
+  <Match Attr="PlateDescription" Tag="Error" Value="regex(longer than)" />
+  <Match Attr="PlateStatus" Tag="Error" Value="regex(longer than)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <ReturnId ParaName="PlateId" Value="5" />
+  <RunInfo Success="1" Time="1444952985" />
+</TestCase>

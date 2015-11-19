@@ -1,0 +1,13 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Add Barcode Conf" TargetURL="add/barcodeconf" Type="NON-BLOCKING" />
+  <Delete TargetURL="delete/barcodeconf/:BarcodeConfId" />
+  <Match Attr="StatusCode" Value="420" />
+  <Match Attr="SystemTable" Tag="Error" Value="regex(missing)" />
+  <Match Attr="SystemField" Tag="Error" Value="regex(missing)" />
+  <Match Attr="BarcodeCode" Tag="Error" Value="regex(missing)" />
+  <Match Attr="BarcodeDef" Tag="Error" Value="regex(missing)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <ReturnId ParaName="BarcodeConfId" Value="1" />
+  <RunInfo Success="1" Time="1444716663" />
+</TestCase>

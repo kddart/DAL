@@ -1,0 +1,18 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Update General Unit" TargetURL="update/generalunit/_id" Type="BLOCKING" />
+  <Delete TargetURL="delete/generalunit/:GeneralUnitId" />
+  <INPUT ParaName="UnitTypeId" Value="2" />
+  <INPUT ParaName="UnitNote" Value="" />
+  <INPUT ParaName="UnitSource" Value="Empty" />
+  <INPUT ParaName="StorageNote" Value="Notes" />
+  <Match Attr="StatusCode" Value="420" />
+  <Match Attr="UnitName" Tag="Error" Value="regex(missing)" />
+  <Match Attr="UseByItem" Tag="Error" Value="regex(missing)" />
+  <Match Attr="UseByTrait" Tag="Error" Value="regex(missing)" />
+  <Match Attr="UseByTrialEvent" Tag="Error" Value="regex(missing)" />
+  <Match Attr="UseBylayerattrib" Tag="Error" Value="regex(missing)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <ReturnId ParaName="GeneralUnitId" Value="3" />
+  <RunInfo Success="1" Time="1444872018" />
+</TestCase>

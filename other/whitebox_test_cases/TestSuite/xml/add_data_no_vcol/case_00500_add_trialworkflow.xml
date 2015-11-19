@@ -1,0 +1,16 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Add trial workflow" TargetURL="trial/:TrialId/add/workflow" Type="BLOCKING" />
+  <Delete TargetURL="delete/trialworkflow/:TrialWorkflowId" />
+  <INPUT ParaName="TrialId" SrcValue="xml/add_data_no_vcol/case_00499_add_trial_with_workflow.xml" />
+  <INPUT ParaName="WorkflowdefId" SrcValue="xml/add_data_no_vcol/case_00497_add_workflow_def.xml" />
+  <INPUT ParaName="ReminderTo" Value="dart-it@kddart.org" />
+  <INPUT ParaName="Note" Value="Automatic testing framework" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Match Attr="ParaName" Tag="ReturnId" Value="TrialWorkflowId" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00499_add_trial_with_workflow.xml" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00497_add_workflow_def.xml" Order="4" />
+  <RunInfo Success="1" Time="1440484746" />
+</TestCase>

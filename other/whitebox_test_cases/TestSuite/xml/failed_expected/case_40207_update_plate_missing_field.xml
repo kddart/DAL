@@ -1,0 +1,16 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Update Plate" TargetURL="update/plate/_id" Type="BLOCKING" />
+  <Delete TargetURL="delete/plate/:PlateId" />
+  <INPUT ParaName="PlateType" SrcValue="xml/add_data_no_vcol/case_00372_add_platetype.xml" />
+  <INPUT ParaName="PlateDescription" Value="Target Plate" />
+  <INPUT ParaName="StorageId" Value="2" />
+  <INPUT ParaName="PlateWells" Value="96" />
+  <INPUT ParaName="PlateStatus" Value="Sequenced" />
+  <INPUT ParaName="OperatorId" Value="1" />
+  <Match Attr="StatusCode" Value="420" />
+  <Match Attr="PlateName" Tag="Error" Value="regex(missing)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <ReturnId ParaName="PlateId" Value="3" />
+  <RunInfo Success="1" Time="1444885533" />
+</TestCase>

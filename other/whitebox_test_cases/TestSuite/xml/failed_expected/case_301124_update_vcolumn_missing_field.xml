@@ -1,0 +1,19 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Update vcolumn" TargetURL="update/vcolumn/_id" Type="BLOCKING" />
+  <Delete TargetURL="delete/contact/_id" />
+  <INPUT ParaName="FactorCaption" Value="0" />
+  <INPUT ParaName="FactorDescription" Value="Empty" />
+  <INPUT ParaName="FactorUnit" Value="empty" />
+  <INPUT ParaName="FactorValidRule" Value="0" />
+  <INPUT ParaName="FactorValidRuleErrMsg" Value="0" />
+  <Match Attr="StatusCode" Value="420" />
+  <Match Attr="FactorName" Tag="Error" Value="regex(missing)" />
+  <Match Attr="FactorDataType" Tag="Error" Value="regex(missing)" />
+  <Match Attr="CanFactorHaveNull" Tag="Error" Value="regex(missing)" />
+  <Match Attr="FactorValueMaxLength" Tag="Error" Value="regex(missing)" />
+  <Match Attr="Public" Tag="Error" Value="regex(missing)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <ReturnId ParaName="OrganisationId" Value="5029" />
+  <RunInfo Success="1" Time="1444957725" />
+</TestCase>

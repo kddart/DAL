@@ -1,0 +1,10 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Update Organisation" TargetURL="update/organisation/_id" Type="BLOCKING" />
+  <Delete TargetURL="delete/organisation/_id/:OrganisationId" />
+  <Match Attr="StatusCode" Value="420" />
+  <Match Attr="OrganisationName" Tag="Error" Value="regex(missing)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <ReturnId ParaName="OrganisationId" Value="5029" />
+  <RunInfo Success="1" Time="1444957578" />
+</TestCase>

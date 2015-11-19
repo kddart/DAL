@@ -1,0 +1,9 @@
+<TestCase>
+  <CaseInfo Description="List General ID with invalid filter" TargetURL="list/generalunit/10/page/1" Type="BLOCKING" />
+  <INPUT ParaName="Filtering" Value="GenID=''" />
+  <Match Attr="StatusCode" Value="420" />
+  <Match Attr="Message" Tag="Error" Value="regex(unknown)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <RunInfo Success="1" Time="1444365218" />
+</TestCase>

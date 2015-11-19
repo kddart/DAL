@@ -1,0 +1,56 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "id": "http://kddart.org",
+  "type": "object",
+  "properties": {
+    "DATA": {
+      "id": "http://kddart.org/DATA",
+      "type": "array",
+      "items": {
+        "oneOf": [ {
+          "id": "http://kddart.org/DATA/0",
+          "type": "object",
+          "properties": {
+            "recordid": {
+              "id": "http://kddart.org/DATA/0/recordid",
+              "type": "integer"
+            },
+            "layerattrib": {
+              "id": "http://kddart.org/DATA/0/layerattrib",
+              "type": "string"
+            },
+            "value": {
+              "id": "http://kddart.org/DATA/0/value",
+              "type": "string"
+            },
+            "dt": {
+              "id": "http://kddart.org/DATA/0/dt",
+              "type": "string"
+            },
+            "systemuserid": {
+              "id": "http://kddart.org/DATA/0/systemuserid",
+              "type": "string"
+            },
+            "geometry": {
+              "id": "http://kddart.org/DATA/0/geometry",
+              "type": "string"
+            }
+          },
+          "required": [
+            "recordid",
+            "layerattrib",
+            "value",
+            "dt",
+            "systemuserid",
+            "geometry"
+          ],
+          "additionalProperties": false
+        } ]
+      },
+      "minItems": 1
+    }
+  },
+  "required": [
+    "DATA"
+  ]
+}

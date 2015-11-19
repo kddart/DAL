@@ -1,0 +1,15 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Add Workflow Definition" TargetURL="workflow/:WorkflowId/add/definition" Type="BLOCKING" />
+  <Delete TargetURL="delete/workflowdef/:WorkflowdefId" />
+  <INPUT ParaName="WorkflowId" SrcValue="xml/add_data_no_vcol/case_00495_add_workflow.xml" />
+  <INPUT ParaName="StepName" PrefixVal="Step_" Random="1" />
+  <INPUT ParaName="StepNote" Value="Testing framework" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Match Attr="ParaName" Tag="ReturnId" Value="WorkflowdefId" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00495_add_workflow.xml" Order="3" />
+  <ReturnId ParaName="WorkflowdefId" Value="5" />
+  <RunInfo Success="1" Time="1440484745" />
+</TestCase>

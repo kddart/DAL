@@ -1,0 +1,13 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Update Item Group" TargetURL="update/itemgroup/_id" Type="BLOCKING" />
+  <Delete TargetURL="delete/itemgroup/:ItemGroupId" />
+  <INPUT ParaName="ItemGroupNote" Value="Group Note" />
+  <INPUT ParaName="AddedByUser" Value="1" />
+  <Match Attr="StatusCode" Value="420" />
+  <Match Attr="ItemGroupName" Tag="Error" Value="regex(missing)" />
+  <Match Attr="Active" Tag="Error" Value="regex(missing)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <ReturnId ParaName="ItemGroupId" Value="3" />
+  <RunInfo Success="1" Time="1444873076" />
+</TestCase>

@@ -1,0 +1,21 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Add Layer" TargetURL="add/layer" Type="BLOCKING" />
+  <INPUT ParaName="alias" Value="Empty" />
+  <INPUT ParaName="layermetadata" Value="Empty" />
+  <INPUT ParaName="geometrytype" Value="Empty" />
+  <INPUT ParaName="description" Value="Empty" />
+  <INPUT ParaName="parent" Value="Empty" />
+  <INPUT ParaName="layermetadata" Value="Empty" />
+  <Match Attr="StatusCode" Value="420" />
+  <Match Attr="layername" Tag="Error" Value="regex(missing)" />
+  <Match Attr="layertype" Tag="Error" Value="regex(missing)" />
+  <Match Attr="iseditable" Tag="Error" Value="regex(missing)" />
+  <Match Attr="accessgroupid" Tag="Error" Value="regex(missing)" />
+  <Match Attr="owngroupperm" Tag="Error" Value="regex(missing)" />
+  <Match Attr="accessgroupperm" Tag="Error" Value="regex(missing)" />
+  <Match Attr="otherperm" Tag="Error" Value="regex(missing)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <ReturnId ParaName="owngroupid" Value="5029" />
+  <RunInfo Success="1" Time="1444784408" />
+</TestCase>

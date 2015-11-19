@@ -1,0 +1,16 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Update Contact" TargetURL="update/designtype/:DesignTypeId" Type="BLOCKING" />
+  <Delete TargetURL="delete/designtype/:DesignTypeId" />
+  <INPUT ParaName="DesignTypeId" SrcValue="xml/add_data_no_vcol/case_00118_add_designtype.xml" />
+  <INPUT ParaName="DesignTypeName" PrefixVal="Traditional to fail ttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt- " Random="1" />
+  <INPUT ParaName="DesignSoftware" Value="Optimal Trial Design" />
+  <INPUT ParaName="DesignTemplateFile" Value="none" />
+  <INPUT ParaName="DesignGenotypeFormat" Value="normal" />
+  <INPUT ParaName="DesignFactorAliasPrefix" Value="DiG" />
+  <Match Attr="StatusCode" Value="420" />
+  <Match Attr="DesignTypeName" Tag="Error" Value="regex(longer than)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  
+  
+</TestCase>

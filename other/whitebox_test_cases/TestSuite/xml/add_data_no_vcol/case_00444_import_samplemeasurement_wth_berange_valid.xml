@@ -1,0 +1,19 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record_upload" Description="Import sample measurement" TargetURL="import/samplemeasurement/csv" Type="BLOCKING" />
+  <INPUT ParaName="TrialUnitId" Value="0" />
+  <INPUT ParaName="SampleTypeId" Value="1" />
+  <INPUT ParaName="TraitId" Value="2" />
+  <INPUT ParaName="MeasureDateTime" Value="3" />
+  <INPUT ParaName="InstanceNumber" Value="4" />
+  <INPUT ParaName="TraitValue" Value="5" />
+  <INPUT SrcXML="xml/add_data_no_vcol/samplemeasurement_3.xml" Transform="1" XSL="xml/add_data_no_vcol/samplemeasurement_1.xsl" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00358_add_trialunit.xml" Force="1" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00442_add_trait_with_berange_valid.xml" Order="4" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00201_add_sampletype.xml" Order="5" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00443_add_trialtrait_berange_val.xml" Force="1" Order="6" />
+  <RunInfo Success="1" Time="1443160456" />
+</TestCase>

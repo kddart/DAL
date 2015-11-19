@@ -1,0 +1,9 @@
+<TestCase>
+  <CaseInfo Description="List Specimen with invalid filter" TargetURL="genotype/_genoid/list/specimen" Type="BLOCKING" />
+  <INPUT ParaName="Filtering" Value="SpecID='0'" />
+  <Match Attr="StatusCode" Value="420" />
+  <Match Attr="Message" Tag="Error" Value="regex(unknown)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <RunInfo Success="1" Time="1444363593" />
+</TestCase>

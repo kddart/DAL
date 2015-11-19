@@ -1,0 +1,12 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Update Genotype Trait" TargetURL="update/genotypetrait/:GenotypeTraitId" Type="BLOCKING" />
+  <Delete TargetURL="delete/genotypetrait/:GenotypeTraitId" />
+  <INPUT ParaName="GenotypeTraitId" SrcValue="xml/add_data_no_vcol/case_10109_genotype_add_trait.xml" />
+  <INPUT ParaName="TraitValue" Value="1" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_10109_genotype_add_trait.xml" Force="1" Order="3" />
+  
+</TestCase>

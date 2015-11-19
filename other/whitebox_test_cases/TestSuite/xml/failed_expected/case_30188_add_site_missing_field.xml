@@ -1,0 +1,15 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Add Site" TargetURL="add/site" Type="BLOCKING" />
+  <Delete TargetURL="delete/site/_id" />
+  <INPUT ParaName="SiteStartDate" Value="0" />
+  <INPUT ParaName="SiteEndDate" Value="0" />
+  <Match Attr="StatusCode" Value="420" />
+  <Match Attr="CurrentSiteManagerId" Tag="Error" Value="regex(missing)" />
+  <Match Attr="SiteTypeId" Tag="Error" Value="regex(missing)" />
+  <Match Attr="SiteName" Tag="Error" Value="regex(missing)" />
+  <Match Attr="SiteAcronym" Tag="Error" Value="regex(missing)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <ReturnId ParaName="SiteId" Value="5029" />
+  <RunInfo Success="1" Time="1444784510" />
+</TestCase>

@@ -1,0 +1,12 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Update Breeding Method" TargetURL="update/breedingmethod/:BreedingMethodId" Type="BLOCKING" />
+  <Delete TargetURL="delete/breedingmethod/:BreedingMethodId" />
+  <INPUT ParaName="BreedingMethodId" SrcValue="xml/add_data_no_vcol/case_00208_add_breeding_method.xml" />
+  <INPUT ParaName="BreedingMethodName" PrefixVal="Updated BreedMethod_to fail tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt" Random="1" />
+  <Match Attr="StatusCode" Value="420" />
+  <Match Attr="BreedingMethodName" Tag="Error" Value="regex(longer than)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  
+  
+</TestCase>

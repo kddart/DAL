@@ -1,0 +1,17 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Add Project" TargetURL="add/project" Type="BLOCKING" />
+  <Delete TargetURL="delete/project/:ProjectId" />
+  <INPUT ParaName="ProjectStatus" Value="Active" />
+  <INPUT ParaName="ProjectStartDate" Value="12-10-2015" />
+  <INPUT ParaName="ProjectEndDate" Value="12-10-2017" />
+  <INPUT ParaName="ProjectNote" Value="empty" />
+  <Match Attr="StatusCode" Value="420" />
+  <Match Attr="ProjectManagerId" Tag="Error" Value="regex(missing)" />
+  <Match Attr="ProjectName" Tag="Error" Value="regex(missing)" />
+  <Match Attr="TypeId" Tag="Error" Value="regex(missing)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00394_add_project.xml" Force="1" Order="3" />
+  <ReturnId ParaName="ProjectId" Value="5029" />
+  <RunInfo Success="1" Time="1444777171" />
+</TestCase>

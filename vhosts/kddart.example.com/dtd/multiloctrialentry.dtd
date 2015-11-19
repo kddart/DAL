@@ -1,0 +1,4 @@
+<!ELEMENT DATA ( multiloctrialentry+ ) >
+
+<!ELEMENT multiloctrialentry EMPTY >
+<!ATTLIST multiloctrialentry TrialId NMTOKEN #REQUIRED >
