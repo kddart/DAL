@@ -21,34 +21,34 @@ DB_PASS='yourSecurePassword'
 handle_mysql() {
 
     UNAME=$1
-    PASS=$2
-    DB=$3
-    SQL_FILE=$4
-    DB_UNAME=$5
-    DB_HOST=$6
+    PASS_ARG=$6
+    DB=$2
+    SQL_FILE=$3
+    DB_UNAME=$4
+    DB_HOST=$5
     
     echo "MySQL DB: $DB"
 
-    DB_EXIST=`mysql -u $UNAME --password=$PASS -e 'show databases;' | gawk '{print $1}' | grep "^$DB\$"`
+    DB_EXIST=`mysql -u $UNAME $PASS_ARG -e 'show databases;' | gawk '{print $1}' | grep "^$DB\$"`
 
     echo "MySQL DB Status: $DB_EXIST"
 
     if [ ${#DB_EXIST} -gt 0 ]
     then
 	      echo "Drop $DB"
-	      mysql -u $UNAME --password=$PASS -e "drop database $DB;"
+	      mysql -u $UNAME $PASS_ARG -e "drop database $DB;"
     fi
 
-    mysql -u $UNAME --password=$PASS -e "CREATE DATABASE \`$DB\`;"
+    mysql -u $UNAME $PASS_ARG -e "CREATE DATABASE \`$DB\`;"
 
     #QUOTED_DB_UNAME="'"$DB_UNAME"'"
 
     #echo "Quoted Db Uname: $QUOTED_DB_UNAME"
     echo "DB: $DB | Username: $DB_UNAME | Host: $DB_HOST"
 
-    mysql $DB -u $UNAME --password=$PASS < $SQL_FILE
+    mysql $DB -u $UNAME $PASS_ARG < $SQL_FILE
 
-    mysql -u $UNAME --password=$PASS -e "grant SELECT, INSERT, UPDATE, DELETE, CREATE ON $DB.* TO '$DB_UNAME'@'$DB_HOST';"
+    mysql -u $UNAME $PASS_ARG -e "grant SELECT, INSERT, UPDATE, DELETE, CREATE ON $DB.* TO '$DB_UNAME'@'$DB_HOST';"
 
 }
 
@@ -74,7 +74,7 @@ EOF
     then
 
         monetdb stop $DB
-        monetdb destroy $DB
+        monetdb -q destroy $DB -f
     fi
 
     monetdb create $DB
@@ -105,47 +105,58 @@ EOF
     rm ${DOTMONETDBFILE} 
 }
 
-if [ $# -lt 6 ]
+if [ $# -lt 7 ]
 then
-    echo -e "Usage: $0 <postgres dbname> <postgres sql> <main module dbname> <main module mysql sql> <marker dbname> <marker mysql sql> [1 (force drop db if exists)]"
+    echo -e "Usage: $0 <1 for no password prompt | other value for passowrd prompt> <postgres dbname> <postgres sql> <main module dbname> <main module mysql sql> <marker dbname> <marker mysql sql> [1 (force drop db if exists)]"
     exit 1
 fi
 
-PG_DBNAME=$1
-PG_SQL=$2
-MAIN_DBNAME=$3
-MAIN_SQL=$4
-MARKER_DBNAME=$5
-MARKER_SQL=$6
+NO_PASS=$1
+PG_DBNAME=$2
+PG_SQL=$3
+MAIN_DBNAME=$4
+MAIN_SQL=$5
+MARKER_DBNAME=$6
+MARKER_SQL=$7
 
 FORCE_DROP_DB=0
 
-if [[ ! -z "$7" ]]
+if [[ ! -z "$8" ]]
 then
-    if [ $7 -eq 1 ]
+    if [ $8 -eq 1 ]
     then
         FORCE_DROP_DB=1
     fi
 fi
 
-stty -echo
+MYSQL_PASS_ARG=''
+MONET_PASS='monetdb'
 
-echo -n "Password for $MYSQL_UNAME in MySQL: "
-read MYSQL_PASS
+if [[ $NO_PASS -ne 1 ]]
+then
 
-stty echo
+    stty -echo
 
-echo
+    echo -n "Password for $MYSQL_UNAME in MySQL: "
+    read MYSQL_PASS
 
-echo -n "Password for $MONETDB_UNAME in MonetDB: "
+    stty echo
 
-stty -echo
+    echo
 
-read MDB_PASS
+    echo -n "Password for $MONETDB_UNAME in MonetDB: "
 
-stty echo
+    stty -echo
 
-echo
+    read MDB_PASS
+
+    stty echo
+
+    echo
+
+    MONET_PASS=$MDB_PASS
+    MYSQL_PASS_ARG="--password=$MYSQL_PASS"
+fi
 
 POSTGRES_DB_EXIST=`psql -h $DB_HOST -l -U $PG_UNAME | gawk '{print $1}' | grep "^$PG_DBNAME\$"`
 
@@ -158,7 +169,7 @@ then
     fi
 fi
 
-MAIN_DB_EXIST=`mysql -u $MYSQL_UNAME --password=$MYSQL_PASS -e 'show databases;' | gawk '{print $1}' | grep "^$MAIN_DBNAME\$"`
+MAIN_DB_EXIST=`mysql -u $MYSQL_UNAME $MYSQL_PASS_ARG -e 'show databases;' | gawk '{print $1}' | grep "^$MAIN_DBNAME\$"`
 
 #echo "Main MySQL DB Status: $MAIN_DB_EXIST"
 
@@ -223,18 +234,18 @@ done
 
 QUOTED_DB_UNAME="'"$DB_UNAME"'"
 
-MYSQL_DB_EXIST=`mysql -u $MYSQL_UNAME --password=$MYSQL_PASS -e "select User from mysql.user where User = $QUOTED_DB_UNAME;"`
+MYSQL_DB_EXIST=`mysql -u $MYSQL_UNAME $MYSQL_PASS_ARG -e "select User from mysql.user where User = $QUOTED_DB_UNAME;"`
 
 if [ ${#MYSQL_DB_EXIST} -gt 0 ]
 then
     echo "Drop $DB_UNAME from MySQL"
-    mysql -u $MYSQL_UNAME --password=$MYSQL_PASS -e "drop user '$DB_UNAME'@'$DB_HOST';"
+    mysql -u $MYSQL_UNAME $MYSQL_PASS_ARG -e "drop user '$DB_UNAME'@'$DB_HOST';"
 fi
 
 echo "Create $DB_UNAME in MySQL"
-mysql -u $MYSQL_UNAME --password=$MYSQL_PASS -e "grant usage on *.* to '$DB_UNAME'@'$DB_HOST' IDENTIFIED BY '$DB_PASS';"
+mysql -u $MYSQL_UNAME $MYSQL_PASS_ARG -e "grant usage on *.* to '$DB_UNAME'@'$DB_HOST' IDENTIFIED BY '$DB_PASS';"
 
-handle_mysql $MYSQL_UNAME $MYSQL_PASS $MAIN_DBNAME $MAIN_SQL $DB_UNAME $DB_HOST
-handle_monetdb $MONETDB_UNAME $MDB_PASS $MARKER_DBNAME $MARKER_SQL $DB_UNAME $DB_PASS
+handle_mysql $MYSQL_UNAME $MAIN_DBNAME $MAIN_SQL $DB_UNAME $DB_HOST $MYSQL_PASS_ARG
+handle_monetdb $MONETDB_UNAME $MONET_PASS $MARKER_DBNAME $MARKER_SQL $DB_UNAME $DB_PASS
 
-echo "Completed successfully!"
+echo "Completed!"
