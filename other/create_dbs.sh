@@ -9,6 +9,9 @@
 #             the databases according to the dump file. Please read through
 #             the script to see exactly what it does.
 
+# Make this script stops when there is an error
+set -e
+
 # database access configuration (user will be prompted for MySQL password during the run of the script)
 MYSQL_UNAME='root'
 PG_UNAME='postgres'
