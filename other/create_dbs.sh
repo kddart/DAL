@@ -121,7 +121,7 @@ EOF
     echo "Sleep 10 seconds"
     sleep 10s 
 
-    echo "Load SQL file into monetdb database $DB"
+    echo "Load SQL file $SQL_FILE into monetdb database $DB"
 
     mclient -d $DB < $SQL_FILE
 
