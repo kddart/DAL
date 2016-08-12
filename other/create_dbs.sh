@@ -76,11 +76,26 @@ EOF
     if [ ${#DB_EXIST_STATUS} -gt 0 ]
     then
 
+	echo "Stop monetdb database $DB"	
+
         monetdb stop $DB
+
+	echo "Delete monetdb database $DB"
+
         monetdb -q destroy $DB -f
     fi
 
+    echo "Sleep 10 seconds"
+    sleep 10s 
+
+    echo "Create monetdb database $DB"
+
     monetdb create $DB
+
+    echo "Release monetdb database $DB"
+
+    echo "Sleep 10 seconds"
+    sleep 10s 
 
     monetdb release $DB
 
@@ -102,6 +117,11 @@ EOF
 #password=$DB_PASS
 #language=sql
 #EOF
+
+    echo "Sleep 10 seconds"
+    sleep 10s 
+
+    echo "Load SQL file into monetdb database $DB"
 
     mclient -d $DB < $SQL_FILE
 
