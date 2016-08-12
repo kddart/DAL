@@ -123,7 +123,7 @@ EOF
 
     echo "Load SQL file $SQL_FILE into monetdb database $DB"
 
-    mclient -d $DB < $SQL_FILE
+    cat $SQL_FILE | mclient -d $DB
 
     rm ${DOTMONETDBFILE} 
 }
