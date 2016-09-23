@@ -3,3 +3,4 @@
 <!ELEMENT genotypespecimen EMPTY >
 <!ATTLIST genotypespecimen GenotypeId NMTOKEN #REQUIRED >
 <!ATTLIST genotypespecimen GenotypeSpecimenType NMTOKEN #IMPLIED >
+<!ATTLIST genotypespecimen InheritanceFlag NMTOKEN #IMPLIED >

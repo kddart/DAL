@@ -12,5 +12,5 @@
   <Parent CaseFile="xml/add_data_no_vcol/case_00310_add_item.xml" Order="3" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00402_add_filetype1.xml" Order="4" />
   <ReturnId ParaName="MultimediaId" Value="19" />
-  <RunInfo Success="1" Time="1443160585" />
+  <RunInfo Success="1" Time="1474006988" />
 </TestCase>

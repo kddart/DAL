@@ -12,6 +12,6 @@
   <Parent CaseFile="xml/add_data_no_vcol/case_00387_add_geno_4_genpedigree.xml" Order="3" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00390_add_geno_4_genpedigree.xml" Order="4" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00384_add_genparent_type.xml" Order="5" />
-  <ReturnId ParaName="GenPedigreeId" Value="2" />
-  <RunInfo Success="1" Time="1443160952" />
+  <ReturnId ParaName="GenPedigreeId" Value="16" />
+  <RunInfo Success="1" Time="1474007384" />
 </TestCase>

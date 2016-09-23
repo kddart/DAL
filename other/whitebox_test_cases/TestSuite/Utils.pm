@@ -1,6 +1,9 @@
 package Utils;
 require Exporter;
 
+use strict;
+no strict 'refs';
+
 use XML::Writer;
 use XML::Simple;
 use LWP::UserAgent;
@@ -14,25 +17,6 @@ use XML::XSLT;
 use JSON::XS;
 use Cwd;
 
-# Copyright (c) 2015, Diversity Arrays Technology, All rights reserved.
-
-# COPYRIGHT AND LICENSE
-# 
-# Copyright (C) 2014 by Diversity Arrays Technology Pty Ltd
-# 
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-# 
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-
-# Author    : Puthick Hok
-# Version   : 2.3.0 build 1040
-
 our @ISA      = qw(Exporter);
 our @EXPORT   = qw(get_write_token switch_group standard_request add_record
                    logout run_test_case add_record_upload claim_grp_ownership
@@ -42,7 +26,7 @@ our @EXPORT   = qw(get_write_token switch_group standard_request add_record
 
 my $dal_base_url_file = 'dal_base_url.conf';
 
-our $SESSION_TIME_SECOND  = 300;
+our $SESSION_TIME_SECOND  = 600;
 
 our $ACCEPT_HEADER_LOOKUP = {'JSON' => 'application/json',
                              'XML'  => 'text/xml',
@@ -512,12 +496,22 @@ sub match_data {
 
 sub get_case_parameter {
 
-  my $input_aref = $_[0];
-  my $logger     = $_[1];
+  my $tcase_data_ref = $_[0];
+  my $logger         = $_[1];
+  my $case_file      = $_[2];
+
+  my $input_aref = $tcase_data_ref->{'INPUT'};
 
   my $parameter = {};
 
+  my $start_time;
+
+  my $id_data_lookup_href       = {};
+  my $src_case_data_lookup_href = {};
+
   for my $input_href (@{$input_aref}) {
+
+    $start_time = [gettimeofday()];
 
     my $para_name = '';
     my $para_val  = '';
@@ -590,11 +584,72 @@ sub get_case_parameter {
 
         #print "Src case file: $src_case_file\n";
 
-        my $src_case_data_ref = XMLin($src_case_file, ForceArray => 1);
+        my $src_case_data_ref = undef;
+
+        if (defined $src_case_data_lookup_href->{$src_case_file}) {
+
+          $src_case_data_ref = $src_case_data_lookup_href->{$src_case_file};
+        }
+        else {
+
+          $src_case_data_ref = XMLin($src_case_file, ForceArray => 1);
+          $src_case_data_lookup_href->{$src_case_file} = $src_case_data_ref;
+        }
 
         if (defined $src_case_data_ref->{'ReturnId'}->[0]->{'Value'}) {
 
           $para_val = $src_case_data_ref->{'ReturnId'}->[0]->{'Value'};
+        }
+        elsif (defined $src_case_data_ref->{'ReturnId'}->[0]->{'IdFile'}) {
+
+          if ( ! ((defined $input_href->{'Idx'}) && (defined $input_href->{'Attr'})) ) {
+
+            $logger->debug("$case_file: $para_name source value 'Idx' and 'Attr' missing.");
+            die "$case_file: $para_name source value 'Idx' and 'Attr' missing.";
+          }
+
+          my $file_format     = $src_case_data_ref->{'ReturnId'}->[0]->{'FileFormat'};
+          my $id_file         = $src_case_data_ref->{'ReturnId'}->[0]->{'IdFile'};
+          my $id_data         = undef;
+
+          my $record_idx = $input_href->{'Idx'};
+          my $val_attr   = $input_href->{'Attr'};
+
+          if (defined $id_data_lookup_href->{$id_file}) {
+
+            $id_data = $id_data_lookup_href->{$id_file};
+          }
+          else {
+
+            $logger->debug("Read IdFile: $id_file");
+
+            my $id_file_content = read_file($id_file);
+
+            my $xml_con_start_time = [gettimeofday()];
+
+            if (uc($file_format) eq 'XML') {
+
+              $id_data = XMLin($id_file_content, ForceArray => 1);
+            }
+            elsif (uc($file_format) eq 'JSON') {
+
+              $id_data = decode_json($id_file_content);
+            }
+
+            $id_data_lookup_href->{$id_file} = $id_data;
+
+            my $xml_con_elapsed_time = tv_interval($xml_con_start_time);
+
+            $logger->debug("Convert XML time: $xml_con_elapsed_time seconds");
+          }
+
+          my $lookup_start_time = [gettimeofday()];
+
+          $para_val = $id_data->{'ReturnId'}->[$record_idx]->{$val_attr};
+
+          my $lookup_elapsed_time = tv_interval($lookup_start_time);
+
+          $logger->debug("Lookup time: $lookup_elapsed_time seconds");
         }
         else {
 
@@ -703,11 +758,38 @@ sub get_case_parameter {
                   die "$case_file: $para_name source xml file $src_file with direct replacement set without header row.";
                 }
 
-                $para_val = {'FilePath' => $src_file, 'HeaderRow' => $input_href->{'HeaderRow'}};
+                $para_val = {'FilePath' => $src_file, 'HeaderRow' => $input_href->{'HeaderRow'}, 'DirectReplacement' => 1};
               }
               else {
 
                 $para_val  = read_file($src_file);
+              }
+            }
+            elsif ($input_href->{'MemoryReplacementXML'}) {
+
+              if ($input_href->{'MemoryReplacementXML'} eq '1') {
+
+                if ( ! defined($input_href->{'ParaName'}) ) {
+
+                  $logger->debug("$case_file: $para_name - XMLin source file $src_file ParaName not defined.");
+                  die "$case_file: $para_name - XMLin source file $src_file ParaName not defined.";
+                }
+
+                my $input_para_name = $input_href->{'ParaName'};
+
+                my $xml_content  = read_file($src_file);
+
+                my $src_file_aref = xml2arrayref($xml_content, $input_para_name);
+
+                $logger->debug("MemoryReplacementXML: $input_para_name");
+
+                if (ref($src_file_aref) ne 'ARRAY') {
+
+                  $logger->debug("$case_file: $para_name - XMLin source file $src_file doesn't return arrayref.");
+                  die "$case_file: $para_name - XMLin source file $src_file doesn't return arrayref.";
+                }
+
+                $para_val = {'MemoryReplacementXML' => 1, 'DATA' => $src_file_aref, 'DATATAG' => $input_para_name};
               }
             }
             else {
@@ -815,8 +897,17 @@ sub get_case_parameter {
           $input_val_prefix = $input_href->{'PrefixVal'};
         }
 
-        my $rand_str = random_regex('\d\d\d\d\d\d\d');
+        my $rand_val_size = 11;
+
+        if (defined $input_href->{'Size'}) {
+
+          $rand_val_size = $input_href->{'Size'} - length($input_val_prefix);
+        }
+
+        my $rand_str = random_regex('\d' x $rand_val_size);
         $para_val = "${input_val_prefix}$rand_str";
+
+        #print "Random - para name: $para_name - para val: $para_val\n";
       }
     }
 
@@ -826,6 +917,11 @@ sub get_case_parameter {
     }
 
     $parameter->{$para_name} = $para_val;
+
+    $logger->debug("Para name: $para_name - val: $para_val");
+
+    my $elapsed_time = tv_interval($start_time);
+    $logger->debug("$case_file - $para_name - $elapsed_time seconds");
   }
 
   return $parameter;
@@ -864,20 +960,34 @@ sub standard_request {
 
   my $req = POST($url, $parameter);
 
-  my $response = $browser->request($req);
-  my $msg_xml  = $response->content();
+  my $response     = $browser->request($req);
+  my $msg_content  = $response->content();
 
-  $logger->debug("Content: " . $msg_xml);
+  $logger->debug("Content: " . $msg_content);
   $logger->debug("Response code: " . $response->code());
+
+  my $return_data    = {};
+
+  if ($response->code() == 200) {
+
+    if (uc($output_format) eq 'XML') {
+
+      $return_data = XMLin($msg_content, ForceArray => 1);
+    }
+    elsif (uc($output_format) eq 'JSON') {
+
+      $return_data = decode_json($msg_content);
+    }
+  }
 
   my @is_match_return = is_match($response, $output_format, $match, $logger);
 
   if ($is_match_return[0] == 1) {
 
-    print "$msg_xml\n";
+    print "$msg_content\n";
   }
 
-  return (@is_match_return, undef);
+  return (@is_match_return, undef, $return_data);
 }
 
 sub logout {
@@ -965,70 +1075,159 @@ sub add_record_upload {
 
   if (ref($parameter->{'uploadfile'}) eq 'HASH') {
 
-    my $header_row = $parameter->{'uploadfile'}->{'HeaderRow'} + 1;
-    my $file_path  = $parameter->{'uploadfile'}->{'FilePath'};
+    if (defined $parameter->{'uploadfile'}->{'DirectReplacement'}) {
 
-    my $sed_cmd    = qq|sed -n '${header_row}p' $file_path|;
+      if ($parameter->{'uploadfile'}->{'DirectReplacement'} eq '1') {
 
-    my $old_header = `$sed_cmd`;
-    my $new_header = $old_header;
+        my $header_row = $parameter->{'uploadfile'}->{'HeaderRow'} + 1;
+        my $file_path  = $parameter->{'uploadfile'}->{'FilePath'};
 
-    while($new_header =~ /\|:(\w+):\|?/ ) {
+        my $sed_cmd    = qq|sed -n '${header_row}p' $file_path|;
 
-      my $para_name = $1;
-      my $para_val  = $parameter->{$para_name};
-      $new_header   =~ s/\|:${para_name}:\|/${para_val}/;
+        my $old_header = `$sed_cmd`;
+        my $new_header = $old_header;
+
+        while($new_header =~ /\|:(\w+):\|/ ) {
+
+          my $para_name = $1;
+          my $para_val  = $parameter->{$para_name};
+          $new_header   =~ s/\|:${para_name}:\|/${para_val}/;
+        }
+
+        $logger->debug("OLD HEADER: $old_header");
+        $logger->debug("NEW HEADER: $new_header");
+
+        my @file_path_split = split('/', $file_path);
+
+        my $file_name = $file_path_split[-1];
+
+        my $new_file_name = 'newfile_' . random_regex('\d\d\d\d\d\d\d') . '_' . $file_name;
+
+        my $last_path_element = scalar(@file_path_split) - 2;
+
+        my $just_path = join('/', @file_path_split[0..$last_path_element]);
+
+        my $upload_file_path = cwd() . '/' . $just_path . '/' . $new_file_name;
+
+        my $before_header_row = $header_row - 1;
+
+        $sed_cmd = qq|sed -n '1,${before_header_row}'p $file_path > $upload_file_path|;
+
+        my $cmd_result = `$sed_cmd`;
+
+        $logger->debug("RESULT OF $sed_cmd : $cmd_result");
+
+        my $upload_filehandle;
+
+        open($upload_filehandle, ">$upload_file_path");
+
+        print $upload_filehandle "$new_header";
+
+        close($upload_filehandle);
+
+        my $next_line_number = $header_row + 1;
+
+        $sed_cmd = qq|sed -n '$next_line_number,\$'p $file_path >> $upload_file_path|;
+
+        $cmd_result = `$sed_cmd`;
+
+        $logger->debug("RESULT OF $sed_cmd : $cmd_result");
+
+        open(my $upload_fh, "$upload_file_path");
+
+        my $md5_engine = Digest::MD5->new();
+        $md5_engine->addfile($upload_fh);
+
+        close($upload_fh);
+
+        $upload_file_md5 = $md5_engine->hexdigest();
+
+        push(@{$sending_param}, 'uploadfile' => [$upload_file_path]);
+      }
     }
+    elsif (defined $parameter->{'uploadfile'}->{'MemoryReplacementXML'}) {
 
-    $logger->debug("OLD HEADER: $old_header");
-    $logger->debug("NEW HEADER: $new_header");
+      $logger->debug("Memory replacement in XML mode");
 
-    my @file_path_split = split('/', $file_path);
+      if ($parameter->{'uploadfile'}->{'MemoryReplacementXML'} eq '1') {
 
-    my $file_name = $file_path_split[-1];
+        my $upload_data_aref = $parameter->{'uploadfile'}->{'DATA'};
+        my $upload_tag       = $parameter->{'uploadfile'}->{'DATATAG'};
 
-    my $new_file_name = 'newfile_' . random_regex('\d\d\d\d\d\d\d') . '_' . $file_name;
+        my $transformed_data_aref = [];
 
-    my $last_path_element = scalar(@file_path_split) - 2;
+        foreach my $upload_data_href (@{$upload_data_aref}) {
 
-    my $just_path = join('/', @file_path_split[0..$last_path_element]);
+          foreach my $up_param (keys(%{$upload_data_href})) {
 
-    my $upload_file_path = cwd() . '/' . $just_path . '/' . $new_file_name;
+            my $upload_data_val = $upload_data_href->{$up_param};
 
-    my $before_header_row = $header_row - 1;
+            if (ref $upload_data_val eq 'ARRAY') {
 
-    $sed_cmd = qq|sed -n '1,${before_header_row}'p $file_path > $upload_file_path|;
+              my $next_data_aref = [];
 
-    my $cmd_result = `$sed_cmd`;
+              foreach my $next_rec_href (@{$upload_data_val}) {
 
-    $logger->debug("RESULT OF $sed_cmd : $cmd_result");
+                foreach my $next_param (keys(%{$next_rec_href})) {
 
-    $cmd_result = `echo -n "$new_header" >> $upload_file_path`;
+                  my $next_val = $next_rec_href->{$next_param};
 
-    my $next_line_number = $header_row + 1;
+                  if ($next_val =~ /\|:(\w+):\|/) {
 
-    $sed_cmd = qq|sed -n '$next_line_number,\$'p $file_path >> $upload_file_path|;
+                    my $p_name = $1;
+                    my $p_val  = $parameter->{$p_name};
 
-    $cmd_result = `$sed_cmd`;
+                    $logger->debug("XML upload param name: $p_name - $p_val");
 
-    $logger->debug("RESULT OF $sed_cmd : $cmd_result");
+                    $next_val =~ s/\|:${p_name}:\|/${p_val}/;
 
-    open(my $upload_fh, "$upload_file_path");
+                    $next_rec_href->{$next_param} = $next_val;
+                  }
+                }
 
-    my $md5_engine = Digest::MD5->new();
-    $md5_engine->addfile($upload_fh);
+                push(@{$next_data_aref}, $next_rec_href);
+              }
 
-    close($upload_fh);
+              $upload_data_href->{$up_param} = $next_data_aref;
+            }
+            else {
 
-    $upload_file_md5 = $md5_engine->hexdigest();
+              $logger->debug("XML upload param val: $up_param - $upload_data_val");
 
-    push(@{$sending_param}, 'uploadfile' => [$upload_file_path]);
+              if ( $upload_data_val =~ /\|:(\w+):\|/ ) {
+
+                my $p_name = $1;
+                my $p_val  = $parameter->{$p_name};
+
+                $logger->debug("XML upload param name: $p_name - $p_val");
+
+                $upload_data_val =~ s/\|:${p_name}:\|/${p_val}/;
+
+                $logger->debug("XML upload param val: $up_param - $upload_data_val");
+
+                $upload_data_href->{$up_param} = $upload_data_val;
+              }
+            }
+          }
+
+          push(@{$transformed_data_aref}, $upload_data_href);
+        }
+
+        my $upload_content = recurse_arrayref2xml($transformed_data_aref, $upload_tag);
+
+        $upload_file_md5 = md5_hex($upload_content);
+
+        push(@{$sending_param}, 'uploadfile'     => [undef, 'uploadfile', Content => $upload_content]);
+
+        $logger->debug("Submitted upload file: $upload_content");
+      }
+    }
   }
   else {
 
     my $upload_content  = $parameter->{'uploadfile'};
 
-    while($upload_content =~ /\|:(\w+):\|?/ ) {
+    while($upload_content =~ /\|:(\w+):\|/ ) {
 
       my $para_name = $1;
       my $para_val  = $parameter->{$para_name};
@@ -1065,35 +1264,73 @@ sub add_record_upload {
 
   my $req = POST($url, Content_Type => 'multipart/form-data', Content => $sending_param);
 
-  my $response = $browser->request($req);
-  my $msg_xml  = $response->content();
+  my $response     = $browser->request($req);
+  my $msg_content  = $response->content();
 
-  $logger->debug("Add ($url): $msg_xml");
+  $logger->debug("Add ($url): $msg_content");
 
   my $return_id_href = undef;
+  my $return_data    = {};
 
   if ($response->code() == 200) {
 
-    my $return_data = {};
     if (uc($output_format) eq 'XML') {
 
-      $return_data = XMLin($msg_xml, ForceArray => 1);
+      $return_data = XMLin($msg_content, ForceArray => 1);
     }
     elsif (uc($output_format) eq 'JSON') {
 
-      $return_data = decode_json($msg_xml);
+      $return_data = decode_json($msg_content);
     }
-    $return_id_href = $return_data->{'ReturnId'}->[0];
+
+    if (defined $return_data->{'ReturnId'}) {
+
+      $return_id_href = $return_data->{'ReturnId'}->[0];
+    }
+    elsif (defined $return_data->{'ReturnIdFile'}) {
+
+      $logger->debug("Output Format: $output_format");
+
+      my $return_id_f_href   = $return_data->{'ReturnIdFile'}->[0];
+      my $return_id_file_url = $return_id_f_href->{lc($output_format)};
+
+      $logger->debug("Return ID file URL: $return_id_file_url");
+
+      my @file_url_block = split('/', $return_id_file_url);
+      my $filename = $file_url_block[-1];
+
+      $logger->debug("ID filename: $filename");
+
+      sleep(10);
+
+      $browser->default_header('Cache-Control' => 'no-store, no-cache, must-revalidate, post-check=0, pre-check=0');
+
+      my $download_response = $browser->get($return_id_file_url,
+                                            ':content_file' => "./$filename"
+                                            );
+
+      if (!$download_response->is_success) {
+
+        #debug("Status code: " . $download_response->code());
+        # return (err, msg, err_aref)
+        die "$url - $return_id_file_url - Cannot download return id file";
+      }
+
+      $return_id_href = {
+        'IdFile' => "./$filename",
+        'FileFormat' => lc($output_format)
+        };
+    }
   }
 
   my @is_match_return = is_match($response, $output_format, $match, $logger);
 
   if ($is_match_return[0] == 1) {
 
-    print "$msg_xml\n";
+    print "$msg_content\n";
   }
 
-  return (@is_match_return, $return_id_href);
+  return (@is_match_return, $return_id_href, $return_data);
 }
 
 sub add_record {
@@ -1164,35 +1401,39 @@ sub add_record {
 
   my $req = POST($url, $sending_param);
 
-  my $response = $browser->request($req);
-  my $msg_xml  = $response->content();
+  my $response     = $browser->request($req);
+  my $msg_content  = $response->content();
 
-  $logger->debug("Add ($url): $msg_xml");
+  $logger->debug("Add ($url): $msg_content");
 
   my $return_id_href = undef;
+  my $return_data    = {};
 
   if ($response->code() == 200) {
 
-    my $return_data = {};
     if (uc($output_format) eq 'XML') {
 
-      $return_data = XMLin($msg_xml, ForceArray => 1);
+      $return_data = XMLin($msg_content, ForceArray => 1);
     }
     elsif (uc($output_format) eq 'JSON') {
 
-      $return_data = decode_json($msg_xml);
+      $return_data = decode_json($msg_content);
     }
-    $return_id_href = $return_data->{'ReturnId'}->[0];
+
+    if (defined $return_data->{'ReturnId'}) {
+
+      $return_id_href = $return_data->{'ReturnId'}->[0];
+    }
   }
 
   my @is_match_return = is_match($response, $output_format, $match, $logger);
 
   if ($is_match_return[0] == 1) {
 
-    print "$msg_xml\n";
+    print "$msg_content\n";
   }
 
-  return (@is_match_return, $return_id_href);
+  return (@is_match_return, $return_id_href, $return_data);
 }
 
 sub run_test_case {
@@ -1262,7 +1503,7 @@ sub run_test_case {
     run_test_case($case_file, $case_force, $logger);
   }
 
-  my $parameter = get_case_parameter($tcase_data_ref->{'INPUT'}, $logger);
+  my $parameter = get_case_parameter($tcase_data_ref, $logger, $case_file);
 
   my $url = $tcase_data_ref->{'CaseInfo'}->[0]->{'TargetURL'};
 
@@ -1297,20 +1538,57 @@ sub run_test_case {
   my $case_err       = 0;
   my $attr_csv       = '';
   my $return_id_href = undef;
+  my $return_data    = undef;
+
   if (defined $tcase_data_ref->{'CaseInfo'}->[0]->{'CustomMethod'}) {
 
     my $custom_method = $tcase_data_ref->{'CaseInfo'}->[0]->{'CustomMethod'};
 
-    ($case_err, $attr_csv, $return_id_href) = $custom_method->($parameter, $output_format, \@sorted_match, $logger);
+    ($case_err, $attr_csv, $return_id_href, $return_data) = $custom_method->($parameter, $output_format, \@sorted_match, $logger);
   }
   else {
 
-    ($case_err, $attr_csv, $return_id_href) = standard_request($parameter, $output_format, \@sorted_match, $logger);
+    ($case_err, $attr_csv, $return_id_href, $return_data) = standard_request($parameter, $output_format, \@sorted_match, $logger);
   }
 
   if (defined $return_id_href) {
 
     $tcase_data_ref->{'ReturnId'} = [$return_id_href];
+  }
+  else {
+
+    if (defined $return_data) {
+
+      if (defined $tcase_data_ref->{'CaseInfo'}->[0]->{'CaptureFieldName'}) {
+
+        my $capture_field_name = $tcase_data_ref->{'CaseInfo'}->[0]->{'CaptureFieldName'};
+
+        if (defined $return_data->{'RecordMeta'}) {
+
+          my $ret_tag_name = $return_data->{'RecordMeta'}->[0]->{'TagName'};
+          $return_id_href = {};
+
+          if (defined $return_data->{$ret_tag_name}) {
+
+            $return_id_href->{'ParaName'} = $capture_field_name;
+
+            if (defined $return_data->{$ret_tag_name}->[0]->{$capture_field_name}) {
+
+              $return_id_href->{'Value'}    = $return_data->{$ret_tag_name}->[0]->{$capture_field_name};
+              $tcase_data_ref->{'ReturnId'} = [$return_id_href];
+            }
+            else {
+
+              die "$capture_field_name is not found.\n";
+            }
+          }
+          else {
+
+            die "$ret_tag_name is not exists.\n";
+          }
+        }
+      }
+    }
   }
 
   my $case_type = $tcase_data_ref->{'CaseInfo'}->[0]->{'Type'};
@@ -1416,19 +1694,33 @@ sub claim_grp_ownership {
 
   my $inside_req_res = POST ($url, $send_parameter);
 
-  my $inside_req = $browser->request($inside_req_res);
-  my $msg_xml    = $inside_req->content();
+  my $inside_req     = $browser->request($inside_req_res);
+  my $msg_content    = $inside_req->content();
 
-  $logger->debug($msg_xml);
+  $logger->debug($msg_content);
+
+  my $return_data    = {};
+
+  if ($inside_req_res->code() == 200) {
+
+    if (uc($output_format) eq 'XML') {
+
+      $return_data = XMLin($msg_content, ForceArray => 1);
+    }
+    elsif (uc($output_format) eq 'JSON') {
+
+      $return_data = decode_json($msg_content);
+    }
+  }
 
   my @is_match_return = is_match($inside_req, $output_format, $match, $logger);
 
   if ($is_match_return[0] == 1) {
 
-    print "$msg_xml\n";
+    print "$msg_content\n";
   }
 
-  return (@is_match_return, undef);
+  return (@is_match_return, undef, $return_data);
 }
 
 sub read_file {
@@ -1647,7 +1939,7 @@ sub delete_test_record {
     my $return_id = $tcase_data_ref->{'ReturnId'}->[0]->{'Value'};
     my $url       = $delete_ref->{'TargetURL'};
 
-    my $case_parameter = get_case_parameter($tcase_data_ref->{'INPUT'}, $logger);
+    my $case_parameter = get_case_parameter($tcase_data_ref, $logger, $url);
 
     for my $para_name (keys(%{$case_parameter})) {
 
@@ -1718,5 +2010,102 @@ sub make_random_number {
   return $randstring;
 }
 
+sub make_xml_tag {
+
+  my $data     = $_[0];
+  my $tag_name = $_[1];
+  my $writer   = $_[2];
+
+  if (!$writer) {
+
+    return 1;
+  }
+
+  for my $row (@{$data}) {
+
+    my $nested = 0;
+    my %attributes;
+    my @nested_field;
+    for my $fieldname (keys(%{$row})) {
+
+      if (ref $row->{$fieldname} eq 'ARRAY') {
+
+        $nested = 1;
+        push(@nested_field, $fieldname);
+      }
+      else {
+
+        $attributes{$fieldname} = $row->{$fieldname};
+      }
+    }
+
+    if ($nested) {
+
+      $writer->startTag($tag_name, %attributes);
+      for my $nested_fieldname (@nested_field) {
+
+        make_xml_tag($row->{$nested_fieldname}, $nested_fieldname, $writer);
+      }
+      $writer->endTag($tag_name);
+    }
+    else {
+
+      $writer->emptyTag($tag_name, %attributes);
+    }
+  }
+
+  return 0;
+}
+
+sub recurse_arrayref2xml {
+
+  my $data      = $_[0];
+  my $tag_name  = $_[1];
+  my $xsl       = $_[2];
+
+  my $xml = '';
+  my $writer = new XML::Writer(OUTPUT => \$xml, DATA_MODE => 1);
+  $writer->xmlDecl('UTF-8');
+
+  if ($xsl && length($xsl) > 0) {
+
+    $writer->pi('xml-stylesheet', qq{href="$xsl" type="text/xsl"});
+  }
+
+  my $root_tag = 'DATA';
+  $writer->startTag($root_tag);
+  make_xml_tag($data, $tag_name, $writer);
+  $writer->endTag($root_tag);
+  $writer->end();
+
+  return $xml;
+}
+
+sub xml2arrayref {
+
+  my $data_src = $_[0];
+  my $tag_name = $_[1];
+
+  my $data_ref = XMLin($data_src, ForceArray => 1);
+
+  my $data_row_ref = [];
+  if ($data_ref->{$tag_name}) {
+
+    # when there is only one tag inside the root tag, XMLin
+    # returns a hash reference rather than array reference.
+    if ( ref $data_ref->{$tag_name} eq 'HASH' ) {
+
+      my @forced_aref;
+      push(@forced_aref, $data_ref->{$tag_name});
+      $data_row_ref = \@forced_aref;
+    }
+    elsif (ref $data_ref->{$tag_name} eq 'ARRAY') {
+
+      $data_row_ref = $data_ref->{$tag_name};
+    }
+  }
+
+  return $data_row_ref;
+}
 
 1;

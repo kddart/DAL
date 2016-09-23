@@ -16,6 +16,6 @@
   <Match Attr="Quality" Tag="Error" Value="regex(longer than)" />
   <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
-  <ReturnId ParaName="ExtractId" Value="3" />
-  <RunInfo Success="1" Time="1444786029" />
+  
+  
 </TestCase>

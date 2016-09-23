@@ -15,5 +15,5 @@
   <Parent CaseFile="xml/add_data_no_vcol/case_00308_add_item_type.xml" Order="5" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00446_add_specimen_1geno.xml" Order="6" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00447_add_specimen_1geno_1.xml" Order="7" />
-  <RunInfo Success="1" Time="1443075716" />
+  <RunInfo Success="1" Time="1473396825" />
 </TestCase>

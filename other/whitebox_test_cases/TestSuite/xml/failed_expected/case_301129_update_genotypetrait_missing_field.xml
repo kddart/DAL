@@ -4,5 +4,5 @@
   <Match Attr="TraitValue" Tag="Error" Value="regex(missing)" />
   <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
-  <RunInfo Success="1" Time="1444957774" />
+  
 </TestCase>

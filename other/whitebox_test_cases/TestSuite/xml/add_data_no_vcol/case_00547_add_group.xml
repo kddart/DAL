@@ -1,0 +1,12 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Add Group" TargetURL="add/group" Type="BLOCKING" />
+  <INPUT ParaName="SystemGroupName" PrefixVal="Group_" Random="1" />
+  <INPUT ParaName="SystemGroupDescription" Value="Testing add group" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Match Attr="ParaName" Tag="ReturnId" Value="GroupId" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <ReturnId ParaName="GroupId" Value="4" />
+  <RunInfo Success="1" Time="1474007415" />
+</TestCase>

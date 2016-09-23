@@ -1,24 +1,14 @@
-#$Id: System.pm 1028 2015-10-21 07:39:52Z puthick $
-#$Author: puthick $
+#$Id$
+#$Author$
 
-# Copyright (c) 2015, Diversity Arrays Technology, All rights reserved.
-
-# COPYRIGHT AND LICENSE
-# 
-# Copyright (C) 2014 by Diversity Arrays Technology Pty Ltd
-# 
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-# 
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
+# Copyright (c) 2011, Diversity Arrays Technology, All rights reserved.
 
 # Author    : Puthick Hok
-# Version   : 2.3.0 build 1040
+# Created   : 02/06/2010
+# Modified  :
+# Purpose   : 
+#          
+#          
 
 package KDDArT::DAL::System;
 
@@ -30,7 +20,8 @@ BEGIN {
 
   my ($volume, $current_dir, $file) = File::Spec->splitpath(__FILE__);
 
-  $main::kddart_base_dir = "${current_dir}../../..";
+  my @current_dir_part = split('/perl-lib/KDDArT/DAL/', $current_dir);
+  $main::kddart_base_dir = $current_dir_part[0];
 }
 
 use lib "$main::kddart_base_dir/perl-lib";
@@ -46,6 +37,7 @@ use DateTime::Format::MySQL;
 use Digest::MD5 qw(md5 md5_hex md5_base64);
 use Crypt::Random qw( makerandom );
 use JSON::XS qw(encode_json decode_json);
+use XML::Checker::Parser;
 
 sub setup {
 
@@ -81,6 +73,15 @@ sub setup {
                                            'update_workflow_def_gadmin',
                                            'del_workflow_def_gadmin',
                                            'update_user_preference',
+                                           'add_keyword_gadmin',
+                                           'update_keyword_gadmin',
+                                           'del_keyword_gadmin',
+                                           'add_keyword_group_gadmin',
+                                           'update_keyword_group_gadmin',
+                                           'add_keyword2group_bulk_gadmin',
+                                           'remove_keyword_from_group_gadmin',
+                                           'del_keyword_group_gadmin',
+                                           'update_group_gadmin',
       );
   __PACKAGE__->authen->check_signature_runmodes('add_user_gadmin',
                                                 'update_user_gadmin',
@@ -100,6 +101,13 @@ sub setup {
                                                 'update_workflow_def_gadmin',
                                                 'del_workflow_def_gadmin',
                                                 'update_user_preference',
+                                                'add_keyword_gadmin',
+                                                'update_keyword_gadmin',
+                                                'del_keyword_gadmin',
+                                                'update_keyword_group_gadmin',
+                                                'remove_keyword_from_group_gadmin',
+                                                'del_keyword_group_gadmin',
+                                                'update_group_gadmin',
       );
   __PACKAGE__->authen->check_gadmin_runmodes('add_user_gadmin',
                                              'update_user_gadmin',
@@ -117,8 +125,19 @@ sub setup {
                                              'add_workflow_def_gadmin',
                                              'update_workflow_def_gadmin',
                                              'del_workflow_def_gadmin',
+                                             'add_keyword_gadmin',
+                                             'update_keyword_gadmin',
+                                             'del_keyword_gadmin',
+                                             'add_keyword_group_gadmin',
+                                             'update_keyword_group_gadmin',
+                                             'add_keyword2group_bulk_gadmin',
+                                             'remove_keyword_from_group_gadmin',
+                                             'del_keyword_group_gadmin',
+                                             'update_group_gadmin',
       );
   __PACKAGE__->authen->check_sign_upload_runmodes('add_multimedia',
+                                                  'add_keyword_group_gadmin',
+                                                  'add_keyword2group_bulk_gadmin',
       );
 
   $self->run_modes(
@@ -146,20 +165,34 @@ sub setup {
     'list_multimedia'              => 'list_multimedia_runmode',
     'get_multimedia'               => 'get_multimedia_runmode',
     'update_multimedia'            => 'update_multimedia_runmode',
-    'del_multimedia_gadmin'        => 'del_multimedia_runmode',
-    'add_workflow_gadmin'          => 'add_workflow_runmode',
-    'update_workflow_gadmin'       => 'update_workflow_runmode',
-    'del_workflow_gadmin'          => 'del_workflow_runmode',
-    'list_workflow'                => 'list_workflow_runmode',
-    'get_workflow'                 => 'get_workflow_runmode',
-    'add_workflow_def_gadmin'      => 'add_workflow_def_runmode',
-    'update_workflow_def_gadmin'   => 'update_workflow_def_runmode',
-    'list_workflow_def'            => 'list_workflow_def_runmode',
-    'get_workflow_def'             => 'get_workflow_def_runmode',
-    'del_workflow_def_gadmin'      => 'del_workflow_def_runmode',
-    'get_user_preference'          => 'get_user_preference_runmode',
-    'update_user_preference'       => 'update_user_preference_runmode',
-      );
+    'del_multimedia_gadmin'               => 'del_multimedia_runmode',
+    'add_workflow_gadmin'                 => 'add_workflow_runmode',
+    'update_workflow_gadmin'              => 'update_workflow_runmode',
+    'del_workflow_gadmin'                 => 'del_workflow_runmode',
+    'list_workflow'                       => 'list_workflow_runmode',
+    'get_workflow'                        => 'get_workflow_runmode',
+    'add_workflow_def_gadmin'             => 'add_workflow_def_runmode',
+    'update_workflow_def_gadmin'          => 'update_workflow_def_runmode',
+    'list_workflow_def'                   => 'list_workflow_def_runmode',
+    'get_workflow_def'                    => 'get_workflow_def_runmode',
+    'del_workflow_def_gadmin'             => 'del_workflow_def_runmode',
+    'get_user_preference'                 => 'get_user_preference_runmode',
+    'update_user_preference'              => 'update_user_preference_runmode',
+    'add_keyword_gadmin'                  => 'add_keyword_runmode',
+    'update_keyword_gadmin'               => 'update_keyword_runmode',
+    'list_keyword_advanced'               => 'list_keyword_advanced_runmode',
+    'get_keyword'                         => 'get_keyword_runmode',
+    'del_keyword_gadmin'                  => 'del_keyword_runmode',
+    'add_keyword_group_gadmin'            => 'add_keyword_group_runmode',
+    'update_keyword_group_gadmin'         => 'update_keyword_group_runmode',
+    'list_keyword_group_advanced'         => 'list_keyword_group_runmode',
+    'get_keyword_group'                   => 'get_keyword_group_runmode',
+    'add_keyword2group_bulk_gadmin'       => 'add_keyword2group_bulk_runmode',
+    'list_keyword_in_group'               => 'list_keyword_in_group_runmode',
+    'remove_keyword_from_group_gadmin'    => 'remove_keyword_from_group_runmode',
+    'del_keyword_group_gadmin'            => 'del_keyword_group_runmode',
+    'update_group_gadmin'                 => 'update_group_runmode',
+   );
 
   my $logger = get_logger();
   Log::Log4perl::MDC->put('client_ip', $ENV{'REMOTE_ADDR'});
@@ -960,7 +993,10 @@ sub add_group_member {
 
     if ($dbh_write->err()) {
 
-      return $self->error_message('Unexpected error.');
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error.'}]};
+
+      return $data_for_postrun_href;
     }
 
     $sth->finish();
@@ -1195,10 +1231,11 @@ sub list_user_runmode {
     $where_clause = '';
   }
 
-  my $sql = 'SELECT UserName, ContactId, UserType ';
+  my $sql = 'SELECT systemuser.UserId, UserName, ContactId, UserType ';
   $sql   .= 'FROM systemuser LEFT JOIN authorisedsystemgroup ';
   $sql   .= 'ON systemuser.UserId = authorisedsystemgroup.UserId ';
   $sql   .= $where_clause;
+  $sql   .= ' ORDER BY systemuser.UserId DESC';
 
   my ($read_user_err, $read_user_msg, $user_data) = $self->list_user(1, $sql, $where_arg);
 
@@ -3467,15 +3504,15 @@ sub add_workflow_runmode {
 "Description": "Add a new workflow into the system",
 "AuthRequired": 1,
 "GroupRequired": 1,
-"GroupAdminRequired": 0,
+"GroupAdminRequired": 1,
 "SignatureRequired": 1,
 "AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
 "KDDArTModule": "main",
 "KDDArTTable": "workflow",
 "SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><ReturnId Value='1' ParaName='WorkflowId' /><Info Message='Workflow (1) has been added successfully.' /></DATA>",
 "SuccessMessageJSON": "{'ReturnId' : [{'Value' : '2', 'ParaName' : 'WorkflowId'}], 'Info' : [{'Message' : 'Workflow (2) has been added successfully.'}]}",
-"ErrorMessageXML": [{"idNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error WorkflowType='WorkflowType (11): not found or inactive.' /></DATA>"}],
-"ErrorMessageJSON": [{"idNotFound": "{'Error' : [{'WorkflowType' : 'WorkflowType (11): not found or inactive.'}]}"}],
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error WorkflowType='WorkflowType (11): not found or inactive.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'WorkflowType' : 'WorkflowType (11): not found or inactive.'}]}"}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
@@ -5109,6 +5146,2061 @@ sub check_trialunit_perm {
 
     return 1;
   }
+}
+
+sub add_keyword_runmode {
+
+=pod add_keyword_gadmin_HELP_START
+{
+"OperationName" : "Add keyword",
+"Description": "Add a new keyword into the system",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 1,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"KDDArTModule": "main",
+"KDDArTTable": "keyword",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><ReturnId Value='1' ParaName='KeywordId' /><Info Message='Keyword (1) has been added successfully.' /></DATA>",
+"SuccessMessageJSON": "{'ReturnId' : [{'Value' : '2', 'ParaName' : 'KeywordId'}], 'Info' : [{'Message' : 'Keyword (2) has been added successfully.'}]}",
+"ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
+"ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self  = shift;
+  my $query = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  # Generic required static field checking
+
+  my $dbh_read = connect_kdb_read();
+
+  my $skip_field = {};
+
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'keyword', $skip_field);
+
+  if ($chk_sfield_err) {
+
+    $self->logger->debug($chk_sfield_msg);
+
+    return $for_postrun_href;
+  }
+
+  $dbh_read->disconnect();
+
+  # Finish generic required static field checking
+
+  my $keyword_name    = $query->param('KeywordName');
+
+  my $keyword_note    = undef;
+
+  if (defined $query->param('KeywordNote')) {
+
+    if (length($query->param('KeywordNote')) > 0) {
+
+      $keyword_note = $query->param('KeywordNote');
+    }
+  }
+
+  my $dbh_k_read = connect_kdb_read();
+
+  if (record_existence($dbh_k_read, 'keyword', 'KeywordName', $keyword_name)) {
+
+    my $err_msg = "KeywordName ($keyword_name): already exists.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'KeywordName' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh_k_read->disconnect();
+
+  my $dbh_k_write = connect_kdb_write();
+
+  my $sql = 'INSERT INTO keyword SET ';
+  $sql   .= 'KeywordName=?, ';
+  $sql   .= 'KeywordNote=?';
+
+  my $sth = $dbh_k_write->prepare($sql);
+  $sth->execute( $keyword_name, $keyword_note );
+
+  my $keyword_id = -1;
+  if (!$dbh_k_write->err()) {
+
+    $keyword_id = $dbh_k_write->last_insert_id(undef, undef, 'keyword', 'KeywordId');
+    $self->logger->debug("KeywordId: $keyword_id");
+  }
+  else {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+  $sth->finish();
+
+  $dbh_k_write->disconnect();
+
+  my $info_msg_aref  = [{'Message' => "Keyword ($keyword_id) has been added successfully."}];
+  my $return_id_aref = [{'Value' => "$keyword_id", 'ParaName' => 'KeywordId'}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'      => $info_msg_aref,
+                                           'ReturnId'  => $return_id_aref,
+  };
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub update_keyword_runmode {
+
+=pod update_keyword_gadmin_HELP_START
+{
+"OperationName" : "Update keyword",
+"Description": "Update keyword specified by id.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 1,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"KDDArTModule": "main",
+"KDDArTTable": "keyword",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='Keyword (3) has been successfully updated.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'Keyword (3) has been successfully updated.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Keyword (19): not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Keyword (19): not found.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing keyword id"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self  = $_[0];
+  my $query = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  # Generic required static field checking
+
+  my $dbh_read = connect_kdb_read();
+
+  my $skip_field = {};
+
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'keyword', $skip_field);
+
+  if ($chk_sfield_err) {
+
+    $self->logger->debug($chk_sfield_msg);
+
+    return $for_postrun_href;
+  }
+
+  $dbh_read->disconnect();
+
+  # Finish generic required static field checking
+
+  my $keyword_id        = $self->param('id');
+  my $keyword_name      = $query->param('KeywordName');
+
+  my $dbh_k_read = connect_kdb_read();
+
+  my $sql = 'SELECT KeywordId FROM keyword WHERE KeywordName=? AND KeywordId<>?';
+
+  my ($r_kwd_err, $db_kwd_id) = read_cell($dbh_k_read, $sql, [$keyword_name, $keyword_id]);
+
+  if ($r_kwd_err) {
+
+    my $err_msg = "Unexpected Error.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (length($db_kwd_id) > 0) {
+
+    my $err_msg = "KeywordName ($keyword_name) already exists.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'KeywordName' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (!record_existence( $dbh_k_read, 'keyword', 'KeywordId', $keyword_id )) {
+
+    my $err_msg = "Keyword ($keyword_id): not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $keyword_note = read_cell_value($dbh_k_read, 'keyword', 'KeywordNote', 'KeywordId', $keyword_id);
+
+  if (length($keyword_note) == 0) {
+
+    $keyword_note = undef;
+  }
+
+  if (defined $query->param('KeywordNote')) {
+
+    if (length($query->param('KeywordNote')) > 0) {
+
+      $keyword_note = $query->param('KeywordNote');
+    }
+  }
+
+  $dbh_k_read->disconnect();
+
+  my $dbh_k_write = connect_kdb_write();
+
+  $sql    = "UPDATE keyword SET ";
+  $sql   .= "KeywordName=?, ";
+  $sql   .= "KeywordNote=? ";
+  $sql   .= "WHERE KeywordId=?";
+
+  my $sth = $dbh_k_write->prepare($sql);
+  $sth->execute( $keyword_name, $keyword_note, $keyword_id );
+
+  if ( $dbh_k_write->err() ) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $self->logger->debug("KeywordId: $keyword_id updated");
+  $sth->finish();
+  $dbh_k_write->disconnect();
+
+  my $info_msg_aref = [ { 'Message' => "Keyword ($keyword_id) has been successfully updated." } ];
+
+  return {
+    'Error'     => 0,
+    'Data'      => { 'Info' => $info_msg_aref, },
+    'ExtraData' => 0
+  };
+}
+
+sub list_keyword {
+
+  my $self            = $_[0];
+  my $extra_attr_yes  = $_[1];
+  my $sql             = $_[2];
+  my $where_para_aref = $_[3];
+
+  my $err = 0;
+  my $msg = '';
+
+  my $data_aref = [];
+
+  my $dbh = connect_kdb_read();
+
+  ($err, $msg, $data_aref) = read_data($dbh, $sql, $where_para_aref);
+
+  if ($err) {
+
+    return ($err, $msg, []);
+  }
+
+  #$self->logger->debug("Number of records: " . scalar(@{$data_aref}));
+
+  my $extra_attr_kwd_data = [];
+
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  if ($extra_attr_yes && ($gadmin_status eq '1')) {
+
+    my $kwd_id_aref = [];
+
+    for my $row (@{$data_aref}) {
+
+      push(@{$kwd_id_aref}, $row->{'KeywordId'});
+    }
+
+    if (scalar(@{$kwd_id_aref}) > 0) {
+
+      my $chk_table_aref = [{'TableName' => 'keywordgroupentry', 'FieldName' => 'KeywordId'},
+                            {'TableName' => 'trialunitkeyword', 'FieldName' => 'KeywordId'},
+                            {'TableName' => 'specimenkeyword', 'FieldName' => 'KeywordId'}
+                           ];
+
+      my ($chk_id_err, $chk_id_msg,
+          $used_id_href, $not_used_id_href) = id_existence_bulk($dbh, $chk_table_aref, $kwd_id_aref);
+
+      if ($chk_id_err) {
+
+        $self->logger->debug("Check id existence error: $chk_id_msg");
+        $err = 1;
+        $msg = $chk_id_msg;
+      }
+      else {
+
+        for my $row (@{$data_aref}) {
+
+          my $kwd_id = $row->{'KeywordId'};
+          $row->{'update'}   = "update/keyword/$kwd_id";
+
+          # delete link only if this keyword isn't used
+          if ( $not_used_id_href->{$kwd_id} ) {
+
+            $row->{'delete'}   = "delete/keyword/$kwd_id";
+          }
+
+          push(@{$extra_attr_kwd_data}, $row);
+        }
+      }
+    }
+  }
+  else {
+
+    $extra_attr_kwd_data = $data_aref;
+  }
+
+  $dbh->disconnect();
+
+  return ($err, $msg, $extra_attr_kwd_data);
+}
+
+sub list_keyword_advanced_runmode {
+
+=pod list_keyword_advanced_HELP_START
+{
+"OperationName" : "List keyword(s)",
+"Description": "Return a list of keywords currently present in the system.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "FILTERING"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Pagination NumOfRecords='1' NumOfPages='1' Page='1' NumPerPage='10' /><RecordMeta TagName='Keyword' /><Keyword KeywordId='1' KeywordName='Keyword_5247457' delete='delete/keyword/1' KeywordNote='' update='update/keyword/1' /></DATA>",
+"SuccessMessageJSON": "{'Pagination' : [{'NumOfRecords' : '1', 'NumOfPages' : 1, 'NumPerPage' : '10', 'Page' : '1'}], 'RecordMeta' : [{'TagName' : 'Keyword'}], 'Keyword' : [{'KeywordId' : '1', 'delete' : 'delete/keyword/1', 'KeywordName' : 'Keyword_5247457', 'KeywordNote' : null, 'update' : 'update/keyword/1'}]}",
+"ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
+"ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
+"URLParameter": [{"ParameterName": "nperpage", "Description": "Number of records in a page for pagination"}, {"ParameterName": "num", "Description": "The page number of the pagination"}],
+"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database field name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "FieldList", "Description": "Comma separated value of wanted fields."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases."}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self  = shift;
+  my $query = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  my $pagination  = 0;
+  my $nb_per_page = -1;
+  my $page        = -1;
+
+  $self->logger->debug("Base dir: $main::kddart_base_dir");
+
+  if ( (defined $self->param('nperpage')) && (defined $self->param('num')) ) {
+
+    $pagination  = 1;
+    $nb_per_page = $self->param('nperpage');
+    $page        = $self->param('num');
+  }
+
+  my $field_list_csv = '';
+
+  if (defined $query->param('FieldList')) {
+
+    $field_list_csv = $query->param('FieldList');
+  }
+
+  my $filtering_csv = '';
+
+  if (defined $query->param('Filtering')) {
+
+    $filtering_csv = $query->param('Filtering');
+  }
+
+  $self->logger->debug("Filtering csv: $filtering_csv");
+
+  my $sorting = '';
+
+  if (defined $query->param('Sorting')) {
+
+    $sorting = $query->param('Sorting');
+  }
+
+  my $dbh = connect_kdb_read();
+
+  my $sql = 'SELECT * FROM keyword LIMIT 1';
+
+  my ($sam_kwd_err, $sam_kwd_msg, $sam_kwd_data) = $self->list_keyword(0, $sql);
+
+  if ($sam_kwd_err) {
+
+    $self->logger->debug($sam_kwd_msg);
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $sample_data_aref = $sam_kwd_data;
+
+  my @field_list_all;
+
+  if (scalar(@{$sample_data_aref}) == 1) {
+
+    @field_list_all = keys(%{$sample_data_aref->[0]});
+  }
+  else {
+
+    $self->logger->debug("It reaches here");
+    my ($sfield_err, $sfield_msg, $sfield_data, $pkey_data) = get_static_field($dbh, 'keyword');
+
+    if ($sfield_err) {
+
+      $self->logger->debug("Get static field failed: $sfield_msg");
+      return $self->_set_error();
+    }
+
+    for my $sfield_rec (@{$sfield_data}) {
+
+      push(@field_list_all, $sfield_rec->{'Name'});
+    }
+
+    for my $pkey_field (@{$pkey_data}) {
+
+      push(@field_list_all, $pkey_field);
+    }
+  }
+
+  $self->logger->debug("Field list all: " . join(',', @field_list_all));
+
+  my $final_field_list = \@field_list_all;
+
+  if (length($field_list_csv) > 0) {
+
+    my ($sel_field_err, $sel_field_msg, $sel_field_list) = parse_selected_field($field_list_csv,
+                                                                                $final_field_list,
+                                                                                'KeywordId');
+
+    if ($sel_field_err) {
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $sel_field_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    $final_field_list = $sel_field_list;
+  }
+
+  $sql  = 'SELECT ' . join(',', @{$final_field_list}) . ' ';
+  $sql .= 'FROM keyword ';
+
+  my ( $filter_err, $filter_msg, $filter_phrase, $where_arg ) = parse_filtering('KeywordId',
+                                                                                'keyword',
+                                                                                $filtering_csv,
+                                                                                $final_field_list);
+  if ($filter_err) {
+
+    $self->logger->debug("Parse filtering failed: $filter_msg");
+    my $err_msg = $filter_msg;
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $filtering_exp = '';
+
+  if (length($filter_phrase) > 0) {
+
+    $filtering_exp = " WHERE $filter_phrase ";
+  }
+
+  $sql .= " $filtering_exp ";
+
+  my $pagination_aref    = [];
+  my $paged_limit_clause = '';
+  my $paged_limit_elapsed;
+
+  if ($pagination) {
+
+    my ($int_err, $int_err_msg) = check_integer_value( {'nperpage' => $nb_per_page,
+                                                        'num'      => $page
+                                                       });
+
+    if ($int_err) {
+
+      $int_err_msg .= ' not integer.';
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $int_err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    $self->logger->debug("Filtering expression: $filtering_exp");
+
+    my ($pg_id_err, $pg_id_msg, $nb_records,
+        $nb_pages, $limit_clause, $rcount_time);
+
+    $self->logger->debug("COUNT NB RECORD: NO FACTOR IN FILTERING");
+
+    ($pg_id_err, $pg_id_msg, $nb_records,
+     $nb_pages, $limit_clause, $rcount_time) = get_paged_filter($dbh,
+                                                                $nb_per_page,
+                                                                $page,
+                                                                'keyword',
+                                                                'KeywordId',
+                                                                $filtering_exp,
+                                                                $where_arg);
+
+    $self->logger->debug("SQL Row count time: $rcount_time");
+
+    if ($pg_id_err == 1) {
+
+      $self->logger->debug($pg_id_msg);
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    if ($pg_id_err == 2) {
+
+      $page = 0;
+    }
+
+    $pagination_aref = [{'NumOfRecords' => $nb_records,
+                         'NumOfPages'   => $nb_pages,
+                         'Page'         => $page,
+                         'NumPerPage'   => $nb_per_page,
+                        }];
+
+    $paged_limit_clause = $limit_clause;
+  }
+
+  $dbh->disconnect();
+
+  my ($sort_err, $sort_msg, $sort_sql) = parse_sorting($sorting, $final_field_list);
+
+  if ($sort_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $sort_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (length($sort_sql) > 0) {
+
+    $sql .= " ORDER BY $sort_sql ";
+  }
+  else {
+
+    $sql .= ' ORDER BY keyword.KeywordId DESC';
+  }
+
+  $sql .= " $paged_limit_clause ";
+
+  $self->logger->debug("SQL with VCol: $sql");
+  $self->logger->debug("Where arg: " . join(',', @{$where_arg}));
+
+  # where_arg here in the list function because of the filtering 
+  my ($read_kwd_err, $read_kwd_msg, $kwd_data) = $self->list_keyword(1, $sql, $where_arg);
+
+  if ($read_kwd_err) {
+
+    $self->logger->debug($read_kwd_msg);
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Keyword'      => $kwd_data,
+                                           'Pagination'   => $pagination_aref,
+                                           'RecordMeta'   => [{'TagName' => 'Keyword'}],
+  };
+
+  return $data_for_postrun_href;
+}
+
+sub get_keyword_runmode {
+
+=pod get_keyword_HELP_START
+{
+"OperationName" : "Get keyword",
+"Description": "Get detailed information about keyword specified by id.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><RecordMeta TagName='Keyword' /><Keyword KeywordId='1' KeywordName='Keyword_5247457' delete='delete/keyword/1' KeywordNote='' update='update/keyword/1' /></DATA>",
+"SuccessMessageJSON": "{'RecordMeta' : [{'TagName' : 'Keyword'}], 'Keyword' : [{'KeywordId' : '1', 'delete' : 'delete/keyword/1', 'KeywordName' : 'Keyword_5247457', 'KeywordNote' : null, 'update' : 'update/keyword/1'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='KeywordId (11): not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'KeywordId (11): not found.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing keyword id."}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self  = shift;
+
+  my $keyword_id = $self->param('id');
+  my $data_for_postrun_href = {};
+
+  my $dbh = connect_kdb_read();
+  my $keyword_exist = record_existence($dbh, 'keyword', 'KeywordId', $keyword_id);
+  $dbh->disconnect();
+
+  if (!$keyword_exist) {
+
+    my $err_msg = "KeywordId ($keyword_id): not found.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $sql = 'SELECT * FROM keyword ';
+  $sql   .= 'WHERE KeywordId=?';
+
+  my ($read_keyword_err, $read_keyword_msg, $keyword_data) = $self->list_keyword(1, $sql, [$keyword_id]);
+
+  if ($read_keyword_err) {
+
+    $self->logger->debug($read_keyword_msg);
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Keyword'        => $keyword_data,
+                                           'RecordMeta'     => [{'TagName' => 'Keyword'}],
+                                          };
+
+  return $data_for_postrun_href;
+}
+
+sub del_keyword_runmode {
+
+=pod del_keyword_gadmin_HELP_START
+{
+"OperationName" : "Delete keyword",
+"Description": "Delete keyword if it is not used and it is not part of any grouping.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 1,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='Keyword (3) has been successfully deleted.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'Keyword (4) has been successfully deleted.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='KeywordId (7): not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'KeywordId (7): not found.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing keyword id."}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my ($self) = @_;
+
+  my $data_for_postrun_href = {};
+
+  my $keyword_id  = $self->param('id');
+
+  my $dbh_k_read   = connect_kdb_read();
+
+  my $is_keyword_id_exist = record_existence( $dbh_k_read, 'keyword', 'KeywordId', $keyword_id );
+
+  if ( !$is_keyword_id_exist ) {
+
+    my $err_msg = "KeywordId ($keyword_id): not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (record_existence($dbh_k_read, 'keywordgroupentry', 'KeywordId', $keyword_id)) {
+
+    my $err_msg = "Keyword ($keyword_id): part of a group.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (record_existence($dbh_k_read, 'trialunitkeyword', 'KeywordId', $keyword_id)) {
+
+    my $err_msg = "Keyword ($keyword_id): used in trialunit.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (record_existence($dbh_k_read, 'specimenkeyword', 'KeywordId', $keyword_id)) {
+
+    my $err_msg = "Keyword ($keyword_id): used in specimen.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh_k_read->disconnect();
+
+  my $dbh_k_write = connect_kdb_write();
+
+  my $sql = "DELETE FROM keyword WHERE KeywordId=?";
+  my $sth = $dbh_k_write->prepare($sql);
+  $sth->execute($keyword_id);
+
+  if ( $dbh_k_write->err() ) {
+
+    my $err_msg = "Unexpected Error.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $self->logger->debug("KeywordId: $keyword_id deleted");
+  $sth->finish();
+  $dbh_k_write->disconnect();
+
+  my $info_msg_aref = [ { 'Message' => "Keyword ($keyword_id) has been successfully deleted." } ];
+
+  return {
+    'Error'     => 0,
+    'Data'      => { 'Info' => $info_msg_aref, },
+    'ExtraData' => 0
+  };
+}
+
+sub add_keyword_group_runmode {
+
+=pod add_keyword_group_gadmin_HELP_START
+{
+"OperationName" : "Add keyword group",
+"Description": "Add a new keyword group.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 1,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"KDDArTModule": "main",
+"KDDArTTable": "keywordgroup",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><ReturnId Value='7' ParaName='KeywordGroupId' /><Info Message='KeywordGroup (7) has been added successfully.' /></DATA>",
+"SuccessMessageJSON": "{'ReturnId' : [{'Value' : '8','ParaName' : 'KeywordGroupId'}],'Info' : [{'Message' : 'KeywordGroup (8) has been added successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='KeywordId (97): not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'KeywordId (97): not found.'}]}"}],
+"RequiredUpload": 1,
+"UploadFileFormat": "XML",
+"UploadFileParameterName": "uploadfile",
+"DTDFileNameForUploadXML": "keywordgroup.dtd",
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self  = shift;
+  my $query = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  # Generic required static field checking
+
+  my $dbh_read = connect_kdb_read();
+
+  my $skip_field = {};
+
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'keywordgroup', $skip_field);
+
+  if ($chk_sfield_err) {
+
+    $self->logger->debug($chk_sfield_msg);
+
+    return $for_postrun_href;
+  }
+
+  $dbh_read->disconnect();
+
+  # Finish generic required static field checking
+
+  my $keyword_group_name         = $query->param('KeywordGroupName');
+
+  my $dbh_write = connect_kdb_write();
+
+  if (record_existence($dbh_write, 'keywordgroup', 'KeywordGroupName', $keyword_group_name)) {
+
+    my $err_msg = "KeywordGroupName ($keyword_group_name): already exists.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'KeywordGroupName' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $keyword_info_xml_file = $self->authen->get_upload_file();
+  my $keyword_info_dtd_file = $self->get_keyword_group_dtd_file();
+
+  add_dtd($keyword_info_dtd_file, $keyword_info_xml_file);
+
+  my $xml_checker_parser = new XML::Checker::Parser( Handlers => { } );
+
+  eval {
+
+    local $XML::Checker::FAIL = sub {
+
+      my $code = shift;
+      my $err_str = XML::Checker::error_string ($code, @_);
+      $self->logger->debug("XML Parsing ERR: $code : $err_str");
+      die $err_str;
+    };
+    $xml_checker_parser->parsefile($keyword_info_xml_file);
+  };
+
+  if ($@) {
+
+    my $err_msg = $@;
+    $self->logger->debug("Parsing XML error: $err_msg");
+    my $user_err_msg = "Keyword group xml file does not comply with its definition.\n";
+    $user_err_msg   .= "Details: $err_msg";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $user_err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $keyword_info_xml  = read_file($keyword_info_xml_file);
+  my $keyword_info_aref = xml2arrayref($keyword_info_xml, 'keywordgroupentry');
+
+  my $uniq_kwd_id_href = {};
+
+  for my $keyword_info (@{$keyword_info_aref}) {
+
+    my $kwd_id = $keyword_info->{'KeywordId'};
+
+    if (defined $uniq_kwd_id_href->{$kwd_id}) {
+
+      my $err_msg = "Keyword ($kwd_id): duplicate.";
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+    else {
+
+      $uniq_kwd_id_href->{$kwd_id} = 1;
+    }
+  }
+
+  my @kwd_id_list = keys(%{$uniq_kwd_id_href});
+
+  if (scalar(@kwd_id_list) > 0) {
+
+    my $keyword_sql = 'SELECT KeywordId ';
+    $keyword_sql   .= 'FROM keyword ';
+    $keyword_sql   .= 'WHERE KeywordId IN (' . join(',', @kwd_id_list) . ') ';
+
+    my $keyword_lookup = $dbh_write->selectall_hashref($keyword_sql, 'KeywordId');
+
+    if ($dbh_write->err()) {
+
+      $self->logger->debug("SELECT keyword failed: " . $dbh_write->errstr());
+
+      my $err_msg = "Unexpected Error.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my $not_found_keyword_id_aref = [];
+
+    for my $kwd_id (@kwd_id_list) {
+
+      if ( !(defined $keyword_lookup->{$kwd_id}) ) {
+
+        push(@{$not_found_keyword_id_aref}, $kwd_id);
+      }
+    }
+
+    if (scalar(@{$not_found_keyword_id_aref}) > 0) {
+
+      my $err_msg = "Keyword (" . join(',', @{$not_found_keyword_id_aref}) . "): not found";
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  my $sql = 'INSERT INTO keywordgroup SET ';
+  $sql   .= 'KeywordGroupName=?';
+
+  my $sth = $dbh_write->prepare($sql);
+  $sth->execute($keyword_group_name);
+
+  if ($dbh_write->err()) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+  $sth->finish();
+
+  my $keyword_group_id = $dbh_write->last_insert_id(undef, undef, 'keywordgroup', 'KeywordGroupId');
+
+  $sql  = "INSERT INTO keywordgroupentry(KeywordGroupId,KeywordId) VALUES ";
+
+  my @kwd_grp_entry_sql_list;
+
+  for my $keyword_info (@{$keyword_info_aref}) {
+
+    my $keyword_id   = $keyword_info->{'KeywordId'};
+
+    my $sql_list = qq|($keyword_group_id, $keyword_id)|;
+
+    push(@kwd_grp_entry_sql_list, $sql_list);
+  }
+
+  $sql .= join(',', @kwd_grp_entry_sql_list);
+
+  $self->logger->debug("SQL: $sql");
+
+  $sth = $dbh_write->prepare($sql);
+  $sth->execute();
+
+  if ($dbh_write->err()) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+  $sth->finish();
+
+  $dbh_write->disconnect();
+
+  my $info_msg_aref  = [{'Message' => "KeywordGroup ($keyword_group_id) has been added successfully."}];
+  my $return_id_aref = [{'Value' => "$keyword_group_id", 'ParaName' => 'KeywordGroupId'}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'     => $info_msg_aref,
+                                           'ReturnId' => $return_id_aref,
+  };
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub update_keyword_group_runmode {
+
+=pod update_keyword_group_gadmin_HELP_START
+{
+"OperationName" : "Update keyword group",
+"Description": "Update information about keyword group specified by id.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 1,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"KDDArTModule": "main",
+"KDDArTTable": "keywordgroup",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='KeywordGroup (9) has been updated successfully.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'KeywordGroup (9) has been added successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='KeywordGroup (10) not found.' /></DATA>" }],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'KeywordGroup (10) not found.'}]}" }],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing KeywordGroupId"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self            = shift;
+  my $keyword_grp_id  = $self->param('id');
+  my $query           = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  # Generic required static field checking
+
+  my $dbh_read = connect_kdb_read();
+
+  my $skip_field = {};
+
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'keywordgroup', $skip_field);
+
+  if ($chk_sfield_err) {
+
+    $self->logger->debug($chk_sfield_msg);
+
+    return $for_postrun_href;
+  }
+
+  $dbh_read->disconnect();
+
+  # Finish generic required static field checking
+
+  my $dbh_write = connect_kdb_write();
+
+  my $keyword_grp_exist = record_existence($dbh_write, 'keywordgroup', 'KeywordGroupId', $keyword_grp_id);
+
+  if (!$keyword_grp_exist) {
+
+    my $err_msg = "KeywordGroup ($keyword_grp_id): not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $keyword_group_name         = $query->param('KeywordGroupName');
+
+  my $chk_spec_grp_name_sql = 'SELECT KeywordGroupId FROM keywordgroup ';
+  $chk_spec_grp_name_sql   .= 'WHERE KeywordGroupId <> ? AND KeywordGroupName = ?';
+
+  my ($r_chk_spec_grp_name_err, $duplicate_spec_grp_id) = read_cell($dbh_write, $chk_spec_grp_name_sql,
+                                                                    [$keyword_grp_id, $keyword_group_name]);
+
+  if (length($duplicate_spec_grp_id) > 0) {
+
+    my $err_msg = "KeywordGroupName ($keyword_group_name) already exists.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $sql = 'UPDATE keywordgroup SET ';
+  $sql   .= 'KeywordGroupName=? ';
+  $sql   .= 'WHERE KeywordGroupId=?';
+
+  my $sth = $dbh_write->prepare($sql);
+  $sth->execute($keyword_group_name, $keyword_grp_id);
+
+  if ($dbh_write->err()) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+  $sth->finish();
+
+  $dbh_write->disconnect();
+
+  my $info_msg_aref = [{'Message' => "KeywordGroup ($keyword_grp_id) has been updated successfully."}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info' => $info_msg_aref};
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub list_keyword_group {
+
+  my $self            = $_[0];
+  my $extra_attr_yes  = $_[1];
+  my $sql             = $_[2];
+  my $where_para_aref = $_[3];
+
+  my $err = 0;
+  my $msg = '';
+
+  my $data_aref = [];
+
+  my $dbh = connect_kdb_read();
+
+  ($err, $msg, $data_aref) = read_data($dbh, $sql, $where_para_aref);
+
+  if ($err) {
+
+    return ($err, $msg, []);
+  }
+
+  #$self->logger->debug("Number of records: " . scalar(@{$data_aref}));
+
+  my $extra_attr_kwd_grp_data = [];
+
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  if ($extra_attr_yes && ($gadmin_status eq '1')) {
+
+    for my $row (@{$data_aref}) {
+
+      my $kwd_grp_id = $row->{'KeywordGroupId'};
+      $row->{'update'}     = "update/keywordgroup/$kwd_grp_id";
+      $row->{'delete'}     = "delete/keywordgroup/$kwd_grp_id";
+      $row->{'addKeyword'} = "keywordgroup/$kwd_grp_id/add/keyword/bulk";
+
+      push(@{$extra_attr_kwd_grp_data}, $row);
+    }
+  }
+  else {
+
+    $extra_attr_kwd_grp_data = $data_aref;
+  }
+
+  $dbh->disconnect();
+
+  return ($err, $msg, $extra_attr_kwd_grp_data);
+}
+
+sub list_keyword_group_runmode {
+
+=pod list_keyword_group_advanced_HELP_START
+{
+"OperationName" : "List keyword group(s)",
+"Description": "Return a list of keyword groups currently present in the system.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "FILTERING"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Pagination NumOfRecords='4' NumOfPages='4' Page='1' NumPerPage='1' /><KeywordGroup KeywordGroupName='UPDATE Keyword_8149578' KeywordGroupId='4' delete='delete/keywordgroup/4' update='update/keywordgroup/4' /><RecordMeta TagName='KeywordGroup' /></DATA>",
+"SuccessMessageJSON": "{'Pagination' : [{'NumOfRecords' : '4', 'NumOfPages' : 4, 'NumPerPage' : '1', 'Page' : '1'}], 'KeywordGroup' : [{'KeywordGroupName' : 'UPDATE Keyword_8149578', 'KeywordGroupId' : '4', 'delete' : 'delete/keywordgroup/4', 'update' : 'update/keywordgroup/4'}], 'RecordMeta' : [{'TagName' : 'KeywordGroup'}]}",
+"ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
+"ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
+"URLParameter": [{"ParameterName": "nperpage", "Description": "Number of records in a page for pagination"}, {"ParameterName": "num", "Description": "The page number of the pagination"}],
+"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database field name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "FieldList", "Description": "Comma separated value of wanted fields."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases."}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self  = shift;
+  my $query = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  my $pagination  = 0;
+  my $nb_per_page = -1;
+  my $page        = -1;
+
+  $self->logger->debug("Base dir: $main::kddart_base_dir");
+
+  if ( (defined $self->param('nperpage')) && (defined $self->param('num')) ) {
+
+    $pagination  = 1;
+    $nb_per_page = $self->param('nperpage');
+    $page        = $self->param('num');
+  }
+
+  my $field_list_csv = '';
+
+  if (defined $query->param('FieldList')) {
+
+    $field_list_csv = $query->param('FieldList');
+  }
+
+  my $filtering_csv = '';
+
+  if (defined $query->param('Filtering')) {
+
+    $filtering_csv = $query->param('Filtering');
+  }
+
+  $self->logger->debug("Filtering csv: $filtering_csv");
+
+  my $sorting = '';
+
+  if (defined $query->param('Sorting')) {
+
+    $sorting = $query->param('Sorting');
+  }
+
+  my $dbh = connect_kdb_read();
+
+  my $sql = 'SELECT * FROM keywordgroup LIMIT 1';
+
+  my ($sam_kwd_grp_err, $sam_kwd_grp_msg, $sam_kwd_grp_data) = $self->list_keyword_group(0, $sql);
+
+  if ($sam_kwd_grp_err) {
+
+    $self->logger->debug($sam_kwd_grp_msg);
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $sample_data_aref = $sam_kwd_grp_data;
+
+  my @field_list_all;
+
+  if (scalar(@{$sample_data_aref}) == 1) {
+
+    @field_list_all = keys(%{$sample_data_aref->[0]});
+  }
+  else {
+
+    $self->logger->debug("It reaches here");
+    my ($sfield_err, $sfield_msg, $sfield_data, $pkey_data) = get_static_field($dbh, 'keywordgroup');
+
+    if ($sfield_err) {
+
+      $self->logger->debug("Get static field failed: $sfield_msg");
+      return $self->_set_error();
+    }
+
+    for my $sfield_rec (@{$sfield_data}) {
+
+      push(@field_list_all, $sfield_rec->{'Name'});
+    }
+
+    for my $pkey_field (@{$pkey_data}) {
+
+      push(@field_list_all, $pkey_field);
+    }
+  }
+
+  $self->logger->debug("Field list all: " . join(',', @field_list_all));
+
+  my $final_field_list = \@field_list_all;
+
+  if (length($field_list_csv) > 0) {
+
+    my ($sel_field_err, $sel_field_msg, $sel_field_list) = parse_selected_field($field_list_csv,
+                                                                                $final_field_list,
+                                                                                'KeywordGroupId');
+
+    if ($sel_field_err) {
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $sel_field_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    $final_field_list = $sel_field_list;
+  }
+
+  $sql  = 'SELECT ' . join(',', @{$final_field_list}) . ' ';
+  $sql .= 'FROM keywordgroup ';
+
+  my ( $filter_err, $filter_msg, $filter_phrase, $where_arg ) = parse_filtering('KeywordGroupId',
+                                                                                'keywordgroup',
+                                                                                $filtering_csv,
+                                                                                $final_field_list);
+  if ($filter_err) {
+
+    $self->logger->debug("Parse filtering failed: $filter_msg");
+    my $err_msg = $filter_msg;
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $filtering_exp = '';
+
+  if (length($filter_phrase) > 0) {
+
+    $filtering_exp = " WHERE $filter_phrase ";
+  }
+
+  $sql .= " $filtering_exp ";
+
+  my $pagination_aref    = [];
+  my $paged_limit_clause = '';
+  my $paged_limit_elapsed;
+
+  if ($pagination) {
+
+    my ($int_err, $int_err_msg) = check_integer_value( {'nperpage' => $nb_per_page,
+                                                        'num'      => $page
+                                                       });
+
+    if ($int_err) {
+
+      $int_err_msg .= ' not integer.';
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $int_err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    $self->logger->debug("Filtering expression: $filtering_exp");
+
+    my ($pg_id_err, $pg_id_msg, $nb_records,
+        $nb_pages, $limit_clause, $rcount_time);
+
+    $self->logger->debug("COUNT NB RECORD: NO FACTOR IN FILTERING");
+
+    ($pg_id_err, $pg_id_msg, $nb_records,
+     $nb_pages, $limit_clause, $rcount_time) = get_paged_filter($dbh,
+                                                                $nb_per_page,
+                                                                $page,
+                                                                'keywordgroup',
+                                                                'KeywordGroupId',
+                                                                $filtering_exp,
+                                                                $where_arg);
+
+    $self->logger->debug("SQL Row count time: $rcount_time");
+
+    if ($pg_id_err == 1) {
+
+      $self->logger->debug($pg_id_msg);
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    if ($pg_id_err == 2) {
+
+      $page = 0;
+    }
+
+    $pagination_aref = [{'NumOfRecords' => $nb_records,
+                         'NumOfPages'   => $nb_pages,
+                         'Page'         => $page,
+                         'NumPerPage'   => $nb_per_page,
+                        }];
+
+    $paged_limit_clause = $limit_clause;
+  }
+
+  $dbh->disconnect();
+
+  my ($sort_err, $sort_msg, $sort_sql) = parse_sorting($sorting, $final_field_list);
+
+  if ($sort_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $sort_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (length($sort_sql) > 0) {
+
+    $sql .= " ORDER BY $sort_sql ";
+  }
+  else {
+
+    $sql .= ' ORDER BY keywordgroup.KeywordGroupId DESC';
+  }
+
+  $sql .= " $paged_limit_clause ";
+
+  $self->logger->debug("SQL with VCol: $sql");
+  $self->logger->debug("Where arg: " . join(',', @{$where_arg}));
+
+  # where_arg here in the list function because of the filtering 
+  my ($read_kwd_grp_err, $read_kwd_grp_msg, $kwd_grp_data) = $self->list_keyword_group(1, $sql, $where_arg);
+
+  if ($read_kwd_grp_err) {
+
+    $self->logger->debug($read_kwd_grp_msg);
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'KeywordGroup' => $kwd_grp_data,
+                                           'Pagination'   => $pagination_aref,
+                                           'RecordMeta'   => [{'TagName' => 'KeywordGroup'}],
+  };
+
+  return $data_for_postrun_href;
+}
+
+sub get_keyword_group_runmode {
+
+=pod get_keyword_group_HELP_START
+{
+"OperationName" : "Get keyword group",
+"Description": "Get detailed information about keyword group specified by id.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><RecordMeta TagName='KeywordGroup' /><Keyword KeywordGroupName='UPDATE Keyword_8149578' KeywordGroupId='4' delete='delete/keywordgroup/4' update='update/keywordgroup/4' /></DATA>",
+"SuccessMessageJSON": "{'RecordMeta' : [{'TagName' : 'KeywordGroup'}], 'Keyword' : [{'KeywordGroupName' : 'UPDATE Keyword_8149578', 'KeywordGroupId' : '4', 'delete' : 'delete/keywordgroup/4', 'update' : 'update/keywordgroup/4'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='KeywordGroupId (11): not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'KeywordGroupId (11): not found.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing keyword group id."}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self  = shift;
+
+  my $kwd_grp_id = $self->param('id');
+  my $data_for_postrun_href = {};
+
+  my $dbh = connect_kdb_read();
+  my $kwd_grp_exist = record_existence($dbh, 'keywordgroup', 'KeywordGroupId', $kwd_grp_id);
+  $dbh->disconnect();
+
+  if (!$kwd_grp_exist) {
+
+    my $err_msg = "KeywordGroupId ($kwd_grp_id): not found.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $sql = 'SELECT * FROM keywordgroup ';
+  $sql   .= 'WHERE KeywordGroupId=?';
+
+  my ($read_kwd_grp_err, $read_kwd_grp_msg, $kwd_grp_data) = $self->list_keyword_group(1, $sql, [$kwd_grp_id]);
+
+  if ($read_kwd_grp_err) {
+
+    $self->logger->debug($read_kwd_grp_msg);
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'KeywordGroup'   => $kwd_grp_data,
+                                           'RecordMeta'     => [{'TagName' => 'KeywordGroup'}],
+                                          };
+
+  return $data_for_postrun_href;
+}
+
+sub add_keyword2group_bulk_runmode {
+
+=pod add_keyword2group_bulk_gadmin_HELP_START
+{
+"OperationName" : "Add keyword to a group",
+"Description": "Add a keyword to a keywordgroup.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 1,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='2 keyword(s) has been added to keywordgroup (4) successfully.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : '2 keyword(s) has been added to keywordgroup (4) successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='KeywordId (97): not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'KeywordId (97): not found.'}]}"}],
+"RequiredUpload": 1,
+"UploadFileFormat": "XML",
+"UploadFileParameterName": "uploadfile",
+"DTDFileNameForUploadXML": "keywordgroup.dtd",
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self  = shift;
+
+  my $kwd_grp_id = $self->param('id');
+  my $data_for_postrun_href = {};
+
+  my $dbh = connect_kdb_read();
+  my $kwd_grp_exist = record_existence($dbh, 'keywordgroup', 'KeywordGroupId', $kwd_grp_id);
+  $dbh->disconnect();
+
+  if (!$kwd_grp_exist) {
+
+    my $err_msg = "KeywordGroupId ($kwd_grp_id): not found.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $keyword_info_xml_file = $self->authen->get_upload_file();
+  my $keyword_info_dtd_file = $self->get_keyword_group_dtd_file();
+
+  add_dtd($keyword_info_dtd_file, $keyword_info_xml_file);
+
+  my $xml_checker_parser = new XML::Checker::Parser( Handlers => { } );
+
+  eval {
+
+    local $XML::Checker::FAIL = sub {
+
+      my $code = shift;
+      my $err_str = XML::Checker::error_string ($code, @_);
+      $self->logger->debug("XML Parsing ERR: $code : $err_str");
+      die $err_str;
+    };
+    $xml_checker_parser->parsefile($keyword_info_xml_file);
+  };
+
+  if ($@) {
+
+    my $err_msg = $@;
+    $self->logger->debug("Parsing XML error: $err_msg");
+    my $user_err_msg = "Keyword group xml file does not comply with its definition.\n";
+    $user_err_msg   .= "Details: $err_msg";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $user_err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $dbh_write = connect_kdb_write();
+
+  my $keyword_info_xml  = read_file($keyword_info_xml_file);
+  my $keyword_info_aref = xml2arrayref($keyword_info_xml, 'keywordgroupentry');
+
+  my $uniq_kwd_id_href = {};
+
+  for my $keyword_info (@{$keyword_info_aref}) {
+
+    my $kwd_id = $keyword_info->{'KeywordId'};
+
+    if (defined $uniq_kwd_id_href->{$kwd_id}) {
+
+      my $err_msg = "Keyword ($kwd_id): duplicate.";
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+    else {
+
+      $uniq_kwd_id_href->{$kwd_id} = 1;
+    }
+  }
+
+  my @kwd_id_list = keys(%{$uniq_kwd_id_href});
+
+  if (scalar(@kwd_id_list) > 0) {
+
+    my $keyword_sql = 'SELECT KeywordId ';
+    $keyword_sql   .= 'FROM keyword ';
+    $keyword_sql   .= 'WHERE KeywordId IN (' . join(',', @kwd_id_list) . ') ';
+
+    my $keyword_lookup = $dbh_write->selectall_hashref($keyword_sql, 'KeywordId');
+
+    if ($dbh_write->err()) {
+
+      $self->logger->debug("SELECT keyword failed: " . $dbh_write->errstr());
+
+      my $err_msg = "Unexpected Error.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my $not_found_keyword_id_aref = [];
+
+    for my $kwd_id (@kwd_id_list) {
+
+      if ( !(defined $keyword_lookup->{$kwd_id}) ) {
+
+        push(@{$not_found_keyword_id_aref}, $kwd_id);
+      }
+    }
+
+    if (scalar(@{$not_found_keyword_id_aref}) > 0) {
+
+      my $err_msg = "Keyword (" . join(',', @{$not_found_keyword_id_aref}) . "): not found";
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    $keyword_sql  = qq|SELECT KeywordId FROM keywordgroupentry |;
+    $keyword_sql .= qq|WHERE KeywordGroupId=$kwd_grp_id AND KeywordId IN (| . join(',', @kwd_id_list) . ')';
+
+    $keyword_lookup = $dbh_write->selectall_hashref($keyword_sql, 'KeywordId');
+
+    if ($dbh_write->err()) {
+
+      $self->logger->debug("SELECT keyword failed: " . $dbh_write->errstr());
+
+      my $err_msg = "Unexpected Error.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my $already_in_group_aref = [];
+
+    for my $kwd_id (@kwd_id_list) {
+
+      if ( defined $keyword_lookup->{$kwd_id} ) {
+
+        push(@{$already_in_group_aref}, $kwd_id);
+      }
+    }
+
+    if (scalar(@{$already_in_group_aref}) > 0) {
+
+      my $err_msg = "Keyword (" . join(',', @{$already_in_group_aref}) . "): already in keywordgroup ($kwd_grp_id).";
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  my $sql = "INSERT INTO keywordgroupentry(KeywordGroupId,KeywordId) VALUES ";
+
+  my @kwd_grp_entry_sql_list;
+
+  for my $keyword_info (@{$keyword_info_aref}) {
+
+    my $keyword_id   = $keyword_info->{'KeywordId'};
+
+    my $sql_list = qq|($kwd_grp_id, $keyword_id)|;
+
+    push(@kwd_grp_entry_sql_list, $sql_list);
+  }
+
+  my $nb_keyword = scalar(@kwd_grp_entry_sql_list);
+  $sql .= join(',', @kwd_grp_entry_sql_list);
+
+  $self->logger->debug("SQL: $sql");
+
+  my $sth = $dbh_write->prepare($sql);
+  $sth->execute();
+
+  if ($dbh_write->err()) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+  $sth->finish();
+
+  $dbh_write->disconnect();
+
+  my $info_msg_aref  = [{'Message' => "$nb_keyword keyword(s) has been added to keywordgroup ($kwd_grp_id) successfully."}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'     => $info_msg_aref };
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub list_keyword_in_group {
+
+  my $self            = $_[0];
+  my $extra_attr_yes  = $_[1];
+  my $sql             = $_[2];
+  my $where_para_aref = $_[3];
+
+  my $err = 0;
+  my $msg = '';
+
+  my $data_aref = [];
+
+  my $dbh = connect_kdb_read();
+
+  ($err, $msg, $data_aref) = read_data($dbh, $sql, $where_para_aref);
+
+  if ($err) {
+
+    return ($err, $msg, []);
+  }
+
+  #$self->logger->debug("Number of records: " . scalar(@{$data_aref}));
+
+  my $extra_attr_kwd_data = [];
+
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  if ($extra_attr_yes && ($gadmin_status eq '1')) {
+
+    for my $row (@{$data_aref}) {
+
+      my $kwd_id     = $row->{'KeywordId'};
+      my $kwd_grp_id = $row->{'KeywordGroupId'};
+      $row->{'removeKeyword'} = "keywordgroup/$kwd_grp_id/remove/keyword/$kwd_id";
+
+      push(@{$extra_attr_kwd_data}, $row);
+    }
+
+  }
+  else {
+
+    $extra_attr_kwd_data = $data_aref;
+  }
+
+  $dbh->disconnect();
+
+  return ($err, $msg, $extra_attr_kwd_data);
+}
+
+sub list_keyword_in_group_runmode {
+
+=pod list_keyword_in_group_HELP_START
+{
+"OperationName" : "List keyword(s) in the specified group",
+"Description": "Listing keywords in the group specified by id.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><KeywordGroupEntry KeywordGroupEntryId='5' removeKeyword='keywordgroup/4/remove/keyword/8' KeywordId='8' KeywordGroupId='4' KeywordName='Keyword_2667243' />RecordMeta TagName='KeywordGroupEntry' /></DATA>",
+"SuccessMessageJSON": "{'KeywordGroupEntry' : [{'removeKeyword' : 'keywordgroup/4/remove/keyword/8', 'KeywordGroupEntryId' : '5', 'KeywordId' : '8', 'KeywordGroupId' : '4', 'KeywordName' : 'Keyword_2667243'}], 'RecordMeta' : [{'TagName' : 'KeywordGroupEntry'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='KeywordGroupId (11): not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'KeywordGroupId (11): not found.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing keyword group id."}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self  = shift;
+
+  my $kwd_grp_id = $self->param('id');
+  my $data_for_postrun_href = {};
+
+  my $dbh = connect_kdb_read();
+  my $kwd_grp_exist = record_existence($dbh, 'keywordgroup', 'KeywordGroupId', $kwd_grp_id);
+  $dbh->disconnect();
+
+  if (!$kwd_grp_exist) {
+
+    my $err_msg = "KeywordGroupId ($kwd_grp_id): not found.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $sql = 'SELECT keywordgroupentry.*, keyword.KeywordName ';
+  $sql   .= 'FROM keywordgroupentry ';
+  $sql   .= 'LEFT JOIN keyword ON keywordgroupentry.KeywordId=keyword.KeywordId ';
+  $sql   .= 'WHERE KeywordGroupId=?';
+
+  my ($read_kwd_grp_entry_err, $read_kwd_grp_entry_msg, $kwd_grp_entry_data) = $self->list_keyword_in_group(1, $sql,
+                                                                                                            [$kwd_grp_id]);
+
+  if ($read_kwd_grp_entry_err) {
+
+    $self->logger->debug($read_kwd_grp_entry_msg);
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'KeywordGroupEntry'     => $kwd_grp_entry_data,
+                                           'RecordMeta'            => [{'TagName' => 'KeywordGroupEntry'}],
+                                          };
+
+  return $data_for_postrun_href;
+}
+
+sub remove_keyword_from_group_runmode {
+
+=pod remove_keyword_from_group_gadmin_HELP_START
+{
+"OperationName" : "Remove keyword from group",
+"Description": "Remove specified keyword from keywordgrou specified by idp",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 1,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='Keyword (18) has been removed from keywordgroup (6) successfully.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'Keyword (18) has been removed from keywordgroup (7) successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='KeywordGroupId (7): not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'KeywordGroupId (7): not found.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing keyword group id."}, {"ParameterName": "id", "Description": "keyword id which is part of the keyword group."}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my ($self) = @_;
+
+  my $data_for_postrun_href = {};
+
+  my $kwd_grp_id  = $self->param('id');
+  my $kwd_id      = $self->param('kwdid');
+
+  my $dbh_k_read   = connect_kdb_read();
+
+  if ( !record_existence( $dbh_k_read, 'keywordgroup', 'KeywordGroupId', $kwd_grp_id ) ) {
+
+    my $err_msg = "KeywordGroupId ($kwd_grp_id): not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $sql = 'SELECT KeywordGroupEntryId FROM keywordgroupentry WHERE KeywordGroupId=? AND KeywordId=?';
+
+  my ($r_kwd_grp_entry_err, $db_kwd_grp_entry_id) = read_cell($dbh_k_read, $sql, [$kwd_grp_id, $kwd_id]);
+
+  if (length($db_kwd_grp_entry_id) == 0) {
+
+    my $err_msg = "KeywordId ($kwd_id): not found in keywordgroup ($kwd_grp_id).";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $self->logger->debug("KeywordGroupEntryId: $db_kwd_grp_entry_id");
+
+  $dbh_k_read->disconnect();
+
+  my $dbh_k_write = connect_kdb_write();
+
+  $sql = "DELETE FROM keywordgroupentry WHERE KeywordGroupEntryId=?";
+  my $sth = $dbh_k_write->prepare($sql);
+  $sth->execute($db_kwd_grp_entry_id);
+
+  if ( $dbh_k_write->err() ) {
+
+    my $err_msg = "Unexpected Error.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sth->finish();
+  $dbh_k_write->disconnect();
+
+  my $info_msg_aref = [ { 'Message' => "Keyword ($kwd_id) has been removed from keywordgroup ($kwd_grp_id) successfully." } ];
+
+  return {
+    'Error'     => 0,
+    'Data'      => { 'Info' => $info_msg_aref, },
+    'ExtraData' => 0
+  };
+}
+
+sub del_keyword_group_runmode {
+
+=pod del_keyword_group_gadmin_HELP_START
+{
+"OperationName" : "Delete keyword group",
+"Description": "Delete keyword group if it does not have any memeber keyword.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 1,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='KeywordGroup (3) has been successfully deleted.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'KeywordGroup (4) has been successfully deleted.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='KeywordGroupId (7): not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'KeywordGroupId (7): not found.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing keyword group id."}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my ($self) = @_;
+
+  my $data_for_postrun_href = {};
+
+  my $kwd_grp_id  = $self->param('id');
+
+  my $dbh_k_read   = connect_kdb_read();
+
+  if ( !record_existence( $dbh_k_read, 'keywordgroup', 'KeywordGroupId', $kwd_grp_id ) ) {
+
+    my $err_msg = "KeywordGroupId ($kwd_grp_id): not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (record_existence($dbh_k_read, 'keywordgroupentry', 'KeywordGroupId', $kwd_grp_id)) {
+
+    my $err_msg = "KeywordGroup ($kwd_grp_id): still has member keyword(s).";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh_k_read->disconnect();
+
+  my $dbh_k_write = connect_kdb_write();
+
+  my $sql = "DELETE FROM keywordgroup WHERE KeywordGroupId=?";
+  my $sth = $dbh_k_write->prepare($sql);
+  $sth->execute($kwd_grp_id);
+
+  if ( $dbh_k_write->err() ) {
+
+    my $err_msg = "Unexpected Error.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $self->logger->debug("KeywordGroupId: $kwd_grp_id deleted");
+  $sth->finish();
+  $dbh_k_write->disconnect();
+
+  my $info_msg_aref = [ { 'Message' => "KeywordGroup ($kwd_grp_id) has been successfully deleted." } ];
+
+  return {
+    'Error'     => 0,
+    'Data'      => { 'Info' => $info_msg_aref, },
+    'ExtraData' => 0
+  };
+}
+
+sub update_group_runmode {
+
+=pod update_group_gadmin_HELP_START
+{
+"OperationName" : "Update group",
+"Description": "Update existing system group.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 1,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"KDDArTModule": "main",
+"KDDArTTable": "systemgroup",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='Group (2) has been updated successfully.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'Group (2) has been updated successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Group (3) not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Group (3) not found.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing GroupId"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self     = shift;
+  my $group_id = $self->param('id');
+  my $query    = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  # Generic required static field checking
+
+  my $dbh_read = connect_kdb_read();
+
+  my $skip_field = {};
+
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'systemgroup', $skip_field);
+
+  if ($chk_sfield_err) {
+
+    $self->logger->debug($chk_sfield_msg);
+
+    return $for_postrun_href;
+  }
+
+  $dbh_read->disconnect();
+
+  # Finish generic required static field checking
+
+  my $group_name   = $query->param('SystemGroupName');
+  my $group_desc   = $query->param('SystemGroupDescription');
+
+  my $dbh_write = connect_kdb_write();
+
+  my $group_exist = record_existence($dbh_write, 'systemgroup', 'SystemGroupId', $group_id);
+
+  if (!$group_exist) {
+
+    my $err_msg = "Group ($group_id) not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $sql = 'SELECT SystemGroupId FROM systemgroup WHERE SystemGroupId <> ? AND SystemGroupName = ?';
+
+  my ($r_grp_err, $db_grp_id) = read_cell($dbh_write, $sql, [$group_id, $group_name]);
+
+  if ($r_grp_err) {
+
+    $self->logger->debug("Checking if group name already exists failed.");
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (length($db_grp_id) > 0) {
+
+    my $err_msg = "Group ($group_name) already exists.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'SystemGroupName' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sql    = 'UPDATE systemgroup SET ';
+  $sql   .= 'SystemGroupName=?, ';
+  $sql   .= 'SystemGroupDescription=? ';
+  $sql   .= 'WHERE SystemGroupId=?';
+
+  my $sth = $dbh_write->prepare($sql);
+  $sth->execute($group_name, $group_desc, $group_id);
+
+  if ($dbh_write->err()) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sth->finish();
+
+  $dbh_write->disconnect();
+
+  my $info_msg_aref = [{'Message' => "Group ($group_id) has been updated successfully."}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'      => $info_msg_aref};
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub get_keyword_group_dtd_file {
+
+  my $dtd_path = $ENV{DOCUMENT_ROOT} . '/' . $DTD_PATH;
+
+  return "${dtd_path}/keywordgroup.dtd";
 }
 
 sub logger {

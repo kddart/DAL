@@ -1,11 +1,11 @@
 <TestCase>
   <CaseInfo CustomMethod="add_record" Description="Remove Trial from MultiLocTrial" TargetURL="multiloctrial/:MultiLocTrialId/remove/trial/:TrialId" Type="BLOCKING" />
   <INPUT ParaName="MultiLocTrialId" SrcValue="xml/add_data_no_vcol/case_00505_add_multiloctrial.xml" />
-  <INPUT ParaName="TrialId" SrcValue="xml/add_data_no_vcol/case_00503_add_trial4multiloc1.xml" />
+  <INPUT ParaName="TrialId" SrcValue="xml/add_data_no_vcol/case_00503_add_trial4trialgroup1.xml" />
   <Match Attr="StatusCode" Value="200" />
   <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
   <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00505_add_multiloctrial.xml" Order="3" />
-  <RunInfo Success="1" Time="1444969972" />
+  
 </TestCase>

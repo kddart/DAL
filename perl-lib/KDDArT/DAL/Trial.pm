@@ -1,24 +1,14 @@
-#$Id: Trial.pm 1023 2015-10-16 05:20:00Z puthick $
-#$Author: puthick $
+#$Id$
+#$Author$
 
-# Copyright (c) 2015, Diversity Arrays Technology, All rights reserved.
-
-# COPYRIGHT AND LICENSE
-# 
-# Copyright (C) 2014 by Diversity Arrays Technology Pty Ltd
-# 
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-# 
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
+# Copyright (c) 2011, Diversity Arrays Technology, All rights reserved.
 
 # Author    : Puthick Hok
-# Version   : 2.3.0 build 1040
+# Created   : 02/06/2010
+# Modified  :
+# Purpose   :
+#
+#
 
 package KDDArT::DAL::Trial;
 
@@ -30,7 +20,8 @@ BEGIN {
 
   my ($volume, $current_dir, $file) = File::Spec->splitpath(__FILE__);
 
-  $main::kddart_base_dir = "${current_dir}../../..";
+  my @current_dir_part = split('/perl-lib/KDDArT/DAL/', $current_dir);
+  $main::kddart_base_dir = $current_dir_part[0];
 }
 
 use lib "$main::kddart_base_dir/perl-lib";
@@ -43,6 +34,7 @@ use CGI::Application::Plugin::Session;
 use Log::Log4perl qw(get_logger :levels);
 use XML::Checker::Parser;
 use Crypt::Random qw( makerandom );
+use Time::HiRes qw( tv_interval gettimeofday );
 
 sub setup {
 
@@ -84,11 +76,15 @@ sub setup {
                                            'add_trial_workflow',
                                            'update_trial_workflow',
                                            'del_trial_workflow_gadmin',
-                                           'add_multiloc_trial',
-                                           'update_multiloc_trial',
-                                           'del_multiloc_trial',
-                                           'add_trial2mlt',
-                                           'remove_trial_from_mlt',
+                                           'add_trialgroup',
+                                           'update_trialgroup',
+                                           'del_trialgroup',
+                                           'add_trial2trialgroup',
+                                           'remove_trial_from_trialgroup',
+                                           'import_trialunitkeyword_csv',
+                                           'add_trial_unit_keyword',
+                                           'remove_trial_unit_keyword',
+                                           'import_crossing_csv',
       );
   __PACKAGE__->authen->count_session_request_runmodes(':all');
   __PACKAGE__->authen->check_signature_runmodes('add_designtype_gadmin',
@@ -118,9 +114,11 @@ sub setup {
                                                 'add_trial_workflow',
                                                 'update_trial_workflow',
                                                 'del_trial_workflow_gadmin',
-                                                'update_multiloc_trial',
-                                                'del_multiloc_trial',
-                                                'remove_trial_from_mlt',
+                                                'update_trialgroup',
+                                                'del_trialgroup',
+                                                'remove_trial_from_trialgroup',
+                                                'add_trial_unit_keyword',
+                                                'remove_trial_unit_keyword',
       );
 
   __PACKAGE__->authen->check_gadmin_runmodes('add_site_gadmin',
@@ -141,8 +139,10 @@ sub setup {
 
   __PACKAGE__->authen->check_sign_upload_runmodes('add_trial_unit',
                                                   'add_trial_unit_bulk',
-                                                  'add_multiloc_trial',
-                                                  'add_trial2mlt',
+                                                  'add_trialgroup',
+                                                  'add_trial2trialgroup',
+                                                  'import_trialunitkeyword_csv',
+                                                  'import_crossing_csv',
       );
 
   $self->run_modes(
@@ -195,13 +195,19 @@ sub setup {
     'list_trial_workflow'                    => 'list_trial_workflow_runmode',
     'get_trial_workflow'                     => 'get_trial_workflow_runmode',
     'del_trial_workflow_gadmin'              => 'del_trial_workflow_runmode',
-    'add_multiloc_trial'                     => 'add_multiloc_trial_runmode',
-    'update_multiloc_trial'                  => 'update_multiloc_trial_runmode',
-    'list_multiloctrial_advanced'            => 'list_multiloctrial_advanced_runmode',
-    'get_multiloc_trial'                     => 'get_multiloc_trial_runmode',
-    'del_multiloc_trial'                     => 'del_multiloc_trial_runmode',
-    'add_trial2mlt'                          => 'add_trial2mlt_runmode',
-    'remove_trial_from_mlt'                  => 'remove_trial_from_mlt_runmode',
+    'add_trialgroup'                         => 'add_trialgroup_runmode',
+    'update_trialgroup'                      => 'update_trialgroup_runmode',
+    'list_trialgroup_advanced'               => 'list_trialgroup_advanced_runmode',
+    'get_trialgroup'                         => 'get_trialgroup_runmode',
+    'del_trialgroup'                         => 'del_trialgroup_runmode',
+    'add_trial2trialgroup'                   => 'add_trial2trialgroup_runmode',
+    'remove_trial_from_trialgroup'           => 'remove_trial_from_trialgroup_runmode',
+    'import_trialunitkeyword_csv'            => 'import_trialunitkeyword_csv_runmode',
+    'list_trialunit_keyword_advanced'        => 'list_trialunit_keyword_advanced_runmode',
+    'add_trial_unit_keyword'                 => 'add_trial_unit_keyword_runmode',
+    'remove_trial_unit_keyword'              => 'remove_trial_unit_keyword_runmode',
+    'import_crossing_csv'                    => 'import_crossing_csv_runmode',
+    'list_crossing_advanced'                 => 'list_crossing_advanced_runmode',
     );
 
   my $logger = get_logger();
@@ -295,7 +301,7 @@ sub add_site_runmode {
 
   my $dbh_gis_read = connect_gis_read();
   my ($is_wkt_err, $wkt_err_href) = is_valid_wkt_href($dbh_gis_read, {'sitelocation' => $site_location},
-                                                      ['POLYGON', 'MULTIPOLYGON']);
+                                                      ['POLYGON', 'MULTIPOLYGON', 'POINT']);
   $dbh_gis_read->disconnect();
 
   if ($is_wkt_err) {
@@ -461,8 +467,18 @@ sub add_site_runmode {
 
   my $dbh_gis_write = connect_gis_write();
 
-  $sql  = 'INSERT INTO siteloc (siteid, sitelocation) ';
-  $sql .= 'VALUES (?, ST_Multi(ST_GeomFromText(?, -1)))';
+  if ($site_location =~ /^POINT/i) {
+
+    my $st_buffer_val = $POINT2POLYGON_BUFFER4SITE->{$ENV{DOCUMENT_ROOT}};
+
+    $sql  = "INSERT INTO siteloc (siteid, sitelocation) ";
+    $sql .= "VALUES (?, ST_Multi(ST_Buffer(ST_GeomFromText(?, -1), $st_buffer_val, 1)))";
+  }
+  else {
+
+    $sql  = 'INSERT INTO siteloc (siteid, sitelocation) ';
+    $sql .= 'VALUES (?, ST_Multi(ST_GeomFromText(?, -1)))';
+  }
 
   $self->logger->debug("SQL: $sql");
   $self->logger->debug("SiteId: $site_id");
@@ -757,7 +773,7 @@ sub add_trial_runmode {
 
     my $dbh_gis_read = connect_gis_read();
     my ($is_wkt_err, $wkt_err_href) = is_valid_wkt_href($dbh_gis_read, {'triallocation' => $trial_location},
-                                                        ['POLYGON', 'MULTIPOLYGON']);
+                                                        ['POLYGON', 'MULTIPOLYGON', 'POINT']);
     $dbh_gis_read->disconnect();
 
     if ($is_wkt_err) {
@@ -1010,9 +1026,9 @@ sub add_trial_runmode {
       $sql .= 'FactorValue=?';
       my $factor_sth = $dbh_k_write->prepare($sql);
       $factor_sth->execute($trial_id, $vcol_id, $factor_value);
-      
+
       if ($dbh_k_write->err()) {
-        
+
         $data_for_postrun_href->{'Error'} = 1;
         $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
@@ -1026,8 +1042,18 @@ sub add_trial_runmode {
   my $dbh_gis_write = connect_gis_write();
   if (length($trial_location) > 0) {
 
-    $sql  = 'INSERT INTO trialloc (trialid, triallocation) ';
-    $sql .= 'VALUES (?, ST_Multi(ST_GeomFromText(?, -1)))';
+    if ($trial_location =~ /^POINT/i) {
+
+      my $st_buffer_val = $POINT2POLYGON_BUFFER4TRIAL->{$ENV{DOCUMENT_ROOT}};
+
+      $sql  = "INSERT INTO trialloc (trialid, triallocation) ";
+      $sql .= "VALUES (?, ST_Multi(ST_Buffer(ST_GeomFromText(?, -1), $st_buffer_val, 1)))";
+    }
+    else {
+
+      $sql  = 'INSERT INTO trialloc (trialid, triallocation) ';
+      $sql .= 'VALUES (?, ST_Multi(ST_GeomFromText(?, -1)))';
+    }
 
     $self->logger->debug("SQL: $sql");
     $self->logger->debug("TrialId: $trial_id");
@@ -2173,124 +2199,239 @@ sub add_trial_unit_bulk_runmode {
     }
   }
 
-  my $inserted_trialunit_records     = {};
-  my $inserted_trialunit_loc_records = {};
+  # optimisation starts from here. the optimisation will use TrialUnitBarcode as the key for mapping
+  # the data in memory to the record id inserted into the database after SQL bulk insert. The mapping is
+  # used for trialunitspecimen and triallocation. Since TrialUnitBarcode is not compulsory, DAL will generate
+  # temporary TrialUnitBarcodes if they are not provided in the trialunit data.
 
-  for my $trialunit (@{$trialunit_info_aref}) {
+  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
 
-    my $src_trial_unit_id   = $trialunit->{'SourceTrialUnitId'};
-    my $replicate_number    = $trialunit->{'ReplicateNumber'};
-    my $trial_unit_comment  = $trialunit->{'TrialUnitNote'};
-    my $sample_supplier_id  = $trialunit->{'SampleSupplierId'};
-    my $trialunit_location  = $trialunit->{'trialunitlocation'};
+  $year = sprintf("%02d", $year % 100);
+  $yday = sprintf("%03d", $yday);
 
-    my $treatment_id        = undef;
+  my $user_id  = sprintf("%02d", $self->authen->user_id());
 
-    if (length($trialunit->{'TreatmentId'}) > 0) {
+  my @big_a_z_chars = ("A" .. "Z");
 
-      $treatment_id = $trialunit->{'TreatmentId'};
+  my $rand3 = $big_a_z_chars[rand(26)] . $big_a_z_chars[rand(26)] . int(rand(10));
+
+  my $dal_tmp_tu_barcode_prefix = qq|TU_${user_id}_${year}${yday}${hour}${min}${sec}_${rand3}_|;
+
+  my @dimension_field_list;
+
+  for my $dimension (@dimension_list) {
+
+    push(@dimension_field_list, "TrialUnit${dimension}");
+  }
+
+  my $bulk_sql = 'INSERT INTO trialunit ';
+  $bulk_sql   .= '(TrialId,TreatmentId,SourceTrialUnitId,ReplicateNumber,TrialUnitBarcode,TrialUnitNote,SampleSupplierID,';
+  $bulk_sql   .= join(',', @dimension_field_list) . ') VALUES ';
+
+  my @tu_sql_rec_list;
+
+  for (my $i = 0; $i < scalar(@{$trialunit_info_aref}); $i++) {
+
+    my $trialunit_rec       = $trialunit_info_aref->[$i];
+
+    my $replicate_number    = $trialunit_rec->{'ReplicateNumber'};
+    my $trial_unit_comment  = $trialunit_rec->{'TrialUnitNote'};
+    my $sample_supplier_id  = $trialunit_rec->{'SampleSupplierId'};
+
+    my $src_trial_unit_id   = 'NULL';
+
+    if (length($trialunit_rec->{'SourceTrialUnitId'}) > 0) {
+
+      $src_trial_unit_id   = $trialunit_rec->{'SourceTrialUnitId'};
     }
 
-    my $barcode = undef;
+    my $treatment_id        = 'NULL';
 
-    if (defined $trialunit->{'TrialUnitBarcode'} > 0) {
+    if (length($trialunit_rec->{'TreatmentId'}) > 0) {
 
-      if ($trialunit->{'TrialUnitBarcode'} ne '0') {
-
-        $barcode = $trialunit->{'TrialUnitBarcode'};
-      }
+      $treatment_id = $trialunit_rec->{'TreatmentId'};
     }
 
-    my @dimension_val_list;
     my @sql_dimension_list;
 
     for my $dimension (@dimension_list) {
 
-      if (defined $trialunit->{"TrialUnit${dimension}"}) {
+      if (length($trialunit_rec->{"TrialUnit${dimension}"}) > 0) {
 
-        if (length($trialunit->{"TrialUnit${dimension}"}) > 0) {
+        my $dimension_val = $trialunit_rec->{"TrialUnit${dimension}"};
 
-          my $dimension_val = $trialunit->{"TrialUnit${dimension}"};
+        if ($dimension_val !~ /^\d+$/) {
 
-          push(@dimension_val_list, $dimension_val);
-          push(@sql_dimension_list, "TrialUnit${dimension}=?");
+          $dimension_val = $dbh_k_write->quote($dimension_val);
         }
+
+        push(@sql_dimension_list, $dimension_val);
+      }
+      else {
+
+        push(@sql_dimension_list, 'NULL');
       }
     }
 
-    my $tu_specimen_aref = $trialunit->{'trialunitspecimen'};
+    my $tu_barcode = $dal_tmp_tu_barcode_prefix . $i;
 
-    $sql    = 'INSERT INTO trialunit SET ';
-    $sql   .= 'TrialId=?, ';
-    $sql   .= 'SampleSupplierId=?, ';
-    $sql   .= 'TreatmentId=?, ';
-    $sql   .= 'ReplicateNumber=?, ';
-    $sql   .= 'TrialUnitBarcode=?, ';
-    $sql   .= 'TrialUnitNote=?, ';
-    $sql   .= 'SourceTrialUnitId=?, ';
-    $sql   .= join(',', @sql_dimension_list);
+    if (length($trialunit_rec->{'TrialUnitBarcode'}) == 0) {
 
-    my $sth = $dbh_k_write->prepare($sql);
-    $sth->execute($trial_id, $sample_supplier_id, $treatment_id,
-                  $replicate_number, $barcode, $trial_unit_comment, $src_trial_unit_id,
-                  @dimension_val_list
-        );
+      $trialunit_rec->{'TrialUnitBarcode'} = $tu_barcode;
+      $trialunit_rec->{'RemoveBarcode'}    = 1;
+    }
+    else {
 
-    if ($dbh_k_write->err()) {
+      $tu_barcode = $trialunit_rec->{'TrialUnitBarcode'};
+      $trialunit_rec->{'RemoveBarcode'}    = 0;
+    }
 
-      my ($rb_trialunit_err, $rb_trialunit_msg) = $self->rollback_cleanup($dbh_k_write, $inserted_trialunit_records);
+    my $tu_sql_rec_str = qq|(${trial_id},${treatment_id},${src_trial_unit_id},${replicate_number},'${tu_barcode}','${trial_unit_comment}',${sample_supplier_id},|;
+    $tu_sql_rec_str   .= join(',', @sql_dimension_list) . ')';
 
-      if ($rb_trialunit_err) {
+    $self->logger->debug("Trial Unit Rec SQL: $tu_sql_rec_str");
 
-        $self->logger->debug("Rollback error msg: $rb_trialunit_msg");
+    push(@tu_sql_rec_list, $tu_sql_rec_str);
 
-        $data_for_postrun_href->{'Error'} = 1;
-        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+    $trialunit_info_aref->[$i] = $trialunit_rec;
+  }
 
-        return $data_for_postrun_href;
-      }
+  $bulk_sql .= join(',', @tu_sql_rec_list);
 
-      my ($rb_trialunit_loc_err, $rb_trialunit_loc_msg) = $self->rollback_cleanup($dbh_gis_write,
-                                                                                  $inserted_trialunit_loc_records);
+  $sql = 'SELECT TrialUnitId FROM trialunit ORDER BY TrialUnitId DESC LIMIT 1';
 
-      if ($rb_trialunit_loc_err) {
+  my $r_tu_err;
+  my $tu_id_before;
+  my $tu_id_after;
 
-        $self->logger->debug("Rollback error msg: $rb_trialunit_loc_msg");
+  ($r_tu_err, $tu_id_before) = read_cell($dbh_k_write, $sql, []);
 
-        $data_for_postrun_href->{'Error'} = 1;
-        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+  if ($r_tu_err) {
 
-        return $data_for_postrun_href;
-      }
+    $self->logger->debug("Read TrialUnitId before bulk INSERT failed");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
-      $self->logger->debug("SQL Error:" . $dbh_k_write->errstr());
+    return $data_for_postrun_href;
+  }
+
+  my $before_clause = '1=1';
+
+  if (length($tu_id_before) > 0) {
+
+    $before_clause = " TrialUnitId >= $tu_id_before ";
+  }
+
+  $self->logger->debug("BULK SQL: $bulk_sql");
+
+  my $sth = $dbh_k_write->prepare($bulk_sql);
+  $sth->execute();
+
+  if ($dbh_k_write->err()) {
+
+    $self->logger->debug("Add trialunit in bulk failed");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sth->finish();
+
+  $sql = 'SELECT TrialUnitId FROM trialunit ORDER BY TrialUnitId DESC LIMIT 1';
+
+  ($r_tu_err, $tu_id_after) = read_cell($dbh_k_write, $sql, []);
+
+  if ($r_tu_err) {
+
+    $self->logger->debug("Read TrialUnitId after bulk INSERT failed");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $after_clause = '1=1';
+
+  if (length($tu_id_after) > 0) {
+
+    $after_clause = " TrialUnitId <= $tu_id_after ";
+  }
+
+  $sql  = 'SELECT TrialUnitId, TrialUnitBarcode FROM trialunit ';
+  $sql .= "WHERE $before_clause AND $after_clause";
+
+  $self->logger->debug("SQL: $sql");
+
+  $sth = $dbh_k_write->prepare($sql);
+  $sth->execute();
+
+  if ($dbh_k_write->err()) {
+
+    $self->logger->debug("Read TrialUnit in between before and after BULK insert");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $barcode2id_href = $sth->fetchall_hashref('TrialUnitBarcode');
+
+  if ($sth->err()) {
+
+    $self->logger->debug("Read TrialUnit rec into hash lookup in between before and after BULK insert");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  for (my $i = 0; $i < scalar(@{$trialunit_info_aref}); $i++) {
+
+    my $trialunit  = $trialunit_info_aref->[$i];
+    my $tu_barcode = $trialunit->{'TrialUnitBarcode'};
+
+    if (!(defined $barcode2id_href->{$tu_barcode})) {
+
+      $self->logger->debug("Missing TrialUnit barcode lookup");
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
       return $data_for_postrun_href;
     }
-    $sth->finish();
 
-    my $trial_unit_id = $dbh_k_write->last_insert_id(undef, undef, 'trialunit', 'TrialUnitId');
+    my $tu_id = $barcode2id_href->{$tu_barcode}->{'TrialUnitId'};
 
-    if ( !(defined $inserted_trialunit_records->{'trialunit'}) ) {
+    $self->logger->debug("Barcode: $tu_barcode - ID: $tu_id");
 
-      $inserted_trialunit_records->{'trialunit'} = ['TrialUnitId', $trial_unit_id];
-    }
-    else {
+    $trialunit->{'TrialUnitId'} = $tu_id;
 
-      push(@{$inserted_trialunit_records->{'trialunit'}}, $trial_unit_id);
-    }
+    $trialunit_info_aref->[$i] = $trialunit;
+  }
+
+  $bulk_sql = 'INSERT INTO trialunitspecimen(TrialUnitId,SpecimenId,ItemId,PlantDate,HarvestDate,HasDied,Notes) VALUES';
+
+  my $tu_loc_bulk_sql = 'INSERT INTO trialunitloc (trialunitid, trialunitlocation) VALUES';
+
+  my @tu_spec_sql_list;
+  my @tu_loc_sql_list;
+
+  foreach my $trialunit (@{$trialunit_info_aref}) {
+
+    my $trialunit_id        = $trialunit->{'TrialUnitId'};
+    my $trialunit_location  = $trialunit->{'trialunitlocation'};
+
+    my $tu_specimen_aref = $trialunit->{'trialunitspecimen'};
 
     for my $trialunitspecimen (@{$tu_specimen_aref}) {
 
       my $specimen_id  = $trialunitspecimen->{'SpecimenId'};
 
-      my $item_id      = undef;
-      my $plant_date   = q{};
-      my $harvest_date = q{};
-      my $has_died     = q{};
-      my $notes        = q{};
+      my $item_id      = 'NULL';
+      my $plant_date   = 'NULL';
+      my $harvest_date = 'NULL';
+      my $has_died     = 'NULL';
+      my $notes        = 'NULL';
 
       if (defined $trialunitspecimen->{'ItemId'}) {
 
@@ -2304,7 +2445,7 @@ sub add_trial_unit_bulk_runmode {
 
         if ( length($trialunitspecimen->{'PlantDate'}) > 0 ) {
 
-          $plant_date = $trialunitspecimen->{'PlantDate'};
+          $plant_date = $dbh_k_write->quote($trialunitspecimen->{'PlantDate'});
         }
       }
 
@@ -2312,7 +2453,7 @@ sub add_trial_unit_bulk_runmode {
 
         if ( length($trialunitspecimen->{'HarvestDate'}) > 0 ) {
 
-          $harvest_date = $trialunitspecimen->{'HarvestDate'};
+          $harvest_date = $dbh_k_write->quote($trialunitspecimen->{'HarvestDate'});
         }
       }
 
@@ -2328,123 +2469,90 @@ sub add_trial_unit_bulk_runmode {
 
         if ( length($trialunitspecimen->{'Notes'}) > 0 ) {
 
-          $notes = $trialunitspecimen->{'Notes'};
+          $notes = $dbh_k_write->quote($trialunitspecimen->{'Notes'});
         }
       }
 
-      $sql  = 'INSERT INTO trialunitspecimen SET ';
-      $sql .= 'SpecimenId=?, ';
-      $sql .= 'ItemId=?, ';
-      $sql .= 'TrialUnitId=?, ';
-      $sql .= 'PlantDate=?, ';
-      $sql .= 'HarvestDate=?, ';
-      $sql .= 'HasDied=?, ';
-      $sql .= 'Notes=?';
+      my $tu_spec_rec_str = qq|(${trialunit_id},${specimen_id},${item_id},${plant_date},${harvest_date},${has_died},${notes})|;
 
-      my $trialunit_specimen_sth = $dbh_k_write->prepare($sql);
-      $trialunit_specimen_sth->execute($specimen_id, $item_id, $trial_unit_id,
-                                       $plant_date, $harvest_date, $has_died, $notes);
-
-      if ($dbh_k_write->err()) {
-
-        my ($rb_trialunit_err, $rb_trialunit_msg) = $self->rollback_cleanup($dbh_k_write, $inserted_trialunit_records);
-
-        if ($rb_trialunit_err) {
-
-          $self->logger->debug("Rollback error msg: $rb_trialunit_msg");
-
-          $data_for_postrun_href->{'Error'} = 1;
-          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-          return $data_for_postrun_href;
-        }
-
-        my ($rb_trialunit_loc_err, $rb_trialunit_loc_msg) = $self->rollback_cleanup($dbh_gis_write,
-                                                                                    $inserted_trialunit_loc_records);
-
-        if ($rb_trialunit_loc_err) {
-
-          $self->logger->debug("Rollback error msg: $rb_trialunit_loc_msg");
-
-          $data_for_postrun_href->{'Error'} = 1;
-          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-          return $data_for_postrun_href;
-        }
-
-        $data_for_postrun_href->{'Error'} = 1;
-        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-        return $data_for_postrun_href;
-      }
-
-      my $tu_specimen_id = $dbh_k_write->last_insert_id(undef, undef, 'trialunitspecimen', 'TrialUnitSpecimenId');
-
-      if ( !(defined $inserted_trialunit_records->{'trialunitspecimen'}) ) {
-
-        $inserted_trialunit_records->{'trialunitspecimen'} = ['TrialUnitSpecimenId', $tu_specimen_id];
-      }
-      else {
-
-        push(@{$inserted_trialunit_records->{'trialunitspecimen'}}, $tu_specimen_id);
-      }
-
-      $trialunit_specimen_sth->finish();
+      push(@tu_spec_sql_list, $tu_spec_rec_str);
     }
 
     if (length($trialunit_location) > 0) {
 
-      $sql  = 'INSERT INTO trialunitloc (trialunitid, trialunitlocation) ';
-      $sql .= 'VALUES (?, ST_Force_Collection(ST_GeomFromText(?, -1)))';
+      my $tu_loc_sql_str = qq|(${trialunit_id},ST_Force_Collection(ST_GeomFromText('$trialunit_location', -1)))|;
 
-      my $gis_sth = $dbh_gis_write->prepare($sql);
-      $gis_sth->execute($trial_unit_id, $trialunit_location);
-
-      if ($dbh_gis_write->err()) {
-
-        my ($rb_trialunit_err, $rb_trialunit_msg) = $self->rollback_cleanup($dbh_k_write, $inserted_trialunit_records);
-
-        if ($rb_trialunit_err) {
-
-          $self->logger->debug("Rollback error msg: $rb_trialunit_msg");
-
-          $data_for_postrun_href->{'Error'} = 1;
-          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-          return $data_for_postrun_href;
-        }
-
-        my ($rb_trialunit_loc_err, $rb_trialunit_loc_msg) = $self->rollback_cleanup($dbh_gis_write,
-                                                                                    $inserted_trialunit_loc_records);
-
-        if ($rb_trialunit_loc_err) {
-
-          $self->logger->debug("Rollback error msg: $rb_trialunit_loc_msg");
-
-          $data_for_postrun_href->{'Error'} = 1;
-          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-          return $data_for_postrun_href;
-        }
-
-        $self->logger->debug("SQL err: " . $dbh_gis_write->errstr());
-        $data_for_postrun_href->{'Error'} = 1;
-        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-        return $data_for_postrun_href;
-      }
-
-      if ( !(defined $inserted_trialunit_loc_records->{'trialunitloc'}) ) {
-
-        $inserted_trialunit_loc_records->{'trialunitloc'} = ['trialunitid', $trial_unit_id];
-      }
-      else {
-
-        push(@{$inserted_trialunit_loc_records->{'trialunitloc'}}, $trial_unit_id);
-      }
-
-      $gis_sth->finish();
+      push(@tu_loc_sql_list, $tu_loc_sql_str);
     }
+  }
+
+  if (scalar(@tu_spec_sql_list) > 0) {
+
+    $bulk_sql .= join(',', @tu_spec_sql_list);
+
+    $sth = $dbh_k_write->prepare($bulk_sql);
+    $sth->execute();
+
+    if ($dbh_k_write->err()) {
+
+      $self->logger->debug("INSERT TrialUnitSpecimen BULK failed");
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    $sth->finish();
+  }
+
+  if (scalar(@tu_loc_sql_list) > 0) {
+
+    $tu_loc_bulk_sql .= join(',', @tu_loc_sql_list);
+
+    $self->logger->debug("TU LOC SQL: $tu_loc_bulk_sql");
+
+    $sth = $dbh_gis_write->prepare($tu_loc_bulk_sql);
+    $sth->execute();
+
+    if ($dbh_gis_write->err()) {
+
+      $self->logger->debug("INSERT trialunitlocation BULK failed");
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    $sth->finish();
+  }
+
+  my @remove_tu_bar_tu_id;
+
+  foreach my $trialunit (@{$trialunit_info_aref}) {
+
+    if ($trialunit->{'RemoveBarcode'} == 1) {
+
+      push(@remove_tu_bar_tu_id, $trialunit->{'TrialUnitId'});
+    }
+  }
+
+  if (scalar(@remove_tu_bar_tu_id) > 0) {
+
+    $sql = 'UPDATE trialunit SET TrialUnitBarcode=NULL WHERE TrialUnitId IN (' . join(',', @remove_tu_bar_tu_id) . ')';
+
+    $sth = $dbh_k_write->prepare($sql);
+    $sth->execute();
+
+    if ($dbh_k_write->err()) {
+
+      $self->logger->debug("Remove DAL temporary TrialUnitBarcode failed");
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    $sth->finish();
   }
 
   $dbh_k_write->disconnect();
@@ -3073,7 +3181,7 @@ sub update_site_geography_runmode {
 
   my $dbh_gis_read = connect_gis_read();
   my ($is_wkt_err, $wkt_err_href) = is_valid_wkt_href($dbh_gis_read, {'sitelocation' => $site_location},
-                                                      ['POLYGON', 'MULTIPOLYGON']);
+                                                      ['POLYGON', 'MULTIPOLYGON', 'POINT']);
   $dbh_gis_read->disconnect();
 
   if ($is_wkt_err) {
@@ -3086,9 +3194,22 @@ sub update_site_geography_runmode {
 
   my $dbh_gis_write = connect_gis_write();
 
-  my $sql  = 'UPDATE siteloc SET ';
-  $sql    .= 'sitelocation=ST_Multi(ST_GeomFromText(?, -1)) ';
-  $sql    .= 'WHERE siteid=?';
+  my $sql = '';
+
+  if ($site_location =~ /^POINT/i) {
+
+    my $st_buffer_val = $POINT2POLYGON_BUFFER4SITE->{$ENV{DOCUMENT_ROOT}};
+
+    $sql     = "UPDATE siteloc SET ";
+    $sql    .= "sitelocation=ST_Multi(ST_Buffer(ST_GeomFromText(?, -1), $st_buffer_val, 1)) ";
+    $sql    .= 'WHERE siteid=?';
+  }
+  else {
+
+    $sql     = 'UPDATE siteloc SET ';
+    $sql    .= 'sitelocation=ST_Multi(ST_GeomFromText(?, -1)) ';
+    $sql    .= 'WHERE siteid=?';
+  }
 
   $self->logger->debug("SQL: $sql");
   $self->logger->debug("SiteId: $site_id");
@@ -3558,6 +3679,7 @@ sub list_trial {
   my $trial_dimension_href   = {};
   my $trial_workflow_href    = {};
   my $trial_event_href       = {};
+  my $crossing_count_href    = {};
 
   my $chk_id_err        = 0;
   my $chk_id_msg        = '';
@@ -3636,6 +3758,39 @@ sub list_trial {
         return ($err, $msg, []);
       }
       $sth_trial_unit->finish();
+
+      my $crossing_sql = 'SELECT TrialId, count(CrossingId) AS NumOfCross ';
+      $crossing_sql   .= 'FROM crossing ';
+      $crossing_sql   .= 'WHERE TrialId IN (' . join(',', @trial_id_list) . ') ';
+      $crossing_sql   .= 'GROUP BY TrialId';
+
+      my $sth_crossing = $dbh->prepare($crossing_sql);
+      $sth_crossing->execute();
+
+      if (!$dbh->err()) {
+
+        my $count_href = $sth_crossing->fetchall_hashref('TrialId');
+
+        if (!$sth_crossing->err()) {
+
+          $crossing_count_href = $count_href;
+        }
+        else {
+
+          $err = 1;
+          $msg = 'Unexpected error';
+          $self->logger->debug('Err: ' . $dbh->errstr());
+          return ($err, $msg, []);
+        }
+      }
+      else {
+
+        $err = 1;
+        $msg = 'Unexpected error';
+        $self->logger->debug('Err: ' . $dbh->errstr());
+        return ($err, $msg, []);
+      }
+      $sth_crossing->finish();
 
       my $trait_value_sql = 'SELECT TrialId, count(TraitValue) AS NumOfTraitValue ';
       $trait_value_sql   .= 'FROM trialunit LEFT JOIN samplemeasurement ';
@@ -3804,7 +3959,7 @@ sub list_trial {
       my $chk_table_aref = [{'TableName' => 'trialunit', 'FieldName' => 'TrialId'},
                             {'TableName' => 'trialevent', 'FieldName' => 'TrialId'},
                             {'TableName' => 'trialtrait', 'FieldName' => 'TrialId'},
-                            {'TableName' => 'multiloctrialentry', 'FieldName' => 'TrialId'},
+                            {'TableName' => 'trialgroupentry', 'FieldName' => 'TrialId'},
                             {'TableName' => 'trialworkflow', 'FieldName' => 'TrialId'}
           ];
 
@@ -3956,6 +4111,11 @@ sub list_trial {
       if ( $trait_count_href->{$trial_id}->{'NumOfTrait'} > 0 ) {
 
         $row->{'listTrait'} = "trial/$trial_id/list/trait";
+      }
+
+      if ( $crossing_count_href->{$trial_id}->{'NumOfCross'} > 0) {
+
+        $row->{'listCrossing'} = "trial/$trial_id/list/crossing";
       }
 
       if ( ($trait_count_href->{$trial_id}->{'NumOfTrait'} > 0) &&
@@ -4277,7 +4437,7 @@ sub list_trial_advanced_runmode {
       push(@{$sql_field_list}, $com_fd_name);
     }
   }
-  
+
   push(@{$sql_field_list}, "$perm_str AS UltimatePerm");
 
   if ($filtering_csv !~ /Factor/) {
@@ -5200,7 +5360,7 @@ sub update_trial_geography_runmode {
   my $dbh_gis_read = connect_gis_read();
   my ($is_wkt_err, $wkt_err_href) = is_valid_wkt_href($dbh_gis_read,
                                                       {'triallocation' => $trial_location},
-                                                      ['POLYGON', 'MULTIPOLYGON']);
+                                                      ['POLYGON', 'MULTIPOLYGON', 'POINT']);
   $dbh_gis_read->disconnect();
 
   if ($is_wkt_err) {
@@ -5257,9 +5417,20 @@ sub update_trial_geography_runmode {
 
   if ($does_actual_update) {
 
-    $sql  = 'UPDATE trialloc SET ';
-    $sql .= 'triallocation = ST_Multi(ST_GeomFromText(?, -1)) ';
-    $sql .= 'WHERE trialid=?';
+    if ($trial_location =~ /^POINT/i) {
+
+      my $st_buffer_val = $POINT2POLYGON_BUFFER4TRIAL->{$ENV{DOCUMENT_ROOT}};
+
+      $sql  = "UPDATE trialloc SET ";
+      $sql .= "triallocation = ST_Multi(ST_Buffer(ST_GeomFromText(?, -1), $st_buffer_val, 1)) ";
+      $sql .= "WHERE trialid=?";
+    }
+    else {
+
+      $sql  = 'UPDATE trialloc SET ';
+      $sql .= 'triallocation = ST_Multi(ST_GeomFromText(?, -1)) ';
+      $sql .= 'WHERE trialid=?';
+    }
 
     my $gis_sth = $dbh_gis_write->prepare($sql);
     $gis_sth->execute($trial_location, $trial_id);
@@ -5314,7 +5485,7 @@ sub list_trial_unit {
 
   for my $field (@{$gis_field_list}) {
 
-    if ($field eq 'Longitude' || $field eq 'Latitude' || $field eq 'LCol*' || $field eq 'sitelocation') {
+    if ($field eq 'Longitude' || $field eq 'Latitude' || $field eq 'LCol*' || $field eq 'trialunitlocation') {
 
       $field_list_loc_href->{$field} = 1;
     }
@@ -5335,6 +5506,7 @@ sub list_trial_unit {
   my $not_used_id_href  = {};
 
   my $tu_specimen_href = {};
+  my $tu_keyword_href  = {};
 
   if ($extra_attr_yes) {
 
@@ -5375,8 +5547,41 @@ sub list_trial_unit {
         $tu_specimen_href->{$tu_id} = $specimen_aref;
       }
 
+      my $tu_keyword_sql = 'SELECT TrialUnitId, keyword.KeywordId, KeywordName ';
+      $tu_keyword_sql   .= 'FROM trialunitkeyword LEFT JOIN keyword ON ';
+      $tu_keyword_sql   .= 'trialunitkeyword.KeywordId = keyword.KeywordId ';
+      $tu_keyword_sql   .= 'WHERE TrialUnitId IN (' . join(',', @trial_unit_id_list) . ')';
+
+      $self->logger->debug("Trial Unit Keyword SQL: $tu_keyword_sql");
+
+      my $tu_kwd_data_aref = [];
+
+      ($err, $msg, $tu_kwd_data_aref) = read_data($dbh, $tu_keyword_sql, []);
+
+      if ($err) {
+
+        return ($err, $msg, []);
+      }
+
+      for my $tu_kwd_rec (@{$tu_kwd_data_aref}) {
+
+        my $tu_id = $tu_kwd_rec->{'TrialUnitId'};
+
+        my $keyword_aref = [];
+
+        if (defined($tu_keyword_href->{$tu_id})) {
+
+          $keyword_aref = $tu_keyword_href->{$tu_id};
+        }
+
+        push(@{$keyword_aref}, $tu_kwd_rec);
+
+        $tu_keyword_href->{$tu_id} = $keyword_aref;
+      }
+
       my $chk_table_aref = [{'TableName' => 'samplemeasurement', 'FieldName' => 'TrialUnitId'},
-                            {'TableName' => 'trialunitspecimen', 'FieldName' => 'TrialUnitId'}
+                            {'TableName' => 'trialunitspecimen', 'FieldName' => 'TrialUnitId'},
+                            {'TableName' => 'trialunitkeyword', 'FieldName' => 'TrialUnitId'}
           ];
 
       ($chk_id_err, $chk_id_msg,
@@ -5473,27 +5678,34 @@ sub list_trial_unit {
 
       if (defined($tu_specimen_href->{$trial_unit_id})) {
 
-        my $specimen_aref = $tu_specimen_href->{$trial_unit_id};
+        my $specimen_aref  = $tu_specimen_href->{$trial_unit_id};
         $row->{'Specimen'} = $specimen_aref;
       }
 
+      if (defined($tu_keyword_href->{$trial_unit_id})) {
+
+        my $keyword_aref  = $tu_keyword_href->{$trial_unit_id};
+        $row->{'Keyword'} = $keyword_aref;
+      }
+
       $row->{'UltimatePermission'} = $perm_lookup->{$permission};
-    
+
       if ( ($permission & $READ_WRITE_PERM) == $READ_WRITE_PERM ) {
-      
-        $row->{'update'}    = "update/trialunit/$trial_unit_id";
+
+        $row->{'update'}       = "update/trialunit/$trial_unit_id";
         $row->{'addSpecimen'}  = "trialunit/$trial_unit_id/add/specimen";
         $row->{'listSpecimen'} = "trialunit/$trial_unit_id/list/specimen";
-        
+        $row->{'addKeyword'}   = "trialunit/$trial_unit_id/add/keyword";
+
         if ( $not_used_id_href->{$trial_unit_id} ) {
-          
+
           $row->{'delete'}   = "delete/trialunit/$trial_unit_id";
         }
       }
     }
     push(@extra_attr_trial_unit_data, $row);
   }
-  
+
   return ($err, $msg, \@extra_attr_trial_unit_data);
 }
 
@@ -6225,6 +6437,19 @@ sub add_trial_unit_specimen_runmode {
   if (!$specimen_exist) {
 
     my $err_msg = "Specimen ($specimen_id) not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'SpecimenId' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sql = 'SELECT TrialUnitSpecimenId FROM trialunitspecimen WHERE TrialUnitId=? AND SpecimenId=?';
+
+  my ($r_tu_spec_id_err, $tu_spec_id) = read_cell($dbh_read, $sql, [$trial_unit_id, $specimen_id]);
+
+  if (length($tu_spec_id) > 0) {
+
+    my $err_msg = "Specimen ($specimen_id): already exists in trialunit ($trial_unit_id).";
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'SpecimenId' => $err_msg}]};
 
@@ -7116,7 +7341,7 @@ sub list_site_advanced_runmode {
     }
 
     if ($pg_id_err == 2) {
-      
+
       $page = 0;
     }
 
@@ -7304,6 +7529,18 @@ sub list_trial_unit_advanced_runmode {
   }
 
   my $dbh = connect_kdb_read();
+
+  if ($trial_id_provided == 1) {
+
+    if (!record_existence($dbh, 'trial', 'TrialId', $trial_id)) {
+
+      my $err_msg = "Trial ($trial_id): not found";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
 
   my $sample_data_aref = $sample_tu_data;
 
@@ -7561,7 +7798,12 @@ sub list_trial_unit_advanced_runmode {
     return $data_for_postrun_href;
   }
 
-  $data_for_postrun_href->{'Error'} = 0;
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'geojson'}   = 1;
+  $data_for_postrun_href->{'GJSonInfo'} = {'GeometryField' => 'trialunitlocation',
+                                           'FeatureName'   => 'Specimen[0] [ name: Specimen->SpecimenName ]',
+                                           'FeatureId'     => 'TrialUnitId',
+  };
   $data_for_postrun_href->{'Data'}  = {'TrialUnit'  => $tu_data,
                                        'Pagination' => $pagination_aref,
                                        'RecordMeta' => [{'TagName' => 'TrialUnit'}],
@@ -11981,29 +12223,29 @@ sub del_trial_workflow_runmode {
   return $data_for_postrun_href;
 }
 
-sub add_multiloc_trial_runmode {
+sub add_trialgroup_runmode {
 
-=pod add_multiloc_trial_HELP_START
+=pod add_trialgroup_HELP_START
 {
-"OperationName" : "Add multi location trial",
-"Description": "Group trial into multi location trial",
+"OperationName" : "Group existing trials together",
+"Description": "Group existing trials together. This grouping could be multi environment trials.",
 "AuthRequired": 1,
 "GroupRequired": 1,
 "GroupAdminRequired": 0,
 "SignatureRequired": 1,
 "AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
 "KDDArTModule": "main",
-"KDDArTTable": "multiloctrial",
-"SkippedField": ["MultiLocTrialOwner"],
-"KDDArTFactorTable": "multiloctrialfactor",
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><ReturnId Value='1' ParaName='MultiLocTrialId' /><Info Message='MultiLocTrial (1) has been added successfully.' /></DATA>",
-"SuccessMessageJSON": "{'ReturnId' : [{'Value' : '2', 'ParaName' : 'MultiLocTrialId'}], 'Info' : [{'Message' : 'MultiLocTrial (2) has been added successfully.'}]}",
-"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error MultiLocTrialType='MultiLocTrialType (25): not found or inactive.' /></DATA>"}],
-"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'MultiLocTrialType' : 'MultiLocTrialType (25): not found or inactive.'}]}"}],
+"KDDArTTable": "trialgroup",
+"SkippedField": ["TrialGroupOwner"],
+"KDDArTFactorTable": "trialgroupfactor",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><ReturnId Value='1' ParaName='TrialGroupId' /><Info Message='TrialGroup (1) has been added successfully.' /></DATA>",
+"SuccessMessageJSON": "{'ReturnId' : [{'Value' : '2', 'ParaName' : 'TrialGroupId'}], 'Info' : [{'Message' : 'TrialGroup (2) has been added successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error TrialGroupType='TrialGroupType (25): not found or inactive.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'TrialGroupType' : 'TrialGroupType (25): not found or inactive.'}]}"}],
 "RequiredUpload": 1,
 "UploadFileFormat": "XML",
 "UploadFileParameterName": "uploadfile",
-"DTDFileNameForUploadXML": "multiloctrialentry.dtd",
+"DTDFileNameForUploadXML": "trialgroupentry.dtd",
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
@@ -12017,10 +12259,10 @@ sub add_multiloc_trial_runmode {
 
   my $dbh_read = connect_kdb_read();
 
-  my $skip_field = {'MultiLocTrialOwner' => 1};
+  my $skip_field = {'TrialGroupOwner' => 1};
 
   my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
-                                                                                'multiloctrial', $skip_field);
+                                                                                'trialgroup', $skip_field);
 
   if ($chk_sfield_err) {
 
@@ -12033,38 +12275,38 @@ sub add_multiloc_trial_runmode {
 
   # Finish generic required static field checking
 
-  my $mlt_name = $query->param('MultiLocTrialName');
-  my $mlt_type = $query->param('MultiLocTrialType');
+  my $t_grp_name = $query->param('TrialGroupName');
+  my $t_grp_type = $query->param('TrialGroupType');
 
-  my $mlt_start = undef;
-  my $mlt_end   = undef;
-  my $mlt_note  = undef;
+  my $t_grp_start = undef;
+  my $t_grp_end   = undef;
+  my $t_grp_note  = undef;
 
   my $chk_date_href = {};
 
-  if (defined $query->param('MultiLocTrialStart')) {
+  if (defined $query->param('TrialGroupStart')) {
 
-    if (length($query->param('MultiLocTrialStart')) > 0) {
+    if (length($query->param('TrialGroupStart')) > 0) {
 
-      $mlt_start = $query->param('MultiLocTrialStart');
-      $chk_date_href->{'MultiLocTrialStart'} = $mlt_start;
+      $t_grp_start = $query->param('TrialGroupStart');
+      $chk_date_href->{'TrialGroupStart'} = $t_grp_start;
     }
   }
 
-  if (defined $query->param('MultiLocTrialEnd')) {
+  if (defined $query->param('TrialGroupEnd')) {
 
-    if (length($query->param('MultiLocTrialEnd')) > 0) {
+    if (length($query->param('TrialGroupEnd')) > 0) {
 
-      $mlt_end = $query->param('MultiLocTrialEnd');
-      $chk_date_href->{'MultiLocTrialEnd'} = $mlt_end;
+      $t_grp_end = $query->param('TrialGroupEnd');
+      $chk_date_href->{'TrialGroupEnd'} = $t_grp_end;
     }
   }
 
-  if (defined $query->param('MultiLocTrialNote')) {
+  if (defined $query->param('TrialGroupNote')) {
 
-    if (length($query->param('MultiLocTrialNote')) > 0) {
+    if (length($query->param('TrialGroupNote')) > 0) {
 
-      $mlt_note = $query->param('MultiLocTrialNote');
+      $t_grp_note = $query->param('TrialGroupNote');
     }
   }
 
@@ -12080,7 +12322,7 @@ sub add_multiloc_trial_runmode {
 
   my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength ";
   $sql   .= "FROM factor ";
-  $sql   .= "WHERE TableNameOfFactor='multiloctrialfactor'";
+  $sql   .= "WHERE TableNameOfFactor='trialgroupfactor'";
 
   my $dbh_k_read = connect_kdb_read();
   my $vcol_data = $dbh_k_read->selectall_hashref($sql, 'FactorId');
@@ -12120,34 +12362,34 @@ sub add_multiloc_trial_runmode {
     return $data_for_postrun_href;
   }
 
-  if (record_existence($dbh_k_read, 'multiloctrial', 'MultiLocTrialName', $mlt_name)) {
+  if (record_existence($dbh_k_read, 'trialgroup', 'TrialGroupName', $t_grp_name)) {
 
-    my $err_msg = "MultiLocTrialName ($mlt_name): already exists.";
+    my $err_msg = "TrialGroupName ($t_grp_name): already exists.";
     $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'MultiLocTrialName' => $err_msg}]};
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'TrialGroupName' => $err_msg}]};
 
     return $data_for_postrun_href;
   }
 
-  if (!type_existence($dbh_k_read, 'multilocation', $mlt_type)) {
+  if (!type_existence($dbh_k_read, 'trialgroup', $t_grp_type)) {
 
-    my $err_msg = "MultiLocTrialType ($mlt_type): not found or inactive.";
+    my $err_msg = "TrialGroupType ($t_grp_type): not found or inactive.";
     $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'MultiLocTrialType' => $err_msg}]};
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'TrialGroupType' => $err_msg}]};
 
     return $data_for_postrun_href;
   }
 
   my $entry_xml_file              = $self->authen->get_upload_file();
-  my $multiloctrialentry_dtd_file = $self->get_multiloctrialentry_dtd_file();
+  my $trialgroupentry_dtd_file = $self->get_trialgroupentry_dtd_file();
 
-  $self->logger->debug("Multiloctrialentry DTD: $multiloctrialentry_dtd_file");
+  $self->logger->debug("Trialgroupentry DTD: $trialgroupentry_dtd_file");
 
-  add_dtd($multiloctrialentry_dtd_file, $entry_xml_file);
+  add_dtd($trialgroupentry_dtd_file, $entry_xml_file);
 
-  my $multiloctrial_xml = read_file($entry_xml_file);
+  my $trialgroup_xml = read_file($entry_xml_file);
 
-  $self->logger->debug("XML file with DTD: $multiloctrial_xml");
+  $self->logger->debug("XML file with DTD: $trialgroup_xml");
 
   my $xml_checker_parser = new XML::Checker::Parser( Handlers => { } );
 
@@ -12167,7 +12409,7 @@ sub add_multiloc_trial_runmode {
 
     my $err_msg = $@;
     $self->logger->debug("Parsing XML error: $err_msg");
-    my $user_err_msg = "multiloctrialentry xml file does not comply with its definition.\n";
+    my $user_err_msg = "trialgroupentry xml file does not comply with its definition.\n";
     $user_err_msg   .= "Details: $err_msg";
 
     $data_for_postrun_href->{'Error'} = 1;
@@ -12176,7 +12418,7 @@ sub add_multiloc_trial_runmode {
     return $data_for_postrun_href;
   }
 
-  my $trial_entry_aref = xml2arrayref($multiloctrial_xml, 'multiloctrialentry');
+  my $trial_entry_aref = xml2arrayref($trialgroup_xml, 'trialgroupentry');
 
   my $trial_id_aref      = [];
   my $uniq_trial_id_href = {};
@@ -12225,16 +12467,16 @@ sub add_multiloc_trial_runmode {
 
   my $dbh_k_write = connect_kdb_write();
 
-  $sql    = 'INSERT INTO multiloctrial SET ';
-  $sql   .= 'MultiLocTrialName=?, ';
-  $sql   .= 'MultiLocTrialOwner=?, ';
-  $sql   .= 'MultiLocTrialType=?, ';
-  $sql   .= 'MultiLocTrialStart=?, ';
-  $sql   .= 'MultiLocTrialEnd=?, ';
-  $sql   .= 'MultiLocTrialNote=?';
+  $sql    = 'INSERT INTO trialgroup SET ';
+  $sql   .= 'TrialGroupName=?, ';
+  $sql   .= 'TrialGroupOwner=?, ';
+  $sql   .= 'TrialGroupType=?, ';
+  $sql   .= 'TrialGroupStart=?, ';
+  $sql   .= 'TrialGroupEnd=?, ';
+  $sql   .= 'TrialGroupNote=?';
 
   my $sth = $dbh_k_write->prepare($sql);
-  $sth->execute($mlt_name, $user_id, $mlt_type, $mlt_start, $mlt_end, $mlt_note);
+  $sth->execute($t_grp_name, $user_id, $t_grp_type, $t_grp_start, $t_grp_end, $t_grp_note);
 
   if ($dbh_k_write->err()) {
 
@@ -12245,7 +12487,7 @@ sub add_multiloc_trial_runmode {
   }
   $sth->finish();
 
-  my $mlt_id = $dbh_k_write->last_insert_id(undef, undef, 'multiloctrial', 'MultiLocTrialId');
+  my $t_grp_id = $dbh_k_write->last_insert_id(undef, undef, 'trialgroup', 'TrialGroupId');
 
   for my $vcol_id (keys(%{$vcol_data})) {
 
@@ -12253,13 +12495,13 @@ sub add_multiloc_trial_runmode {
 
     if (length($vcol_value) > 0) {
 
-      $sql  = 'INSERT INTO multiloctrialfactor SET ';
-      $sql .= 'MultiLocTrialId=?, ';
+      $sql  = 'INSERT INTO trialgroupfactor SET ';
+      $sql .= 'TrialGroupId=?, ';
       $sql .= 'FactorId=?, ';
       $sql .= 'FactorValue=?';
 
       my $vcol_sth = $dbh_k_write->prepare($sql);
-      $vcol_sth->execute($mlt_id, $vcol_id, $vcol_value);
+      $vcol_sth->execute($t_grp_id, $vcol_id, $vcol_value);
 
       if ($dbh_k_write->err()) {
 
@@ -12273,15 +12515,15 @@ sub add_multiloc_trial_runmode {
     }
   }
 
-  $sql  = 'INSERT INTO multiloctrialentry ';
-  $sql .= '(MultiLocTrialId,TrialId) ';
+  $sql  = 'INSERT INTO trialgroupentry ';
+  $sql .= '(TrialGroupId,TrialId) ';
   $sql .= 'VALUES ';
 
   my @sql_val_list;
 
   for my $trial_id (@{$trial_id_aref}) {
 
-    push(@sql_val_list, qq|($mlt_id, $trial_id)|);
+    push(@sql_val_list, qq|($t_grp_id, $trial_id)|);
   }
 
   $sql .= join(',', @sql_val_list);
@@ -12302,8 +12544,8 @@ sub add_multiloc_trial_runmode {
 
   $dbh_k_write->disconnect();
 
-  my $info_msg_aref  = [{'Message' => "MultiLocTrial ($mlt_id) has been added successfully."}];
-  my $return_id_aref = [{'Value' => "$mlt_id", 'ParaName' => 'MultiLocTrialId'}];
+  my $info_msg_aref  = [{'Message' => "TrialGroup ($t_grp_id) has been added successfully."}];
+  my $return_id_aref = [{'Value' => "$t_grp_id", 'ParaName' => 'TrialGroupId'}];
 
   $data_for_postrun_href->{'Error'}     = 0;
   $data_for_postrun_href->{'Data'}      = {'Info'      => $info_msg_aref,
@@ -12314,29 +12556,26 @@ sub add_multiloc_trial_runmode {
   return $data_for_postrun_href;
 }
 
-sub update_multiloc_trial_runmode {
+sub update_trialgroup_runmode {
 
-=pod update_multiloc_trial_HELP_START
+=pod update_trialgroup_HELP_START
 {
-"OperationName" : "Update multi location trial",
-"Description": "Update detaled information of multiloctrial grouping",
+"OperationName" : "Update trial group meta information",
+"Description": "Update detaled information of trialgroup grouping",
 "AuthRequired": 1,
 "GroupRequired": 1,
 "GroupAdminRequired": 0,
 "SignatureRequired": 1,
 "AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
 "KDDArTModule": "main",
-"KDDArTTable": "multiloctrial",
-"SkippedField": ["MultiLocTrialOwner"],
-"KDDArTFactorTable": "multiloctrialfactor",
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='MultiLocTrial (3) has been updated successfully.' /></DATA>",
-"SuccessMessageJSON": "{'Info' : [{'Message' : 'MultiLocTrial (3) has been updated successfully.'}]}",
-"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='MultiLocTrial (13): not found.' /></DATA>"}],
-"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'MultiLocTrial (13): not found.'}]}"}],
-"RequiredUpload": 1,
-"UploadFileFormat": "XML",
-"UploadFileParameterName": "uploadfile",
-"DTDFileNameForUploadXML": "multiloctrialentry.dtd",
+"KDDArTTable": "trialgroup",
+"SkippedField": ["TrialGroupOwner"],
+"KDDArTFactorTable": "trialgroupfactor",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='TrialGroup (3) has been updated successfully.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'TrialGroup (3) has been updated successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='TrialGroup (13): not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'TrialGroup (13): not found.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing TrialGroupId"}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
@@ -12350,10 +12589,10 @@ sub update_multiloc_trial_runmode {
 
   my $dbh_read = connect_kdb_read();
 
-  my $skip_field = {'MultiLocTrialOwner' => 1};
+  my $skip_field = {'TrialGroupOwner' => 1};
 
   my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
-                                                                                'multiloctrial', $skip_field);
+                                                                                'trialgroup', $skip_field);
 
   if ($chk_sfield_err) {
 
@@ -12368,66 +12607,66 @@ sub update_multiloc_trial_runmode {
 
   my $dbh_k_read = connect_kdb_read();
 
-  my $mlt_id = $self->param('id');
+  my $t_grp_id = $self->param('id');
 
-  if (!record_existence($dbh_k_read, 'multiloctrial', 'MultiLocTrialId', $mlt_id)) {
+  if (!record_existence($dbh_k_read, 'trialgroup', 'TrialGroupId', $t_grp_id)) {
 
-    my $err_msg = "MultiLocTrial ($mlt_id): not found.";
+    my $err_msg = "TrialGroup ($t_grp_id): not found.";
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
     return $data_for_postrun_href;
   }
 
-  my $mlt_name = $query->param('MultiLocTrialName');
-  my $mlt_type = $query->param('MultiLocTrialType');
+  my $t_grp_name = $query->param('TrialGroupName');
+  my $t_grp_type = $query->param('TrialGroupType');
 
-  my $mlt_start = read_cell_value($dbh_k_read, 'multiloctrial', 'MultiLocTrialStart', 'MultiLocTrialId', $mlt_id);
+  my $t_grp_start = read_cell_value($dbh_k_read, 'trialgroup', 'TrialGroupStart', 'TrialGroupId', $t_grp_id);
 
-  if (length($mlt_start) == 0) {
+  if (length($t_grp_start) == 0) {
 
-    $mlt_start = undef;
+    $t_grp_start = undef;
   }
 
-  my $mlt_end   = read_cell_value($dbh_k_read, 'multiloctrial', 'MultiLocTrialEnd', 'MultiLocTrialId', $mlt_id);
+  my $t_grp_end   = read_cell_value($dbh_k_read, 'trialgroup', 'TrialGroupEnd', 'TrialGroupId', $t_grp_id);
 
-  if (length($mlt_end) == 0) {
+  if (length($t_grp_end) == 0) {
 
-    $mlt_end = undef;
+    $t_grp_end = undef;
   }
 
-  my $mlt_note  = read_cell_value($dbh_k_read, 'multiloctrial', 'MultiLocTrialNote', 'MultiLocTrialId', $mlt_id);
+  my $t_grp_note  = read_cell_value($dbh_k_read, 'trialgroup', 'TrialGroupNote', 'TrialGroupId', $t_grp_id);
 
-  if (length($mlt_note) == 0) {
+  if (length($t_grp_note) == 0) {
 
-    $mlt_note = undef;
+    $t_grp_note = undef;
   }
 
   my $chk_date_href = {};
 
-  if (defined $query->param('MultiLocTrialStart')) {
+  if (defined $query->param('TrialGroupStart')) {
 
-    if (length($query->param('MultiLocTrialStart')) > 0) {
+    if (length($query->param('TrialGroupStart')) > 0) {
 
-      $mlt_start = $query->param('MultiLocTrialStart');
-      $chk_date_href->{'MultiLocTrialStart'} = $mlt_start;
+      $t_grp_start = $query->param('TrialGroupStart');
+      $chk_date_href->{'TrialGroupStart'} = $t_grp_start;
     }
   }
 
-  if (defined $query->param('MultiLocTrialEnd')) {
+  if (defined $query->param('TrialGroupEnd')) {
 
-    if (length($query->param('MultiLocTrialEnd')) > 0) {
+    if (length($query->param('TrialGroupEnd')) > 0) {
 
-      $mlt_end = $query->param('MultiLocTrialEnd');
-      $chk_date_href->{'MultiLocTrialEnd'} = $mlt_end;
+      $t_grp_end = $query->param('TrialGroupEnd');
+      $chk_date_href->{'TrialGroupEnd'} = $t_grp_end;
     }
   }
 
-  if (defined $query->param('MultiLocTrialNote')) {
+  if (defined $query->param('TrialGroupNote')) {
 
-    if (length($query->param('MultiLocTrialNote')) > 0) {
+    if (length($query->param('TrialGroupNote')) > 0) {
 
-      $mlt_note = $query->param('MultiLocTrialNote');
+      $t_grp_note = $query->param('TrialGroupNote');
     }
   }
 
@@ -12443,7 +12682,7 @@ sub update_multiloc_trial_runmode {
 
   my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength ";
   $sql   .= "FROM factor ";
-  $sql   .= "WHERE TableNameOfFactor='multiloctrialfactor'";
+  $sql   .= "WHERE TableNameOfFactor='trialgroupfactor'";
 
   my $vcol_data = $dbh_k_read->selectall_hashref($sql, 'FactorId');
 
@@ -12482,11 +12721,11 @@ sub update_multiloc_trial_runmode {
     return $data_for_postrun_href;
   }
 
-  $sql = 'SELECT MultiLocTrialId FROM multiloctrial WHERE MultiLocTrialName=? AND MultiLocTrialId<>?';
+  $sql = 'SELECT TrialGroupId FROM trialgroup WHERE TrialGroupName=? AND TrialGroupId<>?';
 
-  my ($r_mlt_id_err, $db_mlt_id) = read_cell($dbh_k_read, $sql, [$mlt_name, $mlt_id]);
+  my ($r_t_grp_id_err, $db_t_grp_id) = read_cell($dbh_k_read, $sql, [$t_grp_name, $t_grp_id]);
 
-  if ($r_mlt_id_err) {
+  if ($r_t_grp_id_err) {
 
     my $err_msg = "Unexpected Error.";
     $data_for_postrun_href->{'Error'} = 1;
@@ -12495,49 +12734,49 @@ sub update_multiloc_trial_runmode {
     return $data_for_postrun_href;
   }
 
-  if (length($db_mlt_id) > 0) {
+  if (length($db_t_grp_id) > 0) {
 
-    my $err_msg = "MultiLocTrialName ($mlt_name): already exists.";
+    my $err_msg = "TrialGroupName ($t_grp_name): already exists.";
     $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'MultiLocTrialName' => $err_msg}]};
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'TrialGroupName' => $err_msg}]};
 
     return $data_for_postrun_href;
   }
 
-  if (!type_existence($dbh_k_read, 'multilocation', $mlt_type)) {
+  if (!type_existence($dbh_k_read, 'trialgroup', $t_grp_type)) {
 
-    my $err_msg = "MultiLocTrialType ($mlt_type): not found or inactive.";
+    my $err_msg = "TrialGroupType ($t_grp_type): not found or inactive.";
     $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'MultiLocTrialType' => $err_msg}]};
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'TrialGroupType' => $err_msg}]};
 
     return $data_for_postrun_href;
   }
 
   my $user_id = $self->authen->user_id();
 
-  my $mlt_owner = read_cell_value($dbh_k_read, 'multiloctrial', 'MultiLocTrialOwner', 'MultiLocTrialId', $mlt_id);
+  my $t_grp_owner = read_cell_value($dbh_k_read, 'trialgroup', 'TrialGroupOwner', 'TrialGroupId', $t_grp_id);
 
-  if ("$mlt_owner" ne "$user_id") {
+  if ("$t_grp_owner" ne "$user_id") {
 
-    my $err_msg = "MultiLocTrial ($mlt_id): permission denied.";
+    my $err_msg = "TrialGroup ($t_grp_id): permission denied.";
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
     return $data_for_postrun_href;
   }
 
-  $sql  = 'UPDATE multiloctrial SET ';
-  $sql .= 'MultiLocTrialName=?, ';
-  $sql .= 'MultiLocTrialType=?, ';
-  $sql .= 'MultiLocTrialStart=?, ';
-  $sql .= 'MultiLocTrialEnd=?, ';
-  $sql .= 'MultiLocTrialNote=? ';
-  $sql .= 'WHERE MultiLocTrialId=?';
+  $sql  = 'UPDATE trialgroup SET ';
+  $sql .= 'TrialGroupName=?, ';
+  $sql .= 'TrialGroupType=?, ';
+  $sql .= 'TrialGroupStart=?, ';
+  $sql .= 'TrialGroupEnd=?, ';
+  $sql .= 'TrialGroupNote=? ';
+  $sql .= 'WHERE TrialGroupId=?';
 
   my $dbh_k_write = connect_kdb_write();
 
   my $sth = $dbh_k_write->prepare($sql);
-  $sth->execute($mlt_name, $mlt_type, $mlt_start, $mlt_end, $mlt_note, $mlt_id);
+  $sth->execute($t_grp_name, $t_grp_type, $t_grp_start, $t_grp_end, $t_grp_note, $t_grp_id);
 
   if ($dbh_k_write->err()) {
 
@@ -12555,20 +12794,20 @@ sub update_multiloc_trial_runmode {
       my $factor_value = $query->param('VCol_' . "$vcol_id");
 
       $sql  = 'SELECT Count(*) ';
-      $sql .= 'FROM multiloctrialfactor ';
-      $sql .= 'WHERE MultiLocTrialId=? AND FactorId=?';
+      $sql .= 'FROM trialgroupfactor ';
+      $sql .= 'WHERE TrialGroupId=? AND FactorId=?';
 
-      my ($read_err, $count) = read_cell($dbh_k_write, $sql, [$mlt_id, $vcol_id]);
+      my ($read_err, $count) = read_cell($dbh_k_write, $sql, [$t_grp_id, $vcol_id]);
 
       if (length($factor_value) > 0) {
 
         if ($count > 0) {
 
-          $sql  = 'UPDATE multiloctrialfactor SET ';
+          $sql  = 'UPDATE trialgroupfactor SET ';
           $sql .= 'FactorValue=? ';
-          $sql .= 'WHERE MultiLocTrialId=? AND FactorId=?';
+          $sql .= 'WHERE TrialGroupId=? AND FactorId=?';
           my $factor_sth = $dbh_k_write->prepare($sql);
-          $factor_sth->execute($factor_value, $mlt_id, $vcol_id);
+          $factor_sth->execute($factor_value, $t_grp_id, $vcol_id);
 
           if ($dbh_k_write->err()) {
 
@@ -12581,12 +12820,12 @@ sub update_multiloc_trial_runmode {
         }
         else {
 
-          $sql  = 'INSERT INTO multiloctrialfactor SET ';
-          $sql .= 'MultiLocTrialId=?, ';
+          $sql  = 'INSERT INTO trialgroupfactor SET ';
+          $sql .= 'TrialGroupId=?, ';
           $sql .= 'FactorId=?, ';
           $sql .= 'FactorValue=?';
           my $factor_sth = $dbh_k_write->prepare($sql);
-          $factor_sth->execute($mlt_id, $vcol_id, $factor_value);
+          $factor_sth->execute($t_grp_id, $vcol_id, $factor_value);
 
           if ($dbh_k_write->err()) {
 
@@ -12603,11 +12842,11 @@ sub update_multiloc_trial_runmode {
 
         if ($count > 0) {
 
-          $sql  = 'DELETE FROM multiloctrialfactor ';
-          $sql .= 'WHERE MultiLocTrialId=? AND FactorId=?';
+          $sql  = 'DELETE FROM trialgroupfactor ';
+          $sql .= 'WHERE TrialGroupId=? AND FactorId=?';
 
           my $factor_sth = $dbh_k_write->prepare($sql);
-          $factor_sth->execute($mlt_id, $vcol_id);
+          $factor_sth->execute($t_grp_id, $vcol_id);
 
           if ($dbh_k_write->err()) {
 
@@ -12624,7 +12863,7 @@ sub update_multiloc_trial_runmode {
 
   $dbh_k_write->disconnect();
 
-  my $info_msg_aref = [{'Message' => "MultiLocTrial ($mlt_id) has been updated successfully."}];
+  my $info_msg_aref = [{'Message' => "TrialGroup ($t_grp_id) has been updated successfully."}];
 
   $data_for_postrun_href->{'Error'}     = 0;
   $data_for_postrun_href->{'Data'}      = {'Info' => $info_msg_aref};
@@ -12633,7 +12872,7 @@ sub update_multiloc_trial_runmode {
   return $data_for_postrun_href;
 }
 
-sub list_multiloctrial {
+sub list_trialgroup {
 
   my $self            = $_[0];
   my $extra_attr_yes  = $_[1];
@@ -12658,11 +12897,11 @@ sub list_multiloctrial {
 
   my $user_id = $self->authen->user_id();
 
-  my $extra_attr_mlt_data = [];
+  my $extra_attr_t_grp_data = [];
 
   if ($extra_attr_yes) {
 
-    my $mlt_id_aref  = [];
+    my $t_grp_id_aref  = [];
 
     my $entry_lookup      = {};
 
@@ -12673,14 +12912,14 @@ sub list_multiloctrial {
 
     for my $row (@{$data_aref}) {
 
-      push(@{$mlt_id_aref}, $row->{'MultiLocTrialId'});
+      push(@{$t_grp_id_aref}, $row->{'TrialGroupId'});
     }
 
-    if (scalar(@{$mlt_id_aref}) > 0) {
+    if (scalar(@{$t_grp_id_aref}) > 0) {
 
-      my $entry_sql = 'SELECT multiloctrialentry.* ';
-      $entry_sql   .= 'FROM multiloctrialentry ';
-      $entry_sql   .= 'WHERE MultiLocTrialId IN (' . join(',', @{$mlt_id_aref}) . ')';
+      my $entry_sql = 'SELECT trialgroupentry.* ';
+      $entry_sql   .= 'FROM trialgroupentry ';
+      $entry_sql   .= 'WHERE TrialGroupId IN (' . join(',', @{$t_grp_id_aref}) . ')';
 
       my ($entry_err, $entry_msg, $entry_data) = read_data($dbh, $entry_sql, []);
 
@@ -12691,25 +12930,25 @@ sub list_multiloctrial {
 
       for my $row (@{$entry_data}) {
 
-        my $mlt_id = $row->{'MultiLocTrialId'};
+        my $t_grp_id = $row->{'TrialGroupId'};
 
-        if (defined $entry_lookup->{$mlt_id}) {
+        if (defined $entry_lookup->{$t_grp_id}) {
 
-          my $entry_aref = $entry_lookup->{$mlt_id};
+          my $entry_aref = $entry_lookup->{$t_grp_id};
 
           push(@{$entry_aref}, $row);
-          $entry_lookup->{$mlt_id} = $entry_aref;
+          $entry_lookup->{$t_grp_id} = $entry_aref;
         }
         else {
 
-          $entry_lookup->{$mlt_id} = [$row];
+          $entry_lookup->{$t_grp_id} = [$row];
         }
       }
 
-      my $chk_table_aref = [{'TableName' => 'multiloctrialentry', 'FieldName' => 'MultiLocTrialId'}];
+      my $chk_table_aref = [{'TableName' => 'trialgroupentry', 'FieldName' => 'TrialGroupId'}];
 
       ($chk_id_err, $chk_id_msg,
-       $used_id_href, $not_used_id_href) = id_existence_bulk($dbh, $chk_table_aref, $mlt_id_aref);
+       $used_id_href, $not_used_id_href) = id_existence_bulk($dbh, $chk_table_aref, $t_grp_id_aref);
 
       if ($chk_id_err) {
 
@@ -12723,63 +12962,63 @@ sub list_multiloctrial {
 
     for my $row (@{$data_aref}) {
 
-      my $mlt_id = $row->{'MultiLocTrialId'};
-      my $owner  = $row->{'MultiLocTrialOwner'};
+      my $t_grp_id = $row->{'TrialGroupId'};
+      my $owner  = $row->{'TrialGroupOwner'};
 
-      if (defined $entry_lookup->{$mlt_id}) {
+      if (defined $entry_lookup->{$t_grp_id}) {
 
         my $entry_aref = [];
-        my $entry_data = $entry_lookup->{$mlt_id};
+        my $entry_data = $entry_lookup->{$t_grp_id};
 
         for my $entry_info (@{$entry_data}) {
 
           my $trial_id = $entry_info->{'TrialId'};
-          $entry_info->{'removeTrial'} = "multiloctrial/${mlt_id}/remove/trial/$trial_id";
+          $entry_info->{'removeTrial'} = "trialgroup/${t_grp_id}/remove/trial/$trial_id";
 
           push(@{$entry_aref}, $entry_info);
         }
-        $row->{'multiloctrialentry'} = $entry_aref;
+        $row->{'trialgroupentry'} = $entry_aref;
       }
 
 
       if ("$owner" eq "$user_id") {
 
-        $row->{'update'}   = "update/multiloctrial/$mlt_id";
+        $row->{'update'}   = "update/trialgroup/$t_grp_id";
 
-        if ( $not_used_id_href->{$mlt_id} ) {
+        if ( $not_used_id_href->{$t_grp_id} ) {
 
-          $row->{'delete'}   = "delete/multiloctrial/$mlt_id";
+          $row->{'delete'}   = "delete/trialgroup/$t_grp_id";
         }
       }
 
-      push(@{$extra_attr_mlt_data}, $row);
+      push(@{$extra_attr_t_grp_data}, $row);
     }
   }
   else {
 
-    $extra_attr_mlt_data = $data_aref;
+    $extra_attr_t_grp_data = $data_aref;
   }
 
   $dbh->disconnect();
 
-  return ($err, $msg, $extra_attr_mlt_data);
+  return ($err, $msg, $extra_attr_t_grp_data);
 }
 
-sub list_multiloctrial_advanced_runmode {
+sub list_trialgroup_advanced_runmode {
 
-=pod list_multiloctrial_advanced_HELP_START
+=pod list_trialgroup_advanced_HELP_START
 {
-"OperationName" : "List multiloctrial",
-"Description": "Return list of multiloctrial. This listing requires pagination definition.",
+"OperationName" : "List trialgroup",
+"Description": "Return list of trialgroups. This listing requires pagination definition.",
 "AuthRequired": 1,
 "GroupRequired": 1,
 "GroupAdminRequired": 0,
 "SignatureRequired": 0,
 "AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "FILTERING"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Pagination NumOfRecords='4' NumOfPages='4' Page='1' NumPerPage='1' /><RecordMeta TagName='MultiLocTrial' /><MultiLocTrial MultiLocTrialType='189' MultiLocTrialNote='Upated by automatic testing framework' MultiLocTrialEnd='' MultiLocTrialName='UPDATE MultiLocTrialName_6967264' MultiLocTrialOwner='0' MultiLocTrialId='4' MultiLocTrialTypeName='MultiLocationType - 3076800' update='update/multiloctrial/4' MultiLocTrialStart='2015-08-27'><multiloctrialentry MultiLocTrialEntryId='7' MultiLocTrialId='4' removeTrial='multiloctrial/4/remove/trial/20' TrialId='20' /><multiloctrialentry MultiLocTrialEntryId='8' MultiLocTrialId='4' removeTrial='multiloctrial/4/remove/trial/21' TrialId='21' /></MultiLocTrial></DATA>",
-"SuccessMessageJSON": "{'Pagination' : [{'NumOfRecords' : '4', 'NumOfPages' : 4, 'NumPerPage' : '1', 'Page' : '1'}], 'VCol' : [], 'RecordMeta' : [{'TagName' : 'MultiLocTrial'}], 'MultiLocTrial' : [{'MultiLocTrialType' : '189', 'MultiLocTrialName' : 'UPDATE MultiLocTrialName_6967264', 'MultiLocTrialEnd' : null, 'MultiLocTrialId' : '4', 'MultiLocTrialOwner' : '0', 'MultiLocTrialNote' : 'Upated by automatic testing framework', 'MultiLocTrialTypeName' : 'MultiLocationType - 3076800', 'multiloctrialentry' : [{'MultiLocTrialEntryId' : '7', 'MultiLocTrialId' : '4', 'removeTrial' : 'multiloctrial/4/remove/trial/20', 'TrialId' : '20'},{'MultiLocTrialEntryId' : '8', 'MultiLocTrialId' : '4', 'removeTrial' : 'multiloctrial/4/remove/trial/21', 'TrialId' : '21'}], 'update' : 'update/multiloctrial/4', 'MultiLocTrialStart' : '2015-08-27'}]}",
-"ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
-"ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><StatInfo Unit='second' ServerElapsedTime='0.0123678892822266' /><Pagination NumOfRecords='11' Page='1' NumOfPages='6' NumPerPage='2' /><TrialGroup TrialGroupType='436' TrialGroupNote='' TrialGroupName='MultiLocTrialName_77706215649' update='update/trialgroup/11' TrialGroupTypeName='Trial Group Type - 45863861260' TrialGroupId='11' TrialGroupStart='' TrialGroupEnd='' TrialGroupOwner='0'><trialgroupentry TrialId='30' TrialGroupEntryId='25' removeTrial='trialgroup/11/remove/trial/30' TrialGroupId='11' /><trialgroupentry TrialGroupId='11' removeTrial='trialgroup/11/remove/trial/31' TrialGroupEntryId='26' TrialId='31' /></TrialGroup><TrialGroup TrialGroupName='UPDATE TrialGroupName_50034910480' TrialGroupNote='Upated by automatic testing framework' TrialGroupType='428' TrialGroupEnd='' TrialGroupOwner='0' update='update/trialgroup/10' TrialGroupTypeName='Trial Group Type - 87818871818' TrialGroupStart='2015-08-27' TrialGroupId='10'><trialgroupentry TrialGroupEntryId='23' TrialId='28' removeTrial='trialgroup/10/remove/trial/28' TrialGroupId='10' /><trialgroupentry TrialGroupId='10' removeTrial='trialgroup/10/remove/trial/29' TrialId='29' TrialGroupEntryId='24' /></TrialGroup><RecordMeta TagName='TrialGroup' /></DATA>",
+"SuccessMessageJSON": "{'Pagination' : [{'NumPerPage' : '2','NumOfPages' : 6,'Page' : '1','NumOfRecords' : '11'}],'TrialGroup' : [{'trialgroupentry' : [{'TrialGroupEntryId' : '25','TrialId' : '30','removeTrial' : 'trialgroup/11/remove/trial/30','TrialGroupId' : '11'},{'TrialGroupId' : '11','removeTrial' : 'trialgroup/11/remove/trial/31','TrialId' : '31','TrialGroupEntryId' : '26'}],'TrialGroupName' : 'MultiLocTrialName_77706215649','TrialGroupNote' : null,'TrialGroupType' : '436','TrialGroupOwner' : '0','TrialGroupEnd' : null,'TrialGroupStart' : null,'TrialGroupId' : '11','update' : 'update/trialgroup/11','TrialGroupTypeName' : 'Trial Group Type - 45863861260'},{'TrialGroupId' : '10','TrialGroupStart' : '2015-08-27','TrialGroupTypeName' : 'Trial Group Type - 87818871818','update' : 'update/trialgroup/10','TrialGroupOwner' : '0','TrialGroupEnd' : null,'trialgroupentry' : [{'TrialGroupId' : '10','TrialGroupEntryId' : '23','TrialId' : '28','removeTrial' : 'trialgroup/10/remove/trial/28'},{'TrialGroupId' : '10','removeTrial' : 'trialgroup/10/remove/trial/29','TrialId' : '29','TrialGroupEntryId' : '24'}],'TrialGroupType' : '428','TrialGroupNote' : 'Upated by automatic testing framework','TrialGroupName' : 'UPDATE TrialGroupName_50034910480'}],'VCol' : [],'RecordMeta' : [{'TagName' : 'TrialGroup'}],'StatInfo' : [{'Unit' : 'second','ServerElapsedTime' : '0.011975887802124'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><StatInfo Unit='second' ServerElapsedTime='0.00479598440551757' /><Error Message='TrialGroup (13) not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'StatInfo' : [{'Unit' : 'second','ServerElapsedTime' : '0.00476206193542483'}],'Error' : [{'Message' : 'TrialGroup (13) not found.'}]}"}],
 "URLParameter": [{"ParameterName": "nperpage", "Description": "Number of records in a page for pagination"}, {"ParameterName": "num", "Description": "The page number of the pagination"}],
 "HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database field name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "FieldList", "Description": "Comma separated value of wanted fields."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases."}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
@@ -12826,10 +13065,10 @@ sub list_multiloctrial_advanced_runmode {
   }
 
   my $dbh = connect_kdb_read();
-  my $field_list = ['multiloctrial.*', 'VCol*'];
+  my $field_list = ['trialgroup.*', 'VCol*'];
 
-  my ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_sql($dbh, $field_list, 'multiloctrial',
-                                                                        'MultiLocTrialId', '');
+  my ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_sql($dbh, $field_list, 'trialgroup',
+                                                                        'TrialGroupId', '');
 
   if ($vcol_err) {
 
@@ -12844,18 +13083,18 @@ sub list_multiloctrial_advanced_runmode {
 
   $self->logger->debug("SQL with VCol: $sql");
 
-  my ($sam_mlt_err, $sam_mlt_msg, $sam_mlt_data) = $self->list_multiloctrial(0, $sql);
+  my ($sam_t_grp_err, $sam_t_grp_msg, $sam_t_grp_data) = $self->list_trialgroup(0, $sql);
 
-  if ($sam_mlt_err) {
+  if ($sam_t_grp_err) {
 
-    $self->logger->debug($sam_mlt_msg);
+    $self->logger->debug($sam_t_grp_msg);
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
     return $data_for_postrun_href;
   }
 
-  my $sample_data_aref = $sam_mlt_data;
+  my $sample_data_aref = $sam_t_grp_data;
 
   my @field_list_all;
 
@@ -12866,7 +13105,7 @@ sub list_multiloctrial_advanced_runmode {
   else {
 
     $self->logger->debug("It reaches here");
-    my ($sfield_err, $sfield_msg, $sfield_data, $pkey_data) = get_static_field($dbh, 'multiloctrial');
+    my ($sfield_err, $sfield_msg, $sfield_data, $pkey_data) = get_static_field($dbh, 'trialgroup');
 
     if ($sfield_err) {
 
@@ -12893,11 +13132,14 @@ sub list_multiloctrial_advanced_runmode {
 
     my ($sel_field_err, $sel_field_msg, $sel_field_list) = parse_selected_field($field_list_csv,
                                                                                 $final_field_list,
-                                                                                'MultiLocTrialId');
+                                                                                'TrialGroupId');
 
     if ($sel_field_err) {
 
-      return $self->error_message($sel_field_msg);
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $sel_field_msg}]};
+
+      return $data_for_postrun_href;
     }
 
     $final_field_list = $sel_field_list;
@@ -12911,19 +13153,19 @@ sub list_multiloctrial_advanced_runmode {
 
   my $other_join = '';
 
-  if ($field_lookup->{'MultiLocTrialType'} == 1) {
+  if ($field_lookup->{'TrialGroupType'} == 1) {
 
-    $other_join = ' LEFT JOIN generaltype ON multiloctrial.MultiLocTrialType = generaltype.TypeId ';
-    push(@{$final_field_list}, q| generaltype.TypeName AS MultiLocTrialTypeName |);
+    $other_join = ' LEFT JOIN generaltype ON trialgroup.TrialGroupType = generaltype.TypeId ';
+    push(@{$final_field_list}, q| generaltype.TypeName AS TrialGroupTypeName |);
   }
 
-  if ( !(defined $field_lookup->{'MultiLocTrialOwner'}) ) {
+  if ( !(defined $field_lookup->{'TrialGroupOwner'}) ) {
 
-    push(@{$final_field_list}, 'MultiLocTrialOwner');
+    push(@{$final_field_list}, 'TrialGroupOwner');
   }
 
-  ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_sql($dbh, $final_field_list, 'multiloctrial',
-                                                                     'MultiLocTrialId', $other_join);
+  ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_sql($dbh, $final_field_list, 'trialgroup',
+                                                                     'TrialGroupId', $other_join);
 
   if ($vcol_err) {
 
@@ -12939,8 +13181,8 @@ sub list_multiloctrial_advanced_runmode {
 
   $self->logger->debug("Filtering CSV: $filtering_csv");
 
-  my ($filter_err, $filter_msg, $filter_phrase, $where_arg) = parse_filtering('MultiLocTrialId',
-                                                                              'multiloctrial',
+  my ($filter_err, $filter_msg, $filter_phrase, $where_arg) = parse_filtering('TrialGroupId',
+                                                                              'trialgroup',
                                                                               $filtering_csv,
                                                                               $final_field_list,
                                                                               $validation_func_lookup,
@@ -12988,8 +13230,8 @@ sub list_multiloctrial_advanced_runmode {
         $nb_pages, $limit_clause, $rcount_time) = get_paged_filter($dbh,
                                                                    $nb_per_page,
                                                                    $page,
-                                                                   'multiloctrial',
-                                                                   'MultiLocTrialId',
+                                                                   'trialgroup',
+                                                                   'TrialGroupId',
                                                                    $filtering_exp,
                                                                    $where_arg);
 
@@ -13039,18 +13281,18 @@ sub list_multiloctrial_advanced_runmode {
   }
   else {
 
-    $sql .= ' ORDER BY multiloctrial.MultiLocTrialId DESC';
+    $sql .= ' ORDER BY trialgroup.TrialGroupId DESC';
   }
 
   $sql .= " $paged_limit_clause ";
 
   $self->logger->debug("SQL with VCol: $sql");
 
-  my ($read_mlt_err, $read_mlt_msg, $mlt_data) = $self->list_multiloctrial(1, $sql, $where_arg);
+  my ($read_t_grp_err, $read_t_grp_msg, $t_grp_data) = $self->list_trialgroup(1, $sql, $where_arg);
 
-  if ($read_mlt_err) {
+  if ($read_t_grp_err) {
 
-    $self->logger->debug($read_mlt_msg);
+    $self->logger->debug($read_t_grp_msg);
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
@@ -13058,57 +13300,57 @@ sub list_multiloctrial_advanced_runmode {
   }
 
   $data_for_postrun_href->{'Error'}     = 0;
-  $data_for_postrun_href->{'Data'}      = {'MultiLocTrial'   => $mlt_data,
+  $data_for_postrun_href->{'Data'}      = {'TrialGroup'   => $t_grp_data,
                                            'VCol'            => $vcol_list,
                                            'Pagination'      => $pagination_aref,
-                                           'RecordMeta'      => [{'TagName' => 'MultiLocTrial'}],
+                                           'RecordMeta'      => [{'TagName' => 'TrialGroup'}],
   };
 
   return $data_for_postrun_href;
 }
 
-sub get_multiloc_trial_runmode {
+sub get_trialgroup_runmode {
 
-=pod get_multiloc_trial_HELP_START
+=pod get_trialgroup_HELP_START
 {
-"OperationName" : "Get multiloctrial",
-"Description": "Return detailed information about multiloctrial specified by id.",
+"OperationName" : "Get trialgroup",
+"Description": "Return detailed information about trialgroup specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
 "GroupAdminRequired": 0,
 "SignatureRequired": 0,
 "AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><RecordMeta TagName='MultiLocTrial' /><MultiLocTrial MultiLocTrialType='189' MultiLocTrialNote='Upated by automatic testing framework' MultiLocTrialName='UPDATE MultiLocTrialName_6967264' MultiLocTrialEnd='' MultiLocTrialId='4' MultiLocTrialOwner='0' MultiLocTrialTypeName='MultiLocationType - 3076800' update='update/multiloctrial/4' MultiLocTrialStart='2015-08-27'><multiloctrialentry MultiLocTrialEntryId='7' MultiLocTrialId='4' removeTrial='multiloctrial/4/remove/trial/20' TrialId='20' /><multiloctrialentry MultiLocTrialEntryId='8' MultiLocTrialId='4' removeTrial='multiloctrial/4/remove/trial/21' TrialId='21' /></MultiLocTrial></DATA>",
-"SuccessMessageJSON": "{'VCol' : [], 'RecordMeta' : [{'TagName' : 'MultiLocTrial'}], 'MultiLocTrial' : [{'MultiLocTrialType' : '189', 'MultiLocTrialEnd' : null, 'MultiLocTrialName' : 'UPDATE MultiLocTrialName_6967264', 'MultiLocTrialOwner' : '0', 'MultiLocTrialId' : '4', 'MultiLocTrialNote' : 'Upated by automatic testing framework', 'MultiLocTrialTypeName' : 'MultiLocationType - 3076800', 'multiloctrialentry' : [{'MultiLocTrialEntryId' : '7', 'MultiLocTrialId' : '4', 'removeTrial' : 'multiloctrial/4/remove/trial/20', 'TrialId' : '20'},{'MultiLocTrialEntryId' : '8', 'MultiLocTrialId' : '4', 'removeTrial' : 'multiloctrial/4/remove/trial/21', 'TrialId' : '21'}], 'update' : 'update/multiloctrial/4', 'MultiLocTrialStart' : '2015-08-27'}]}",
-"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='MultiLocTrial (10) not found.' /></DATA>"}],
-"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'MultiLocTrial (10) not found.'}]}"}],
-"URLParameter": [{"ParameterName": "id", "Description": "Existing MultiLocTrialId"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><StatInfo Unit='second' ServerElapsedTime='0.00580689762878417' /><TrialGroup TrialGroupName='MultiLocTrialName_22953410170' TrialGroupType='472' TrialGroupNote='' TrialGroupEnd='' TrialGroupOwner='0' TrialGroupTypeName='Trial Group Type - 60699072215' update='update/trialgroup/19' TrialGroupId='19' TrialGroupStart=''><trialgroupentry TrialGroupEntryId='41' TrialId='42' removeTrial='trialgroup/19/remove/trial/42' TrialGroupId='19' /><trialgroupentry TrialGroupId='19' TrialGroupEntryId='42' TrialId='43' removeTrial='trialgroup/19/remove/trial/43' /></TrialGroup><RecordMeta TagName='TrialGroup' /></DATA>",
+"SuccessMessageJSON": "{'StatInfo' : [{'ServerElapsedTime' : '0.00485303071594238','Unit' : 'second'}],'TrialGroup' : [{'trialgroupentry' : [{'TrialGroupId' : '19','TrialGroupEntryId' : '41','TrialId' : '42','removeTrial' : 'trialgroup/19/remove/trial/42'},{'TrialGroupId' : '19','removeTrial' : 'trialgroup/19/remove/trial/43','TrialGroupEntryId' : '42','TrialId' : '43'}],'TrialGroupNote' : null,'TrialGroupType' : '472','TrialGroupName' : 'MultiLocTrialName_22953410170','TrialGroupId' : '19','TrialGroupStart' : null,'TrialGroupTypeName' : 'Trial Group Type - 60699072215','update' : 'update/trialgroup/19','TrialGroupOwner' : '0','TrialGroupEnd' : null}],'RecordMeta' : [{'TagName' : 'TrialGroup'}],'VCol' : []}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><StatInfo Unit='second' ServerElapsedTime='0.00302692114257808' /><Error Message='TrialGroup (14) not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'StatInfo' : [{'ServerElapsedTime' : '0.00553796977233889','Unit' : 'second'}],'Error' : [{'Message' : 'TrialGroup (15) not found.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing TrialGroupId"}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
 
   my $self    = shift;
-  my $mlt_id  = $self->param('id');
+  my $t_grp_id  = $self->param('id');
 
   my $data_for_postrun_href = {};
 
   my $dbh = connect_kdb_read();
 
-  if (!record_existence($dbh, 'multiloctrial', 'MultiLocTrialId', $mlt_id)) {
+  if (!record_existence($dbh, 'trialgroup', 'TrialGroupId', $t_grp_id)) {
 
-    my $err_msg = "MultiLocTrial ($mlt_id) not found.";
+    my $err_msg = "TrialGroup ($t_grp_id) not found.";
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
     return $data_for_postrun_href;
   }
 
-  my $field_list = ['multiloctrial.*', 'VCol*', 'generaltype.TypeName AS MultiLocTrialTypeName'];
+  my $field_list = ['trialgroup.*', 'VCol*', 'generaltype.TypeName AS TrialGroupTypeName'];
 
-  my $other_join = ' LEFT JOIN generaltype ON multiloctrial.MultiLocTrialType = generaltype.TypeId ';
+  my $other_join = ' LEFT JOIN generaltype ON trialgroup.TrialGroupType = generaltype.TypeId ';
 
-  my ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_sql($dbh, $field_list, 'multiloctrial',
-                                                                        'MultiLocTrialId', $other_join);
+  my ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_sql($dbh, $field_list, 'trialgroup',
+                                                                        'TrialGroupId', $other_join);
   $dbh->disconnect();
 
   if ($vcol_err) {
@@ -13118,17 +13360,17 @@ sub get_multiloc_trial_runmode {
 
   $self->logger->debug('Number of vcols: ' . scalar(@{$vcol_list}));
 
-  my $where_clause = " WHERE multiloctrial.MultiLocTrialId=? ";
+  my $where_clause = " WHERE trialgroup.TrialGroupId=? ";
 
   $sql =~ s/GROUP BY/ $where_clause GROUP BY /;
 
   $self->logger->debug("SQL with VCol: $sql");
 
-  my ($read_mlt_err, $read_mlt_msg, $mlt_data) = $self->list_multiloctrial(1, $sql, [$mlt_id]);
+  my ($read_t_grp_err, $read_t_grp_msg, $t_grp_data) = $self->list_trialgroup(1, $sql, [$t_grp_id]);
 
-  if ($read_mlt_err) {
+  if ($read_t_grp_err) {
 
-    $self->logger->debug($read_mlt_msg);
+    $self->logger->debug($read_t_grp_msg);
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
@@ -13136,46 +13378,46 @@ sub get_multiloc_trial_runmode {
   }
 
   $data_for_postrun_href->{'Error'}     = 0;
-  $data_for_postrun_href->{'Data'}      = {'MultiLocTrial'   => $mlt_data,
+  $data_for_postrun_href->{'Data'}      = {'TrialGroup'   => $t_grp_data,
                                            'VCol'            => $vcol_list,
-                                           'RecordMeta'      => [{'TagName' => 'MultiLocTrial'}],
+                                           'RecordMeta'      => [{'TagName' => 'TrialGroup'}],
   };
 
   return $data_for_postrun_href;
 }
 
-sub del_multiloc_trial_runmode {
+sub del_trialgroup_runmode {
 
-=pod del_multiloc_trial_HELP_START
+=pod del_trialgroup_HELP_START
 {
-"OperationName" : "Delete multiloctrial",
-"Description": "Delete multiloctrial grouping specified by id.",
+"OperationName" : "Delete trialgroup",
+"Description": "Delete trialgroup grouping specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
 "GroupAdminRequired": 1,
 "SignatureRequired": 1,
 "AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='MultiLocTrial (5) has been deleted successfully.' /></DATA>",
-"SuccessMessageJSON": "{'Info' : [{'Message' : 'MultiLocTrial (6) has been deleted successfully.'}]}",
-"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='MultiLocTrial (17): not found.' /></DATA>"}],
-"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'MultiLocTrial (17): not found.'}]}"}],
-"URLParameter": [{"ParameterName": "id", "Description": "Existing multiloctrial id"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='TrialGroup (5) has been deleted successfully.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'TrialGroup (6) has been deleted successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='TrialGroup (17): not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'TrialGroup (17): not found.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing TrialGroupId"}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
 
   my $self               = shift;
-  my $mlt_id             = $self->param('id');
+  my $t_grp_id             = $self->param('id');
 
   my $data_for_postrun_href = {};
 
   my $dbh_read = connect_kdb_read();
 
-  my $owner = read_cell_value($dbh_read, 'multiloctrial', 'MultiLocTrialOwner', 'MultiLocTrialId', $mlt_id);
+  my $owner = read_cell_value($dbh_read, 'trialgroup', 'TrialGroupOwner', 'TrialGroupId', $t_grp_id);
 
   if ( length($owner) == 0 ) {
 
-    my $err_msg = "MultiLocTrial ($mlt_id): not found.";
+    my $err_msg = "TrialGroup ($t_grp_id): not found.";
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
@@ -13186,16 +13428,16 @@ sub del_multiloc_trial_runmode {
 
   if ("$owner" ne "$user_id") {
 
-    my $err_msg = "MultiLocTrial ($mlt_id): permission denied.";
+    my $err_msg = "TrialGroup ($t_grp_id): permission denied.";
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
     return $data_for_postrun_href;
   }
 
-  if (record_existence($dbh_read, 'multiloctrialentry', 'MultiLocTrialId', $mlt_id)) {
+  if (record_existence($dbh_read, 'trialgroupentry', 'TrialGroupId', $t_grp_id)) {
 
-    my $err_msg = "MultiLocTrial ($mlt_id): multiloctrialentry records exist.";
+    my $err_msg = "TrialGroup ($t_grp_id): trialgroupentry records exist.";
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
@@ -13206,10 +13448,10 @@ sub del_multiloc_trial_runmode {
 
   my $dbh_write = connect_kdb_write();
 
-  my $sql  = 'DELETE FROM multiloctrial WHERE MultiLocTrialId=?';
+  my $sql  = 'DELETE FROM trialgroup WHERE TrialGroupId=?';
 
   my $sth = $dbh_write->prepare($sql);
-  $sth->execute($mlt_id);
+  $sth->execute($t_grp_id);
 
   if ($dbh_write->err()) {
 
@@ -13222,7 +13464,7 @@ sub del_multiloc_trial_runmode {
 
   $dbh_write->disconnect();
 
-  my $info_msg_aref = [{'Message' => "MultiLocTrial ($mlt_id) has been deleted successfully."}];
+  my $info_msg_aref = [{'Message' => "TrialGroup ($t_grp_id) has been deleted successfully."}];
 
   $data_for_postrun_href->{'Error'}     = 0;
   $data_for_postrun_href->{'Data'}      = {'Info' => $info_msg_aref};
@@ -13231,42 +13473,42 @@ sub del_multiloc_trial_runmode {
   return $data_for_postrun_href;
 }
 
-sub add_trial2mlt_runmode {
+sub add_trial2trialgroup_runmode {
 
-=pod add_trial2mlt_HELP_START
+=pod add_trial2trialgroup_HELP_START
 {
-"OperationName" : "Add more trials to multi location trial",
-"Description": "Add more trials into multi location trial",
+"OperationName" : "Add more trials to a trial group",
+"Description": "Add more trials into a trial group specified by id",
 "AuthRequired": 1,
 "GroupRequired": 1,
 "GroupAdminRequired": 0,
 "SignatureRequired": 1,
 "AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='Trial (28,29) has been added to MultiLocTrial (8) successfully.' /></DATA>",
-"SuccessMessageJSON": "{'Info' : [{'Message' : 'Trial (28,29) has been added to MultiLocTrial (9) successfully.'}]}",
-"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='MultiLocTrial (24): not found.' /></DATA>"}],
-"ErrorMessageJSON": [{"IdNotFound": "{ 'Error' : [{ 'Message' : 'MultiLocTrial (24): not found.'} ]}"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='Trial (28,29) has been added to TrialGroup (8) successfully.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'Trial (28,29) has been added to TrialGroup (9) successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='TrialGroup (24): not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{ 'Error' : [{ 'Message' : 'TrialGroup (24): not found.'} ]}"}],
 "RequiredUpload": 1,
 "UploadFileFormat": "XML",
 "UploadFileParameterName": "uploadfile",
-"DTDFileNameForUploadXML": "multiloctrialentry.dtd",
-"URLParameter": [{"ParameterName": "id", "Description": "Existing MultiLocTrialId"}],
+"DTDFileNameForUploadXML": "trialgroupentry.dtd",
+"URLParameter": [{"ParameterName": "id", "Description": "Existing TrialGroupId"}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
 
   my $self   = $_[0];
-  my $mlt_id = $self->param('id');
+  my $t_grp_id = $self->param('id');
 
   my $data_for_postrun_href = {};
 
   my $dbh_read = connect_kdb_read();
 
-  my $owner = read_cell_value($dbh_read, 'multiloctrial', 'MultiLocTrialOwner', 'MultiLocTrialId', $mlt_id);
+  my $owner = read_cell_value($dbh_read, 'trialgroup', 'TrialGroupOwner', 'TrialGroupId', $t_grp_id);
 
   if ( length($owner) == 0 ) {
 
-    my $err_msg = "MultiLocTrial ($mlt_id): not found.";
+    my $err_msg = "TrialGroup ($t_grp_id): not found.";
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
@@ -13277,7 +13519,7 @@ sub add_trial2mlt_runmode {
 
   if ("$owner" ne "$user_id") {
 
-    my $err_msg = "MultiLocTrial ($mlt_id): permission denied.";
+    my $err_msg = "TrialGroup ($t_grp_id): permission denied.";
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
@@ -13285,15 +13527,15 @@ sub add_trial2mlt_runmode {
   }
 
   my $entry_xml_file              = $self->authen->get_upload_file();
-  my $multiloctrialentry_dtd_file = $self->get_multiloctrialentry_dtd_file();
+  my $trialgroupentry_dtd_file = $self->get_trialgroupentry_dtd_file();
 
-  $self->logger->debug("Multiloctrialentry DTD: $multiloctrialentry_dtd_file");
+  $self->logger->debug("Trialgroupentry DTD: $trialgroupentry_dtd_file");
 
-  add_dtd($multiloctrialentry_dtd_file, $entry_xml_file);
+  add_dtd($trialgroupentry_dtd_file, $entry_xml_file);
 
-  my $multiloctrial_xml = read_file($entry_xml_file);
+  my $trialgroup_xml = read_file($entry_xml_file);
 
-  $self->logger->debug("XML file with DTD: $multiloctrial_xml");
+  $self->logger->debug("XML file with DTD: $trialgroup_xml");
 
   my $xml_checker_parser = new XML::Checker::Parser( Handlers => { } );
 
@@ -13313,7 +13555,7 @@ sub add_trial2mlt_runmode {
 
     my $err_msg = $@;
     $self->logger->debug("Parsing XML error: $err_msg");
-    my $user_err_msg = "multiloctrialentry xml file does not comply with its definition.\n";
+    my $user_err_msg = "trialgroupentry xml file does not comply with its definition.\n";
     $user_err_msg   .= "Details: $err_msg";
 
     $data_for_postrun_href->{'Error'} = 1;
@@ -13322,7 +13564,7 @@ sub add_trial2mlt_runmode {
     return $data_for_postrun_href;
   }
 
-  my $trial_entry_aref = xml2arrayref($multiloctrial_xml, 'multiloctrialentry');
+  my $trial_entry_aref = xml2arrayref($trialgroup_xml, 'trialgroupentry');
 
   my $trial_id_aref      = [];
   my $uniq_trial_id_href = {};
@@ -13333,13 +13575,13 @@ sub add_trial2mlt_runmode {
 
     my $trial_id = $trial_entry_info->{'TrialId'};
 
-    $sql = 'SELECT MultiLocTrialEntryId FROM multiloctrialentry WHERE MultiLocTrialId=? AND TrialId=?';
+    $sql = 'SELECT TrialGroupEntryId FROM trialgroupentry WHERE TrialGroupId=? AND TrialId=?';
 
-    my ($r_mlt_entry_id, $db_mlt_entry_id) = read_cell($dbh_read, $sql, [$mlt_id, $trial_id]);
+    my ($r_t_grp_entry_id, $db_t_grp_entry_id) = read_cell($dbh_read, $sql, [$t_grp_id, $trial_id]);
 
-    if (length($db_mlt_entry_id) > 0) {
+    if (length($db_t_grp_entry_id) > 0) {
 
-      my $err_msg = "Trial ($trial_id): already in MultiLocTrial ($mlt_id).";
+      my $err_msg = "Trial ($trial_id): already in TrialGroup ($t_grp_id).";
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
@@ -13409,15 +13651,15 @@ sub add_trial2mlt_runmode {
 
   my $dbh_k_write = connect_kdb_write();
 
-  $sql  = 'INSERT INTO multiloctrialentry ';
-  $sql .= '(MultiLocTrialId,TrialId) ';
+  $sql  = 'INSERT INTO trialgroupentry ';
+  $sql .= '(TrialGroupId,TrialId) ';
   $sql .= 'VALUES ';
 
   my @sql_val_list;
 
   for my $trial_id (@{$trial_id_aref}) {
 
-    push(@sql_val_list, qq|($mlt_id, $trial_id)|);
+    push(@sql_val_list, qq|($t_grp_id, $trial_id)|);
   }
 
   $sql .= join(',', @sql_val_list);
@@ -13438,7 +13680,7 @@ sub add_trial2mlt_runmode {
 
   $dbh_k_write->disconnect();
 
-  my $info_msg_aref  = [{'Message' => "Trial (" . join(',', @{$trial_id_aref}) . ") has been added to MultiLocTrial ($mlt_id) successfully."}];
+  my $info_msg_aref  = [{'Message' => "Trial (" . join(',', @{$trial_id_aref}) . ") has been added to TrialGroup ($t_grp_id) successfully."}];
 
   $data_for_postrun_href->{'Error'}     = 0;
   $data_for_postrun_href->{'Data'}      = {'Info'      => $info_msg_aref};
@@ -13447,39 +13689,39 @@ sub add_trial2mlt_runmode {
   return $data_for_postrun_href;
 }
 
-sub remove_trial_from_mlt_runmode {
+sub remove_trial_from_trialgroup_runmode {
 
-=pod remove_trial_from_mlt_HELP_START
+=pod remove_trial_from_trialgroup_HELP_START
 {
-"OperationName" : "Remove trial from multiloctrial",
-"Description": "Remove trial specified by id from = multiloctrial specified by id.",
+"OperationName" : "Remove trial from trialgroup",
+"Description": "Remove trial specified by id from trialgroup specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
 "GroupAdminRequired": 1,
 "SignatureRequired": 1,
 "AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='Trial (34) has been removed from MultiLocTrial (12) successfully.' /></DATA>",
-"SuccessMessageJSON": "{'Info' : [{'Message' : 'Trial (34) has been removed from MultiLocTrial (13) successfully.'}]}",
-"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Trial (34): not part of MultiLocTrial (13).' /></DATA>"}],
-"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Trial (34): not part of MultiLocTrial (13).'}]}"}],
-"URLParameter": [{"ParameterName": "id", "Description": "Existing multiloctrial id"}, {"ParameterName": "tid", "Description": "Trial id which is part of specified multiloctrial"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='Trial (34) has been removed from TrialGroup (12) successfully.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'Trial (34) has been removed from TrialGroup (13) successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Trial (34): not part of TrialGroup (13).' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Trial (34): not part of TrialGroup (13).'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing trialgroup id"}, {"ParameterName": "tid", "Description": "Trial id which is part of specified trialgroup"}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
 
   my $self               = shift;
-  my $mlt_id             = $self->param('id');
+  my $t_grp_id             = $self->param('id');
   my $trial_id           = $self->param('tid');
 
   my $data_for_postrun_href = {};
 
   my $dbh_read = connect_kdb_read();
 
-  my $owner = read_cell_value($dbh_read, 'multiloctrial', 'MultiLocTrialOwner', 'MultiLocTrialId', $mlt_id);
+  my $owner = read_cell_value($dbh_read, 'trialgroup', 'TrialGroupOwner', 'TrialGroupId', $t_grp_id);
 
   if ( length($owner) == 0 ) {
 
-    my $err_msg = "MultiLocTrial ($mlt_id): not found.";
+    my $err_msg = "TrialGroup ($t_grp_id): not found.";
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
@@ -13490,18 +13732,18 @@ sub remove_trial_from_mlt_runmode {
 
   if ("$owner" ne "$user_id") {
 
-    my $err_msg = "MultiLocTrial ($mlt_id): permission denied.";
+    my $err_msg = "TrialGroup ($t_grp_id): permission denied.";
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
     return $data_for_postrun_href;
   }
 
-  my $sql = 'SELECT MultiLocTrialEntryId FROM multiloctrialentry WHERE MultiLocTrialId=? AND TrialId=?';
+  my $sql = 'SELECT TrialGroupEntryId FROM trialgroupentry WHERE TrialGroupId=? AND TrialId=?';
 
-  my ($r_mlt_entry_err, $mlt_entry_id) = read_cell($dbh_read, $sql, [$mlt_id, $trial_id]);
+  my ($r_t_grp_entry_err, $t_grp_entry_id) = read_cell($dbh_read, $sql, [$t_grp_id, $trial_id]);
 
-  if ($r_mlt_entry_err) {
+  if ($r_t_grp_entry_err) {
 
     my $err_msg = "Unexpected Error.";
     $data_for_postrun_href->{'Error'} = 1;
@@ -13510,9 +13752,9 @@ sub remove_trial_from_mlt_runmode {
     return $data_for_postrun_href;
   }
 
-  if (length($mlt_entry_id) == 0) {
+  if (length($t_grp_entry_id) == 0) {
 
-    my $err_msg = "Trial ($trial_id): not part of MultiLocTrial ($mlt_id).";
+    my $err_msg = "Trial ($trial_id): not part of TrialGroup ($t_grp_id).";
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
@@ -13523,10 +13765,10 @@ sub remove_trial_from_mlt_runmode {
 
   my $dbh_write = connect_kdb_write();
 
-  $sql  = 'DELETE FROM multiloctrialentry WHERE MultiLocTrialEntryId=?';
+  $sql  = 'DELETE FROM trialgroupentry WHERE TrialGroupEntryId=?';
 
   my $sth = $dbh_write->prepare($sql);
-  $sth->execute($mlt_entry_id);
+  $sth->execute($t_grp_entry_id);
 
   if ($dbh_write->err()) {
 
@@ -13539,11 +13781,1738 @@ sub remove_trial_from_mlt_runmode {
 
   $dbh_write->disconnect();
 
-  my $info_msg_aref = [{'Message' => "Trial ($trial_id) has been removed from MultiLocTrial ($mlt_id) successfully."}];
+  my $info_msg_aref = [{'Message' => "Trial ($trial_id) has been removed from TrialGroup ($t_grp_id) successfully."}];
 
   $data_for_postrun_href->{'Error'}     = 0;
   $data_for_postrun_href->{'Data'}      = {'Info' => $info_msg_aref};
   $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub import_trialunitkeyword_csv_runmode {
+
+=pod import_trialunitkeyword_csv_HELP_START
+{
+"OperationName" : "Import trialunit keyword",
+"Description": "Import keyword for trialunit(s) from a csv file.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='2 records of trialunitkeyword have been inserted successfully.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : '2 records of trialunitkeyword have been inserted successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Row (1): TrialUnit (1) does not exist.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Row (1): TrialUnit (1) does not exist.'}]}"}],
+"RequiredUpload": 1,
+"UploadFileFormat": "CSV",
+"UploadFileParameterName": "uploadfile",
+"HTTPParameter": [{"Required": 1, "Name": "TrialUnitId", "Description": "Column number counting from zero for TrialUnitId column in the upload CSV file"}, {"Required": 1, "Name": "KeywordId", "Description": "Column number counting from zero for KeywordId column in the upload CSV file"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self  = shift;
+  my $query = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  my $data_csv_file = $self->authen->get_upload_file();
+
+  my $num_of_col = get_csvfile_num_of_col($data_csv_file);
+
+  $self->logger->debug("Number of columns: $num_of_col");
+
+  my $TrialUnitId_col     = $query->param('TrialUnitId');
+  my $KeywordId_col       = $query->param('KeywordId');
+
+  my $chk_col_href = { 'TrialUnitId'     => $TrialUnitId_col,
+                       'KeywordId'       => $KeywordId_col
+                     };
+
+  my $matched_col = {};
+
+  $matched_col->{$TrialUnitId_col}     = 'TrialUnitId';
+  $matched_col->{$KeywordId_col}       = 'KeywordId';
+
+  my ($col_def_err, $col_def_err_href) = check_col_def_href( $chk_col_href, $num_of_col);
+
+  if ($col_def_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$col_def_err_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  my @fieldname_list;
+
+  for (my $i = 0; $i < $num_of_col; $i++) {
+
+    if ($matched_col->{$i}) {
+
+      push(@fieldname_list, $matched_col->{$i});
+    }
+    else {
+
+      push(@fieldname_list, 'null');
+    }
+  }
+
+  my ($data_aref, $csv_err, $err_msg) = csvfile2arrayref($data_csv_file, \@fieldname_list, 0);
+
+  if ($csv_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $dbh_write = connect_kdb_write();
+
+  my $group_id      = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+  my $perm_str      = permission_phrase($group_id, 0, $gadmin_status);
+
+  if (scalar(@{$data_aref}) == 0) {
+
+    $self->logger->debug("No data provided");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $bulk_sql = 'INSERT INTO trialunitkeyword ';
+  $bulk_sql   .= '(TrialUnitId,KeywordId) ';
+  $bulk_sql   .= 'VALUES ';
+
+  my $sql;
+  my $sth;
+
+  my $uniq_keyword_href = {};
+
+  my $row_counter = 1;
+  for my $data_row (@{$data_aref}) {
+
+    my $trialunit_id      = $data_row->{'TrialUnitId'};
+    my $keyword_id        = $data_row->{'KeywordId'};
+
+    my ($int_id_err, $int_id_msg) = check_integer_value( { 'TrialUnitId'    => $data_row->{'TrialUnitId'},
+                                                           'KeywordId'      => $data_row->{'KeywordId'}
+                                                         });
+
+    if ($int_id_err) {
+
+      $int_id_msg = "Row ($row_counter): " . $int_id_msg . ' not integer.';
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $int_id_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    $sql = 'SELECT TrialId FROM trialunit WHERE TrialUnitId=?';
+    $sth = $dbh_write->prepare($sql);
+    $sth->execute($trialunit_id);
+
+    my $trial_id = -1;
+    $sth->bind_col(1, \$trial_id);
+    $sth->fetch();
+    $sth->finish();
+
+    if ($trial_id == -1) {
+
+      my $err_msg = "Row ($row_counter): TrialUnit ($trialunit_id) does not exist.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    $sql = 'SELECT KeywordId FROM keyword WHERE KeywordId=?';
+    $sth = $dbh_write->prepare($sql);
+    $sth->execute($keyword_id);
+
+    my $db_keyword_id = -1;
+    $sth->bind_col(1, \$db_keyword_id);
+    $sth->fetch();
+    $sth->finish();
+
+    if ($db_keyword_id == -1) {
+
+      my $err_msg = "Row ($row_counter): Keyword ($db_keyword_id): not found.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my ($is_trial_perm_ok, $trouble_trial_id_aref) = check_permission($dbh_write, 'trial', 'TrialId',
+                                                                      [$trial_id], $group_id, $gadmin_status,
+                                                                      $READ_WRITE_PERM);
+
+    if (!$is_trial_perm_ok) {
+
+      my $perm_err_msg = "Row ($row_counter): Permission denied, Group ($group_id) and Trial ($trial_id).";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $perm_err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    if (defined $uniq_keyword_href->{"$trialunit_id _ $keyword_id"}) {
+
+      my $err_msg = "Row ($row_counter): TrialUnitId ($trialunit_id) - Keyword ($keyword_id): duplicate.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+    else {
+
+      $uniq_keyword_href->{"$trialunit_id _ $keyword_id"} = 1;
+    }
+
+    $sql = 'SELECT TrialUnitKeywordId FROM trialunitkeyword WHERE TrialUnitId=? AND KeywordId=?';
+
+    $sth = $dbh_write->prepare($sql);
+    $sth->execute($trialunit_id, $keyword_id);
+
+    my $tu_keyword_id = -1;
+    $sth->bind_col(1, \$tu_keyword_id);
+    $sth->fetch();
+    $sth->finish();
+
+    if ($tu_keyword_id != -1) {
+
+      my $err_msg = "Row ($row_counter): Keyword ($keyword_id): already exists for TrialUnit ($trialunit_id).";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    $bulk_sql .= "($trialunit_id,$keyword_id),";
+
+    $row_counter += 1;
+  }
+
+  chop($bulk_sql);      # remove excessive comma
+
+  $self->logger->debug("Bulk SQL: $bulk_sql");
+
+  my $nrows_inserted = $dbh_write->do($bulk_sql);
+
+  if ($dbh_write->err()) {
+
+    $self->logger->debug("Db err code: " . $dbh_write->err());
+    my $err_str = $dbh_write->errstr();
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $info_msg = "$nrows_inserted records of trialunitkeyword have been inserted successfully.";
+  my $info_msg_aref = [{'Message' => $info_msg}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'      => $info_msg_aref};
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  $dbh_write->disconnect();
+
+  return $data_for_postrun_href;
+}
+
+sub list_trial_unit_keyword {
+
+  my $self              = $_[0];
+  my $extra_attr_yes    = $_[1];
+  my $sql               = $_[2];
+  my $where_para_aref   = $_[3];
+
+  my $err = 0;
+  my $msg = '';
+
+  my $data_aref = [];
+
+  my $dbh = connect_kdb_read();
+
+  ($err, $msg, $data_aref) = read_data($dbh, $sql, $where_para_aref);
+
+  if ($err) {
+
+    return ($err, $msg, []);
+  }
+
+  $dbh->disconnect();
+
+  my $extra_attr_tunit_keyword_data = [];
+
+  if ($extra_attr_yes) {
+
+    my $perm_lookup  = {'0' => 'None',
+                        '1' => 'Link',
+                        '2' => 'Write',
+                        '3' => 'Write/Link',
+                        '4' => 'Read',
+                        '5' => 'Read/Link',
+                        '6' => 'Read/Write',
+                        '7' => 'Read/Write/Link',
+    };
+
+    for my $row (@{$data_aref}) {
+
+      my $trial_unit_keyword_id    = $row->{'TrialUnitKeywordId'};
+      my $permission               = $row->{'UltimatePerm'};
+      $row->{'UltimatePermission'} = $perm_lookup->{$permission};
+
+      if ( ($permission & $READ_WRITE_PERM) == $READ_WRITE_PERM ) {
+
+        $row->{'remove'} = "remove/trialunitkeyword/$trial_unit_keyword_id";
+      }
+
+      push(@{$extra_attr_tunit_keyword_data}, $row);
+    }
+  }
+  else {
+
+    $extra_attr_tunit_keyword_data = $data_aref;
+  }
+
+  return ($err, $msg, $extra_attr_tunit_keyword_data);
+}
+
+sub list_trialunit_keyword_advanced_runmode {
+
+=pod list_trialunit_keyword_advanced_HELP_START
+{
+"OperationName" : "List trial unit keyword",
+"Description": "List the whole association of keywords with trial units. This listing will require pagination if it is called without trialunit id.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "FILTERING"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Pagination NumOfRecords='2' NumOfPages='2' Page='1' NumPerPage='1' /><RecordMeta TagName='TrialUnitKeyword' /><TrialUnitKeyword TrialUnitKeywordId='6' KeywordId='24' remove='remove/trialunitkeyword/6' UltimatePermission='Read/Write/Link' KeywordName='Keyword_6508061' TrialUnitId='41' UltimatePerm='7' /></DATA>",
+"SuccessMessageJSON": "{'Pagination' : [{'NumOfRecords' : '2', 'NumOfPages' : 2, 'NumPerPage' : '1', 'Page' : '1'}], 'RecordMeta' : [{'TagName' : 'TrialUnitKeyword'}], 'TrialUnitKeyword' : [{'TrialUnitKeywordId' : '6', 'remove' : 'remove/trialunitkeyword/6', 'KeywordId' : '24', 'UltimatePermission' : 'Read/Write/Link', 'KeywordName' : 'Keyword_6508061', 'TrialUnitId' : '41', 'UltimatePerm' : '7'}]}",
+"ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
+"ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
+"URLParameter": [{"ParameterName": "nperpage", "Description": "Number of records in a page for pagination"}, {"ParameterName": "num", "Description": "The page number of the pagination"},{"ParameterName": "id", "Description": "Existing TrialUnitId"}],
+"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database field name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "FieldList", "Description": "Comma separated value of wanted fields."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases."}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self  = shift;
+  my $query = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  my $pagination  = 0;
+  my $nb_per_page = -1;
+  my $page        = -1;
+
+  if ( (defined $self->param('nperpage')) && (defined $self->param('num')) ) {
+
+    $pagination = 1;
+    $nb_per_page = $self->param('nperpage');
+    $page        = $self->param('num');
+  }
+
+  my $field_list_csv = '';
+
+  if (defined $query->param('FieldList')) {
+
+    $field_list_csv = $query->param('FieldList');
+  }
+
+  my $filtering_csv = '';
+
+  if (defined $query->param('Filtering')) {
+
+    $filtering_csv = $query->param('Filtering');
+  }
+
+  my $trial_unit_id          = -1;
+  my $trial_unit_id_provided = 0;
+
+  if (defined $self->param('id')) {
+
+    $trial_unit_id          = $self->param('id');
+    $trial_unit_id_provided = 1;
+
+    if ($filtering_csv =~ /TrialUnitId\s*=\s*(.*),?/) {
+
+      if ( "$trial_unit_id" ne "$1" ) {
+
+        my $err_msg = 'Duplicate filtering condition for TrialUnitId.';
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+        return $data_for_postrun_href;
+      }
+    }
+    else {
+
+      if (length($filtering_csv) > 0) {
+
+        if ($filtering_csv =~ /&$/) {
+
+          $filtering_csv .= "TrialUnitId=$trial_unit_id";
+        }
+        else {
+
+          $filtering_csv .= "&TrialUnitId=$trial_unit_id";
+        }
+      }
+      else {
+
+        $filtering_csv .= "TrialUnitId=$trial_unit_id";
+      }
+    }
+  }
+
+  $self->logger->debug("Filtering csv: $filtering_csv");
+
+  my $sorting = '';
+
+  if (defined $query->param('Sorting')) {
+
+    $sorting = $query->param('Sorting');
+  }
+
+  my $group_id = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+  my $perm_str = permission_phrase($group_id, 0, $gadmin_status, 'trial');
+
+  my $sql = 'SELECT * FROM trialunitkeyword LIMIT 1';
+
+  my ($sample_tup_err, $sample_tup_msg, $sample_tup_data) = $self->list_trial_unit_keyword(0, $sql);
+
+  if ($sample_tup_err) {
+
+    $self->logger->debug($sample_tup_msg);
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $dbh = connect_kdb_read();
+
+  my $sample_data_aref = $sample_tup_data;
+
+  my @field_list_all;
+
+  if (scalar(@{$sample_data_aref}) == 1) {
+
+    @field_list_all = keys(%{$sample_data_aref->[0]});
+  }
+  else {
+
+    $self->logger->debug("It reaches here");
+    my ($sfield_err, $sfield_msg, $sfield_data, $pkey_data) = get_static_field($dbh, 'trialunitkeyword');
+
+    if ($sfield_err) {
+
+      $self->logger->debug("Get static field failed: $sfield_msg");
+      return $self->_set_error();
+    }
+
+    for my $sfield_rec (@{$sfield_data}) {
+
+      push(@field_list_all, $sfield_rec->{'Name'});
+    }
+
+    for my $pkey_field (@{$pkey_data}) {
+
+      push(@field_list_all, $pkey_field);
+    }
+  }
+
+  $self->logger->debug("Field list all: " . join(',', @field_list_all));
+
+  my $final_field_list = \@field_list_all;
+
+  if (length($field_list_csv) > 0) {
+
+    my ($sel_field_err, $sel_field_msg, $sel_field_list) = parse_selected_field($field_list_csv,
+                                                                                $final_field_list,
+                                                                                'TrialUnitKeywordId',
+        );
+
+    if ($sel_field_err) {
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $sel_field_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    $final_field_list = $sel_field_list;
+
+    if ($filtering_csv =~ /TrialUnitId/) {
+
+      push(@{$final_field_list}, 'TrialUnitId');
+    }
+  }
+
+  my $field_lookup = {};
+  for my $fd_name (@{$final_field_list}) {
+
+    $field_lookup->{$fd_name} = 1;
+  }
+
+  my $other_join = '';
+
+  if ($field_lookup->{'KeywordId'}) {
+
+    push(@{$final_field_list}, 'keyword.KeywordName');
+    $other_join .= ' LEFT JOIN keyword ON trialunitkeyword.KeywordId = keyword.KeywordId ';
+  }
+
+  $self->logger->debug("Final field list: " . join(', ', @{$final_field_list}));
+
+  my $sql_field_list = [];
+  for my $field_name (@{$final_field_list}) {
+
+    my $full_field_name = $field_name;
+    if (!($full_field_name =~ /\./)) {
+
+      $full_field_name = 'trialunitkeyword.' . $full_field_name;
+    }
+
+    push(@{$sql_field_list}, $full_field_name);
+  }
+
+  push(@{$sql_field_list}, "$perm_str AS UltimatePerm ");
+
+  my $field_list_str = join(', ', @{$sql_field_list});
+
+  $sql  = "SELECT $field_list_str ";
+  $sql .= 'FROM trialunitkeyword ';
+  $sql .= 'LEFT JOIN trialunit ON trialunitkeyword.TrialUnitId = trialunit.TrialUnitId ';
+  $sql .= 'LEFT JOIN trial ON trialunit.TrialId = trial.TrialId ';
+  $sql .= "$other_join ";
+
+  my $validation_func_lookup = { 'TrialUnitId' => sub { return $self->validate_trial_unit_id(@_); } };
+
+  $self->logger->debug("Final field list: " . join(', ', @{$final_field_list}));
+
+  my ($filter_err, $filter_msg, $filter_phrase, $where_arg) = parse_filtering('TrialUnitKeywordId',
+                                                                              'trialunitkeyword',
+                                                                              $filtering_csv,
+                                                                              $final_field_list,
+                                                                              $validation_func_lookup,
+      );
+
+  $self->logger->debug("Filter phrase: $filter_phrase");
+
+  if ($filter_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $filter_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $filter_where_phrase = '';
+  if (length($filter_phrase) > 0) {
+
+    $filter_where_phrase = " AND $filter_phrase ";
+  }
+
+  my $filtering_exp = " WHERE (($perm_str) & $READ_PERM) = $READ_PERM $filter_where_phrase ";
+
+  my $pagination_aref = [];
+  my $paged_limit_clause = '';
+
+  if ($pagination) {
+
+    my ($int_err, $int_err_msg) = check_integer_value( {'nperpage' => $nb_per_page,
+                                                        'num'      => $page
+                                                       });
+
+    if ($int_err) {
+
+      $int_err_msg .= ' not integer.';
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $int_err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my $page_where_phrase = '';
+    $page_where_phrase   .= ' LEFT JOIN trialunit ON trialunitkeyword.TrialUnitId = trialunit.TrialUnitId ';
+    $page_where_phrase   .= ' LEFT JOIN trial ON trialunit.TrialId = trial.TrialId ';
+    $page_where_phrase   .= " $filtering_exp ";
+
+    my ($paged_id_err, $paged_id_msg, $nb_records,
+        $nb_pages, $limit_clause, $rcount_time) = get_paged_filter($dbh,
+                                                                   $nb_per_page,
+                                                                   $page,
+                                                                   'trialunitkeyword',
+                                                                   'TrialUnitKeywordId',
+                                                                   $page_where_phrase,
+                                                                   $where_arg
+                                                                  );
+
+    if ($paged_id_err == 1) {
+
+      $self->logger->debug($paged_id_msg);
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    if ($paged_id_err == 2) {
+
+      $page = 0;
+    }
+
+    $pagination_aref = [{'NumOfRecords' => $nb_records,
+                         'NumOfPages'   => $nb_pages,
+                         'Page'         => $page,
+                         'NumPerPage'   => $nb_per_page,
+                        }];
+
+    $paged_limit_clause = $limit_clause;
+  }
+
+  $dbh->disconnect();
+
+  $sql .= " $filtering_exp ";
+
+  my ($sort_err, $sort_msg, $sort_sql) = parse_sorting($sorting, $final_field_list, 'trialunitkeyword');
+
+  if ($sort_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $sort_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (length($sort_sql) > 0) {
+
+    $sql .= " ORDER BY $sort_sql ";
+  }
+  else {
+
+    $sql .= ' ORDER BY trialunitkeyword.TrialunitkeywordId DESC';
+  }
+
+  $sql .= " $paged_limit_clause ";
+
+  $self->logger->debug("Where arg: " . join(',', @{$where_arg}));
+
+  $self->logger->debug("SQL: $sql");
+
+  my ($read_tu_kwd_err, $read_tu_kwd_msg, $tu_kwd_data) = $self->list_trial_unit_keyword(1,
+                                                                                         $sql,
+                                                                                         $where_arg);
+
+  if ($read_tu_kwd_err) {
+
+    $self->logger->debug($read_tu_kwd_msg);
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $data_for_postrun_href->{'Error'} = 0;
+  $data_for_postrun_href->{'Data'}  = {'TrialUnitKeyword'   => $tu_kwd_data,
+                                       'Pagination'         => $pagination_aref,
+                                       'RecordMeta'         => [{'TagName' => 'TrialUnitKeyword'}],
+  };
+
+  return $data_for_postrun_href;
+}
+
+sub add_trial_unit_keyword_runmode {
+
+=pod add_trial_unit_keyword_HELP_START
+{
+"OperationName" : "Add keyword to trial unit",
+"Description": "Associate a new keyword with a trial unit specified by id.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"KDDArTModule": "main",
+"KDDArTTable": "trialunitkeyword",
+"SkippedField": ["TrialUnitId"],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><ReturnId Value='103' ParaName='TrialUnitKeywordId' /><Info Message='TrialUnitKeyword (103) has been added successfully.' /></DATA>",
+"SuccessMessageJSON": "{'ReturnId' : [{'Value' : '104','ParaName' : 'TrialUnitKeywordId'}],'Info' : [{'Message' : 'TrialUnitKeyword (104) has been added successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='TrialUnitId (123): not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'TrialUnitId (123): not found.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing TrialUnitId"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self          = shift;
+  my $trial_unit_id = $self->param('id');
+  my $query         = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  # Generic required static field checking
+
+  my $dbh_read = connect_kdb_read();
+
+  my $skip_field = {'TrialUnitId' => 1};
+
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'trialunitkeyword', $skip_field);
+
+  if ($chk_sfield_err) {
+
+    $self->logger->debug($chk_sfield_msg);
+
+    return $for_postrun_href;
+  }
+
+  $dbh_read->disconnect();
+
+  # Finish generic required static field checking
+
+  my $keyword_id   = $query->param('KeywordId');
+
+  $dbh_read = connect_kdb_read();
+
+  my $trial_id = read_cell_value($dbh_read, 'trialunit', 'TrialId', 'TrialUnitId', $trial_unit_id);
+
+  if (length($trial_id) == 0) {
+
+    my $err_msg = "TrialUnitId ($trial_unit_id): not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $group_id = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+  my $perm_str = permission_phrase($group_id, 0, $gadmin_status, 'trial');
+  my $sql      = "SELECT $perm_str AS UltimatePermission ";
+  $sql        .= 'FROM trial ';
+  $sql        .= 'WHERE TrialId=?';
+
+  my ($read_err, $permission) = read_cell($dbh_read, $sql, [$trial_id]);
+
+  if ( ($permission & $READ_WRITE_PERM) != $READ_WRITE_PERM ) {
+
+    my $err_msg = "Trial ($trial_id): permission denied.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $keyword_exist = record_existence($dbh_read, 'keyword', 'KeywordId', $keyword_id);
+
+  if (!$keyword_exist) {
+
+    my $err_msg = "Keyword ($keyword_id) not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'KeywordId' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sql = 'SELECT TrialUnitKeywordId FROM trialunitkeyword WHERE TrialUnitId=? AND KeywordId=?';
+
+  my ($r_tu_kwd_id_err, $tu_kwd_id) = read_cell($dbh_read, $sql, [$trial_unit_id, $keyword_id]);
+
+  if (length($tu_kwd_id) > 0) {
+
+    my $err_msg = "Keyword ($keyword_id): already exists in trialunit ($trial_unit_id).";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'KeywordId' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh_read->disconnect();
+
+  my $dbh_write = connect_kdb_write();
+
+  $sql  = 'INSERT INTO trialunitkeyword SET ';
+  $sql .= 'KeywordId=?, ';
+  $sql .= 'TrialUnitId=?';
+
+  my $sth = $dbh_write->prepare($sql);
+  $sth->execute($keyword_id, $trial_unit_id);
+
+  my $tunit_keyword_id = -1;
+  if ($dbh_write->err()) {
+
+    $self->logger->debug("Insert into trialunitkeyword failed.");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+  $tunit_keyword_id = $dbh_write->last_insert_id(undef, undef, 'trialunitkeyword', 'TrialUnitKeywordId');
+  $sth->finish();
+
+  $dbh_write->disconnect();
+
+  my $info_msg_aref  = [{'Message' => "TrialUnitKeyword ($tunit_keyword_id) has been added successfully."}];
+  my $return_id_aref = [{'Value' => "$tunit_keyword_id", 'ParaName' => 'TrialUnitKeywordId'}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'       => $info_msg_aref,
+                                           'ReturnId'   => $return_id_aref,
+  };
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub remove_trial_unit_keyword_runmode {
+
+=pod remove_trial_unit_keyword_HELP_START
+{
+"OperationName" : "Remove trial unit keyword",
+"Description": "Delete association between trial unit and keyword specified by trialunitkeyword id.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='TrialUnitKeyword (103) has been removed successfully.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'TrialUnitKeyword (104) has been removed successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='TrialUnitKeyword (103) not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'TrialUnitKeyword (103) not found.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing TrialUnitKeywordId"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self             = shift;
+  my $tunit_keyword_id = $self->param('id');
+
+  my $data_for_postrun_href = {};
+
+  my $dbh_read = connect_kdb_read();
+  my $trial_unit_id = read_cell_value($dbh_read, 'trialunitkeyword', 'TrialUnitId',
+                                      'TrialUnitKeywordId', $tunit_keyword_id);
+
+  if (length($trial_unit_id) == 0) {
+
+    my $err_msg = "TrialUnitKeyword ($tunit_keyword_id) not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $trial_id = read_cell_value($dbh_read, 'trialunit', 'TrialId', 'TrialUnitId', $trial_unit_id);
+
+  my $group_id = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+  my $perm_str = permission_phrase($group_id, 0, $gadmin_status, 'trial');
+  my $sql      = "SELECT $perm_str AS UltimatePermission ";
+  $sql        .= 'FROM trial ';
+  $sql        .= 'WHERE TrialId=?';
+
+  my ($read_err, $permission) = read_cell($dbh_read, $sql, [$trial_id]);
+
+  if ( ($permission & $READ_WRITE_PERM) != $READ_WRITE_PERM ) {
+
+    my $err_msg = "Trial ($trial_id): permission denied.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh_read->disconnect();
+
+  my $dbh_write = connect_kdb_write();
+
+  $sql = 'DELETE FROM trialunitkeyword WHERE TrialUnitKeywordId=?';
+
+  my $sth = $dbh_write->prepare($sql);
+  $sth->execute($tunit_keyword_id);
+
+  if ($dbh_write->err()) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sth->finish();
+
+  $dbh_write->disconnect();
+
+  my $info_msg_aref = [{'Message' => "TrialUnitKeyword ($tunit_keyword_id) has been removed successfully."}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'       => $info_msg_aref};
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub import_crossing_csv_runmode {
+
+=pod import_crossing_csv_HELP_START
+{
+"OperationName" : "Import crossing records",
+"Description": "Import crossings from a csv file formatted as a sparse matrix of crossing data at the trial unit level.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='2 of crossing records have been inserted successfully. ' /><StatInfo Unit='second' ServerElapsedTime='0.051' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : '2 of crossing records have been inserted successfully. '}],'StatInfo' : [{'ServerElapsedTime' : '0.049','Unit' : 'second'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><StatInfo Unit='second' ServerElapsedTime='0.015' /><Error Message='TrialUnitSpecimen (200): not found' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'TrialUnitSpecimen (200): not found'}],'StatInfo' : [{'ServerElapsedTime' : '0.015','Unit' : 'second'}]}"}],
+"RequiredUpload": 1,
+"UploadFileFormat": "CSV",
+"UploadFileParameterName": "uploadfile",
+"HTTPParameter": [{"Name": "TrialId", "Description": "Column number starting from 0 in the CSV upload file for TrialId column", "Requried": 1}, {"Name": "BreedingMethodId", "Description": "Column number starting from 0 in the CSV upload file for BreedingMethodId column", "Requried": 1}, {"Name": "MaleParentId", "Description": "Column number starting from 0 for TrialUnitSpecimenId male parent column", "Requried": 1}, {"Name": "FemaleParentId", "Description": "Column number starting from zero for TrialUnitSpecimenId female parent column", "Requried": 1}, {"Name": "CrossingDateTime", "Description": "Column number starting from 0 for crossing date/time column", "Requried": 0}, {"Name": "UserId", "Description": "Column number starting from 0 for UserId column", "Requried": 0}, {"Name": "CrossingNote", "Description": "Column number starting from 0 for CrossingNote column", "Requried": 0}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self  = shift;
+  my $query = $self->query();
+
+  my $start_time = [gettimeofday()];
+  my $data_for_postrun_href = {};
+
+  my $data_csv_file = $self->authen->get_upload_file();
+
+  my $num_of_col = get_csvfile_num_of_col($data_csv_file);
+
+  $self->logger->debug("Number of columns: $num_of_col");
+
+  my $TrialId_col            = $query->param('TrialId');
+  my $BreedingMethodId_col   = $query->param('BreedingMethodId');
+  my $MaleParentId_col       = $query->param('MaleParentId');
+  my $FemaleParentId_col     = $query->param('FemaleParentId');
+
+  my $CrossingDateTime_col   = $query->param('CrossingDateTime');
+  my $UserId_col             = $query->param('UserId');
+  my $CrossingNote_col       = $query->param('CrossingNote');
+
+  my $chk_col_def_data = { 'TrialId'                   => $TrialId_col,
+                           'BreedingMethodId'          => $BreedingMethodId_col,
+                           'MaleParentId'              => $MaleParentId_col,
+                           'FemaleParentId'            => $FemaleParentId_col,
+                         };
+
+  my $matched_col = {};
+
+  $matched_col->{$TrialId_col}          = 'TrialId';
+  $matched_col->{$BreedingMethodId_col} = 'BreedingMethodId';
+  $matched_col->{$MaleParentId_col}     = 'MaleParentId';
+  $matched_col->{$FemaleParentId_col}   = 'FemaleParentId';
+
+  if (defined $query->param('CrossingDateTime')) {
+
+    if (length($query->param('CrossingDateTime')) > 0) {
+
+      $chk_col_def_data->{'CrossingDateTime'} = $CrossingDateTime_col;
+      $matched_col->{$CrossingDateTime_col} = 'CrossingDateTime';
+    }
+  }
+
+  if (defined $query->param('UserId')) {
+
+    if (length($query->param('UserId')) > 0) {
+
+      $chk_col_def_data->{'UserId'} = $UserId_col;
+      $matched_col->{$UserId_col} = 'UserId';
+    }
+  }
+
+  if (defined $query->param('CrossingNote')) {
+
+    if (length($query->param('CrossingNote')) > 0) {
+
+      $chk_col_def_data->{'CrossingNote'} = $CrossingNote_col;
+      $matched_col->{$CrossingNote_col} = 'CrossingNote';
+    }
+  }
+
+
+  my ($col_def_err, $col_def_err_href) = check_col_def_href( $chk_col_def_data, $num_of_col );
+
+  if ($col_def_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$col_def_err_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  my @fieldname_list;
+
+  for (my $i = 0; $i < $num_of_col; $i++) {
+
+    if ($matched_col->{$i}) {
+
+      push(@fieldname_list, $matched_col->{$i});
+    }
+    else {
+
+      push(@fieldname_list, 'null');
+    }
+  }
+
+  my ($data_aref, $csv_err, $err_msg) = csvfile2arrayref($data_csv_file, \@fieldname_list, 0);
+
+  if ($csv_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $num_of_bulk_insert = $NB_RECORD_BULK_INSERT;
+
+  my $dbh_write = connect_kdb_write();
+
+  my $row_counter = 1;
+  my $i = 0;
+  my $num_of_rows = scalar(@{$data_aref});
+
+  if (scalar(@{$data_aref}) == 0) {
+
+    $self->logger->debug("No data provided");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $self->logger->debug("Number of rows: $num_of_rows");
+
+  my $trial_id2tu_spec_id_href = {};
+  my $uniq_bmeth_href          = {};
+  my $uniq_user_id_href        = {};
+
+  my @sql_values;
+
+  foreach my $data_rec (@{$data_aref}) {
+
+    my $TrialId            = $data_rec->{'TrialId'};
+    my $BreedingMethodId   = $data_rec->{'BreedingMethodId'};
+    my $MaleParentId       = $data_rec->{'MaleParentId'};
+    my $FemaleParentId     = $data_rec->{'FemaleParentId'};
+
+    my ( $missing_err, $missing_msg ) = check_missing_value( { 'TrialId' => $TrialId,
+                                                               'BreedingMethodId' => $BreedingMethodId,
+                                                               'MaleParentId' => $MaleParentId,
+                                                               'FemaleParentId' => $FemaleParentId
+                                                             } );
+
+    if ($missing_err) {
+
+      my $err_msg = "Row ($row_counter): " . $missing_msg . ": missing.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my $CrossingDateTime = 'NULL';
+
+    if (defined $data_rec->{'CrossingDateTime'}) {
+
+      if (length($data_rec->{'CrossingDateTime'}) > 0) {
+
+        $CrossingDateTime   = $data_rec->{'CrossingDateTime'};
+
+        my ($crossing_dt_err, $crossing_dt_msg) = check_dt_value( {'CrossingDateTime' => $CrossingDateTime} );
+
+        if ($crossing_dt_err) {
+
+          my $err_msg = "Row ($row_counter): " . $crossing_dt_msg . ": not date/time.";
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+          return $data_for_postrun_href;
+        }
+
+        $CrossingDateTime = $dbh_write->quote($CrossingDateTime);
+      }
+    }
+
+    my $UserId             = 'NULL';
+
+    if (defined $data_rec->{'UserId'}) {
+
+      if (length($data_rec->{'UserId'}) > 0) {
+
+        $UserId = $data_rec->{'UserId'};
+        $uniq_user_id_href->{$UserId} = 1;
+      }
+    }
+
+    my $CrossingNote       = 'NULL';
+
+    if (defined $data_rec->{'CrossingNote'}) {
+
+      if (length($data_rec->{'CrossingNote'}) > 0) {
+
+        $CrossingNote = $dbh_write->quote($data_rec->{'CrossingNote'});
+      }
+    }
+
+    $uniq_bmeth_href->{$BreedingMethodId} = 1;
+
+    my $uniq_tu_spec_in_trial = {};
+
+    if (defined $trial_id2tu_spec_id_href->{$TrialId}) {
+
+      $uniq_tu_spec_in_trial = $trial_id2tu_spec_id_href->{$TrialId};
+    }
+
+    $uniq_tu_spec_in_trial->{$MaleParentId}   = 1;
+    $uniq_tu_spec_in_trial->{$FemaleParentId} = 1;
+
+    $trial_id2tu_spec_id_href->{$TrialId} = $uniq_tu_spec_in_trial;
+
+    push(@sql_values, "(${TrialId},${BreedingMethodId},${MaleParentId},${FemaleParentId},${CrossingDateTime},${UserId},${CrossingNote})");
+
+    $row_counter += 1;
+  }
+
+  my @trial_id_list = keys(%{$trial_id2tu_spec_id_href});
+
+  if (scalar(@trial_id_list) == 0) {
+
+    my $err_msg = "No trial found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $group_id      = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  my ($is_trial_ok, $trouble_trial_id_aref) = check_permission($dbh_write, 'trial', 'TrialId',
+                                                               \@trial_id_list, $group_id, $gadmin_status,
+                                                               $READ_WRITE_PERM);
+
+  if (!$is_trial_ok) {
+
+    my $trouble_trial_id = join(',', @{$trouble_trial_id_aref});
+
+    my $err_msg = "Permission denied: Group ($group_id) and Trial ($trouble_trial_id).";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my @bmeth_id_list = keys(%{$uniq_bmeth_href});
+  my @user_id_list  = keys(%{$uniq_user_id_href});
+
+  my ($bmeth_err, $bmeth_msg, $unfound_bmeth_aref, $found_bmeth_aref) = record_existence_bulk($dbh_write, 'breedingmethod',
+                                                                                              'BreedingMethodId', \@bmeth_id_list);
+
+  if ($bmeth_err) {
+
+    $self->logger->debug("Check recorod existence bulk failed: $bmeth_msg");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (scalar(@{$unfound_bmeth_aref}) > 0) {
+
+    my $unfound_bmeth_csv = join(',', @{$unfound_bmeth_aref});
+
+    my $err_msg = "BreedingMethod ($unfound_bmeth_csv): not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my ($user_err, $user_msg, $unfound_user_aref, $found_user_aref) = record_existence_bulk($dbh_write, 'systemuser',
+                                                                                          'UserId', \@user_id_list);
+
+  if ($user_err) {
+
+    $self->logger->debug("Check recorod existence bulk failed: $user_msg");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (scalar(@{$unfound_user_aref}) > 0) {
+
+    my $unfound_user_csv = join(',', @{$unfound_user_aref});
+
+    my $err_msg = "User ($unfound_user_csv): not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $sql = 'SELECT TrialId, TrialUnitSpecimenId ';
+  $sql   .= 'FROM trialunitspecimen LEFT JOIN trialunit ON trialunitspecimen.TrialUnitId = trialunit.TrialUnitId ';
+  $sql   .= 'WHERE TrialId IN (' . join(',', @trial_id_list) . ')';
+
+  my $sth = $dbh_write->prepare($sql);
+  $sth->execute();
+
+  if ($dbh_write->err()) {
+
+    $self->logger->debug("Read TrialUnitSpecimenId failed");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $tu_spec_href = $sth->fetchall_hashref('TrialUnitSpecimenId');
+
+  if ($sth->err()) {
+
+    $self->logger->debug("Read TrialUnitSpecimenId into hash ref failed");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  foreach my $trial_id (@trial_id_list) {
+
+    my @spec_id_list = keys(%{$trial_id2tu_spec_id_href->{$trial_id}});
+
+    foreach my $tu_spec_id (@spec_id_list) {
+
+      if ( !(defined $tu_spec_href->{$tu_spec_id}) ) {
+
+        my $err_msg = "TrialUnitSpecimen ($tu_spec_id): not found";
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+        return $data_for_postrun_href;
+      }
+      else {
+
+        my $db_trial_id = $tu_spec_href->{$tu_spec_id}->{'TrialId'};
+
+        if ($db_trial_id != $trial_id) {
+
+          my $err_msg = "TrialUnitSpecimen ($tu_spec_id): not in trial ($trial_id).";
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+          return $data_for_postrun_href;
+        }
+      }
+    }
+  }
+
+  if (scalar(@sql_values) == 0) {
+
+    $self->logger->debug("No data");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $bulk_sql = 'INSERT INTO crossing ';
+  $bulk_sql   .= '(TrialId,BreedingMethodId,MaleParentId,FemaleParentId,CrossingDateTime,UserId,CrossingNote) ';
+  $bulk_sql   .= 'VALUES ' . join(',', @sql_values);
+
+  $self->logger->debug("BULK SQL: $bulk_sql");
+
+  my $nb_rows_inserted = $dbh_write->do($bulk_sql);
+
+  if ($dbh_write->err()) {
+
+    $self->logger->debug("Db err code: " . $dbh_write->err());
+
+    if ($dbh_write->err() == 1062) {
+
+      my $err_str = $dbh_write->errstr();
+
+      if ( $err_str =~ /Duplicate entry '(.+)'/ ) {
+
+        my $err_msg = "Duplicate Entry: $1";
+
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+        return $data_for_postrun_href;
+      }
+    }
+    else {
+
+      $self->logger->debug('Error code: ' . $dbh_write->err());
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  $dbh_write->disconnect();
+
+  my $info_msg = "$nb_rows_inserted of crossing records have been inserted successfully. ";
+
+  my $info_msg_aref = [{'Message' => $info_msg}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info' => $info_msg_aref};
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub list_crossing {
+
+  my $self            = $_[0];
+  my $extra_attr_yes  = $_[1];
+  my $sql             = $_[2];
+  my $where_para_aref = $_[3];
+
+  my $err = 0;
+  my $msg = '';
+
+  my $data_aref = [];
+
+  my $dbh = connect_kdb_read();
+
+  ($err, $msg, $data_aref) = read_data($dbh, $sql, $where_para_aref);
+
+  if ($err) {
+
+    return ($err, $msg, []);
+  }
+
+  $dbh->disconnect();
+
+  my $perm_lookup  = {'0' => 'None',
+                      '1' => 'Link',
+                      '2' => 'Write',
+                      '3' => 'Write/Link',
+                      '4' => 'Read',
+                      '5' => 'Read/Link',
+                      '6' => 'Read/Write',
+                      '7' => 'Read/Write/Link',
+  };
+
+  my @extra_attr_crossing_data;
+
+  for my $row (@{$data_aref}) {
+
+    my $crossing_id = $row->{'CrossingId'};
+    my $permission    = $row->{'UltimatePerm'};
+
+    if ($extra_attr_yes) {
+
+      $row->{'UltimatePermission'} = $perm_lookup->{$permission};
+
+      if ( ($permission & $READ_WRITE_PERM) == $READ_WRITE_PERM ) {
+
+        $row->{'update'}       = "update/crossing/$crossing_id";
+      }
+    }
+    push(@extra_attr_crossing_data, $row);
+  }
+
+  return ($err, $msg, \@extra_attr_crossing_data);
+}
+
+sub list_crossing_advanced_runmode {
+
+=pod list_crossing_advanced_HELP_START
+{
+"OperationName" : "List trial crossings",
+"Description": "List trial crossings.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "FILTERING"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "",
+"SuccessMessageJSON": "",
+"ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
+"ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
+"URLParameter": [{"ParameterName": "nperpage", "Description": "Number of records in a page for pagination", "Optional": 1}, {"ParameterName": "num", "Description": "The page number of the pagination", "Optional": 1}, {"ParameterName": "trialid", "Description": "Existing TrialId", "Optional": 1}],
+"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database field name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "FieldList", "Description": "Comma separated value of wanted fields."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases."}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self  = shift;
+  my $query = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  my $pagination  = 0;
+  my $nb_per_page = -1;
+  my $page        = -1;
+
+  if ( (defined $self->param('nperpage')) && (defined $self->param('num')) ) {
+
+    $pagination = 1;
+    $nb_per_page = $self->param('nperpage');
+    $page        = $self->param('num');
+  }
+
+  my $field_list_csv = '';
+
+  if (defined $query->param('FieldList')) {
+
+    $field_list_csv = $query->param('FieldList');
+  }
+
+  my $filtering_csv = '';
+
+  if (defined $query->param('Filtering')) {
+
+    $filtering_csv = $query->param('Filtering');
+  }
+
+  my $trial_id          = -1;
+  my $trial_id_provided = 0;
+
+  if (defined $self->param('trialid')) {
+
+    $trial_id          = $self->param('trialid');
+    $trial_id_provided = 1;
+
+    if ($filtering_csv =~ /TrialId\s*=\s*(.*),?/) {
+
+      if ( "$trial_id" ne "$1" ) {
+
+        my $err_msg = 'Duplicate filtering condition for TrialId.';
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+        return $data_for_postrun_href;
+      }
+    }
+    else {
+
+      if (length($filtering_csv) > 0) {
+
+        if ($filtering_csv =~ /&$/) {
+
+          $filtering_csv .= "TrialId=$trial_id";
+        }
+        else {
+
+          $filtering_csv .= "&TrialId=$trial_id";
+        }
+      }
+      else {
+
+        $filtering_csv .= "TrialId=$trial_id";
+      }
+    }
+  }
+
+  $self->logger->debug("Filtering csv: $filtering_csv");
+
+  my $sorting = '';
+
+  if (defined $query->param('Sorting')) {
+
+    $sorting = $query->param('Sorting');
+  }
+
+  my $group_id = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+  my $perm_str = permission_phrase($group_id, 0, $gadmin_status, 'trial');
+
+  my $sql = 'SELECT * FROM crossing LIMIT 1';
+
+  my ($sample_crossing_err, $sample_crossing_msg, $sample_crossing_data) = $self->list_crossing(0, $sql, []);
+
+  if ($sample_crossing_err) {
+
+    $self->logger->debug($sample_crossing_msg);
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $dbh = connect_kdb_read();
+
+  if ($trial_id_provided == 1) {
+
+    if (!record_existence($dbh, 'trial', 'TrialId', $trial_id)) {
+
+      my $err_msg = "Trial ($trial_id): not found";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  my $sample_data_aref = $sample_crossing_data;
+
+  my @field_list_all;
+
+  if (scalar(@{$sample_data_aref}) == 1) {
+
+    @field_list_all = keys(%{$sample_data_aref->[0]});
+  }
+  else {
+
+    $self->logger->debug("It reaches here");
+    my ($sfield_err, $sfield_msg, $sfield_data, $pkey_data) = get_static_field($dbh, 'crossing');
+
+    if ($sfield_err) {
+
+      $self->logger->debug("Get static field failed: $sfield_msg");
+      return $self->_set_error();
+    }
+
+    for my $sfield_rec (@{$sfield_data}) {
+
+      push(@field_list_all, $sfield_rec->{'Name'});
+    }
+
+    for my $pkey_field (@{$pkey_data}) {
+
+      push(@field_list_all, $pkey_field);
+    }
+  }
+
+  $self->logger->debug("Field list all: " . join(',', @field_list_all));
+
+  my $final_field_list     = \@field_list_all;
+  my $sql_field_list       = [];
+  my $filtering_field_list = [];
+
+  if (length($field_list_csv) > 0) {
+
+    my ($sel_field_err, $sel_field_msg, $sel_field_list) = parse_selected_field($field_list_csv,
+                                                                                $final_field_list,
+                                                                                'CrossingId');
+
+    if ($sel_field_err) {
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $sel_field_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    $final_field_list = $sel_field_list;
+
+    if ($filtering_csv =~ /TrialId/) {
+
+      push(@{$final_field_list}, 'crossing.TrialId');
+    }
+  }
+
+  foreach my $field_name (@{$final_field_list}) {
+
+    push(@{$sql_field_list}, "crossing.${field_name}");
+  }
+
+  $filtering_field_list = $final_field_list;
+
+  my $field_lookup = {};
+  for my $fd_name (@{$final_field_list}) {
+
+    $field_lookup->{$fd_name} = 1;
+  }
+
+  my $other_join = '';
+
+  if ($field_lookup->{'MaleParentId'}) {
+
+    push(@{$sql_field_list}, 'tuspec_male.SpecimenId AS MaleSpecimenId');
+    push(@{$sql_field_list}, 'tuspec_male.TrialUnitId AS MaleTrialUnitId');
+    $other_join .= ' LEFT JOIN trialunitspecimen as tuspec_male ON crossing.MaleParentId = tuspec_male.TrialUnitSpecimenId ';
+
+    push(@{$sql_field_list}, 'spec_male.SpecimenName AS MaleSpecimenName');
+    $other_join .= ' LEFT JOIN specimen as spec_male ON tuspec_male.SpecimenId = spec_male.SpecimenId ';
+  }
+
+  if ($field_lookup->{'FemaleParentId'}) {
+
+    push(@{$sql_field_list}, 'tuspec_female.SpecimenId AS FemaleSpecimenId');
+    push(@{$sql_field_list}, 'tuspec_female.TrialUnitId AS FemaleTrialUnitId');
+    $other_join .= ' LEFT JOIN trialunitspecimen as tuspec_female ON crossing.FemaleParentId = tuspec_female.TrialUnitSpecimenId ';
+
+    push(@{$sql_field_list}, 'spec_female.SpecimenName AS FemaleSpecimenName');
+    $other_join .= ' LEFT JOIN specimen as spec_female ON tuspec_female.SpecimenId = spec_female.SpecimenId ';
+  }
+
+  if ($field_lookup->{'BreedingMethodId'}) {
+
+    push(@{$sql_field_list}, 'breedingmethod.BreedingMethodName');
+    $other_join .= ' LEFT JOIN breedingmethod ON crossing.BreedingMethodId = breedingmethod.BreedingMethodId ';
+  }
+
+  push(@{$sql_field_list}, "$perm_str AS UltimatePerm ");
+
+  my $field_list_str = join(', ', @{$sql_field_list});
+
+  $sql  = "SELECT $field_list_str ";
+  $sql .= 'FROM crossing ';
+  $sql .= 'LEFT JOIN trial ON crossing.TrialId = trial.TrialId ';
+  $sql .= "$other_join ";
+
+  my ($filter_err, $filter_msg, $filter_phrase, $where_arg) = parse_filtering('CrossingId',
+                                                                              'crossing',
+                                                                              $filtering_csv,
+                                                                              $filtering_field_list
+                                                                             );
+
+  $self->logger->debug("Filter phrase: $filter_phrase");
+
+  if ($filter_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $filter_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $filter_where_phrase = '';
+  if (length($filter_phrase) > 0) {
+
+    $filter_where_phrase = " AND $filter_phrase ";
+  }
+
+  my $filtering_exp = "WHERE (($perm_str) & $READ_PERM) = $READ_PERM $filter_where_phrase ";
+
+  my $pagination_aref = [];
+  my $paged_limit_clause = '';
+
+  if ($pagination) {
+
+    my ($int_err, $int_err_msg) = check_integer_value( {'nperpage' => $nb_per_page,
+                                                        'num'      => $page
+                                                       });
+
+    if ($int_err) {
+
+      $int_err_msg .= ' not integer.';
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $int_err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my $page_where_phrase = '';
+    $page_where_phrase   .= ' LEFT JOIN trial ON crossing.TrialId = trial.TrialId ';
+    $page_where_phrase   .= " $filtering_exp ";
+
+    my ($paged_id_err, $paged_id_msg, $nb_records,
+        $nb_pages, $limit_clause, $rcount_time) = get_paged_filter($dbh,
+                                                                   $nb_per_page,
+                                                                   $page,
+                                                                   'crossing',
+                                                                   'CrossingId',
+                                                                   $page_where_phrase,
+                                                                   $where_arg
+            );
+
+    $self->logger->debug("SQL Row count time: $rcount_time");
+
+    if ($paged_id_err == 1) {
+
+      $self->logger->debug($paged_id_msg);
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    if ($paged_id_err == 2) {
+
+      $page = 0;
+    }
+
+    $pagination_aref = [{'NumOfRecords' => $nb_records,
+                         'NumOfPages'   => $nb_pages,
+                         'Page'         => $page,
+                         'NumPerPage'   => $nb_per_page,
+                        }];
+
+    $paged_limit_clause = $limit_clause;
+  }
+
+  $dbh->disconnect();
+
+  $sql .= " $filtering_exp ";
+
+  my ($sort_err, $sort_msg, $sort_sql) = parse_sorting($sorting, $final_field_list);
+
+  if ($sort_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $sort_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (length($sort_sql) > 0) {
+
+    $sql .= " ORDER BY $sort_sql ";
+  }
+  else {
+
+    $sql .= ' ORDER BY crossing.CrossingId DESC';
+  }
+
+  $sql .= " $paged_limit_clause ";
+
+  $self->logger->debug("Where arg: " . join(',', @{$where_arg}));
+
+  $self->logger->debug("SQL with VCol: $sql");
+
+  my ($read_crossing_err, $read_crossing_msg, $crossing_data) = $self->list_crossing(1,
+                                                                               $sql,
+                                                                               $where_arg);
+
+  if ($read_crossing_err) {
+
+    $self->logger->debug($read_crossing_msg);
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $data_for_postrun_href->{'Error'}     = 0;
+
+  $data_for_postrun_href->{'Data'}  = {'Crossing'  => $crossing_data,
+                                       'Pagination' => $pagination_aref,
+                                       'RecordMeta' => [{'TagName' => 'Crossing'}],
+  };
 
   return $data_for_postrun_href;
 }
@@ -13730,11 +15699,11 @@ sub get_addtrialunit_bulk_dtd_file {
   return "${dtd_path}/addtrialunitbulk_upload.dtd";
 }
 
-sub get_multiloctrialentry_dtd_file {
+sub get_trialgroupentry_dtd_file {
 
   my $dtd_path = $ENV{DOCUMENT_ROOT} . '/' . $DTD_PATH;
 
-  return "${dtd_path}/multiloctrialentry.dtd";
+  return "${dtd_path}/trialgroupentry.dtd";
 }
 
 sub logger {

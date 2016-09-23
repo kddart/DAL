@@ -11,6 +11,6 @@
   <Parent CaseFile="xml/add_data_no_vcol/case_00104_add_geno.xml" Order="3" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00401_add_filetype.xml" Order="4" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00400_add_multimedia.xml" Order="5" />
-  <ReturnId ParaName="MultimediaId" Value="2" />
-  <RunInfo Success="1" Time="1439968940" />
+  
+  
 </TestCase>

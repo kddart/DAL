@@ -23,5 +23,5 @@
   <Parent CaseFile="xml/add_data_no_vcol/case_00438_add_trait_no_trait_group_type.xml" Order="3" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00399_add_item_unit4update_trait.xml" Order="4" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00424_add_traitgroup_type.xml" Force="1" Order="5" />
-  <RunInfo Success="1" Time="1443160430" />
+  <RunInfo Success="1" Time="1474006811" />
 </TestCase>

@@ -1,24 +1,14 @@
-#$Id: Genotype.pm 1016 2015-10-08 06:06:28Z puthick $
-#$Author: puthick $
+#$Id$
+#$Author$
 
-# Copyright (c) 2015, Diversity Arrays Technology, All rights reserved.
-
-# COPYRIGHT AND LICENSE
-# 
-# Copyright (C) 2014 by Diversity Arrays Technology Pty Ltd
-# 
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-# 
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
+# Copyright (c) 2011, Diversity Arrays Technology, All rights reserved.
 
 # Author    : Puthick Hok
-# Version   : 2.3.0 build 1040
+# Created   : 02/06/2010
+# Modified  :
+# Purpose   : 
+#          
+#          
 
 package KDDArT::DAL::Genotype;
 
@@ -30,7 +20,8 @@ BEGIN {
 
   my ($volume, $current_dir, $file) = File::Spec->splitpath(__FILE__);
 
-  $main::kddart_base_dir = "${current_dir}../../..";
+  my @current_dir_part = split('/perl-lib/KDDArT/DAL/', $current_dir);
+  $main::kddart_base_dir = $current_dir_part[0];
 }
 
 use lib "$main::kddart_base_dir/perl-lib";
@@ -88,6 +79,11 @@ sub setup {
                                            'add_pedigree',
                                            'remove_genotype_trait',
                                            'add_genpedigree',
+                                           'add_keyword_to_specimen',
+                                           'remove_specimen_keyword',
+                                           'import_genpedigree_csv',
+                                           'update_genpedigree_gadmin',
+                                           'del_genpedigree_gadmin',
       );
   __PACKAGE__->authen->count_session_request_runmodes(':all');
   __PACKAGE__->authen->check_signature_runmodes('add_genotype',
@@ -115,6 +111,10 @@ sub setup {
                                                 'add_pedigree',
                                                 'remove_genotype_trait',
                                                 'add_genpedigree',
+                                                'add_keyword_to_specimen',
+                                                'remove_specimen_keyword',
+                                                'update_genpedigree_gadmin',
+                                                'del_genpedigree_gadmin',
       );
   __PACKAGE__->authen->check_gadmin_runmodes('add_genus_gadmin',
                                              'remove_genotype_from_specimen_gadmin',
@@ -132,6 +132,8 @@ sub setup {
                                              'del_breedingmethod_gadmin',
                                              'update_pedigree_gadmin',
                                              'del_pedigree_gadmin',
+                                             'update_genpedigree_gadmin',
+                                             'del_genpedigree_gadmin',
       );
   __PACKAGE__->authen->check_sign_upload_runmodes('add_specimen',
                                                   'add_specimen_group',
@@ -140,6 +142,7 @@ sub setup {
                                                   'import_genotype_csv',
                                                   'import_specimen_csv',
                                                   'import_pedigree_csv',
+                                                  'import_genpedigree_csv',
       );
 
   $self->run_modes(
@@ -199,7 +202,14 @@ sub setup {
     'list_spec_descendant'                      => 'list_spec_descendant_runmode',
     'list_pedigree_advanced'                    => 'list_pedigree_advanced_runmode',
     'list_gen_pedigree_advanced'                => 'list_gen_pedigree_advanced_runmode',
-      );
+    'add_keyword_to_specimen'                   => 'add_keyword_to_specimen_runmode',
+    'list_specimen_keyword_advanced'            => 'list_specimen_keyword_advanced_runmode',
+    'remove_specimen_keyword'                   => 'remove_specimen_keyword_runmode',
+    'import_genpedigree_csv'                    => 'import_genpedigree_csv_runmode',
+    'export_genpedigree'                        => 'export_genpedigree_runmode',
+    'update_genpedigree_gadmin'                 => 'update_genpedigree_runmode',
+    'del_genpedigree_gadmin'                    => 'del_genpedigree_runmode',
+    );
 
   my $logger = get_logger();
   Log::Log4perl::MDC->put('client_ip', $ENV{'REMOTE_ADDR'});
@@ -212,9 +222,9 @@ sub setup {
         );
 
     my $layout = Log::Log4perl::Layout::PatternLayout->new("[%d] [%H] [%X{client_ip}] [%p] [%F{1}:%L] [%M] [%m]%n");
-    
+
     $app->layout($layout);
-    
+
     $logger->add_appender($app);
   }
   $logger->level($DEBUG);
@@ -240,6 +250,7 @@ sub add_genotype_runmode {
 "AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
 "KDDArTModule": "main",
 "KDDArTTable": "genotype",
+"SkippedField": ["OwnGroupId"],
 "KDDArTFactorTable": "genotypefactor",
 "SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><ReturnId Value='1' ParaName='GenotypeId' /><Info Message='Genotype (1) has been added successfully.' /></DATA>",
 "SuccessMessageJSON": "{ 'ReturnId' : [{ 'Value' : '1', 'ParaName' : 'GenotypeId' }], 'Info' : [{ 'Message' : 'Genotype (1) has been added successfully.' }]}",
@@ -321,7 +332,7 @@ sub add_genotype_runmode {
 
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [$int_err_href]};
-    
+
     return $data_for_postrun_href;
   }
 
@@ -429,7 +440,7 @@ sub add_genotype_runmode {
 
     return $data_for_postrun_href;
   }
-  
+
   my $dbh_k_write = connect_kdb_write();
 
   my $group_id = $self->authen->group_id();
@@ -462,6 +473,7 @@ sub add_genotype_runmode {
   }
   else {
 
+    $self->logger->debug("SQL INSERT failed");
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
@@ -1084,6 +1096,7 @@ sub add_specimen_runmode {
 "AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
 "KDDArTModule": "main",
 "KDDArTTable": "specimen",
+"SkippedField": ["OwnGroupId","OwnGroupPerm","AccessGroupId","AccessGroupPerm","OtherPerm"],
 "SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><ReturnId Value='1' ParaName='SpecimenId' /><Info Message='Specimen (1) has been added successfully.' /></DATA>",
 "SuccessMessageJSON": "{ 'ReturnId' : [{ 'Value' : '1', 'ParaName' : 'SpecimenId' }], 'Info' : [{ 'Message' : 'Specimen (1) has been added successfully.' }]}",
 "ErrorMessageXML": [{"NameAlreadyExists": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error SpecimenName='SpecimenName (kardinal): already exists.' /></DATA>", "MissingParameter": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error SpecimenName='SpecimenName is missing.' /></DATA>" }],
@@ -1101,11 +1114,19 @@ sub add_specimen_runmode {
 
   my $data_for_postrun_href = {};
 
+  my $runmode_start_time = [gettimeofday()];
+
   # Generic required static field checking
 
   my $dbh_read = connect_kdb_read();
 
-  my $skip_field = {};
+  my $skip_field = {
+                    'OwnGroupId'       => 1,
+                    'OwnGroupPerm'     => 1,
+                    'AccessGroupId'    => 1,
+                    'AccessGroupPerm'  => 1,
+                    'OtherPerm'        => 1,
+                   };
 
   my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
                                                                                 'specimen', $skip_field);
@@ -1167,6 +1188,8 @@ sub add_specimen_runmode {
     return $data_for_postrun_href;
   }
 
+  my $barcode_start_time = [gettimeofday()];
+
   if ( length($query->param('SpecimenBarcode')) > 0 ) {
 
     $specimen_barcode = $query->param('SpecimenBarcode');
@@ -1180,6 +1203,27 @@ sub add_specimen_runmode {
       return $data_for_postrun_href;
     }
   }
+
+  my $chk_barcode_elapsed = tv_interval($barcode_start_time);
+
+  $self->logger->debug("Checking barcode time: $chk_barcode_elapsed");
+
+  my $chk_name_start_time = [gettimeofday()];
+
+  my $spec_name_exist = record_existence($dbh_write, 'specimen', 'SpecimenName', $specimen_name);
+
+  if ($spec_name_exist) {
+
+    my $err_msg = "SpecimenName ($specimen_name): already exists.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'SpecimenName' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $chk_name_elapsed = tv_interval($chk_name_start_time);
+
+  $self->logger->debug("Checking name time: $chk_name_elapsed");
 
   my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength ";
   $sql   .= "FROM factor ";
@@ -1223,18 +1267,11 @@ sub add_specimen_runmode {
     return $data_for_postrun_href;
   }
 
-  my $spec_name_exist = record_existence($dbh_k_read, 'specimen', 'SpecimenName', $specimen_name);
-
-  if ($spec_name_exist) {
-
-    my $err_msg = "SpecimenName ($specimen_name): already exists.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'SpecimenName' => $err_msg}]};
-
-    return $data_for_postrun_href; 
-  }
-
   $dbh_k_read->disconnect();
+
+  my $basic_chk_elapsed = tv_interval($runmode_start_time);
+
+  $self->logger->debug("Basic Checking time: $basic_chk_elapsed");
 
   my $geno_info_xml_file = $self->authen->get_upload_file();
   my $geno_info_dtd_file = $self->get_genotype_specimen_dtd_file();
@@ -1299,6 +1336,8 @@ sub add_specimen_runmode {
     }
   }
 
+  my @inherit_geno_id_list;
+
   my @geno_id_list;
   for my $geno_info (@{$geno_info_aref}) {
 
@@ -1346,6 +1385,69 @@ sub add_specimen_runmode {
         }
       }
     }
+
+    if (defined $geno_info->{'InheritanceFlag'}) {
+
+      if (length($geno_info->{'InheritanceFlag'}) > 0) {
+
+        my $inheritance_flag = $geno_info->{'InheritanceFlag'};
+
+        if ($inheritance_flag !~ /0|1/) {
+
+          my $err_msg = "InheritanceFlag ($inheritance_flag) must be either 0 or 1.";
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+          return $data_for_postrun_href;
+        }
+
+        if ("$inheritance_flag" eq '1') {
+
+          push(@inherit_geno_id_list, $geno_id);
+        }
+      }
+    }
+  }
+
+  my $inherit_geno_id = undef;
+
+  if ($nb_geno > 1) {
+
+    my $nb_inherit_geno = scalar(@inherit_geno_id_list);
+
+    if ($nb_inherit_geno == 1) {
+
+      $inherit_geno_id = $inherit_geno_id_list[0];
+    }
+    elsif ($nb_inherit_geno == 0) {
+
+      my $err_msg = "InheritanceFlag: missing for multi genotype specimen.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+    elsif ($nb_inherit_geno > 1) {
+
+      my $err_msg = "InheritanceFlag: more than one flag for multi genotype specimen.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+  else {
+
+    $inherit_geno_id = $geno_info_aref->[0]->{'GenotypeId'};
+  }
+
+  if ( !(defined $inherit_geno_id) ) {
+
+    $self->logger->debug("Inheritance Genotype Id is missing.");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
   }
 
   my ($is_ok, $trouble_geno_id_aref) = check_permission($dbh_write, 'genotype', 'GenotypeId',
@@ -1365,6 +1467,39 @@ sub add_specimen_runmode {
     return $data_for_postrun_href;
   }
 
+  $sql    = 'SELECT OwnGroupId, OwnGroupPerm, AccessGroupId, AccessGroupPerm, OtherPerm ';
+  $sql   .= 'FROM genotype WHERE GenotypeId=?';
+
+  my ($r_inh_perm_err, $r_inh_perm_msg, $inh_data_aref) = read_data($dbh_write, $sql, [$inherit_geno_id]);
+
+  if ($r_inh_perm_err) {
+
+    $self->logger->debug("Read inheritance permission info failed: $r_inh_perm_msg");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (scalar(@{$inh_data_aref}) == 0) {
+
+    $self->logger->debug("No inheritance information retrieved.");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $inh_own_grp_id     = $inh_data_aref->[0]->{'OwnGroupId'};
+  my $inh_own_grp_perm   = $inh_data_aref->[0]->{'OwnGroupPerm'};
+  my $inh_acc_grp_id     = $inh_data_aref->[0]->{'AccessGroupId'};
+  my $inh_acc_grp_perm   = $inh_data_aref->[0]->{'AccessGroupPerm'};
+  my $inh_oth_perm       = $inh_data_aref->[0]->{'OtherPerm'};
+
+  my $chk_elapsed = tv_interval($runmode_start_time);
+
+  $self->logger->debug("Checking time: $chk_elapsed");
+
   $sql    = 'INSERT INTO specimen SET ';
   $sql   .= 'BreedingMethodId=?, ';
   $sql   .= 'SpecimenName=?, ';
@@ -1372,11 +1507,18 @@ sub add_specimen_runmode {
   $sql   .= 'IsActive=?, ';
   $sql   .= 'Pedigree=?, ';
   $sql   .= 'SelectionHistory=?, ';
-  $sql   .= 'FilialGeneration=?';
+  $sql   .= 'FilialGeneration=?, ';
+  $sql   .= 'OwnGroupId=?, ';
+  $sql   .= 'OwnGroupPerm=?, ';
+  $sql   .= 'AccessGroupId=?, ';
+  $sql   .= 'AccessGroupPerm=?, ';
+  $sql   .= 'OtherPerm=?';
 
   my $sth = $dbh_write->prepare($sql);
   $sth->execute($breed_method_id, $specimen_name, $specimen_barcode,
-                $is_active, $pedigree, $selection_history, $filial_generation);
+                $is_active, $pedigree, $selection_history, $filial_generation,
+                $inh_own_grp_id, $inh_own_grp_perm, $inh_acc_grp_id, $inh_acc_grp_perm, $inh_oth_perm
+               );
 
   if ($dbh_write->err()) {
 
@@ -1428,13 +1570,24 @@ sub add_specimen_runmode {
       }
     }
 
+    my $inheritance_flag = undef;
+
+    if (defined $geno_info->{'InheritanceFlag'}) {
+
+      if (length($geno_info->{'InheritanceFlag'}) > 0) {
+
+        $inheritance_flag = $geno_info->{'InheritanceFlag'};
+      }
+    }
+
     $sql  = 'INSERT INTO genotypespecimen SET ';
     $sql .= 'GenotypeId=?, ';
     $sql .= 'SpecimenId=?, ';
-    $sql .= 'GenotypeSpecimenType=?';
+    $sql .= 'GenotypeSpecimenType=?, ';
+    $sql .= 'InheritanceFlag=?';
 
     my $geno_specimen_sth = $dbh_write->prepare($sql);
-    $geno_specimen_sth->execute($geno_id, $specimen_id, $geno_spec_type);
+    $geno_specimen_sth->execute($geno_id, $specimen_id, $geno_spec_type, $inheritance_flag);
 
     if ($dbh_write->err()) {
 
@@ -1492,6 +1645,7 @@ sub list_specimen {
   my $breedingmeth_lookup = {};
   my $geno_spec_lookup    = {};
   my $parent_lookup       = {};
+  my $keyword_lookup      = {};
 
   my $bmethod_id_href     = {};
   my $spec_id_aref        = [];
@@ -1593,6 +1747,38 @@ sub list_specimen {
         }
       }
 
+      my $keyword_sql = 'SELECT SpecimenId, keyword.KeywordId, KeywordName ';
+      $keyword_sql   .= 'FROM specimenkeyword LEFT JOIN keyword ON ';
+      $keyword_sql   .= 'specimenkeyword.KeywordId = keyword.KeywordId ';
+      $keyword_sql   .= 'WHERE SpecimenId IN (' . join(',', @{$spec_id_aref}) . ')';
+
+      $self->logger->debug("Specimen Keyword SQL: $keyword_sql");
+
+      my $spec_kwd_data_aref = [];
+
+      ($err, $msg, $spec_kwd_data_aref) = read_data($dbh, $keyword_sql, []);
+
+      if ($err) {
+
+        return ($err, $msg, []);
+      }
+
+      for my $spec_kwd_rec (@{$spec_kwd_data_aref}) {
+
+        my $spec_id = $spec_kwd_rec->{'SpecimenId'};
+
+        my $keyword_aref = [];
+
+        if (defined($keyword_lookup->{$spec_id})) {
+
+          $keyword_aref = $keyword_lookup->{$spec_id};
+        }
+
+        push(@{$keyword_aref}, $spec_kwd_rec);
+
+        $keyword_lookup->{$spec_id} = $keyword_aref;
+      }
+
       my $chk_table_aref = [{'TableName' => 'specimengroupentry', 'FieldName' => 'SpecimenId'},
                             {'TableName' => 'trialunitspecimen', 'FieldName' => 'SpecimenId'},
                             {'TableName' => 'pedigree', 'FieldName' => 'ParentSpecimenId'},
@@ -1664,6 +1850,11 @@ sub list_specimen {
 
         my $bmeth_id = $specimen_row->{'BreedingMethodId'};
         $specimen_row->{'BreedingMethodName'} = $breedingmeth_lookup->{$bmeth_id}->{'BreedingMethodName'};
+      }
+
+      if (defined $keyword_lookup->{$specimen_id}) {
+
+        $specimen_row->{'Keyword'} = $keyword_lookup->{$specimen_id};
       }
 
       if ($gadmin_status eq '1') {
@@ -1868,10 +2059,9 @@ sub list_specimen_advanced_runmode {
 
   my $group_id = $self->authen->group_id();
   my $gadmin_status = $self->authen->gadmin_status();
-  my $perm_str = permission_phrase($group_id, 0, $gadmin_status, 'genotype');
+  my $perm_str = permission_phrase($group_id, 0, $gadmin_status, 'specimen');
 
-  my $other_join = ' LEFT JOIN genotypespecimen ON specimen.SpecimenId = genotypespecimen.SpecimenId ';
-  $other_join   .= ' LEFT JOIN genotype ON genotypespecimen.GenotypeId = genotype.GenotypeId ';
+  my $other_join = ' ';
 
   ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_sql($dbh, $final_field_list, 'specimen',
                                                                      'SpecimenId', $other_join);
@@ -1888,6 +2078,8 @@ sub list_specimen_advanced_runmode {
   if ($filtering_csv =~ /GenotypeId/) {
 
     push(@{$final_field_list}, 'GenotypeId');
+    $other_join    = ' LEFT JOIN genotypespecimen ON specimen.SpecimenId = genotypespecimen.SpecimenId ';
+    $other_join   .= ' LEFT JOIN genotype ON genotypespecimen.GenotypeId = genotype.GenotypeId ';
   }
 
   my $field_name2table_name  = { 'GenotypeId' => 'genotypespecimen' };
@@ -1938,10 +2130,9 @@ sub list_specimen_advanced_runmode {
       return $data_for_postrun_href;
     }
 
-    my $count_sql = "SELECT COUNT(DISTINCT specimen.SpecimenId) ";
+    my $count_sql = "SELECT COUNT(*) ";
     $count_sql   .= "FROM specimen ";
-    $count_sql   .= "LEFT JOIN genotypespecimen ON specimen.SpecimenId = genotypespecimen.SpecimenId ";
-    $count_sql   .= "LEFT JOIN genotype ON genotypespecimen.GenotypeId = genotype.GenotypeId ";
+    $count_sql   .= "$other_join ";
     $count_sql   .= "$filtering_exp";
 
     $self->logger->debug("COUNT SQL: $count_sql");
@@ -2071,35 +2262,23 @@ sub get_specimen_runmode {
 
   my $group_id = $self->authen->group_id();
   my $gadmin_status = $self->authen->gadmin_status();
-  my $perm_str = permission_phrase($group_id, 0, $gadmin_status, 'genotype');
 
-  my $geno_perm_sql = "SELECT DISTINCT genotypespecimen.SpecimenId ";
-  $geno_perm_sql   .= "FROM genotypespecimen LEFT JOIN genotype ON genotypespecimen.GenotypeId = genotype.GenotypeId ";
-  $geno_perm_sql   .= "WHERE (($perm_str) & $READ_PERM) = $READ_PERM AND genotypespecimen.SpecimenId = ?";
+  my ($is_ok, $trouble_spec_id_aref) = check_permission($dbh, 'specimen', 'SpecimenId',
+                                                        [$specimen_id], $group_id, $gadmin_status,
+                                                        $READ_PERM);
 
-  my ($r_spec_id_err, $db_spec_id) = read_cell($dbh, $geno_perm_sql, [$specimen_id]);
+  if (!$is_ok) {
 
-  if ($r_spec_id_err) {
+    my $perm_err_msg = "Permission denied: Group ($group_id) and specimen ($specimen_id).";
 
-    $self->logger->debug("Read SpecimenId from database failed");
-    my $err_msg = "Unexpected Error.";
     $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-    return $data_for_postrun_href;
-  }
-
-  if (length($db_spec_id) == 0) {
-
-    my $err_msg = "Permission denied: specimen ($specimen_id).";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $perm_err_msg}]};
 
     return $data_for_postrun_href;
   }
 
   my $field_list = ['*'];
-  
+
   my $other_join = '';
 
   my ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_sql($dbh, $field_list, 'specimen',
@@ -2119,11 +2298,9 @@ sub get_specimen_runmode {
 
   $sql   =~ s/GROUP BY/ $filtering_exp GROUP BY /;
 
-  $sql   .= ' ORDER BY specimen.SpecimenId DESC';
-
   $self->logger->debug("SQL with VCol: $sql");
 
-  my ($read_specimen_err, $read_specimen_msg, $specimen_data) = $self->list_specimen(1, 0, $sql, [$specimen_id]);
+  my ($read_specimen_err, $read_specimen_msg, $specimen_data) = $self->list_specimen(1, 1, $sql, [$specimen_id]);
 
   if ($read_specimen_err) {
 
@@ -2204,28 +2381,61 @@ sub update_genotype_runmode {
 
   my $dbh_k_read = connect_kdb_read();
 
-  my $species_name = read_cell_value($dbh_k_read, 'genotype', 'SpeciesName', 'GenotypeId', $genotype_id);
+  my $species_name   = undef;
+  my $acronym        = undef;
+  my $note           = undef;
+  my $genotype_color = undef;
+
+  my $df_val_start_time = [gettimeofday()];
+
+  my $read_sql = 'SELECT SpeciesName, GenotypeAcronym, GenotypeNote, GenotypeColor ';
+  $read_sql   .= 'FROM genotype WHERE GenotypeId=?';
+
+  my ($r_df_val_err, $r_df_val_msg, $geno_df_val_data) = read_data($dbh_k_read, $read_sql, [$genotype_id]);
+
+  if ($r_df_val_err) {
+
+    $self->logger->debug("Retrieve genotype default values for optional fields failed: $r_df_val_msg");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $nb_df_val_rec = scalar(@{$geno_df_val_data});
+
+  if ($nb_df_val_rec != 1) {
+
+    $self->logger->debug("Retrieve specimen default values - number of records unacceptable: $nb_df_val_rec");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $species_name   = $geno_df_val_data->[0]->{'SpecimenBarcode'};
+  $acronym        = $geno_df_val_data->[0]->{'IsActive'};
+  $note           = $geno_df_val_data->[0]->{'Pedigree'};
+  $genotype_color = $geno_df_val_data->[0]->{'SelectionHistory'};
+
+  my $df_val_elapsed = tv_interval($df_val_start_time);
+
+  $self->logger->debug("Retrieving default value time: $df_val_elapsed");
 
   if (defined $query->param('SpeciesName')) {
 
     $species_name = $query->param('SpeciesName');
   }
 
-  my $acronym = read_cell_value($dbh_k_read, 'genotype', 'GenotypeAcronym', 'GenotypeId', $genotype_id);
-
   if (defined $query->param('GenotypeAcronym')) {
 
     $acronym = $query->param('GenotypeAcronym');
   }
 
-  my $note = read_cell_value($dbh_k_read, 'genotype', 'GenotypeNote', 'GenotypeId', $genotype_id);
-
   if (defined $query->param('GenotypeNote')) {
 
     $note = $query->param('GenotypeNote');
   }
-
-  my $genotype_color = read_cell_value($dbh_k_read, 'genotype', 'GenotypeColor', 'GenotypeId', $genotype_id);
 
   if (defined $query->param('GenotypeColor')) {
 
@@ -2473,7 +2683,13 @@ sub update_specimen_runmode {
 
   my $dbh_read = connect_kdb_read();
 
-  my $skip_field = {};
+  my $skip_field = {
+                    'OwnGroupId'       => 1,
+                    'OwnGroupPerm'     => 1,
+                    'AccessGroupId'    => 1,
+                    'AccessGroupPerm'  => 1,
+                    'OtherPerm'        => 1,
+                   };
 
   my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
                                                                                 'specimen', $skip_field);
@@ -2534,11 +2750,48 @@ sub update_specimen_runmode {
   my $specimen_name         = $query->param('SpecimenName');
   my $breed_method_id       = $query->param('BreedingMethodId');
 
-  my $specimen_barcode      = read_cell_value($dbh_k_read, 'specimen', 'SpecimenBarcode', 'SpecimenId', $specimen_id);
-  my $is_active             = read_cell_value($dbh_k_read, 'specimen', 'IsActive', 'SpecimenId', $specimen_id);
-  my $pedigree              = read_cell_value($dbh_k_read, 'specimen', 'Pedigree', 'SpecimenId', $specimen_id);
-  my $selection_history     = read_cell_value($dbh_k_read, 'specimen', 'SelectionHistory', 'SpecimenId', $specimen_id);
-  my $filial_generation     = read_cell_value($dbh_k_read, 'specimen', 'FilialGeneration', 'SpecimenId', $specimen_id);
+  my $df_val_start_time = [gettimeofday()];
+
+  my $read_sql = 'SELECT SpecimenBarcode, IsActive, Pedigree, SelectionHistory, FilialGeneration ';
+  $read_sql   .= 'FROM specimen WHERE SpecimenId=?';
+
+  my ($r_df_val_err, $r_df_val_msg, $spec_df_val_data) = read_data($dbh_k_read, $read_sql, [$specimen_id]);
+
+  if ($r_df_val_err) {
+
+    $self->logger->debug("Retrieve specimen default values for optional fields failed: $r_df_val_msg");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $specimen_barcode      = undef;
+  my $is_active             = undef;
+  my $pedigree              = undef;
+  my $selection_history     = undef;
+  my $filial_generation     = undef;
+
+  my $nb_df_val_rec = scalar(@{$spec_df_val_data});
+
+  if ($nb_df_val_rec != 1) {
+
+    $self->logger->debug("Retrieve specimen default values - number of records unacceptable: $nb_df_val_rec");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $specimen_barcode  = $spec_df_val_data->[0]->{'SpecimenBarcode'};
+  $is_active         = $spec_df_val_data->[0]->{'IsActive'};
+  $pedigree          = $spec_df_val_data->[0]->{'Pedigree'};
+  $selection_history = $spec_df_val_data->[0]->{'SelectionHistory'};
+  $filial_generation = $spec_df_val_data->[0]->{'FilialGeneration'};
+
+  my $df_val_elapsed = tv_interval($df_val_start_time);
+
+  $self->logger->debug("Retrieving default value time: $df_val_elapsed");
 
   if (length($filial_generation) == 0) {
 
@@ -2567,7 +2820,7 @@ sub update_specimen_runmode {
 
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [$int_err_href]};
-    
+
     return $data_for_postrun_href;
   }
 
@@ -2576,7 +2829,7 @@ sub update_specimen_runmode {
     my $err_msg = "BreedingMethodId ($breed_method_id) not found.";
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'BreedingMethodId' => $err_msg}]};
-    
+
     return $data_for_postrun_href;
   }
 
@@ -2698,7 +2951,7 @@ sub update_specimen_runmode {
       $sql  = 'SELECT Count(*) ';
       $sql .= 'FROM specimenfactor ';
       $sql .= 'WHERE SpecimenId=? AND FactorId=?';
-      
+
       my ($read_err, $count) = read_cell($dbh_write, $sql, [$specimen_id, $vcol_id]);
 
       if (length($vcol_value) > 0) {
@@ -2708,10 +2961,10 @@ sub update_specimen_runmode {
           $sql  = 'UPDATE specimenfactor SET ';
           $sql .= 'FactorValue=? ';
           $sql .= 'WHERE SpecimenId=? AND FactorId=?';
-          
+
           my $vcol_sth = $dbh_write->prepare($sql);
           $vcol_sth->execute($vcol_value, $specimen_id, $vcol_id);
-          
+
           if ($dbh_write->err()) {
 
             $data_for_postrun_href->{'Error'} = 1;
@@ -2727,12 +2980,12 @@ sub update_specimen_runmode {
           $sql .= 'SpecimenId=?, ';
           $sql .= 'FactorId=?, ';
           $sql .= 'FactorValue=?';
-          
+
           my $vcol_sth = $dbh_write->prepare($sql);
           $vcol_sth->execute($specimen_id, $vcol_id, $vcol_value);
-          
+
           if ($dbh_write->err()) {
-            
+
             $data_for_postrun_href->{'Error'} = 1;
             $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
@@ -2750,9 +3003,9 @@ sub update_specimen_runmode {
 
           my $factor_sth = $dbh_write->prepare($sql);
           $factor_sth->execute($specimen_id, $vcol_id);
-      
+
           if ($dbh_write->err()) {
-        
+
             $data_for_postrun_href->{'Error'} = 1;
             $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
@@ -3752,11 +4005,19 @@ sub list_genotype_alias_advanced_runmode {
 
     $self->logger->debug("Filtering expression: $filtering_exp");
 
+    #my $count_sql = "SELECT COUNT(GenotypeAliasId) ";
+    #$count_sql   .= "FROM genotypealias LEFT JOIN genotype ON ";
+    #$count_sql   .= "genotypealias.GenotypeId = genotype.GenotypeId ";
+    #$count_sql   .= "$filtering_exp";
+
     my $count_sql = "SELECT COUNT(GenotypeAliasId) ";
-    $count_sql   .= "FROM genotypealias LEFT JOIN genotype ON ";
-    $count_sql   .= "genotypealias.GenotypeId = genotype.GenotypeId ";
-    $count_sql   .= "$filtering_exp";
-   
+    $count_sql   .= "FROM genotypealias ";
+
+    if (length($filter_phrase) > 0) {
+
+      $count_sql .= "WHERE $filter_phrase";
+    }
+
     my ($pg_id_err, $pg_id_msg, $nb_records,
         $nb_pages, $limit_clause, $rcount_time) = get_paged_filter_sql($dbh,
                                                                        $nb_per_page,
@@ -4766,6 +5027,10 @@ sub add_specimen_group_runmode {
 "SuccessMessageJSON": "{'ReturnId' : [{'Value' : '8','ParaName' : 'SpecimenGroupId'}],'Info' : [{'Message' : 'SpecimenGroup (8) has been added successfully.'}]}",
 "ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error SpecimenGroupTypeId='SpecimenGroupTypeId (97): not found or active.' /></DATA>"}],
 "ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'SpecimenGroupTypeId' : 'SpecimenGroupTypeId (97): not found or active.'}]}"}],
+"RequiredUpload": 1,
+"UploadFileFormat": "XML",
+"UploadFileParameterName": "uploadfile",
+"DTDFileNameForUploadXML": "specimengroup.dtd",
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
@@ -4833,7 +5098,7 @@ sub add_specimen_group_runmode {
 
   if (record_existence($dbh_write, 'specimengroup', 'SpecimenGroupName', $specimen_group_name)) {
 
-    my $err_msg = "SpecimenGroupName ($specimen_group_name) already exists.";
+    my $err_msg = "SpecimenGroupName ($specimen_group_name): already exists.";
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'SpecimenGroupName' => $err_msg}]};
 
@@ -5063,6 +5328,7 @@ sub add_specimen_group_runmode {
 
   if ($dbh_write->err()) {
 
+    $self->logger->debug("SQL INSERT failed");
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
@@ -5072,26 +5338,33 @@ sub add_specimen_group_runmode {
 
   my $specimen_group_id = $dbh_write->last_insert_id(undef, undef, 'specimengroup', 'SpecimenGroupId');
 
+  my @spec_grp_entry_sql_list;
+
   for my $specimen_info (@{$specimen_info_aref}) {
 
     my $specimen_id   = $specimen_info->{'SpecimenId'};
-    my $specimen_note = undef;
+    my $specimen_note = 'NULL';
 
     if (defined $specimen_info->{'SpecimenNote'}) {
 
       if (length($specimen_info->{'SpecimenNote'}) > 0) {
 
-        $specimen_note = $specimen_info->{'SpecimenNote'};
+        $specimen_note = $dbh_write->quote($specimen_info->{'SpecimenNote'});
       }
     }
 
-    $sql  = 'INSERT INTO specimengroupentry SET ';
-    $sql .= 'SpecimenGroupId=?, ';
-    $sql .= 'SpecimenId=?, ';
-    $sql .= 'SpecimenNote=?';
+    push(@spec_grp_entry_sql_list, qq|(${specimen_group_id},${specimen_id},${specimen_note})|);
+  }
 
-    my $specimen_group_sth = $dbh_write->prepare($sql);
-    $specimen_group_sth->execute($specimen_group_id, $specimen_id, $specimen_note);
+  if (scalar(@spec_grp_entry_sql_list) > 0) {
+
+    my $spec_grp_entry_sql = q|INSERT INTO specimengroupentry(SpecimenGroupId,SpecimenId,SpecimenNote) VALUES |;
+    $spec_grp_entry_sql   .= join(',', @spec_grp_entry_sql_list);
+
+    $self->logger->debug("Specimen Group Entry SQL: $spec_grp_entry_sql");
+
+    my $specimen_group_sth = $dbh_write->prepare($spec_grp_entry_sql);
+    $specimen_group_sth->execute();
 
     if ($dbh_write->err()) {
 
@@ -5178,7 +5451,9 @@ sub list_specimen_group {
 
     if (scalar(@{$spec_grp_id_aref}) > 0) {
 
-      my $specimen_sql = 'SELECT SpecimenGroupId, SpecimenId, SpecimenNote FROM specimengroupentry ';
+      my $specimen_sql = 'SELECT SpecimenGroupId, specimengroupentry.SpecimenId, ';
+      $specimen_sql   .= 'specimengroupentry.SpecimenNote, specimen.SpecimenName FROM specimengroupentry ';
+      $specimen_sql   .= 'LEFT JOIN specimen ON specimengroupentry.SpecimenId = specimen.SpecimenId ';
       $specimen_sql   .= 'WHERE SpecimenGroupId IN (' . join(',', @{$spec_grp_id_aref}) . ')';
 
       my ($read_err, $read_msg, $specimen_id_aref) = read_data($dbh, $specimen_sql, []);
@@ -5702,8 +5977,8 @@ sub update_specimen_group_runmode {
 "KDDArTTable": "specimengroup",
 "SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='SpecimenGroup (9) has been updated successfully.' /></DATA>",
 "SuccessMessageJSON": "{'Info' : [{'Message' : 'SpecimenGroup (9) has been added successfully.'}]}",
-"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='SpecimenGroup (10) not found.' /></DATA>" }],
-"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'SpecimenGroup (10) not found.'}]}" }],
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='SpecimenGroup (10): not found.' /></DATA>" }],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'SpecimenGroup (10): not found.'}]}" }],
 "URLParameter": [{"ParameterName": "id", "Description": "Existing SpecimenGroupId"}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
@@ -5747,7 +6022,7 @@ sub update_specimen_group_runmode {
 
   if (!$specimen_grp_exist) {
 
-    my $err_msg = "SpecimenGroup ($specimen_grp_id) not found.";
+    my $err_msg = "SpecimenGroup ($specimen_grp_id): not found.";
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
@@ -5800,7 +6075,7 @@ sub update_specimen_group_runmode {
 
   if (length($duplicate_spec_grp_id) > 0) {
 
-    my $err_msg = "SpecimenGroupName ($specimen_group_name) already exists.";
+    my $err_msg = "SpecimenGroupName ($specimen_group_name): already exists.";
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
@@ -6309,7 +6584,10 @@ sub list_genotype_advanced_runmode {
 
     if ($sel_field_err) {
 
-      return $self->error_message($sel_field_msg);
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $sel_field_msg}]};
+
+      return $data_for_postrun_href;
     }
 
     $final_field_list = $sel_field_list;
@@ -6470,7 +6748,7 @@ sub list_genotype_advanced_runmode {
   $self->logger->debug("Where arg: " . join(',', @{$where_arg}));
 
   my $data_start_time = [gettimeofday()];
-  
+
   # where_arg here in the list function because of the filtering 
   my ($read_geno_err, $read_geno_msg, $geno_data) = $self->list_genotype(1, $sql, $where_arg);
 
@@ -7285,10 +7563,16 @@ sub list_genotype_in_specimen_runmode {
   $geno_specimen_sql   .= 'FROM genotype LEFT JOIN genotypespecimen ON ';
   $geno_specimen_sql   .= 'genotype.GenotypeId = genotypespecimen.GenotypeId ';
   $geno_specimen_sql   .= 'WHERE genotypespecimen.SpecimenId=?';
-    
+
+  my $read_geno_start_time = [gettimeofday()];
+
   my ($geno_specimen_err, $geno_specimen_msg, $geno_specimen_data) = read_data($dbh,
-                                                                      $geno_specimen_sql,
-                                                                      [$specimen_id]);
+                                                                               $geno_specimen_sql,
+                                                                               [$specimen_id]);
+
+  my $read_geno_elapsed = tv_interval($read_geno_start_time);
+
+  $self->logger->debug("Read genotype time: $read_geno_elapsed");
 
   if ($geno_specimen_err) {
 
@@ -7297,15 +7581,15 @@ sub list_genotype_in_specimen_runmode {
 
     return $data_for_postrun_href;
   }
-  
+
   $geno_specimen_sql   .= " AND ((($perm_str) & $READ_PERM) = $READ_PERM)";
 
   $self->logger->debug("Genotype specimen permission SQL: $geno_specimen_sql");
-  
+
   my ($geno_p_err, $geno_p_msg, $geno_p_data_perm) = read_data($dbh, $geno_specimen_sql, [$specimen_id]);
 
   if ($geno_p_err) {
-    
+
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
@@ -7313,7 +7597,7 @@ sub list_genotype_in_specimen_runmode {
   }
 
   if (scalar(@{$geno_specimen_data}) != scalar(@{$geno_p_data_perm})) {
-    
+
     $self->logger->debug("Permission denied: specimen ($specimen_id)");
     my $err_msg = "Permission denied: specimen ($specimen_id)";
     $data_for_postrun_href->{'Error'} = 1;
@@ -7336,7 +7620,7 @@ sub list_genotype_in_specimen_runmode {
   my $field_list = ['genotype.*', 'VCol*',
                     "$perm_str AS UltimatePerm",
       ];
-  
+
   my $other_join = '';
 
   my ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_sql($dbh, $field_list, 'genotype',
@@ -7352,13 +7636,15 @@ sub list_genotype_in_specimen_runmode {
   }
 
   $dbh->disconnect();
-  
+
   $self->logger->debug('Number of vcols: ' . scalar(@{$vcol_list}));
 
   my $geno_id_csv = join(',', @geno_id_list);
 
-  $sql   .= " HAVING (($perm_str) & $READ_PERM) = $READ_PERM";
-  $sql   .= " AND GenotypeId IN ($geno_id_csv)";
+  my $filtering_exp = " WHERE (($perm_str) & $READ_PERM) = $READ_PERM ";
+  $filtering_exp   .= " AND genotype.GenotypeId IN ($geno_id_csv)";
+
+  $sql  =~ s/GROUP BY/ $filtering_exp GROUP BY /;
 
   $self->logger->debug("SQL with VCol: $sql");
 
@@ -7489,7 +7775,7 @@ sub import_genotype_csv_runmode {
   }
 
   my @fieldname_list;
-  
+
   for (my $i = 0; $i < $num_of_col; $i++) {
 
     if ($matched_col->{$i}) {
@@ -7897,9 +8183,9 @@ sub import_genotype_csv_runmode {
   my $export_data_path     = "${doc_root}/data/$username";
   my $return_id_filename   = $self->get_current_runmode() . "_return_id_${file_rand}.${content_type}";
   my $return_id_file       = "${export_data_path}/$return_id_filename";
-  
+
   if ( !(-e $export_data_path) ) {
-      
+
     mkdir($export_data_path);
   }
 
@@ -8106,7 +8392,10 @@ sub export_genotype_runmode {
 
     if ($sel_field_err) {
 
-      return $self->error_message($sel_field_msg);
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $sel_field_msg}]};
+
+      return $data_for_postrun_href;
     }
 
     $final_field_list = $sel_field_list;
@@ -8371,9 +8660,14 @@ sub import_specimen_csv_runmode {
 
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-      
+
       return $data_for_postrun_href;
     }
+
+    my $InheritanceGenotype_col = $query->param('InheritanceGenotype');
+
+    $chk_col_def_data->{'InheritanceGenotype'} = $InheritanceGenotype_col;
+    $matched_col->{$InheritanceGenotype_col}   = 'InheritanceGenotype';
   }
 
   my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength ";
@@ -8418,7 +8712,7 @@ sub import_specimen_csv_runmode {
   }
 
   my @fieldname_list;
-  
+
   for (my $i = 0; $i < $num_of_col; $i++) {
 
     if ($matched_col->{$i}) {
@@ -8451,9 +8745,11 @@ sub import_specimen_csv_runmode {
 
   $self->logger->debug("Number of rows: $num_of_rows");
 
-  my $unique_specimen_href  = {};
-  my $unique_bmeth_id_href  = {};
-  my $unique_barcode_href   = {};
+  my $unique_specimen_href     = {};
+  my $unique_bmeth_id_href     = {};
+  my $unique_barcode_href      = {};
+
+  my $inherit_perm_info_lookup = {};
 
   my $inner_loop_max_j = 0;
 
@@ -8465,7 +8761,8 @@ sub import_specimen_csv_runmode {
 
     my $specimen_name_where     = '';
     my $barcode_where           = '';
-    my $uniq_geno_href;
+    my $uniq_geno_href          = {};
+    my $uniq_inherit_geno_href  = {};
 
     #$self->logger->debug("Checking: $i, $smallest_num");
 
@@ -8582,6 +8879,45 @@ sub import_specimen_csv_runmode {
         $int_chk_geno_data_href->{$geno_id_field} = $geno_id;
 
         $uniq_geno_href->{$geno_id} = $row_counter;
+      }
+
+      my $inherit_geno_id = undef;
+
+      if (scalar(@genotypeid_field) > 1) {
+
+        $inherit_geno_id = $data_row->{'InheritanceGenotype'};
+        $missing_geno_data_href->{'InheritanceGenotype'} = $inherit_geno_id;
+        $int_chk_geno_data_href->{'InheritanceGenotype'} = $inherit_geno_id;
+
+        my $is_inherit_geno_matched = 0;
+
+        for my $geno_id_field (@genotypeid_field) {
+
+          my $geno_id = $data_row->{$geno_id_field};
+
+          if ($inherit_geno_id == $geno_id) {
+
+            $is_inherit_geno_matched = 1;
+            last;
+          }
+        }
+
+        if ( !$is_inherit_geno_matched ) {
+
+          my $err_msg = "Row ($row_counter): inheritance genotype is not one of the genotypes in this row.";
+          return $self->_set_error($err_msg);
+        }
+      }
+      elsif (scalar(@genotypeid_field) == 1)  {
+
+        my $geno_id_field = $genotypeid_field[0];
+        $inherit_geno_id  = $data_row->{$geno_id_field};
+      }
+      # else is impossible due to the checking of $geno_info_provided
+
+      if ( !(defined $inherit_perm_info_lookup->{$inherit_geno_id}) ) {
+
+        $uniq_inherit_geno_href->{$inherit_geno_id} = $row_counter;
       }
 
       my ($geno_missing_err, $geno_missing_msg) = check_missing_value( $missing_geno_data_href );
@@ -8744,6 +9080,34 @@ sub import_specimen_csv_runmode {
       }
     }
 
+    my @inherit_geno_id_list = keys(%{$uniq_inherit_geno_href});
+
+    if (scalar(@inherit_geno_id_list) > 0) {
+
+      my $inherit_perm_sql    = 'SELECT GenotypeId, OwnGroupId, OwnGroupPerm, AccessGroupId, AccessGroupPerm, ';
+      $inherit_perm_sql      .= 'OtherPerm FROM genotype ';
+      $inherit_perm_sql      .= 'WHERE GenotypeId IN (' . join(',', @inherit_geno_id_list) . ')';
+
+      my ($r_inherit_perm_err, $r_inherit_perm_msg, $inherit_perm_data) = read_data($dbh_write,
+                                                                                    $inherit_perm_sql, []);
+
+      if ($r_inherit_perm_err) {
+
+        $self->logger->debug("Read inherit permission failed: $r_inherit_perm_msg");
+
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+        return $data_for_postrun_href;
+      }
+
+      foreach my $inherit_perm_row (@{$inherit_perm_data}) {
+
+        my $geno_id = $inherit_perm_row->{'GenotypeId'};
+        $inherit_perm_info_lookup->{$geno_id} = $inherit_perm_row;
+      }
+    }
+
     $i += $num_of_bulk_insert;
 
     #$self->logger->debug("Smallest num: $smallest_num");
@@ -8792,7 +9156,9 @@ sub import_specimen_csv_runmode {
     #$self->logger->debug("Composing: $i, $smallest_num");
 
     my $bulk_sql = 'INSERT INTO specimen ';
-    $bulk_sql   .= '(SpecimenName,BreedingMethodId,SpecimenBarcode,IsActive,Pedigree,SelectionHistory,FilialGeneration) ';
+    $bulk_sql   .= '(SpecimenName,BreedingMethodId,SpecimenBarcode,IsActive,Pedigree,';
+    $bulk_sql   .= 'SelectionHistory,FilialGeneration,OwnGroupId,OwnGroupPerm,AccessGroupId,';
+    $bulk_sql   .= 'AccessGroupPerm,OtherPerm) ';
     $bulk_sql   .= 'VALUES ';
 
     my $specimen_name_where     = '';
@@ -8845,8 +9211,48 @@ sub import_specimen_csv_runmode {
 
       $specimen_name_where .= "$specimen_name,";
 
-      $bulk_sql .= "($specimen_name,$breeding_method_id,$specimen_barcode,$is_active,$pedigree,$selection_history,";
-      $bulk_sql .= "$filial_generation),";
+      my $inherit_geno_id = undef;
+
+      if (scalar(@genotypeid_field) > 1) {
+
+        $inherit_geno_id = $data_row->{'InheritanceGenotype'};
+      }
+      elsif (scalar(@genotypeid_field) == 1)  {
+
+        my $geno_id_field = $genotypeid_field[0];
+        $inherit_geno_id  = $data_row->{$geno_id_field};
+      }
+      # else is impossible due to the checking of $geno_info_provided
+
+      if ( !(defined $inherit_geno_id) ) {
+
+        $self->logger->debug("Very strange: undefined inherit_geno_id");
+
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+        return $data_for_postrun_href;
+      }
+
+      if ( !(defined $inherit_perm_info_lookup) ) {
+
+        $self->logger->debug("Another strange: inherited genotype permission info not found");
+
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+        return $data_for_postrun_href;
+      }
+
+      my $own_grp_id    = $inherit_perm_info_lookup->{$inherit_geno_id}->{'OwnGroupId'};
+      my $own_grp_perm  = $inherit_perm_info_lookup->{$inherit_geno_id}->{'OwnGroupPerm'};
+      my $acc_grp_id    = $inherit_perm_info_lookup->{$inherit_geno_id}->{'AccessGroupId'};
+      my $acc_grp_perm  = $inherit_perm_info_lookup->{$inherit_geno_id}->{'AccessGroupPerm'};
+      my $oth_perm      = $inherit_perm_info_lookup->{$inherit_geno_id}->{'OtherPerm'};
+
+      $bulk_sql .= "($specimen_name,$breeding_method_id,$specimen_barcode,$is_active,$pedigree,";
+      $bulk_sql .= "$selection_history,$filial_generation,$own_grp_id,$own_grp_perm,$acc_grp_id,$acc_grp_perm,";
+      $bulk_sql .= "$oth_perm),";
 
       $j += 1;
     }
@@ -8874,7 +9280,7 @@ sub import_specimen_csv_runmode {
     $sth->finish();
 
     my $insert_geno_spec_bulk_sql = 'INSERT INTO genotypespecimen ';
-    $insert_geno_spec_bulk_sql   .= '(SpecimenId,GenotypeId) ';
+    $insert_geno_spec_bulk_sql   .= '(SpecimenId,GenotypeId,InheritanceFlag) ';
     $insert_geno_spec_bulk_sql   .= 'VALUES ';
 
     $j = $i;
@@ -8891,10 +9297,31 @@ sub import_specimen_csv_runmode {
 
       push(@{$just_inserted_id_data}, $just_inserted_id_rec);
 
+      my $inherit_geno_id = undef;
+
+      if (scalar(@genotypeid_field) > 1) {
+
+        $inherit_geno_id = $data_row->{'InheritanceGenotype'};
+      }
+      elsif (scalar(@genotypeid_field) == 1)  {
+
+        my $geno_id_field = $genotypeid_field[0];
+        $inherit_geno_id  = $data_row->{$geno_id_field};
+      }
+      # else is impossible due to the checking of $geno_info_provided
+
       for my $geno_id_field (@genotypeid_field) {
 
         my $geno_id = $data_row->{$geno_id_field};
-        $insert_geno_spec_bulk_sql .= "($specimen_id,$geno_id),";
+
+        my $inheritance_flag = 'NULL';
+
+        if ($geno_id == $inherit_geno_id) {
+
+          $inheritance_flag = '1';
+        }
+
+        $insert_geno_spec_bulk_sql .= "($specimen_id,$geno_id,$inheritance_flag),";
       }
 
       $j += 1;
@@ -8971,7 +9398,7 @@ sub import_specimen_csv_runmode {
 
     $i += $num_of_bulk_insert;
   }
-  
+
   $dbh_write->disconnect();
 
   my $return_id_data = {};
@@ -9941,7 +10368,10 @@ sub del_breedingmethod_runmode {
   if ($dbh_k_write->err()) {
 
     $self->logger->debug($dbh_k_write->errstr());
-    return $self->error_message('Unexpected error.');
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error.'}]};
+
+    return $data_for_postrun_href;
   }
 
   $sth->finish();
@@ -10120,7 +10550,7 @@ sub import_pedigree_csv_runmode {
 
         $int_chk_href->{'NumberOfSpecimens'} = $data_row->{'NumberOfSpecimens'};
       }
-      
+
       my ($int_id_err, $int_id_msg) = check_integer_value( $int_chk_href );
 
       if ($int_id_err) {
@@ -10165,9 +10595,8 @@ sub import_pedigree_csv_runmode {
 
       $unique_specimen_href->{$specimen_id}        = $row_counter;
       $unique_specimen_href->{$parent_specimen_id} = $row_counter;
-      
+
       $unique_parent_type_href->{$parent_type} = $row_counter;
-      
 
       $parent_where .= "$parent_key,";
 
@@ -10198,7 +10627,7 @@ sub import_pedigree_csv_runmode {
             push(@unknown_spec_rownum, $unique_specimen_href->{$spec_id_in_csv});
           }
         }
-        
+
         my $err_msg = 'Row (' . join(',', @unknown_spec_rownum) . '): Specimen (';
         $err_msg   .= join(',', @unknown_spec) . ') not found.';
 
@@ -10213,7 +10642,7 @@ sub import_pedigree_csv_runmode {
       $chk_geno_perm_sql   .= "(( ($perm_str) & $LINK_PERM ) = $LINK_PERM)";
 
       my $specimen_id_db_data = $dbh_write->selectall_hashref($chk_geno_perm_sql, 'SpecimenId');
-      
+
       my @trouble_specimen_id_list;
       my $is_perm_ok = 1;
 
@@ -10336,7 +10765,7 @@ sub import_pedigree_csv_runmode {
         $selection_reason = $data_row->{'SelectionReason'};
       }
 
-      my $number_of_specimens = -1;
+      my $number_of_specimens = 'NULL';
 
       if (defined $data_row->{'NumberOfSpecimens'}) {
 
@@ -10351,7 +10780,7 @@ sub import_pedigree_csv_runmode {
     #$self->logger->debug("Bulk SQL: $bulk_sql");
 
     chop($bulk_sql);            # remove excessive trailling comma
-    
+
     my $nrows_inserted = $dbh_write->do($bulk_sql);
 
     if ($dbh_write->err()) {
@@ -10366,7 +10795,7 @@ sub import_pedigree_csv_runmode {
 
     $i += $num_of_bulk_insert;
   }
-  
+
   $dbh_write->disconnect();
 
   my $elapsed_time = tv_interval($start_time);
@@ -11286,7 +11715,30 @@ sub update_pedigree_runmode {
     return $self->_set_error($err_msg);
   }
 
-  my $sql = 'UPDATE pedigree SET ';
+  my $sql = 'SELECT PedigreeId FROM pedigree WHERE SpecimenId=? AND ParentSpecimenId=? AND ParentType=?';
+
+  my ($r_pedigree_err, $db_pedigree_id) = read_cell($dbh_write, $sql, [$specimen_id, $p_specimen_id, $parent_type]);
+
+  if ($r_pedigree_err) {
+
+    $self->logger->debug("Read PedigreeId failed");
+    my $err_msg = "Unexpected Error.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (length($db_pedigree_id) > 0) {
+
+    my $err_msg = "Specimen ($specimen_id), ParentSpecimen ($p_specimen_id), ParentType ($parent_type): already exists.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sql    = 'UPDATE pedigree SET ';
   $sql   .= 'SpecimenId=?, ';
   $sql   .= 'ParentSpecimenId=?, ';
   $sql   .= 'ParentType=?, ';
@@ -11302,7 +11754,7 @@ sub update_pedigree_runmode {
 
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-    
+
     return $data_for_postrun_href;
   }
   $sth->finish();
@@ -11324,7 +11776,7 @@ sub del_pedigree_runmode {
 =pod del_pedigree_gadmin_HELP_START
 {
 "OperationName" : "Delete pedigree",
-"Description": "Delete specimen pedigree specified by id. Deleted pedigree record can not break pedigree tree.",
+"Description": "Delete specimen pedigree specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
 "GroupAdminRequired": 1,
@@ -11574,6 +12026,7 @@ sub list_gen_ancestor_runmode {
 "SuccessMessageJSON": "{'RecordMeta' : [{'TagName' : 'Ancestor'}],'Ancestor' : [{'ParentGenotypeId' : '2','NumberOfGenotypes' : null,'GenotypeId' : '1','GenParentType' : '59','GenPedigreeId' : '5','Level' : 0,'GenParentTypeName' : 'GenParentType - 8659523','ParentGenotypeName' : 'Geno_5317468'}]}",
 "ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
 "ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
+"HTTPParameter": [{"Required": 0, "Name": "Level", "Description": "The number of recursions to retrieve the parentage records from the database"}],
 "URLParameter": [{"ParameterName": "genoid", "Description": "Existing GenotypeId"}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
@@ -11596,7 +12049,7 @@ sub list_gen_ancestor_runmode {
     }
   }
 
-  my $stopping_level = -1;
+  my $stopping_level = 0;
 
   if (length($level) > 0) {
 
@@ -11610,6 +12063,12 @@ sub list_gen_ancestor_runmode {
       return $data_for_postrun_href;
     }
 
+    if ($level > $MAX_RECURSIVE_ANCESTOR_LEVEL) {
+
+      $level = $MAX_RECURSIVE_ANCESTOR_LEVEL;
+    }
+
+    # Make it into integer
     $stopping_level = $level + 0;
   }
 
@@ -11686,6 +12145,7 @@ sub list_gen_descendant_runmode {
 "SuccessMessageJSON": "{'RecordMeta' : [{'TagName' : 'Descendant'}],'Descendant' : [{'ParentGenotypeId' : '2','NumberOfGenotypes' : null,'GenotypeId' : '1','GenotypeName' : 'Geno_5736568','GenParentType' : '59','GenPedigreeId' : '5','Level' : 0,'GenParentTypeName' : 'GenParentType - 8659523'}]}",
 "ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
 "ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
+"HTTPParameter": [{"Required": 0, "Name": "Level", "Description": "The number of recursions to retrieve the parentage records from the database"}],
 "URLParameter": [{"ParameterName": "genoid", "Description": "Existing GenotypeId"}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
@@ -11708,7 +12168,7 @@ sub list_gen_descendant_runmode {
     }
   }
 
-  my $stopping_level = -1;
+  my $stopping_level = 0;
 
   if (length($level) > 0) {
 
@@ -11720,6 +12180,11 @@ sub list_gen_descendant_runmode {
       $data_for_postrun_href->{'Data'}  = {'Error' => [$int_err_href]};
 
       return $data_for_postrun_href;
+    }
+
+    if ($level > $MAX_RECURSIVE_DESCENDANT_LEVEL) {
+
+      $level = $MAX_RECURSIVE_DESCENDANT_LEVEL;
     }
 
     $stopping_level = $level + 0;
@@ -11798,6 +12263,7 @@ sub list_spec_ancestor_runmode {
 "SuccessMessageJSON": "{'RecordMeta' : [{'TagName' : 'Ancestor'}],'Ancestor' : [{'ParentSpecimenId' : '11','NumberOfSpecimens' : null,'ParentType' : '7','SelectionReason' : null,'PedigreeId' : '6','Level' : 0,'ParentSpecimenName' : 'Import_specimen1_9161882','ParentTypeName' : 'Male-5673950','SpecimenId' : '10'}]}",
 "ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
 "ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
+"HTTPParameter": [{"Required": 0, "Name": "Level", "Description": "The number of recursions to retrieve the parentage records from the database"}],
 "URLParameter": [{"ParameterName": "id", "Description": "Existing SpecimenId"}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
@@ -11819,7 +12285,7 @@ sub list_spec_ancestor_runmode {
     }
   }
 
-  my $stopping_level = -1;
+  my $stopping_level = 0;
 
   if (length($level) > 0) {
 
@@ -11829,8 +12295,13 @@ sub list_spec_ancestor_runmode {
 
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [$int_err_href]};
-    
+
       return $data_for_postrun_href;
+    }
+
+    if ($level > $MAX_RECURSIVE_ANCESTOR_LEVEL) {
+
+      $level = $MAX_RECURSIVE_ANCESTOR_LEVEL;
     }
 
     $stopping_level = $level + 0;
@@ -11924,6 +12395,7 @@ sub list_spec_descendant_runmode {
 "SuccessMessageJSON": "{'RecordMeta' : [{'TagName' : 'Descendant'}],'Descendant' : [{'ParentSpecimenId' : '11','NumberOfSpecimens' : null,'SpecimenName' : 'Import_specimen2_4056954','ParentType' : '7','SelectionReason' : null,'PedigreeId' : '6','Level' : 0,'ParentTypeName' : 'Male-5673950','SpecimenId' : '10'}]}",
 "ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
 "ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
+"HTTPParameter": [{"Required": 0, "Name": "Level", "Description": "The number of recursions to retrieve the parentage records from the database"}],
 "URLParameter": [{"ParameterName": "id", "Description": "Existing SpecimenId"}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
@@ -11945,7 +12417,7 @@ sub list_spec_descendant_runmode {
     }
   }
 
-  my $stopping_level = -1;
+  my $stopping_level = 0;
 
   if (length($level) > 0) {
 
@@ -11955,8 +12427,13 @@ sub list_spec_descendant_runmode {
 
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [$int_err_href]};
-    
+
       return $data_for_postrun_href;
+    }
+
+    if ($level > $MAX_RECURSIVE_DESCENDANT_LEVEL) {
+
+      $level = $MAX_RECURSIVE_DESCENDANT_LEVEL;
     }
 
     $stopping_level = $level + 0;
@@ -12541,6 +13018,1500 @@ sub list_gen_pedigree_advanced_runmode {
                                            'Pagination'    => $pagination_aref,
                                            'RecordMeta'    => [{'TagName' => 'GenPedigree'}],
   };
+
+  return $data_for_postrun_href;
+}
+
+sub add_keyword_to_specimen_runmode {
+
+=pod add_keyword_to_specimen_HELP_START
+{
+"OperationName" : "Attach keyword to specimen",
+"Description": "Add keyword to the specimen specified by.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"KDDArTModule": "main",
+"KDDArTTable": "specimenkeyword",
+"SkippedField": ["SpecimenId"],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><ReturnId Value='2' ParaName='SpecimenKeywordId' /><Info Message='Keyword (29) now part of specimen (206).' /></DATA>",
+"SuccessMessageJSON": "{'ReturnId' : [{'Value' : '3', 'ParaName' : 'SpecimenKeywordId'}], 'Info' : [{'Message' : 'Keyword (30) now part of specimen (206).'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Keyword (666876) not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{ 'Error':[{'Message': 'Keyword (6668) not found.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing SpecimenId"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self         = shift;
+  my $specimen_id  = $self->param('id');
+  my $query        = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  my $dbh_read = connect_kdb_read();
+
+  my $specimen_exist = record_existence($dbh_read, 'specimen', 'SpecimenId', $specimen_id);
+
+  if (!$specimen_exist) {
+
+    my $err_msg = "Specimen ($specimen_id) not found.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $group_id = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+  my $perm_str = permission_phrase($group_id, 0, $gadmin_status, 'genotype');
+
+  my $geno_perm_sql = "SELECT DISTINCT genotypespecimen.SpecimenId ";
+  $geno_perm_sql   .= "FROM genotypespecimen LEFT JOIN genotype ON genotypespecimen.GenotypeId = genotype.GenotypeId ";
+  $geno_perm_sql   .= "WHERE (($perm_str) & $READ_WRITE_PERM) = $READ_WRITE_PERM AND genotypespecimen.SpecimenId = ?";
+
+  my ($r_spec_id_err, $db_spec_id) = read_cell($dbh_read, $geno_perm_sql, [$specimen_id]);
+
+  if ($r_spec_id_err) {
+
+    $self->logger->debug("Read SpecimenId from database failed");
+    my $err_msg = "Unexpected Error.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (length($db_spec_id) == 0) {
+
+    my $err_msg = "Permission denied: specimen ($specimen_id).";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $keyword_id = $query->param('KeywordId');
+
+  my ($missing_err, $missing_href) = check_missing_href( {'KeywordId' => $keyword_id} );
+
+  if ($missing_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $sql = 'SELECT SpecimenKeywordId ';
+  $sql   .= 'FROM specimenkeyword ';
+  $sql   .= 'WHERE KeywordId=? AND SpecimenId=?';
+
+  my $sth = $dbh_read->prepare($sql);
+  $sth->execute($keyword_id, $specimen_id);
+  my $db_spec_kwd_id = -1;
+  $sth->bind_col(1, \$db_spec_kwd_id);
+  $sth->fetch();
+  $sth->finish();
+
+  if ($db_spec_kwd_id != -1) {
+
+    my $err_msg = "Keyword ($keyword_id): already part of specimen ($specimen_id).";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh_read->disconnect();
+
+  my $dbh_write = connect_kdb_write();
+
+  $sql  = 'INSERT INTO specimenkeyword SET ';
+  $sql .= 'KeywordId=?, ';
+  $sql .= 'SpecimenId=?';
+
+  $sth = $dbh_write->prepare($sql);
+  $sth->execute($keyword_id, $specimen_id);
+
+  if ($dbh_write->err()) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $spec_kwd_id = $dbh_write->last_insert_id(undef, undef, 'specimenkeyword', 'SpecimenKeywordId');
+
+  $sth->finish();
+
+  $dbh_write->disconnect();
+
+  my $info_msg_aref = [{'Message' => "Keyword ($keyword_id) now part of specimen ($specimen_id)."}];
+  my $return_id_aref = [{'Value' => "$spec_kwd_id", 'ParaName' => 'SpecimenKeywordId'}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'     => $info_msg_aref,
+                                           'ReturnId' => $return_id_aref
+  };
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub list_specimen_keyword {
+
+  my $self              = $_[0];
+  my $extra_attr_yes    = $_[1];
+  my $sql               = $_[2];
+  my $where_para_aref   = $_[3];
+
+  my $err = 0;
+  my $msg = '';
+
+  my $data_aref = [];
+
+  my $dbh = connect_kdb_read();
+
+  ($err, $msg, $data_aref) = read_data($dbh, $sql, $where_para_aref);
+
+  if ($err) {
+
+    return ($err, $msg, []);
+  }
+
+  $dbh->disconnect();
+
+  my $extra_attr_tunit_keyword_data = [];
+
+  if ($extra_attr_yes) {
+
+    my $perm_lookup  = {'0' => 'None',
+                        '1' => 'Link',
+                        '2' => 'Write',
+                        '3' => 'Write/Link',
+                        '4' => 'Read',
+                        '5' => 'Read/Link',
+                        '6' => 'Read/Write',
+                        '7' => 'Read/Write/Link',
+    };
+
+    for my $row (@{$data_aref}) {
+
+      my $specimen_keyword_id      = $row->{'SpecimenKeywordId'};
+      my $permission               = $row->{'UltimatePerm'};
+      $row->{'UltimatePermission'} = $perm_lookup->{$permission};
+
+      if ( ($permission & $READ_WRITE_PERM) == $READ_WRITE_PERM ) {
+
+        $row->{'remove'} = "remove/specimenkeyword/$specimen_keyword_id";
+      }
+
+      push(@{$extra_attr_tunit_keyword_data}, $row);
+    }
+  }
+  else {
+
+    $extra_attr_tunit_keyword_data = $data_aref;
+  }
+
+  return ($err, $msg, $extra_attr_tunit_keyword_data);
+}
+
+sub list_specimen_keyword_advanced_runmode {
+
+=pod list_specimen_keyword_advanced_HELP_START
+{
+"OperationName" : "List keywords for specimen",
+"Description": "List keywords associated for specimen specified by id.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><RecordMeta TagName='SpecimenKeyword' /><SpecimenKeyword SpecimenKeywordId='1' KeywordId='28' remove='remove/specimenkeyword/1' UltimatePermission='Read/Write/Link' KeywordName='Keyword_4972780' UltimatePerm='7' SpecimenId='206' /><SpecimenKeyword SpecimenKeywordId='2' KeywordId='29' remove='remove/specimenkeyword/2' UltimatePermission='Read/Write/Link' KeywordName='Keyword_6850702' UltimatePerm='7' SpecimenId='206' /></DATA>",
+"SuccessMessageJSON": "{'RecordMeta' : [{'TagName' : 'SpecimenKeyword'}], 'SpecimenKeyword' : [{'SpecimenKeywordId' : '1', 'remove' : 'remove/specimenkeyword/1', 'KeywordId' : '28', 'UltimatePermission' : 'Read/Write/Link', 'KeywordName' : 'Keyword_4972780', 'SpecimenId' : '206', 'UltimatePerm' : '7'},{'SpecimenKeywordId' : '2', 'remove' : 'remove/specimenkeyword/2', 'KeywordId' : '29', 'UltimatePermission' : 'Read/Write/Link', 'KeywordName' : 'Keyword_6850702', 'SpecimenId' : '206', 'UltimatePerm' : '7'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Specimen (500) not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Specimen (500) not found.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing SpecimenId"},{"ParameterName": "nperpage", "Description": "Number of records in a page for pagination"}, {"ParameterName": "num", "Description": "The page number of the pagination"}],
+"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database field name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "FieldList", "Description": "Comma separated value of wanted fields."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases."}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self  = shift;
+  my $query = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  my $pagination  = 0;
+  my $nb_per_page = -1;
+  my $page        = -1;
+
+  if ( (defined $self->param('nperpage')) && (defined $self->param('num')) ) {
+
+    $pagination = 1;
+    $nb_per_page = $self->param('nperpage');
+    $page        = $self->param('num');
+  }
+
+  my $field_list_csv = '';
+
+  if (defined $query->param('FieldList')) {
+
+    $field_list_csv = $query->param('FieldList');
+  }
+
+  my $filtering_csv = '';
+
+  if (defined $query->param('Filtering')) {
+
+    $filtering_csv = $query->param('Filtering');
+  }
+
+  my $specimen_id          = -1;
+  my $specimen_id_provided = 0;
+
+  if (defined $self->param('id')) {
+
+    $specimen_id          = $self->param('id');
+    $specimen_id_provided = 1;
+
+    if ($filtering_csv =~ /SpecimenId\s*=\s*(.*),?/) {
+
+      if ( "$specimen_id" ne "$1" ) {
+
+        my $err_msg = 'Duplicate filtering condition for SpecimenId.';
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+        return $data_for_postrun_href;
+      }
+    }
+    else {
+
+      if (length($filtering_csv) > 0) {
+
+        if ($filtering_csv =~ /&$/) {
+
+          $filtering_csv .= "SpecimenId=$specimen_id";
+        }
+        else {
+
+          $filtering_csv .= "&SpecimenId=$specimen_id";
+        }
+      }
+      else {
+
+        $filtering_csv .= "SpecimenId=$specimen_id";
+      }
+    }
+  }
+
+  $self->logger->debug("Filtering csv: $filtering_csv");
+
+  my $sorting = '';
+
+  if (defined $query->param('Sorting')) {
+
+    $sorting = $query->param('Sorting');
+  }
+
+  my $group_id      = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+  my $perm_str      = permission_phrase($group_id, 0, $gadmin_status, 'specimen');
+
+  my $sql = 'SELECT * FROM specimenkeyword LIMIT 1';
+
+  my ($sample_tup_err, $sample_tup_msg, $sample_spec_key_data) = $self->list_specimen_keyword(0, $sql);
+
+  if ($sample_tup_err) {
+
+    $self->logger->debug($sample_tup_msg);
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $dbh = connect_kdb_read();
+
+  my $sample_data_aref = $sample_spec_key_data;
+
+  my @field_list_all;
+
+  if (scalar(@{$sample_data_aref}) == 1) {
+
+    @field_list_all = keys(%{$sample_data_aref->[0]});
+  }
+  else {
+
+    $self->logger->debug("It reaches here");
+    my ($sfield_err, $sfield_msg, $sfield_data, $pkey_data) = get_static_field($dbh, 'specimenkeyword');
+
+    if ($sfield_err) {
+
+      $self->logger->debug("Get static field failed: $sfield_msg");
+      return $self->_set_error();
+    }
+
+    for my $sfield_rec (@{$sfield_data}) {
+
+      push(@field_list_all, $sfield_rec->{'Name'});
+    }
+
+    for my $pkey_field (@{$pkey_data}) {
+
+      push(@field_list_all, $pkey_field);
+    }
+  }
+
+  $self->logger->debug("Field list all: " . join(',', @field_list_all));
+
+  my $final_field_list = \@field_list_all;
+
+  if (length($field_list_csv) > 0) {
+
+    my ($sel_field_err, $sel_field_msg, $sel_field_list) = parse_selected_field($field_list_csv,
+                                                                                $final_field_list,
+                                                                                'SpecimenKeywordId',
+                                                                               );
+
+    if ($sel_field_err) {
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $sel_field_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    $final_field_list = $sel_field_list;
+
+    if ($filtering_csv =~ /SpecimenId/) {
+
+      push(@{$final_field_list}, 'SpecimenId');
+    }
+  }
+
+  my $field_lookup = {};
+  for my $fd_name (@{$final_field_list}) {
+
+    $field_lookup->{$fd_name} = 1;
+  }
+
+  my $other_join = '';
+
+  if ($field_lookup->{'KeywordId'}) {
+
+    push(@{$final_field_list}, 'keyword.KeywordName');
+    $other_join .= ' LEFT JOIN keyword ON specimenkeyword.KeywordId = keyword.KeywordId ';
+  }
+
+  $self->logger->debug("Final field list: " . join(', ', @{$final_field_list}));
+
+  my $sql_field_list = [];
+  for my $field_name (@{$final_field_list}) {
+
+    my $full_field_name = $field_name;
+    if (!($full_field_name =~ /\./)) {
+
+      $full_field_name = 'specimenkeyword.' . $full_field_name;
+    }
+
+    push(@{$sql_field_list}, $full_field_name);
+  }
+
+  push(@{$sql_field_list}, "$perm_str AS UltimatePerm ");
+
+  my $field_list_str = join(', ', @{$sql_field_list});
+
+  $sql  = "SELECT $field_list_str ";
+  $sql .= 'FROM specimenkeyword ';
+  $sql .= 'LEFT JOIN specimen ON specimenkeyword.SpecimenId = specimen.SpecimenId ';
+  $sql .= "$other_join ";
+
+  my $validation_func_lookup = {};
+
+  $self->logger->debug("Final field list: " . join(', ', @{$final_field_list}));
+
+  my ($filter_err, $filter_msg, $filter_phrase, $where_arg) = parse_filtering('SpecimenKeywordId',
+                                                                              'specimenkeyword',
+                                                                              $filtering_csv,
+                                                                              $final_field_list,
+                                                                              $validation_func_lookup,
+                                                                             );
+
+  $self->logger->debug("Filter phrase: $filter_phrase");
+
+  if ($filter_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $filter_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $filter_where_phrase = '';
+  if (length($filter_phrase) > 0) {
+
+    $filter_where_phrase = " AND $filter_phrase ";
+  }
+
+  my $filtering_exp = " WHERE (($perm_str) & $READ_PERM) = $READ_PERM $filter_where_phrase ";
+
+  my $pagination_aref = [];
+  my $paged_limit_clause = '';
+
+  if ($pagination) {
+
+    my ($int_err, $int_err_msg) = check_integer_value( {'nperpage' => $nb_per_page,
+                                                        'num'      => $page
+                                                       });
+
+    if ($int_err) {
+
+      $int_err_msg .= ' not integer.';
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $int_err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my $page_where_phrase = '';
+    $page_where_phrase   .= ' LEFT JOIN specimen ON specimenkeyword.SpecimenId = specimen.SpecimenId ';
+    $page_where_phrase   .= " $filtering_exp ";
+
+    my ($paged_id_err, $paged_id_msg, $nb_records,
+        $nb_pages, $limit_clause, $rcount_time) = get_paged_filter($dbh,
+                                                                   $nb_per_page,
+                                                                   $page,
+                                                                   'specimenkeyword',
+                                                                   'SpecimenKeywordId',
+                                                                   $page_where_phrase,
+                                                                   $where_arg
+                                                                  );
+
+    if ($paged_id_err == 1) {
+
+      $self->logger->debug($paged_id_msg);
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    if ($paged_id_err == 2) {
+
+      $page = 0;
+    }
+
+    $pagination_aref = [{'NumOfRecords' => $nb_records,
+                         'NumOfPages'   => $nb_pages,
+                         'Page'         => $page,
+                         'NumPerPage'   => $nb_per_page,
+                        }];
+
+    $paged_limit_clause = $limit_clause;
+  }
+
+  $dbh->disconnect();
+
+  $sql .= " $filtering_exp ";
+
+  my ($sort_err, $sort_msg, $sort_sql) = parse_sorting($sorting, $final_field_list, 'specimenkeyword');
+
+  if ($sort_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $sort_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (length($sort_sql) > 0) {
+
+    $sql .= " ORDER BY $sort_sql ";
+  }
+  else {
+
+    $sql .= ' ORDER BY specimenkeyword.SpecimenkeywordId DESC';
+  }
+
+  $sql .= " $paged_limit_clause ";
+
+  $self->logger->debug("Where arg: " . join(',', @{$where_arg}));
+
+  $self->logger->debug("SQL: $sql");
+
+  my ($read_spec_kwd_err, $read_spec_kwd_msg, $spec_kwd_data) = $self->list_specimen_keyword(1,
+                                                                                             $sql,
+                                                                                             $where_arg);
+
+  if ($read_spec_kwd_err) {
+
+    $self->logger->debug($read_spec_kwd_msg);
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $data_for_postrun_href->{'Error'} = 0;
+  $data_for_postrun_href->{'Data'}  = {'SpecimenKeyword'    => $spec_kwd_data,
+                                       'Pagination'         => $pagination_aref,
+                                       'RecordMeta'         => [{'TagName' => 'SpecimenKeyword'}],
+  };
+
+  return $data_for_postrun_href;
+}
+
+sub remove_specimen_keyword_runmode {
+
+=pod remove_specimen_keyword_HELP_START
+{
+"OperationName" : "Remove specimen keyword",
+"Description": "Delete association between specimen and keyword specified by specimenkeyword id.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='SpecimenKeyword (6) has been removed successfully.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'SpecimenKeyword (5) has been removed successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='SpecimenKeyword (103) not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'SpecimenKeyword (103) not found.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing SpecimenKeywordId"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self                = shift;
+  my $specimen_keyword_id = $self->param('id');
+
+  my $data_for_postrun_href = {};
+
+  my $dbh_read = connect_kdb_read();
+  my $specimen_id = read_cell_value($dbh_read, 'specimenkeyword', 'SpecimenId',
+                                    'SpecimenKeywordId', $specimen_keyword_id);
+
+  if (length($specimen_id) == 0) {
+
+    my $err_msg = "SpecimenKeyword ($specimen_keyword_id) not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $group_id = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+  my $perm_str = permission_phrase($group_id, 0, $gadmin_status, 'genotype');
+
+  my $sql      = "SELECT $perm_str AS UltimatePerm ";
+  $sql        .= "FROM genotypespecimen LEFT JOIN genotype ON ";
+  $sql        .= "genotypespecimen.GenotypeId = genotype.GenotypeId ";
+  $sql        .= "WHERE genotypespecimen.SpecimenId=?";
+
+  my ($r_geno_perm_err, $r_geno_perm_msg, $geno_perm_aref) = read_data($dbh_read, $sql, [$specimen_id]);
+
+  if ($r_geno_perm_err) {
+
+    $self->logger->debug("Read genotype permission failed: $r_geno_perm_msg");
+    my $err_msg = "Unexpected Error.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $final_perm = 0;
+
+  foreach my $geno_rec (@{$geno_perm_aref}) {
+
+    my $geno_perm = $geno_rec->{'UltimatePerm'};
+
+    if ($geno_perm > $final_perm) {
+
+      $final_perm = $geno_perm;
+    }
+  }
+
+  if ( ($final_perm & $READ_WRITE_PERM) != $READ_WRITE_PERM ) {
+
+    my $err_msg = "Specimen ($specimen_id): permission denied.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh_read->disconnect();
+
+  my $dbh_write = connect_kdb_write();
+
+  $sql = 'DELETE FROM specimenkeyword WHERE SpecimenKeywordId=?';
+
+  my $sth = $dbh_write->prepare($sql);
+  $sth->execute($specimen_keyword_id);
+
+  if ($dbh_write->err()) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sth->finish();
+
+  $dbh_write->disconnect();
+
+  my $info_msg_aref = [{'Message' => "SpecimenKeyword ($specimen_keyword_id) has been removed successfully."}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'       => $info_msg_aref};
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub import_genpedigree_csv_runmode {
+
+=pod import_genpedigree_csv_HELP_START
+{
+"OperationName" : "Import genpedigree",
+"Description": "Import genotype pedigree information in bulk using csv file.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='1 genpedigree records have been inserted successfully. Time taken in seconds: 0.123427.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : '1 genpedigree records have been inserted successfully. Time taken in seconds: 0.122738.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Row (1): Genotype (91056) not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Row (1): Genotype (91054) not found.'}]}"}],
+"RequiredUpload": 1,
+"UploadFileFormat": "CSV",
+"UploadFileParameterName": "uploadfile",
+"HTTPParameter": [{"Required": 1, "Name": "GenotypeId", "Description": "The column number for GenotypeId column in the upload CSV file"}, {"Required": 1, "Name": "ParentGenotypeId", "Description": "The column number for ParentGenotypeId column in the upload CSV file"}, {"Required": 1, "Name": "GenParentType", "Description": "The column number for GenParentType column in the upload CSV file"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self  = shift;
+  my $query = $self->query();
+
+  my $start_time = [gettimeofday()];
+  my $data_for_postrun_href = {};
+
+  my $data_csv_file = $self->authen->get_upload_file();
+
+  my $num_of_col = get_csvfile_num_of_col($data_csv_file);
+
+  $self->logger->debug("Number of columns: $num_of_col");
+
+  my $GenotypeId_col            = $query->param('GenotypeId');
+  my $ParentGenotypeId_col      = $query->param('ParentGenotypeId');
+  my $GenParentType_col         = $query->param('GenParentType');
+
+  my $chk_col_def_data = { 'GenotypeId'        => $GenotypeId_col,
+                           'ParentGenotypeId'  => $ParentGenotypeId_col,
+                           'GenParentType'     => $GenParentType_col,
+  };
+
+  my $matched_col = {};
+
+  $matched_col->{$GenotypeId_col}          = 'GenotypeId';
+  $matched_col->{$ParentGenotypeId_col}    = 'ParentGenotypeId';
+  $matched_col->{$GenParentType_col}       = 'GenParentType';
+
+
+  if (defined $query->param('NumberOfGenotypes')) {
+
+    my $NumberOfGenotypes_col                = $query->param('NumberOfGenotypes');
+    $chk_col_def_data->{'NumberOfGenotypes'} = $NumberOfGenotypes_col;
+    $matched_col->{$NumberOfGenotypes_col}   = 'NumberOfGenotypes';
+  }
+
+  my ($col_def_err, $col_def_msg) = check_col_definition( $chk_col_def_data, $num_of_col );
+
+  if ($col_def_err) {
+
+    return $self->_set_error($col_def_msg);
+  }
+
+  my @fieldname_list;
+
+  for (my $i = 0; $i < $num_of_col; $i++) {
+
+    if ($matched_col->{$i}) {
+
+      push(@fieldname_list, $matched_col->{$i});
+    }
+    else {
+
+      push(@fieldname_list, 'null');
+    }
+  }
+
+  my ($data_aref, $csv_err, $err_msg) = csvfile2arrayref($data_csv_file, \@fieldname_list, 0);
+
+  if ($csv_err) {
+
+    return $self->_set_error($err_msg);
+  }
+
+  my $group_id = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  my $num_of_bulk_insert = $NB_RECORD_BULK_INSERT;
+
+  my $dbh_write = connect_kdb_write();
+
+  my $row_counter = 1;
+  my $i = 0;
+  my $num_of_rows = scalar(@{$data_aref});
+
+  $self->logger->debug("Number of rows: $num_of_rows");
+
+  my $unique_parent_href      = {};
+  my $unique_parent_type_href = {};
+
+  my $inner_loop_max_j = 0;
+
+  while( $i < $num_of_rows ) {
+
+    my $j = $i;
+    $inner_loop_max_j = $j + $num_of_bulk_insert;
+    my $smallest_num = $num_of_rows > $inner_loop_max_j ? $inner_loop_max_j : $num_of_rows;
+
+    my $unique_genotype_href    = {};
+    my $parent_where            = '';
+
+    #$self->logger->debug("Checking: $i, $smallest_num");
+
+    while( $j < $smallest_num ) {
+
+      my $data_row = $data_aref->[$j];
+
+      my $missing_para_chk_href = { 'GenotypeId'       => $data_row->{'GenotypeId'},
+                                    'ParentGenotypeId' => $data_row->{'ParentGenotypeId'},
+                                    'GenParentType'    => $data_row->{'GenParentType'},
+      };
+
+      my ($missing_err, $missing_msg) = check_missing_value( $missing_para_chk_href );
+
+      if ($missing_err) {
+
+        $missing_msg = "Row ($row_counter): $missing_msg missing.";
+        return $self->_set_error($missing_msg);
+      }
+
+      my $int_chk_href = { 'GenotypeId'       => $data_row->{'GenotypeId'},
+                           'ParentGenotypeId' => $data_row->{'ParentGenotypeId'},
+                           'GenParentType'    => $data_row->{'GenParentType'},
+      };
+
+      if (defined $data_row->{'NumberOfGenotypes'}) {
+
+        $int_chk_href->{'NumberOfGenotypes'} = $data_row->{'NumberOfGenotypes'};
+      }
+
+      my ($int_id_err, $int_id_msg) = check_integer_value( $int_chk_href );
+
+      if ($int_id_err) {
+
+        $int_id_msg = "Row ($row_counter): " . $int_id_msg . ' not integer.';
+        return $self->_set_error($int_id_msg);
+      }
+
+      my $genotype_id        = $data_row->{'GenotypeId'};
+      my $parent_genotype_id = $data_row->{'ParentGenotypeId'};
+      my $parent_type        = $data_row->{'GenParentType'};
+
+      my $parent_key = "${genotype_id}_${parent_genotype_id}_${parent_type}";
+      $parent_key = $dbh_write->quote($parent_key);
+
+      if ($unique_parent_href->{$parent_key}) {
+
+        my $err_msg = "Row ($row_counter): duplicate parent ";
+        $err_msg   .= "($genotype_id, $parent_genotype_id, $parent_type) in CSV file.";
+        return $self->_set_error($err_msg);
+      }
+      else {
+
+        $unique_parent_href->{$parent_key} = 1;
+      }
+
+      $unique_genotype_href->{$genotype_id}        = $row_counter;
+      $unique_genotype_href->{$parent_genotype_id} = $row_counter;
+
+      $unique_parent_type_href->{$parent_type}     = $row_counter;
+
+      $parent_where .= "$parent_key,";
+
+      $j += 1;
+      $row_counter += 1;
+    }
+
+    my @genotype_list = keys(%{$unique_genotype_href});
+
+    if (scalar(@genotype_list)) {
+
+      my $genotype_where = join(',', @genotype_list);
+      my $chk_spec_sql = "SELECT GenotypeId FROM genotype ";
+      $chk_spec_sql   .= "WHERE GenotypeId IN ($genotype_where)";
+
+      my $found_spec_data = $dbh_write->selectall_hashref($chk_spec_sql, 'GenotypeId');
+
+      if (scalar(keys(%{$found_spec_data})) < scalar(@genotype_list)) {
+
+        my @unknown_spec;
+        my @unknown_spec_rownum;
+
+        for my $spec_id_in_csv (@genotype_list) {
+
+          if ( !(defined $found_spec_data->{$spec_id_in_csv}) ) {
+
+            push(@unknown_spec, $spec_id_in_csv);
+            push(@unknown_spec_rownum, $unique_genotype_href->{$spec_id_in_csv});
+          }
+        }
+
+        my $err_msg = 'Row (' . join(',', @unknown_spec_rownum) . '): Genotype (';
+        $err_msg   .= join(',', @unknown_spec) . ') not found.';
+
+        return $self->_set_error($err_msg);
+      }
+
+      my $perm_str = permission_phrase($group_id, 0, $gadmin_status, 'genotype');
+
+      my $chk_geno_perm_sql = "SELECT GenotypeId FROM genotype ";
+      $chk_geno_perm_sql   .= "WHERE GenotypeId IN ($genotype_where) AND ";
+      $chk_geno_perm_sql   .= "(( ($perm_str) & $READ_WRITE_PERM ) = $READ_WRITE_PERM)";
+
+      my $genotype_id_db_data = $dbh_write->selectall_hashref($chk_geno_perm_sql, 'GenotypeId');
+
+      my @trouble_genotype_id_list;
+      my $is_perm_ok = 1;
+
+      for my $spec_id (@genotype_list) {
+
+        if (!($genotype_id_db_data->{$spec_id})) {
+
+          $is_perm_ok = 0;
+          push(@trouble_genotype_id_list, $spec_id);
+        }
+      }
+
+      if (!$is_perm_ok) {
+
+        my $trouble_spec_id_str = join(',', @trouble_genotype_id_list);
+        my $start_row = $i + 1;
+        my $end_row   = $smallest_num;
+        my $err_msg = "Row ($start_row, $end_row): Genotype ($trouble_spec_id_str) permission denied.";
+        return $self->_set_error($err_msg);
+      }
+    }
+
+    $self->logger->debug("Parent where: $parent_where");
+
+    if (length($parent_where) > 0) {
+
+      chop($parent_where); # remove the last comma
+      my $check_parent_sql = "SELECT CONCAT(GenotypeId, '_', CONCAT(ParentGenotypeId, '_', GenParentType)) AS ID ";
+      $check_parent_sql   .= "FROM genpedigree ";
+      $check_parent_sql   .= "WHERE CONCAT(GenotypeId, '_', CONCAT(ParentGenotypeId, '_', GenParentType)) ";
+      $check_parent_sql   .= "IN ($parent_where)";
+
+      #$self->logger->debug("Check Parent SQL: $check_parent_sql");
+
+      my ($chk_parent_read_err, $chk_parent_read_msg, $parent_data) = read_data($dbh_write, $check_parent_sql);
+
+      if ( scalar(@{$parent_data}) ) {
+
+        my $duplicate_parent_str = '';
+        for my $parent_row (@{$parent_data}) {
+
+          my $duplicate_parent = $parent_row->{'ID'};
+          $duplicate_parent =~ /^(\d+)_(\d+)_(\d+)$/;
+          my $spec_id   = $1;
+          my $p_spec_id = $2;
+          my $p_type    = $3;
+
+          $duplicate_parent_str .= "($spec_id,$p_spec_id,$p_type),";
+        }
+
+        my $start_row = $i + 1;
+        my $end_row   = $smallest_num;
+        my $err_msg = "Row ($start_row, $end_row): ($duplicate_parent_str) (GenotypeId,ParentGenotypeId,GenParentType) ";
+        $err_msg   .= "parent type already exist.";
+        return $self->_set_error($err_msg);
+      }
+    }
+
+    $i += $num_of_bulk_insert;
+
+    #$self->logger->debug("Smallest num: $smallest_num");
+    #$self->logger->debug("I: $i");
+  }
+
+  if (scalar(keys(%{$unique_parent_type_href}))) {
+
+    my $chk_ptype_sql = 'SELECT TypeId FROM generaltype ';
+    $chk_ptype_sql   .= 'WHERE TypeId IN (' . join(',', keys(%{$unique_parent_type_href})) . ') AND ';
+    $chk_ptype_sql   .= "Class='genparent' AND IsTypeActive=1";
+
+    my $parent_type_data      = $dbh_write->selectall_hashref($chk_ptype_sql, 'TypeId');
+
+    if ( scalar(keys(%{$parent_type_data})) < scalar(keys(%{$unique_parent_type_href})) ) {
+
+      my @unknown_parent_type;
+      my @unknown_parent_type_rownum;
+      for my $parent_type_in_csv (keys(%{$unique_parent_type_href})) {
+
+        if ( !(defined $parent_type_data->{$parent_type_in_csv}) ) {
+
+          push(@unknown_parent_type, $parent_type_in_csv);
+          push(@unknown_parent_type_rownum, $unique_parent_type_href->{$parent_type_in_csv});
+        }
+      }
+
+      my $err_msg = 'Row (' . join(',', @unknown_parent_type_rownum) . '): GenParentType (';
+      $err_msg   .= join(',', @unknown_parent_type) . ') not found or inactive.';
+
+      return $self->_set_error($err_msg);
+    }
+  }
+
+  my $total_affected_records = 0;
+  $i = 0;
+
+  while( $i < $num_of_rows ) {
+
+    my $j = $i;
+    my $inner_loop_max_j = $j + $num_of_bulk_insert;
+    my $smallest_num = $num_of_rows > $inner_loop_max_j ? $inner_loop_max_j : $num_of_rows;
+
+    #$self->logger->debug("Composing: $i, $smallest_num");
+
+    my $bulk_sql = 'INSERT INTO genpedigree ';
+    $bulk_sql   .= '(GenotypeId,ParentGenotypeId,GenParentType,NumberOfGenotypes) ';
+    $bulk_sql   .= 'VALUES ';
+
+    while( $j < $smallest_num ) {
+
+      my $data_row = $data_aref->[$j];
+
+      my $genotype_id        = $data_row->{'GenotypeId'};
+      my $parent_genotype_id = $data_row->{'ParentGenotypeId'};
+      my $parent_type        = $data_row->{'GenParentType'};
+
+      my $number_of_genotypes = 'NULL';
+
+      if (defined $data_row->{'NumberOfGenotypes'}) {
+
+        $number_of_genotypes = $data_row->{'NumberOfGenotypes'};
+      }
+
+      $bulk_sql .= "($genotype_id,$parent_genotype_id,$parent_type,$number_of_genotypes),";
+
+      $j += 1;
+    }
+
+    #$self->logger->debug("Bulk SQL: $bulk_sql");
+
+    chop($bulk_sql);            # remove excessive trailling comma
+
+    my $nrows_inserted = $dbh_write->do($bulk_sql);
+
+    if ($dbh_write->err()) {
+
+      $self->logger->debug('Error code: ' . $dbh_write->err());
+      $self->logger->debug('Error: ' . $dbh_write->errstr());
+
+      return $self->_set_error('Unexpected error.');
+    }
+
+    $total_affected_records += $nrows_inserted;
+
+    $i += $num_of_bulk_insert;
+  }
+
+  $dbh_write->disconnect();
+
+  my $elapsed_time = tv_interval($start_time);
+
+  my $info_msg = "$total_affected_records genpedigree records have been inserted successfully. ";
+  $info_msg   .= "Time taken in seconds: $elapsed_time.";
+  my $info_msg_aref = [{'Message' => $info_msg}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'      => $info_msg_aref};
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub export_genpedigree_runmode {
+
+=pod export_genpedigree_HELP_START
+{
+"OperationName" : "Export genpedigree",
+"Description": "Export genotype pedigree into csv file.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "FILTERING"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='Time taken in seconds: 0.002039.' /><OutputFile csv='http://kddart-d.diversityarrays.com/data/admin/export_genpedigree_7bb14c3bbfba954c817bd3fd2fff29ac.csv' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'Time taken in seconds: 0.002103.'}], 'OutputFile' : [{'csv' : 'http://kddart-d.diversityarrays.com/data/admin/export_genpedigree_7bb14c3bbfba954c817bd3fd2fff29ac.csv'}]}",
+"ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
+"ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
+"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database field name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "FieldList", "Description": "Comma separated value of wanted fields."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases."}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self  = shift;
+  my $query = $self->query();
+
+  my $start_time = [gettimeofday()];
+  my $data_for_postrun_href = {};
+
+  my $field_list_csv = '';
+
+  if (defined $query->param('FieldList')) {
+
+    $field_list_csv = $query->param('FieldList');
+  }
+
+  my $filtering_csv = '';
+
+  if (defined $query->param('Filtering')) {
+
+    $filtering_csv = $query->param('Filtering');
+  }
+
+  $self->logger->debug("Filtering csv: $filtering_csv");
+
+  my $sorting = '';
+
+  if (defined $query->param('Sorting')) {
+
+    $sorting = $query->param('Sorting');
+  }
+
+  my $username             = $self->authen->username();
+  my $doc_root             = $ENV{'DOCUMENT_ROOT'};
+  my $export_data_path     = "${doc_root}/data/$username";
+  my $current_runmode      = $self->get_current_runmode();
+  my $lock_filename        = "${current_runmode}.lock";
+
+  if ( !(-e $export_data_path) ) {
+
+    mkdir($export_data_path);
+  }
+
+  my $lockfile = File::Lockfile->new( $lock_filename, $export_data_path );
+  my $pid = $lockfile->check();
+  if ( $pid ) {
+    $self->logger->debug("$lock_filename exists in $export_data_path");
+    my $msg = 'Lockfile exists: either another process of this export is running or ';
+    $msg   .= 'there was an unexpected error regarding clearing this lockfile.';
+    return $self->_set_error( $msg );
+  }
+
+  my $sql   = " SELECT * FROM genpedigree LIMIT 1";
+
+  my ($sam_gen_pedigree_err, $sam_gen_pedigree_msg, $sam_gen_pedigree_data) = $self->list_gen_pedigree(0, $sql);
+
+  if ($sam_gen_pedigree_err) {
+
+    $self->logger->debug($sam_gen_pedigree_msg);
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $sample_gen_pedigree_aref = $sam_gen_pedigree_data;
+
+  my @field_list_all = keys(%{$sample_gen_pedigree_aref->[0]});
+
+  #no field return, it means no record. error prevention
+  if (scalar(@field_list_all) == 0) {
+
+    push(@field_list_all, '*');
+  }
+
+  my $final_field_list = \@field_list_all;
+
+  $sql = 'SELECT ' . join(',',@{$final_field_list}) . ' FROM genpedigree ';
+
+  if (length($field_list_csv) > 0) {
+
+    my ($sel_field_err, $sel_field_msg, $sel_field_list) = parse_selected_field($field_list_csv,
+                                                                                \@field_list_all,
+                                                                                'GenPedigreeId');
+
+    if ($sel_field_err) {
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $sel_field_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    $final_field_list = $sel_field_list;
+  }
+
+  my ($filter_err, $filter_msg, $filter_phrase, $where_arg) = parse_filtering('GenPedigreeId',
+                                                                              'genpedigree',
+                                                                              $filtering_csv,
+                                                                              $final_field_list,
+                                                                              {},
+                                                                              {});
+
+  $self->logger->debug("Filter phrase: $filter_phrase");
+
+  if ($filter_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $filter_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (length($filter_phrase) > 0) {
+
+    $sql .= " WHERE $filter_phrase ";
+  }
+
+  my ($sort_err, $sort_msg, $sort_sql) = parse_sorting($sorting, $final_field_list);
+
+  if ($sort_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $sort_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (length($sort_sql) > 0) {
+
+    $sql .= " ORDER BY $sort_sql ";
+  }
+  else {
+
+    $sql .= ' ORDER BY genpedigree.GenPedigreeId DESC';
+  }
+
+  my $sql2md5 = md5_hex($sql);
+
+  my $genpedigree_filename    = "export_genpedigree_$sql2md5.csv";
+  my $genpedigree_file        = "${export_data_path}/$genpedigree_filename";
+
+  # where_arg here because of the filtering
+  my ($read_ped_err, $read_ped_msg, $gen_pedigree_data) = $self->list_gen_pedigree(0, $sql, $where_arg);
+
+  if ($read_ped_err) {
+
+    $self->logger->debug($read_ped_msg);
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $fieldname_order = { 'GenPedigreeId'     => 0,
+                          'GenotypeId'        => 1,
+                          'ParentGenotypeId'  => 2,
+                          'GenParentType'     => 3,
+                          'NumberOfGenotypes' => 4,
+  };
+
+  arrayref2csvfile($genpedigree_file, $fieldname_order, $gen_pedigree_data);
+
+  my $url = reconstruct_server_url();
+  my $elapsed_time = tv_interval($start_time);
+
+  my $href_info = { 'csv'  => "$url/data/$username/$genpedigree_filename" };
+
+  my $time_info = { 'Message' => "Time taken in seconds: $elapsed_time." };
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'OutputFile' => [$href_info], 'Info' => [$time_info] };
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub update_genpedigree_runmode {
+
+=pod update_genpedigree_gadmin_HELP_START
+{
+"OperationName" : "Update genpedigree",
+"Description": "Update genotype pedigree record specified by id.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 1,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"KDDArTModule": "main",
+"KDDArTTable": "genpedigree",
+"SuccessMessageXML": "",
+"SuccessMessageJSON": "",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error GenotypeId='GenotypeId (482): not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'GenotypeId' : 'GenotypeId (482): not found.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing GenPedigreeId"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self           = shift;
+  my $query          = $self->query();
+  my $genpedigree_id = $self->param('id');
+
+  my $data_for_postrun_href = {};
+
+  # Generic required static field checking
+
+  my $dbh_read = connect_kdb_read();
+
+  my $skip_field = {'OwnGroupId' => 1};
+
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'genpedigree', $skip_field);
+
+  if ($chk_sfield_err) {
+
+    $self->logger->debug($chk_sfield_msg);
+
+    return $for_postrun_href;
+  }
+
+  $dbh_read->disconnect();
+
+  # Finish generic required static field checking
+
+  my $dbh_write = connect_kdb_write();
+
+  if (!record_existence($dbh_write, 'genpedigree', 'GenPedigreeId', $genpedigree_id)) {
+
+    my $err_msg = "GenPedigreeId ($genpedigree_id): not found.";
+    return $self->_set_error($err_msg);
+  }
+
+  my $genotype_id           = $query->param('GenotypeId');
+  my $p_genotype_id         = $query->param('ParentGenotypeId');
+  my $parent_type           = $query->param('GenParentType');
+
+  my $chk_int_href = {};
+  my $nb_of_genotypes       = undef;
+
+  if ( length($query->param('NumberOfGenotypes')) > 0) {
+
+    $nb_of_genotypes = $query->param('NumberOfGenotypes');
+    $chk_int_href->{'NumberOfGenotypes'} = $nb_of_genotypes;
+  }
+
+  my ($int_err, $int_err_href) = check_integer_href( $chk_int_href );
+
+  if ($int_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $int_err_href}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (!type_existence($dbh_write, 'genparent', $parent_type)) {
+
+    my $err_msg = "GenParentType ($parent_type): not found or inactive.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'GenParentType' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (!record_existence($dbh_write, 'genotype', 'GenotypeId', $genotype_id)) {
+
+    my $err_msg = "GenotypeId ($genotype_id): not found.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'GenotypeId' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (!record_existence($dbh_write, 'genotype', 'GenotypeId', $p_genotype_id)) {
+
+    my $err_msg = "ParentGenotypeId ($p_genotype_id): not found.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'ParentGenotypeId' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $group_id  = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  my ($is_geno_ok, $trouble_geno_id_aref) = check_permission($dbh_write, 'genotype', 'GenotypeId',
+                                                             [$genotype_id], $group_id, $gadmin_status,
+                                                             $READ_WRITE_PERM);
+
+  if (!$is_geno_ok) {
+
+    my $perm_err_msg = '';
+    $perm_err_msg   .= "Permission denied: Group ($group_id) and Genotype ($genotype_id).";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $perm_err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  ($is_geno_ok, $trouble_geno_id_aref) = check_permission($dbh_write, 'genotype', 'GenotypeId',
+                                                          [$p_genotype_id], $group_id, $gadmin_status,
+                                                          $LINK_PERM);
+
+  if (!$is_geno_ok) {
+
+    my $perm_err_msg = '';
+    $perm_err_msg   .= "Permission denied: Group ($group_id) and ParentGenotype ($p_genotype_id).";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $perm_err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $sql = 'SELECT GenPedigreeId FROM genpedigree WHERE GenotypeId=? AND ParentGenotypeId=? AND GenParentType=?';
+
+  my ($r_gen_pedigree_err, $db_gen_pedigree_id) = read_cell($dbh_write, $sql, [$genotype_id, $p_genotype_id, $parent_type]);
+
+  if ($r_gen_pedigree_err) {
+
+    $self->logger->debug("Read GenPedigreeId failed");
+    my $err_msg = "Unexpected Error.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (length($db_gen_pedigree_id) > 0) {
+
+    my $err_msg = "Genotype ($genotype_id), ParentGenotype ($p_genotype_id), GenParentType ($parent_type): already exists.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sql    = 'UPDATE genpedigree SET ';
+  $sql   .= 'GenotypeId=?, ';
+  $sql   .= 'ParentGenotypeId=?, ';
+  $sql   .= 'GenParentType=?, ';
+  $sql   .= 'NumberOfGenotypes=? ';
+  $sql   .= 'WHERE GenPedigreeId=?';
+
+
+  my $sth = $dbh_write->prepare($sql);
+  $sth->execute($genotype_id, $p_genotype_id, $parent_type, $nb_of_genotypes, $genpedigree_id);
+
+  if ($dbh_write->err()) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+  $sth->finish();
+
+  $dbh_write->disconnect();
+
+  my $info_msg_aref  = [{'Message' => "GenPedigree ($genpedigree_id) has been updated successfully."}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'      => $info_msg_aref,
+  };
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub del_genpedigree_runmode {
+
+=pod del_genpedigree_gadmin_HELP_START
+{
+"OperationName" : "Delete genpedigree",
+"Description": "Delete genotype pedigree specified by id.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 1,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='GenPedigreeId (10) has been deleted successfully.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'GenPedigreeId (11) has been deleted successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='GenPedigreeId (6) not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'GenPedigreeId (6) not found.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing GenPedigreeId."}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self             = shift;
+  my $gen_pedigree_id  = $self->param('id');
+
+  my $data_for_postrun_href = {};
+
+  my $dbh_k_read = connect_kdb_read();
+
+  my $gen_pedigree_exist = record_existence($dbh_k_read, 'genpedigree', 'GenPedigreeId', $gen_pedigree_id);
+
+  if (!$gen_pedigree_exist) {
+
+    my $err_msg = "GenPedigreeId ($gen_pedigree_id) not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh_k_read->disconnect();
+
+  my $dbh_k_write = connect_kdb_write();
+
+  my $sql = 'DELETE FROM genpedigree WHERE GenPedigreeId=?';
+  my $sth = $dbh_k_write->prepare($sql);
+
+  $sth->execute($gen_pedigree_id);
+
+  if ($dbh_k_write->err()) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sth->finish();
+
+  $dbh_k_write->disconnect();
+
+  my $info_msg_aref = [{'Message' => "GenPedigreeId ($gen_pedigree_id) has been deleted successfully."}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info' => $info_msg_aref};
+  $data_for_postrun_href->{'ExtraData'} = 0;
 
   return $data_for_postrun_href;
 }

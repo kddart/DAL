@@ -1,0 +1,12 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Add Keyword" TargetURL="add/keyword" Type="BLOCKING" />
+  <Delete TargetURL="delete/keyword/:KeywordId" />
+  <INPUT ParaName="KeywordName" PrefixVal="Keyword_" Random="1" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Match Attr="ParaName" Tag="ReturnId" Value="KeywordId" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <ReturnId ParaName="KeywordId" Value="44" />
+  <RunInfo Success="1" Time="1474007426" />
+</TestCase>

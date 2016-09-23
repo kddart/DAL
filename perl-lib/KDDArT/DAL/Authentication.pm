@@ -1,24 +1,14 @@
-#$Id: Authentication.pm 1030 2015-10-22 02:05:45Z puthick $
-#$Author: puthick $
+#$Id$
+#$Author$
 
-# Copyright (c) 2015, Diversity Arrays Technology, All rights reserved.
-
-# COPYRIGHT AND LICENSE
-# 
-# Copyright (C) 2014 by Diversity Arrays Technology Pty Ltd
-# 
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-# 
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
+# Copyright (c) 2011, Diversity Arrays Technology, All rights reserved.
 
 # Author    : Puthick Hok
-# Version   : 2.3.0 build 1040
+# Created   : 02/06/2010
+# Modified  :
+# Purpose   : 
+#          
+#          
 
 package KDDArT::DAL::Authentication;
 
@@ -240,18 +230,6 @@ sub login_runmode {
           -expires     => '+10y',
             );
 
-        my $download_cookie = $q->cookie(
-          -name        => 'KDDArT_DOWNLOAD',
-          -value       => "$cookie_only_rand",
-          -expires     => '+10y',
-            );
-
-        my $download_session_cookie = $q->cookie(
-          -name        => 'KDDArT_DOWNLOAD_SESSID',
-          -value       => "$session_id",
-          -expires     => '+10y',
-            );
-
         my $dbh_write = connect_kdb_write();
 
         my $cur_dt = DateTime->now( time_zone => $TIMEZONE );
@@ -268,7 +246,7 @@ sub login_runmode {
         log_activity($dbh_write, $user_id, 0, 'LOGIN');
         $dbh_write->disconnect();
 
-        $self->header_add(-cookie => [$cookie, $download_session_cookie, $download_cookie]);
+        $self->header_add(-cookie => [$cookie]);
         $self->session_cookie();
 
         $self->logger->debug("$username");
@@ -281,18 +259,6 @@ sub login_runmode {
 
         my $cookie = $q->cookie(
           -name        => 'KDDArT_RANDOM_NUMBER',
-          -value       => '',
-          -expires     => '+10y',
-            );
-
-        my $download_cookie = $q->cookie(
-          -name        => 'KDDArT_DOWNLOAD',
-          -value       => '',
-          -expires     => '+10y',
-            );
-
-        my $download_session_cookie = $q->cookie(
-          -name        => 'KDDArT_DOWNLOAD_SESSID',
           -value       => '',
           -expires     => '+10y',
             );
@@ -311,7 +277,7 @@ sub login_runmode {
                                     'EXTRA_DATA'     => '0',
             );
 
-        $self->header_add(-cookie => [$cookie, $download_session_cookie, $download_cookie]);
+        $self->header_add(-cookie => [$cookie]);
         $self->session_cookie();
 
         $self->logger->debug("Password signature verification failed db: $signature_db, user: $signature");
@@ -789,18 +755,6 @@ sub oauth2_google_runmode {
           -expires     => '+10y',
             );
 
-        my $download_cookie = $query->cookie(
-          -name        => 'KDDArT_DOWNLOAD',
-          -value       => "$cookie_only_rand",
-          -expires     => '+10y',
-            );
-
-        my $download_session_cookie = $query->cookie(
-          -name        => 'KDDArT_DOWNLOAD_SESSID',
-          -value       => "$session_id",
-          -expires     => '+10y',
-            );
-
         my $cur_dt = DateTime->now( time_zone => $TIMEZONE );
         $cur_dt = DateTime::Format::MySQL->format_datetime($cur_dt);
 
@@ -816,7 +770,7 @@ sub oauth2_google_runmode {
 
         $dbh_write->disconnect();
 
-        $self->header_add(-cookie => [$cookie, $download_session_cookie, $download_cookie]);
+        $self->header_add(-cookie => [$cookie]);
         $self->session_cookie();
 
         $self->logger->debug("$username");

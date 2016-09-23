@@ -9,9 +9,6 @@
 #             the databases according to the dump file. Please read through
 #             the script to see exactly what it does.
 
-# Make this script stops when there is an error
-set -e
-
 # database access configuration (user will be prompted for MySQL password during the run of the script)
 MYSQL_UNAME='root'
 PG_UNAME='postgres'
@@ -20,6 +17,21 @@ DB_UNAME='kddart_dal'
 DB_HOST='localhost'
 # set your own postgres password as configured on your server
 DB_PASS='yourSecurePassword'
+
+usage() { echo "Usage: $0 [-x <mysql kddart_dal password>] <other args>" 1>&2; exit 1; }
+
+# Handle options:
+while getopts ":x:" arg; do
+    case "${arg}" in
+        x)
+            DB_PASS=${OPTARG}
+            ;;
+        *)
+            usage
+            ;;
+    esac
+done
+shift $((OPTIND-1))
 
 handle_mysql() {
 
@@ -76,26 +88,11 @@ EOF
     if [ ${#DB_EXIST_STATUS} -gt 0 ]
     then
 
-	echo "Stop monetdb database $DB"	
-
         monetdb stop $DB
-
-	echo "Delete monetdb database $DB"
-
         monetdb -q destroy $DB -f
     fi
 
-    echo "Sleep 10 seconds"
-    sleep 10s 
-
-    echo "Create monetdb database $DB"
-
     monetdb create $DB
-
-    echo "Release monetdb database $DB"
-
-    echo "Sleep 10 seconds"
-    sleep 10s 
 
     monetdb release $DB
 
@@ -118,19 +115,14 @@ EOF
 #language=sql
 #EOF
 
-    echo "Sleep 10 seconds"
-    sleep 10s 
-
-    echo "Load SQL file $SQL_FILE into monetdb database $DB"
-
-    cat $SQL_FILE | mclient -d $DB
+    mclient -d $DB < $SQL_FILE
 
     rm ${DOTMONETDBFILE} 
 }
 
 if [ $# -lt 7 ]
 then
-    echo -e "Usage: $0 <1 for no password prompt | other value for passowrd prompt> <postgres dbname> <postgres sql> <main module dbname> <main module mysql sql> <marker dbname> <marker mysql sql> [1 (force drop db if exists)]"
+    echo -e "Usage: $0 <1 for no password | other value for passowrd prompt> <postgres dbname> <postgres sql> <main module dbname> <main module mysql sql> <marker dbname> <marker mysql sql> [1 (force drop db if exists)]"
     exit 1
 fi
 

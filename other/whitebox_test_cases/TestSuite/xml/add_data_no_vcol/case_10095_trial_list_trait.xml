@@ -9,5 +9,5 @@
   <Parent CaseFile="xml/add_data_no_vcol/case_00007_add_trial.xml" Order="3" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00365_add_trialtrait1.xml" Order="4" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00366_add_trialtrait2.xml" Order="5" />
-  <RunInfo Success="1" Time="1443160600" />
+  <RunInfo Success="1" Time="1474007004" />
 </TestCase>

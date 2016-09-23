@@ -5,11 +5,11 @@
   <INPUT ParaName="ContactLastName" PrefixVal="User-" Random="1" />
   <INPUT ParaName="ContactFirstName" Value="Testing" />
   <INPUT ParaName="ContactAcronym" Value="TU" />
-  <INPUT ParaName="ContactAddress" Value="7 Your Street Suburb Postcode 777 Country" />
+  <INPUT ParaName="ContactAddress" Value="1 Wilf Crane Crescent Yarralumla ACT 2600 Australia" />
   <INPUT ParaName="CountryCode" Value="AU" />
   <INPUT ParaName="ContactTelephone" Value="+61 2 6122 7335" />
   <INPUT ParaName="ContactMobile" Value="04 12345678" />
-  <INPUT ParaName="ContactEMail" Value="testuser@kddart.example.com" />
+  <INPUT ParaName="ContactEMail" Value="admin@kddart.example.com" />
   <Match Attr="StatusCode" Value="200" />
   <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
   <Match Attr="ParaName" Tag="ReturnId" Value="ContactId" />

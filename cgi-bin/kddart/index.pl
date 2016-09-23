@@ -1,26 +1,16 @@
 #!/usr/bin/perl -w
 
-#$Id: index.pl 1033 2015-11-02 03:39:35Z puthick $
-#$Author: puthick $
+#$Id$
+#$Author$
 
-# Copyright (c) 2015, Diversity Arrays Technology, All rights reserved.
-
-# COPYRIGHT AND LICENSE
-# 
-# Copyright (C) 2014 by Diversity Arrays Technology Pty Ltd
-# 
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-# 
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
+# Copyright (c) 2011, Diversity Arrays Technology, All rights reserved.
 
 # Author    : Puthick Hok
-# Version   : 2.3.0 build 1040
+# Created   : 02/06/2010
+# Modified  :
+# Purpose   : 
+#          
+#          
 
 use strict;
 use warnings;
@@ -30,7 +20,8 @@ BEGIN {
 
   my ($volume, $current_dir, $file) = File::Spec->splitpath(__FILE__);
 
-  $main::kddart_base_dir_cgi = "${current_dir}../..";
+  my @current_dir_part = split('/perl-lib/KDDArT/DAL/', $current_dir);
+  $main::kddart_base_dir = $current_dir_part[0];
 }
 
 use lib "$main::kddart_base_dir_cgi/perl-lib";
@@ -134,6 +125,9 @@ CGI::Application::Dispatch->dispatch(
 
     'list/all/group'                                    => { app => 'KDDArT::DAL::System',
                                                              rm  => 'list_all_group' },
+
+    'update/group/:id'                                  => { app => 'KDDArT::DAL::System',
+                                                             rm  => 'update_group_gadmin' },
 
     'list/operation'                                    => { app => 'KDDArT::DAL::System',
                                                              rm  => 'list_operation' },
@@ -523,26 +517,26 @@ CGI::Application::Dispatch->dispatch(
     'trial/:id/list/dimension'                          => { app => 'KDDArT::DAL::Trial',
                                                              rm  => 'list_trial_dimension' },
 
-    'add/multiloctrial'                                 => { app => 'KDDArT::DAL::Trial',
-                                                             rm  => 'add_multiloc_trial' },
+    'add/trialgroup'                                    => { app => 'KDDArT::DAL::Trial',
+                                                             rm  => 'add_trialgroup' },
 
-    'update/multiloctrial/:id'                          => { app => 'KDDArT::DAL::Trial',
-                                                             rm  => 'update_multiloc_trial' },
+    'update/trialgroup/:id'                             => { app => 'KDDArT::DAL::Trial',
+                                                             rm  => 'update_trialgroup' },
 
-    'list/multiloctrial/:nperpage/page/:num'            => { app => 'KDDArT::DAL::Trial',
-                                                             rm  => 'list_multiloctrial_advanced' },
+    'list/trialgroup/:nperpage/page/:num'               => { app => 'KDDArT::DAL::Trial',
+                                                             rm  => 'list_trialgroup_advanced' },
 
-    'get/multiloctrial/:id'                             => { app => 'KDDArT::DAL::Trial',
-                                                             rm  => 'get_multiloc_trial' },
+    'get/trialgroup/:id'                                => { app => 'KDDArT::DAL::Trial',
+                                                             rm  => 'get_trialgroup' },
 
-    'delete/multiloctrial/:id'                          => { app => 'KDDArT::DAL::Trial',
-                                                             rm  => 'del_multiloc_trial' },
+    'delete/trialgroup/:id'                             => { app => 'KDDArT::DAL::Trial',
+                                                             rm  => 'del_trialgroup' },
 
-    'multiloctrial/:id/add/trial'                       => { app => 'KDDArT::DAL::Trial',
-                                                             rm  => 'add_trial2mlt' },
+    'trialgroup/:id/add/trial'                          => { app => 'KDDArT::DAL::Trial',
+                                                             rm  => 'add_trial2trialgroup' },
 
-    'multiloctrial/:id/remove/trial/:tid'               => { app => 'KDDArT::DAL::Trial',
-                                                             rm  => 'remove_trial_from_mlt' },
+    'trialgroup/:id/remove/trial/:tid'                  => { app => 'KDDArT::DAL::Trial',
+                                                             rm  => 'remove_trial_from_trialgroup' },
 
     'trial/:id/export/datakapturetemplate'              => { app => 'KDDArT::DAL::Trait',
                                                              rm  => 'export_datakapture_template' },
@@ -691,6 +685,9 @@ CGI::Application::Dispatch->dispatch(
     'add/plate/n/extract'                               => { app => 'KDDArT::DAL::Extract',
                                                              rm  => 'add_plate_n_extract_gadmin' },
 
+    'import/plate/n/extract/xml'                        => { app => 'KDDArT::DAL::Extract',
+                                                             rm  => 'import_plate_n_extract_gadmin' },
+
     'add/analysisgroup'                                 => { app => 'KDDArT::DAL::Extract',
                                                              rm  => 'add_analysisgroup' },
 
@@ -701,7 +698,10 @@ CGI::Application::Dispatch->dispatch(
                                                              rm  => 'update_extract_gadmin' },
 
     'analysisgroup/:id/import/markerdata/csv'           => { app => 'KDDArT::DAL::Marker',
-                                                             rm  => 'import_marker_dart' },
+                                                             rm  => 'import_markerdata_dart' },
+
+    'dataset/:id/append/markerdata/csv'                 => { app => 'KDDArT::DAL::Marker',
+                                                             rm  => 'append_markerdata_csv' },
 
     'analysisgroup/:id/export/markerdata/csv'           => { app => 'KDDArT::DAL::Marker',
                                                              rm  => 'export_marker_dart' },
@@ -713,7 +713,16 @@ CGI::Application::Dispatch->dispatch(
                                                              rm  => 'list_marker_meta_field' },
 
     'analysisgroup/:analid/list/extract'                => { app => 'KDDArT::DAL::Extract',
-                                                             rm  => 'list_extract' },
+                                                             rm  => 'list_extract_advanced' },
+
+    'list/extract/:nperpage/page/:num'                  => { app => 'KDDArT::DAL::Extract',
+                                                             rm  => 'list_extract_advanced' },
+
+    'plate/:plateid/list/extract'                       => { app => 'KDDArT::DAL::Extract',
+                                                             rm  => 'list_extract_advanced' },
+
+    'dataset/:dsid/list/extract'                        => { app => 'KDDArT::DAL::Extract',
+                                                             rm  => 'list_extract_advanced' },
 
     'analysisgroup/:analid/list/marker/:nperpage/page/:num' => { app => 'KDDArT::DAL::Marker',
                                                                  rm  => 'list_marker' },
@@ -759,9 +768,6 @@ CGI::Application::Dispatch->dispatch(
 
     'delete/plate/:id'                                  => { app => 'KDDArT::DAL::Extract',
                                                              rm  => 'del_plate_gadmin' },
-
-    'list/extract'                                      => { app => 'KDDArT::DAL::Extract',
-                                                             rm  => 'list_extract' },
 
     'delete/extract/:id'                                => { app => 'KDDArT::DAL::Extract',
                                                              rm  => 'del_extract_gadmin' },
@@ -990,6 +996,108 @@ CGI::Application::Dispatch->dispatch(
 
     'oauth2google'                                      => { app => 'KDDArT::DAL::Authentication',
                                                              rm  => 'oauth2_google' },
+
+    'add/keyword'                                       => { app => 'KDDArT::DAL::System',
+                                                             rm  => 'add_keyword_gadmin' },
+
+    'update/keyword/:id'                                => { app => 'KDDArT::DAL::System',
+                                                             rm  => 'update_keyword_gadmin' },
+
+    'list/keyword/:nperpage/page/:num'                  => { app => 'KDDArT::DAL::System',
+                                                             rm  => 'list_keyword_advanced' },
+
+    'get/keyword/:id'                                   => { app => 'KDDArT::DAL::System',
+                                                             rm  => 'get_keyword' },
+
+    'delete/keyword/:id'                                => { app => 'KDDArT::DAL::System',
+                                                             rm  => 'del_keyword_gadmin' },
+
+    'add/keywordgroup'                                  => { app => 'KDDArT::DAL::System',
+                                                             rm  => 'add_keyword_group_gadmin' },
+
+    'update/keywordgroup/:id'                           => { app => 'KDDArT::DAL::System',
+                                                             rm  => 'update_keyword_group_gadmin' },
+
+    'list/keywordgroup/:nperpage/page/:num'             => { app => 'KDDArT::DAL::System',
+                                                             rm  => 'list_keyword_group_advanced' },
+
+    'get/keywordgroup/:id'                              => { app => 'KDDArT::DAL::System',
+                                                             rm  => 'get_keyword_group' },
+
+    'keywordgroup/:id/add/keyword/bulk'                 => { app => 'KDDArT::DAL::System',
+                                                             rm  => 'add_keyword2group_bulk_gadmin' },
+
+    'keywordgroup/:id/list/keyword'                     => { app => 'KDDArT::DAL::System',
+                                                             rm  => 'list_keyword_in_group' },
+
+    'keywordgroup/:id/remove/keyword/:kwdid'            => { app => 'KDDArT::DAL::System',
+                                                             rm  => 'remove_keyword_from_group_gadmin' },
+
+    'delete/keywordgroup/:id'                           => { app => 'KDDArT::DAL::System',
+                                                             rm  => 'del_keyword_group_gadmin' },
+
+    'import/trialunitkeyword/csv'                       => { app => 'KDDArT::DAL::Trial',
+                                                             rm  => 'import_trialunitkeyword_csv' },
+
+    'trialunit/:id/list/keyword/:nperpage/page/:num'    => { app => 'KDDArT::DAL::Trial',
+                                                             rm  => 'list_trialunit_keyword_advanced' },
+
+    'trialunit/:id/list/keyword'                        => { app => 'KDDArT::DAL::Trial',
+                                                             rm  => 'list_trialunit_keyword_advanced' },
+
+    'list/trialunitkeyword/:nperpage/page/:num'         => { app => 'KDDArT::DAL::Trial',
+                                                             rm  => 'list_trialunit_keyword_advanced' },
+
+    'trialunit/:id/add/keyword'                         => { app => 'KDDArT::DAL::Trial',
+                                                             rm  => 'add_trial_unit_keyword' },
+
+    'remove/trialunitkeyword/:id'                       => { app => 'KDDArT::DAL::Trial',
+                                                             rm  => 'remove_trial_unit_keyword' },
+
+    'specimen/:id/add/keyword'                          => { app => 'KDDArT::DAL::Genotype',
+                                                             rm  => 'add_keyword_to_specimen' },
+
+    'specimen/:id/list/keyword/:nperpage/page/:num'     => { app => 'KDDArT::DAL::Genotype',
+                                                             rm  => 'list_specimen_keyword_advanced' },
+
+    'specimen/:id/list/keyword'                         => { app => 'KDDArT::DAL::Genotype',
+                                                             rm  => 'list_specimen_keyword_advanced' },
+
+    'list/specimenkeyword/:nperpage/page/:num'          => { app => 'KDDArT::DAL::Genotype',
+                                                             rm  => 'list_specimen_keyword_advanced' },
+
+    'remove/specimenkeyword/:id'                        => { app => 'KDDArT::DAL::Genotype',
+                                                             rm  => 'remove_specimen_keyword' },
+
+    'import/genpedigree/csv'                            => { app => 'KDDArT::DAL::Genotype',
+                                                             rm  => 'import_genpedigree_csv' },
+
+    'export/genpedigree'                                => { app => 'KDDArT::DAL::Genotype',
+                                                             rm  => 'export_genpedigree' },
+
+    'update/genpedigree/:id'                            => { app => 'KDDArT::DAL::Genotype',
+                                                             rm  => 'update_genpedigree_gadmin' },
+
+    'delete/genpedigree/:id'                            => { app => 'KDDArT::DAL::Genotype',
+                                                             rm  => 'del_genpedigree_gadmin' },
+
+    'list/extractmarkerdata/:nperpage/page/:num/n/:nperblock/block/:bnum' => { app => 'KDDArT::DAL::Marker',
+                                                                               rm  => 'list_extract_marker_data' },
+
+    'search/:core/:nperpage/page/:num'                  => { app => 'KDDArT::DAL::Search',
+                                                             rm  => 'search_solr' },
+
+    'import/crossing/csv'                               => { app => 'KDDArT::DAL::Trial',
+                                                             rm  => 'import_crossing_csv' },
+
+    'trial/:trialid/list/crossing'                      => { app => 'KDDArT::DAL::Trial',
+                                                             rm  => 'list_crossing_advanced' },
+
+    'list/solrcore'                                     => { app => 'KDDArT::DAL::Search',
+                                                             rm  => 'list_solr_core' },
+
+    'solrcore/:core/list/entity'                        => { app => 'KDDArT::DAL::Search',
+                                                             rm  => 'list_solr_entity' },
 
   ],
 );

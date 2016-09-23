@@ -1,0 +1,6 @@
+<DATA>
+  <plate DateCreated="2016-02-23" PlateDescription="Testing from import plate n extract" PlateName="|:PlateName1:|" PlateType="|:PlateType:|">
+    <extract GenotypeId="|:Genotype1:|" Tissue="|:Tissue:|" WellCol="1" WellRow="A" />
+    <extract GenotypeId="|:Genotype2:|" Tissue="|:Tissue:|" WellCol="2" WellRow="A" />
+  </plate>
+</DATA>

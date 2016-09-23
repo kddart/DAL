@@ -4,5 +4,5 @@
   <Match Attr="StatusCode" Value="200" />
   <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
   <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Force="1" Order="1" />
-  <RunInfo Success="1" Time="1444960571" />
+  <RunInfo Success="1" Time="1474353740" />
 </TestCase>

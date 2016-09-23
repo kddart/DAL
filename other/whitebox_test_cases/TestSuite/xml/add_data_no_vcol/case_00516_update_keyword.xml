@@ -1,0 +1,13 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Update Keyword" TargetURL="update/keyword/:KeywordId" Type="BLOCKING" />
+  <Delete TargetURL="delete/keyword/:KeywordId" />
+  <INPUT ParaName="KeywordId" SrcValue="xml/add_data_no_vcol/case_00515_add_keyword.xml" />
+  <INPUT ParaName="KeywordName" PrefixVal="UPDATED Keyword_" Random="1" />
+  <INPUT ParaName="KeywordNote" Value="Updated by automatic testing framework" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00515_add_keyword.xml" Order="3" />
+  <RunInfo Success="1" Time="1474007414" />
+</TestCase>

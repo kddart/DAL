@@ -16,5 +16,5 @@
   <Parent CaseFile="xml/add_data_no_vcol/case_10196_add_plate_type.xml" Order="3" />
   <Parent CaseFile="xml/add_data_no_vcol/case_10194_add_itemgroup1_plate_extract.xml" Order="4" />
   <Parent CaseFile="xml/add_data_no_vcol/case_10195_add_itemgroup2_plate_extract.xml" Order="5" />
-  <RunInfo Success="1" Time="1444787330" />
+  
 </TestCase>

@@ -1,0 +1,15 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record_upload" Description="Import item" TargetURL="import/item/csv" Type="BLOCKING" />
+  <INPUT ParaName="ItemSourceId" Value="0" />
+  <INPUT ParaName="SpecimenId" Value="1" />
+  <INPUT ParaName="UnitId" Value="2" />
+  <INPUT ParaName="ItemTypeId" Value="3" />
+  <INPUT ParaName="StorageId" Value="4" />
+  <INPUT ParaName="Amount" Value="5" />
+  <INPUT ParaName="uploadfile" SrcFile="xml/add_data_no_vcol/item_src_caige.csv" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  
+</TestCase>

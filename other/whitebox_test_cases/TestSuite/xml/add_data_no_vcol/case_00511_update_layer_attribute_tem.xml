@@ -12,5 +12,5 @@
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00347_add_layer_attribute_tem.xml" Order="3" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00225_add_item_unit.xml" Order="4" />
-  <RunInfo Success="1" Time="1441003511" />
+  
 </TestCase>

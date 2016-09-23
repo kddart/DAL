@@ -15,5 +15,5 @@
   <Parent CaseFile="xml/add_data_no_vcol/case_00442_add_trait_with_berange_valid.xml" Order="4" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00201_add_sampletype.xml" Order="5" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00443_add_trialtrait_berange_val.xml" Force="1" Order="6" />
-  <RunInfo Success="1" Time="1443160456" />
+  <RunInfo Success="1" Time="1474006834" />
 </TestCase>

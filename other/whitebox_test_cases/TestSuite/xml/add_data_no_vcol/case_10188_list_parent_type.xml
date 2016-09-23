@@ -5,5 +5,5 @@
   <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00343_add_parent_type.xml" Order="3" />
-  <RunInfo Success="1" Time="1443160356" />
+  <RunInfo Success="1" Time="1474006740" />
 </TestCase>

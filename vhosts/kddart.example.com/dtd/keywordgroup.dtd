@@ -1,0 +1,4 @@
+<!ELEMENT DATA ( keywordgroupentry* ) >
+
+<!ELEMENT keywordgroupentry EMPTY >
+<!ATTLIST keywordgroupentry KeywordId NMTOKEN #REQUIRED >

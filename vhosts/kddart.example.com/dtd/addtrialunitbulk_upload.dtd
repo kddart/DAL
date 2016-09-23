@@ -5,7 +5,7 @@
 <!ATTLIST trialunit SampleSupplierId NMTOKEN #IMPLIED >
 <!ATTLIST trialunit SourceTrialUnitId NMTOKEN #IMPLIED >
 <!ATTLIST trialunit TreatmentId NMTOKEN #IMPLIED >
-<!ATTLIST trialunit TrialUnitBarcode NMTOKEN #IMPLIED >
+<!ATTLIST trialunit TrialUnitBarcode CDATA #IMPLIED >
 <!ATTLIST trialunit TrialUnitPosition CDATA #IMPLIED >
 <!ATTLIST trialunit TrialUnitEntryId NMTOKEN #IMPLIED >
 <!ATTLIST trialunit TrialUnitX NMTOKEN #IMPLIED >

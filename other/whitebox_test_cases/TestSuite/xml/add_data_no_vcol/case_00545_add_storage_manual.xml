@@ -1,0 +1,14 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Add Storage" TargetURL="add/storage" Type="BLOCKING" />
+  <Delete TargetURL="delete/storage/:StorageId" />
+  <INPUT ParaName="StorageBarcode" PrefixVal="S_" Random="1" />
+  <INPUT ParaName="StorageLocation" Value="Cool Room 2" />
+  <INPUT ParaName="StorageDetails" Value="Primary seed storage location" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Match Attr="ParaName" Tag="ReturnId" Value="StorageId" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  
+  
+</TestCase>

@@ -29,5 +29,5 @@
   <Parent CaseFile="xml/add_data_no_vcol/case_00308_add_item_type.xml" Order="9" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00309_add_item_state.xml" Order="10" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00310_add_item.xml" Order="11" />
-  <RunInfo Success="1" Time="1443160499" />
+  <RunInfo Success="1" Time="1474006905" />
 </TestCase>

@@ -1,4 +1,4 @@
 <DATA>
-<extract ItemGroupId="" ParaName="ItemGroupId" SrcValue="xml/add_data_no_vcol/case_10194_add_itemgroup1_plate_extract.xml" WellRow="A" WellCol="1" />
-<extract ItemGroupId="" ParaName="ItemGroupId" SrcValue="xml/add_data_no_vcol/case_10195_add_itemgroup2_plate_extract.xml" WellRow="A" WellCol="2" />
+<extract ItemGroupId="" ParaName="ItemGroupId" SrcValue="xml/add_data_no_vcol/case_10194_add_itemgroup1_plate_extract.xml" WellRow="A" WellCol="1" Tissue="|:Tissue:|" />
+<extract ItemGroupId="" ParaName="ItemGroupId" SrcValue="xml/add_data_no_vcol/case_10195_add_itemgroup2_plate_extract.xml" WellRow="A" WellCol="2" Tissue="|:Tissue:|" />
 </DATA>

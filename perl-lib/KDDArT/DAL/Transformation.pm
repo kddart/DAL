@@ -1,29 +1,18 @@
-#$Id: Transformation.pm 1028 2015-10-21 07:39:52Z puthick $
-#$Author: puthick $
+#$Id$
+#$Author$
 
-# Copyright (c) 2015, Diversity Arrays Technology, All rights reserved.
-
-# COPYRIGHT AND LICENSE
-# 
-# Copyright (C) 2014 by Diversity Arrays Technology Pty Ltd
-# 
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-# 
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
+# Copyright (c) 2011, Diversity Arrays Technology, All rights reserved.
 
 # Author    : Puthick Hok
-# Version   : 2.3.0 build 1040
+# Created   : 02/06/2010
+# Modified  :
+# Purpose   : 
+#          
+#          
 
 package KDDArT::DAL::Transformation;
 
 use strict;
-no strict 'refs';
 use warnings;
 
 BEGIN {
@@ -42,7 +31,7 @@ use base qw(CGI::Application);
 use Log::Log4perl qw(get_logger :levels);
 use JSON::XS;
 use Hash::Merge qw( merge );
-use CGI::Application::Plugin::Config::Simple;
+use Time::HiRes qw( tv_interval gettimeofday );
 
 sub cgiapp_init {
 
@@ -70,97 +59,13 @@ sub cgiapp_init {
 
   $self->logger->debug("CFG FILE: $CFG_FILE_PATH");
 
-  if (-e $CFG_FILE_PATH) {
+  my ($load_conf_err, $load_conf_msg) = load_config();
 
-    if (-r $CFG_FILE_PATH) {
+  $self->logger->debug("LOAD CONFIG MSG: $load_conf_msg");
 
-      $self->config_file($CFG_FILE_PATH);
+  if ($load_conf_err) {
 
-      # Load configuration file
-
-      my $config_hash = $self->config_param();
-
-      my @block_param_list = keys(%{$config_hash});
-
-      foreach my $block_param (@block_param_list) {
-
-        #$self->logger->debug("BLOCK: $block_param");
-
-        my $param_val = $config_hash->{$block_param};
-
-        if ($block_param =~ /(\w+)\.(.*)/) {
-
-          my $block_name = $1;
-          my $param_name = $2;
-
-          #$self->logger->debug("BLOCK NAME: $block_name - PARAM NAME: $param_name - PARAM VALUE: $param_val");
-
-          if (defined $${block_name}) {
-
-            # use plain text variable referencing
-            my $variable_data_type = ref $${block_name};
-            #$self->logger->debug("Variable data type: $variable_data_type");
-
-            my $local_val = '';
-
-            if ($variable_data_type eq 'HASH') {
-
-              # need   no strict 'refs' to work
-
-              #$self->logger->debug("Base DIR: " . $main::kddart_base_dir);
-
-              if (defined $${block_name}->{"$main::kddart_base_dir/$param_name"}) {
-
-                $local_val = $${block_name}->{"$main::kddart_base_dir/$param_name"};
-
-                #$self->logger->debug("Block local before replacement: $local_val");
-
-                if ($local_val eq 'FROM CFG_FILE') {
-
-                  $${block_name}->{"$main::kddart_base_dir/$param_name"} = $param_val;
-                }
-              }
-              else {
-
-                $${block_name}->{"$main::kddart_base_dir/$param_name"} = $param_val;
-              }
-            }
-            elsif (length($variable_data_type) == 0) {
-
-              if (defined $${block_name}) {
-
-                $local_val = $${block_name};
-
-                if ($local_val eq 'FROM CFG_FILE') {
-
-                  $${block_name} = $param_val;
-                }
-              }
-              else {
-
-                $${block_name} = $param_val;
-              }
-            }
-            else {
-
-              $self->logger->debug("Variable data type: $variable_data_type for $block_name UNSUPPORTED");
-            }
-          }
-          else {
-
-            $self->logger->debug("$block_name is undefined.");
-          }
-        }
-      }
-    }
-    else {
-
-      $self->logger->debug("Config file $CFG_FILE_PATH : NOT READABLE");
-    }
-  }
-  else {
-
-    $self->logger->debug("Config file $CFG_FILE_PATH : NOT FOUND");
+    die "Cannot load config file: $CFG_FILE_PATH";
   }
 }
 
@@ -198,14 +103,20 @@ sub cgiapp_postrun {
   my $http_err_code     = 420;
   my $output_text       = '';
 
-  if (length($complex_pass_data->{'ExtraData'}) > 0) {
+  if (defined $complex_pass_data->{'ExtraData'}) {
 
-    $is_extra_data = $complex_pass_data->{'ExtraData'};
+    if (length($complex_pass_data->{'ExtraData'}) > 0) {
+
+      $is_extra_data = $complex_pass_data->{'ExtraData'};
+    }
   }
 
-  if (length($complex_pass_data->{'HTTPErrorCode'}) > 0) {
+  if (defined $complex_pass_data->{'HTTPErrorCode'}) {
 
-    $http_err_code = $complex_pass_data->{'HTTPErrorCode'};
+    if (length($complex_pass_data->{'HTTPErrorCode'}) > 0) {
+
+      $http_err_code = $complex_pass_data->{'HTTPErrorCode'};
+    }
   }
 
   my $content_type = '';
@@ -299,6 +210,18 @@ sub cgiapp_postrun {
       }
     }
   }
+
+  my $rm_start_time   = $self->authen->get_rm_start_time();
+  my $rm_elapsed_time = sprintf("%.3f", tv_interval([$rm_start_time]));
+
+  my $current_runmode = $self->authen->get_current_runmode();
+
+  $self->logger->debug("Runmode $current_runmode elapsed time: $rm_elapsed_time second(s)");
+
+  my $stat_transform_data = $hash_merger->merge({'StatInfo' => [{'ServerElapsedTime' => $rm_elapsed_time,
+                                                                 'Unit' => 'second' }]},
+                                                $transform_data);
+  $transform_data = $stat_transform_data;
 
   if ($content_type eq 'GEOJSON') {
 
@@ -495,6 +418,25 @@ sub geojson_transformation {
 
           my $token_value = $record->{$token};
           $feature_name =~ s/$token/$token_value/g;
+        }
+        else {
+
+          if ($token =~ /->/) {
+
+            my ($array_var, $array_hash_field_name) = split(/->/, $token);
+
+            if (ref $record->{$array_var} eq 'ARRAY') {
+
+              if (ref $record->{$array_var}->[0] eq 'HASH') {
+
+                if (defined $record->{$array_var}->[0]->{$array_hash_field_name}) {
+
+                  my $token_value = $record->{$array_var}->[0]->{$array_hash_field_name};
+                  $feature_name =~ s/$token/$token_value/g;
+                }
+              }
+            }
+          }
         }
       }
 

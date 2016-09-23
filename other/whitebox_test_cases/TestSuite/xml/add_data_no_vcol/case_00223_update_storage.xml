@@ -1,5 +1,5 @@
 <TestCase>
-  <CaseInfo CustomMethod="add_record" Description="Add Storage" TargetURL="update/storage/:StorageId" Type="BLOCKING" />
+  <CaseInfo CustomMethod="add_record" Description="Update Storage" TargetURL="update/storage/:StorageId" Type="BLOCKING" />
   <INPUT ParaName="StorageId" SrcValue="xml/add_data_no_vcol/case_00222_add_storage.xml" />
   <INPUT ParaName="StorageBarcode" PrefixVal="S_" Random="1" />
   <INPUT ParaName="StorageLocation" Value="Non existing" />
@@ -8,5 +8,6 @@
   <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
   <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
-  <RunInfo Success="0" Time="0" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00222_add_storage.xml" Order="3" />
+  <RunInfo Success="1" Time="1474006887" />
 </TestCase>

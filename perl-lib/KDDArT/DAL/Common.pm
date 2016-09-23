@@ -1,29 +1,20 @@
-#$Id: Common.pm 1028 2015-10-21 07:39:52Z puthick $
-#$Author: puthick $
+#$Id$
+#$Author$
 
-# Copyright (c) 2015, Diversity Arrays Technology, All rights reserved.
-
-# COPYRIGHT AND LICENSE
-# 
-# Copyright (C) 2014 by Diversity Arrays Technology Pty Ltd
-# 
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-# 
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
+# Copyright (c) 2011, Diversity Arrays Technology, All rights reserved.
 
 # Author    : Puthick Hok
-# Version   : 2.3.0 build 1040
+# Created   : 02/06/2010
+# Modified  :
+# Purpose   : 
+#          
+#          
 
 package KDDArT::DAL::Common;
 require Exporter;
 
 use strict;
+no strict 'refs';
 use warnings;
 
 BEGIN {
@@ -47,6 +38,10 @@ use Text::CSV::Simple;
 use DateTime::Format::MySQL;
 use Time::HiRes qw( tv_interval gettimeofday );
 use Email::Valid;
+use Config::Simple;
+use LWP::UserAgent;
+use HTTP::Request::Common qw(POST GET);
+use JSON::XS qw(decode_json);
 
 our @ISA      = qw(Exporter);
 our @EXPORT   = qw($DTD_PATH $RPOSTGRES_UP_FILE $GIS_BUFFER_DISTANCE
@@ -62,7 +57,9 @@ our @EXPORT   = qw($DTD_PATH $RPOSTGRES_UP_FILE $GIS_BUFFER_DISTANCE
                    $DSN_MDB_WRITE $DSN_GIS_READ $DSN_GIS_WRITE $RMYSQL_UP_FILE
                    $MONETDB_UP_FILE $GENOTYPE2SPECIMEN_CFG $OAUTH2_SITE
                    $OAUTH2_AUTHORIZE_PATH $OAUTH2_CLIENT_ID $OAUTH2_CLIENT_SECRET
-                   $OAUTH2_SCOPE $OAUTH2_ACCESS_TOKEN_URL $JSON_SCHEMA_PATH
+                   $OAUTH2_SCOPE $OAUTH2_ACCESS_TOKEN_URL $JSON_SCHEMA_PATH $CONFIG_LOADED
+                   $SOLR_URL $POINT2POLYGON_BUFFER4SITE $POINT2POLYGON_BUFFER4TRIAL
+                   $MAX_RECURSIVE_ANCESTOR_LEVEL $MAX_RECURSIVE_DESCENDANT_LEVEL
                    trim ltrim rtrim read_uname_pass connect_kdb_read
                    execute_sql read_cell permission_phrase
                    read_cookie arrayref2csvfile arrayref2xml reconstruct_server_url
@@ -88,144 +85,66 @@ our @EXPORT   = qw($DTD_PATH $RPOSTGRES_UP_FILE $GIS_BUFFER_DISTANCE
                    copy_file filter_csv parse_marker_filtering recurse_read generate_factor_sql_v2
                    parse_filtering_v2 get_file_block id_existence_bulk table_existence_bulk check_perm_href
                    filter_csv_aref parse_marker_sorting get_sorting_function check_static_field
-                   get_next_value_for check_bool_href check_email_href check_value_href
+                   get_next_value_for check_bool_href check_email_href check_value_href load_config read_cookies
+                   record_existence_bulk get_solr_cores get_solr_fields get_solr_entities
                  );
 
-our $DSN_KDB_READ = {};
+our $DSN_KDB_READ             = {};
 
-$DSN_KDB_READ->{"$main::kddart_base_dir/vhosts/kddart.diversityarrays.com"}      = 'DBI:mysql:database=kddart_v2_3:host=localhost:mysql_connect_timeout=6000:mysql_write_timeout=600:mysql_read_timeout=300';
+our $DSN_KDB_WRITE            = {};
 
-$DSN_KDB_READ->{"$main::kddart_base_dir/vhosts/kddart-d.diversityarrays.com"}    = 'FROM CFG_FILE';
+our $DSN_MDB_READ             = {};
 
-$DSN_KDB_READ->{"$main::kddart_base_dir/vhosts/kddart-t.diversityarrays.com"}    = 'DBI:mysql:database=kddart_v2_3:host=localhost:mysql_connect_timeout=6000:mysql_write_timeout=600:mysql_read_timeout=300';
+our $DSN_MDB_WRITE            = {};
 
-$DSN_KDB_READ->{"$main::kddart_base_dir/vhosts/kddart-dal.diversityarrays.com"}  = 'DBI:mysql:database=kddart_v2_3:host=localhost:mysql_connect_timeout=6000:mysql_write_timeout=600:mysql_read_timeout=300';
+our $DSN_GIS_READ             = {};
 
-our $DSN_KDB_WRITE = {};
+our $DSN_GIS_WRITE            = {};
 
-$DSN_KDB_WRITE->{"$main::kddart_base_dir/vhosts/kddart.diversityarrays.com"}     = 'DBI:mysql:database=kddart_v2_3:host=localhost:mysql_connect_timeout=6000:mysql_write_timeout=600:mysql_read_timeout=300';
+our $RMYSQL_UP_FILE           = {};
 
-$DSN_KDB_WRITE->{"$main::kddart_base_dir/vhosts/kddart-d.diversityarrays.com"}   = 'FROM CFG_FILE';
+our $MONETDB_UP_FILE          = {};
 
-$DSN_KDB_WRITE->{"$main::kddart_base_dir/vhosts/kddart-t.diversityarrays.com"}   = 'DBI:mysql:database=kddart_v2_3:host=localhost:mysql_connect_timeout=6000:mysql_write_timeout=600:mysql_read_timeout=300';
+our $RPOSTGRES_UP_FILE        = {};
 
-$DSN_KDB_WRITE->{"$main::kddart_base_dir/vhosts/kddart-dal.diversityarrays.com"} = 'DBI:mysql:database=kddart_v2_3:host=localhost:mysql_connect_timeout=6000:mysql_write_timeout=600:mysql_read_timeout=300';
-
-our $DSN_MDB_READ = {};
-
-$DSN_MDB_READ->{"$main::kddart_base_dir/vhosts/kddart.diversityarrays.com"}      = 'dbi:monetdb:database=kddart_marker_v2_3;host=localhost;port=50000;language=sql';
-
-$DSN_MDB_READ->{"$main::kddart_base_dir/vhosts/kddart-d.diversityarrays.com"}    = 'FROM CFG_FILE';
-
-$DSN_MDB_READ->{"$main::kddart_base_dir/vhosts/kddart-t.diversityarrays.com"}    = 'dbi:monetdb:database=kddart_marker_v2_3;host=localhost;port=50000;language=sql';
-
-$DSN_MDB_READ->{"$main::kddart_base_dir/vhosts/kddart-dal.diversityarrays.com"}  = 'dbi:monetdb:database=kddart_marker_v2_3;host=localhost;port=50000;language=sql';
-
-our $DSN_MDB_WRITE = {};
-
-$DSN_MDB_WRITE->{"$main::kddart_base_dir/vhosts/kddart.diversityarrays.com"}     = 'dbi:monetdb:database=kddart_marker_v2_3;host=localhost;port=50000;language=sql';
-
-$DSN_MDB_WRITE->{"$main::kddart_base_dir/vhosts/kddart-d.diversityarrays.com"}   = 'FROM CFG_FILE';
-
-$DSN_MDB_WRITE->{"$main::kddart_base_dir/vhosts/kddart-t.diversityarrays.com"}   = 'dbi:monetdb:database=kddart_marker_v2_3;host=localhost;port=50000;language=sql';
-
-$DSN_MDB_WRITE->{"$main::kddart_base_dir/vhosts/kddart-dal.diversityarrays.com"} = 'dbi:monetdb:database=kddart_marker_v2_3;host=localhost;port=50000;language=sql';
-
-# End of MonetDB DSN
-
-our $DSN_GIS_READ = {};
-
-$DSN_GIS_READ->{"$main::kddart_base_dir/vhosts/kddart.diversityarrays.com"}      = 'dbi:Pg:dbname=kddart_gis_enviro_v2_3;host=localhost';
-
-$DSN_GIS_READ->{"$main::kddart_base_dir/vhosts/kddart-d.diversityarrays.com"}    = 'FROM CFG_FILE';
-
-$DSN_GIS_READ->{"$main::kddart_base_dir/vhosts/kddart-t.diversityarrays.com"}    = 'dbi:Pg:dbname=kddart_gis_enviro_v2_3;host=localhost';
-
-$DSN_GIS_READ->{"$main::kddart_base_dir/vhosts/kddart-dal.diversityarrays.com"}  = 'dbi:Pg:dbname=kddart_gis_enviro_v2_3;host=localhost';
-
-our $DSN_GIS_WRITE = {};
-
-$DSN_GIS_WRITE->{"$main::kddart_base_dir/vhosts/kddart.diversityarrays.com"}     = 'dbi:Pg:dbname=kddart_gis_enviro_v2_3;host=localhost';
-
-$DSN_GIS_WRITE->{"$main::kddart_base_dir/vhosts/kddart-d.diversityarrays.com"}   = 'FROM CFG_FILE';
-
-$DSN_GIS_WRITE->{"$main::kddart_base_dir/vhosts/kddart-t.diversityarrays.com"}   = 'dbi:Pg:dbname=kddart_gis_enviro_v2_3;host=localhost';
-
-$DSN_GIS_WRITE->{"$main::kddart_base_dir/vhosts/kddart-dal.diversityarrays.com"} = 'dbi:Pg:dbname=kddart_gis_enviro_v2_3;host=localhost';
-
-our $RMYSQL_UP_FILE = {};
-
-$RMYSQL_UP_FILE->{"$main::kddart_base_dir/vhosts/kddart.diversityarrays.com"}     = "$main::kddart_base_dir/secure/mysql_user.txt";
-
-$RMYSQL_UP_FILE->{"$main::kddart_base_dir/vhosts/kddart-d.diversityarrays.com"}   = "FROM CFG_FILE";
-
-$RMYSQL_UP_FILE->{"$main::kddart_base_dir/vhosts/kddart-t.diversityarrays.com"}   = "$main::kddart_base_dir/secure/mysql_user.txt";
-
-$RMYSQL_UP_FILE->{"$main::kddart_base_dir/vhosts/kddart-dal.diversityarrays.com"} = "$main::kddart_base_dir/secure/mysql_user.txt";
-
-our $MONETDB_UP_FILE = {};
-
-$MONETDB_UP_FILE->{"$main::kddart_base_dir/vhosts/kddart.diversityarrays.com"}     = "$main::kddart_base_dir/secure/monetdb_user.txt";
-
-$MONETDB_UP_FILE->{"$main::kddart_base_dir/vhosts/kddart-d.diversityarrays.com"}   = "FROM CFG_FILE";
-
-$MONETDB_UP_FILE->{"$main::kddart_base_dir/vhosts/kddart-t.diversityarrays.com"}   = "$main::kddart_base_dir/secure/monetdb_user.txt";
-
-$MONETDB_UP_FILE->{"$main::kddart_base_dir/vhosts/kddart-dal.diversityarrays.com"} = "$main::kddart_base_dir/secure/monetdb_user.txt";
-
-our $RPOSTGRES_UP_FILE = {};
-
-$RPOSTGRES_UP_FILE->{"$main::kddart_base_dir/vhosts/kddart.diversityarrays.com"}      = "$main::kddart_base_dir/secure/postgres_user.txt";
-
-$RPOSTGRES_UP_FILE->{"$main::kddart_base_dir/vhosts/kddart-d.diversityarrays.com"}    = "FROM CFG_FILE";
-
-$RPOSTGRES_UP_FILE->{"$main::kddart_base_dir/vhosts/kddart-t.diversityarrays.com"}    = "$main::kddart_base_dir/secure/postgres_user.txt";
-
-$RPOSTGRES_UP_FILE->{"$main::kddart_base_dir/vhosts/kddart-dal.diversityarrays.com"}  = "$main::kddart_base_dir/secure/postgres_user.txt";
+our $SOLR_URL                 = {};
 
 our $OAUTH2_SITE              = {};
 
-$OAUTH2_SITE->{"$main::kddart_base_dir/vhosts/kddart-d.diversityarrays.com"}          = "FROM CFG_FILE";
-
 our $OAUTH2_AUTHORIZE_PATH    = {};
-
-$OAUTH2_AUTHORIZE_PATH->{"$main::kddart_base_dir/vhosts/kddart-d.diversityarrays.com"} = "FROM CFG_FILE";
 
 our $OAUTH2_CLIENT_ID         = {};
 
-$OAUTH2_CLIENT_ID->{"$main::kddart_base_dir/vhosts/kddart-d.diversityarrays.com"}     = "FROM CFG_FILE";
-
 our $OAUTH2_CLIENT_SECRET     = {};
-
-$OAUTH2_CLIENT_SECRET->{"$main::kddart_base_dir/vhosts/kddart-d.diversityarrays.com"} = "FROM CFG_FILE";
 
 our $OAUTH2_SCOPE             = {};
 
-$OAUTH2_SCOPE->{"$main::kddart_base_dir/vhosts/kddart-d.diversityarrays.com"}         = "FROM CFG_FILE";
-
 our $OAUTH2_ACCESS_TOKEN_URL  = {};
 
-$OAUTH2_ACCESS_TOKEN_URL->{"$main::kddart_base_dir/vhosts/kddart-d.diversityarrays.com"} = "FROM CFG_FILE";
+our $MULTIMEDIA_STORAGE_PATH  = "FROM CFG_FILE";
 
-our $MULTIMEDIA_STORAGE_PATH
-                            = "FROM CFG_FILE";
+our $DTD_PATH                 = "FROM CFG_FILE";
 
-our $DTD_PATH               = "FROM CFG_FILE";
+our $JSON_SCHEMA_PATH         = "FROM CFG_FILE";
 
-our $JSON_SCHEMA_PATH       = "FROM CFG_FILE";
+our $TMP_DATA_PATH            = "FROM CFG_FILE";
 
-our $TMP_DATA_PATH          = "FROM CFG_FILE";
+our $SESSION_STORAGE_PATH     = "FROM CFG_FILE";
 
-our $SESSION_STORAGE_PATH   = "FROM CFG_FILE";
+our $CFG_FILE_PATH            = "$main::kddart_base_dir/secure/kddart_dal.cfg";
 
-our $CFG_FILE_PATH          = "$main::kddart_base_dir/secure/kddart_dal.cfg";
-
-our $NB_RECORD_BULK_INSERT  = 3000;
+our $NB_RECORD_BULK_INSERT    = 3000;
 
 our $GIS_BUFFER_DISTANCE;
-$GIS_BUFFER_DISTANCE        = 1; # 1 metre
+$GIS_BUFFER_DISTANCE            = 1; # 1 metre
 
-our $GIS_ENFORCE_GEO_WITHIN = 1;
+our $GIS_ENFORCE_GEO_WITHIN     = 1;
+
+# The buffer in fraction of degree for the ST_Buffer when sitelocation is provided as just a point
+our $POINT2POLYGON_BUFFER4SITE  = {};
+
+# The buffer in fraction of degree for the ST_Buffer when triallocation is provided as just a point
+our $POINT2POLYGON_BUFFER4TRIAL = {};
 
 our $CGI_INDEX_SCRIPT;
 $CGI_INDEX_SCRIPT           = "$main::kddart_base_dir/cgi-bin/kddart/index.pl";
@@ -243,9 +162,11 @@ our $ACCEPT_HEADER_LOOKUP   = { 'application/json' => 'JSON',
                                 'text/xml'         => 'XML',
 };
 
+our $CONFIG_LOADED          = 0;
+
 our $VALID_CTYPE            = {'xml' => 1, 'json' => 1, 'geojson' => 1};
 
-our $DAL_VERSION            = '2.3.1';
+our $DAL_VERSION            = '2.3.2';
 our $DAL_COPYRIGHT          = 'Copyright (c) 2015, Diversity Arrays Technology, All rights reserved.';
 our $DAL_ABOUT              = 'Data Access Layer';
 
@@ -257,7 +178,10 @@ our $GENOTYPE2SPECIMEN_CFG  = "FROM CFG_FILE";
 
 our $UNIT_POSITION_SPLITTER = "FROM CFG_FILE";
 
-our $M2M_RELATION           = {};
+our $MAX_RECURSIVE_ANCESTOR_LEVEL     = "FROM CFG_FILE";
+our $MAX_RECURSIVE_DESCENDANT_LEVEL   = "FROM CFG_FILE";
+
+our $M2M_RELATION                = {};
 
 $M2M_RELATION->{'specimen'}      = ['genotypespecimen'];
 $M2M_RELATION->{'specimengroup'} = ['specimengroupentry'];
@@ -633,6 +557,26 @@ sub read_cookie {
   return $desired_cookie_value;
 }
 
+sub read_cookies {
+
+  my $HTTP_COOKIE = $_[0];
+  my $CK_NAME     = $_[1];
+
+  my @cookieArray = split("; ", $HTTP_COOKIE);
+  my @desired_cookie_list;
+
+  my ($cookie_name, $cookie_value);
+  foreach (@cookieArray)
+  {
+    ($cookie_name, $cookie_value) = split("=", $_);
+    if ($cookie_name eq $CK_NAME)
+    {
+      push(@desired_cookie_list, $cookie_value);
+    }
+  }
+  return \@desired_cookie_list;
+}
+
 sub arrayref2csvfile {
 
   my $csvfile          = $_[0];
@@ -646,7 +590,11 @@ sub arrayref2csvfile {
   my @field_list;
   my @unorder_field_list;
 
+  my $found_field_href = {};
+
   for my $field (keys(%{$data_aref->[0]})) {
+
+    $found_field_href->{$field} = 1;
 
     if (defined $field_order_href->{$field}) {
 
@@ -655,6 +603,15 @@ sub arrayref2csvfile {
     else {
 
       push(@unorder_field_list, [$field, 999999]);
+    }
+  }
+
+  for my $field (keys(%{$field_order_href})) {
+
+    if ( !(defined $found_field_href->{$field}) ) {
+
+      my $field_order = $field_order_href->{$field};
+      push(@unorder_field_list, [$field, $field_order]);
     }
   }
 
@@ -1004,11 +961,18 @@ sub record_existence {
 
   if (lc($driver_name) eq 'pg') {
 
+    # PostgreSQL is case sensitive by default
     $sql .= "WHERE lower(CAST($field_name AS VARCHAR(255)))=? ";
+  }
+  elsif (lc($driver_name) eq 'monetdb') {
+
+    # MonetDB is case sensitive by default
+    $sql .= "WHERE LOWER($field_name)=? ";
   }
   else {
 
-    $sql .= "WHERE LOWER($field_name)=? ";
+    # MySQL or MariaDB is case insensitive by default
+    $sql .= "WHERE $field_name=? ";
   }
 
   $sql   .= "LIMIT 1";
@@ -1542,7 +1506,10 @@ sub generate_mfactor_sql {
 
   if (length($vcol_field_part) > 0) {
 
-    $returned_sql = "SELECT ${select_field_part}, ${vcol_field_part} ";
+    # Disable virtual column until a new virtual column for marker (monetdb) is in place
+
+    #$returned_sql = "SELECT ${select_field_part}, ${vcol_field_part} ";
+    $returned_sql = "SELECT ${select_field_part} ";
   }
   else {
 
@@ -1564,7 +1531,10 @@ sub generate_mfactor_sql {
   $returned_sql   .= qq|FROM "$table_name" LEFT JOIN "$factor_table" |;
   $returned_sql   .= qq|ON "${table_name}"."${id_fieldname}" = "${factor_table}"."${id_fieldname}" |;
   $returned_sql   .= $other_join;
-  $returned_sql   .= qq| GROUP BY $group_by_part |;
+
+  # Disable virtual column until a new virtual column for marker (monetdb) is in place
+
+  #$returned_sql   .= qq| GROUP BY $group_by_part |;
 
   return ($err, $trouble_vcol_str, $returned_sql, \@vcol_list);
 }
@@ -4360,6 +4330,8 @@ sub parse_sorting {
 
   for my $field (@{$field_list_all}) {
 
+    $field =~ s/"//g;
+
     if ($field =~ /ST_AsText\((.+)\)/) {
 
       my $geo_field = $1;
@@ -4725,6 +4697,16 @@ sub WKT2geoJSON {
 
     $geom->{type} = "Point";
     $wkt =~ s/POINT//og;
+    $wkt =~ s/\)/\]/og;
+    $wkt =~ s/\(/\[/og;
+    $wkt =~ s/(-?\d+(?:\.\d+)?)\s(-?\d+(?:\.\d+)?)/ $1, $2/og;
+    $geom->{'coordinates'} = eval($wkt);
+  }
+  elsif ($wkt =~ /^GEOMETRYCOLLECTION\(POINT/) {
+
+    $geom->{type} = "Point";
+    $wkt =~ s/GEOMETRYCOLLECTION\(POINT//og;
+    $wkt =~ s/\)$//;
     $wkt =~ s/\)/\]/og;
     $wkt =~ s/\(/\[/og;
     $wkt =~ s/(-?\d+(?:\.\d+)?)\s(-?\d+(?:\.\d+)?)/ $1, $2/og;
@@ -5158,9 +5140,12 @@ sub get_static_field {
       my $col_size      = $col_info->{"type_digits"};
       my $field_comment = $col_info_lookup->{$field_name}->{'FieldComment'};
 
-      if ($col_info_lookup->{$field_name}->{'PrimaryKey'} == 1) {
+      if (defined($col_info_lookup->{$field_name}->{'PrimaryKey'})) {
 
-        push(@{$pkey_data}, $field_name);
+        if ($col_info_lookup->{$field_name}->{'PrimaryKey'} eq '1') {
+
+          push(@{$pkey_data}, $field_name);
+        }
       }
 
       my $required_status;
@@ -5174,10 +5159,13 @@ sub get_static_field {
         $required_status = 1;
       }
 
-      if ($col_info->{'default'} =~ /next value for/) {
+      if (defined($col_info->{'default'})) {
 
-        # it's an auto number
-        $required_status = 0;
+        if ($col_info->{'default'} =~ /next value for/) {
+
+          # it's an auto number
+          $required_status = 0;
+        }
       }
 
       my $static_field = {};
@@ -5278,9 +5266,11 @@ sub get_static_field {
         $dtype_name = $type_info[0]->{'TYPE_NAME'};
       }
 
-      my $col_size   = $sth->{'PRECISION'}->[$i];
+      my $col_size   = -1;
 
       if (lc($driver_name) eq 'pg') {
+
+        $col_size   = $sth->{'PRECISION'}->[$i];
 
         if ($dtype_name eq 'text') {
 
@@ -5300,12 +5290,45 @@ sub get_static_field {
 
           $static_field->{'Description'} = $comment_lookup_href->{$field_name}->{'Comment'};
         }
+
+        if (defined $comment_lookup_href->{$field_name}->{'Type'}) {
+
+          my $sql_type_txt = $comment_lookup_href->{$field_name}->{'Type'};
+
+          if ($sql_type_txt =~ /\w+\((\d+)\)/) {
+
+            $col_size = $1;
+          }
+          elsif ($sql_type_txt =~ /set\((.*)\)/) {
+
+            warn "SQL type: $sql_type_txt";
+            my $set_option_csv = $1;
+            $dtype_name = 'set';
+
+            my @set_option_list = split(',', $set_option_csv);
+
+            $col_size = length($set_option_list[0]);
+
+            for (my $i = 1; $i < scalar(@set_option_list); $i++) {
+
+              if (length($set_option_list[$i]) > $col_size) {
+
+                $col_size = length($set_option_list[$i]);
+              }
+            }
+
+            # Due to the 2 single quotes col_size is 2 more than what it really is
+            $col_size -= 2; # make it as it is
+          }
+        }
       }
 
       $static_field->{'Name'}       = $field_name;
       $static_field->{'Required'}   = $required_status;
       $static_field->{'DataType'}   = $dtype_name;
       $static_field->{'ColSize'}    = $col_size;
+
+      #warn "Field name: $field_name - col size: $col_size";
 
       push(@{$static_field_aref}, $static_field);
     }
@@ -5392,6 +5415,9 @@ sub copy_file {
 
     $write_mode = $_[3];
   }
+
+  open(my $from_fileh, "<$from_filename") or return (1, "Read $from_filename failed: $!");
+  close($from_fileh);
 
   my $cp_result = `perl -ne 'print if $from_line .. -1' $from_filename $write_mode $to_filename`;
 
@@ -5580,6 +5606,13 @@ sub recurse_read {
   my $current_level    = $_[4];
   my $stopping_level   = $_[5];
 
+  my $global_id_href = {};
+
+  if (defined $_[6]) {
+
+    $global_id_href = $_[6];
+  }
+
   my $err          = 0;
   my $msg          = '';
   my $data         = [];
@@ -5601,7 +5634,13 @@ sub recurse_read {
     $err          = 0;
     $msg          = '';
     $finish_level = $current_level;
-    $data         = $read_data_aref;
+
+    for my $read_data_rec (@{$read_data_aref}) {
+
+      $read_data_rec->{'Level'} = $current_level;
+
+      push(@{$data}, $read_data_rec);
+    }
 
     return ($err, $msg, $finish_level, $data);
   }
@@ -5611,18 +5650,24 @@ sub recurse_read {
   for my $read_data_rec (@{$read_data_aref}) {
 
     my $id = $read_data_rec->{$seeking_id_field};
-    $next_level_id_dict{$id} = 1;
 
     $read_data_rec->{'Level'} = $current_level;
 
     push(@{$data}, $read_data_rec);
+
+    if (! (defined $global_id_href->{$id}) ) {
+
+      $global_id_href->{$id} = 1;
+
+      $next_level_id_dict{$id} = 1;
+    }
   }
 
   for my $next_level_id (keys(%next_level_id_dict)) {
 
     my ($nlevel_err, $nlevel_msg, $nlevel_fl, $nlevel_data) = recurse_read($dbh, $sql, [$next_level_id],
                                                                            $seeking_id_field, $current_level+1,
-                                                                           $stopping_level);
+                                                                           $stopping_level, $global_id_href);
 
     if ($nlevel_err) {
 
@@ -5688,6 +5733,8 @@ sub parse_filtering {
   my $geo_field_href = {};
 
   for my $field (@{$field_list_all}) {
+
+    $field =~ s/"//g;
 
     if ($field =~ /ST_AsText\((.+)\)/) {
 
@@ -5779,25 +5826,43 @@ sub parse_filtering {
       $operator         = $2;
       $is_quote_arg_val = 1;
     }
-    elsif ($expression =~ /^(\w+)\s*(<>)\s*'[\w|\s|\-|\(|\)|\^|\>|\<|\%|\:|\?|\+|\[|\]|\.|\*|\/|\\|\;|\|]*'$/i) {
-
-      $field_name       = $1;
-      $operator         = $2;
-      $is_quote_arg_val = 1;
-    }
     elsif ($expression =~ /^(\w+)\s+(IN)\s+\((\s*'[\w|\s|\-|\(|\)|\^|\>|\<|\%|\:|\?|\+|\[|\]|\.|\*|\/|\\|\;|\|]+'\s*,?)+\)$/i) {
 
       $field_name       = $1;
       $operator         = $2;
       $is_quote_arg_val = 1;
     }
-    elsif ($expression =~ /^(\w+)\s+(LIKE)\s+'[%|\w|\s|\-|\+]+'$/i) {
+    elsif ($expression =~ /^(\w+)\s+(NOT IN)\s+\((\s*\d+\s*,?)+\)$/i) {
 
       $field_name       = $1;
       $operator         = $2;
       $is_quote_arg_val = 1;
     }
-    elsif ($expression =~ /^(\w+)\s+(NOT LIKE)\s+'[%|\w|\s|\-|\+]+'$/i) {
+    elsif ($expression =~ /^(\w+)\s+(NOT IN)\s+\((\s*'\d{4}\-\d{2}\-\d{2}( \d{2}\:\d{2}\:\d{2})?'\s*,?)+\)$/i) {
+
+      $field_name       = $1;
+      $operator         = $2;
+      $is_quote_arg_val = 1;
+    }
+    elsif ($expression =~ /^(\w+)\s+(NOT IN)\s+\((\s*'[\w|\s|\-|\(|\)|\^|\>|\<|\%|\:|\?|\+|\[|\]|\.|\*|\/|\\|\;|\|]+'\s*,?)+\)$/i) {
+
+      $field_name       = $1;
+      $operator         = $2;
+      $is_quote_arg_val = 1;
+    }
+    elsif ($expression =~ /^(\w+)\s*(<>)\s*'[\w|\s|\-|\(|\)|\^|\>|\<|\%|\:|\?|\+|\[|\]|\.|\*|\/|\\|\;|\|]*'$/i) {
+
+      $field_name       = $1;
+      $operator         = $2;
+      $is_quote_arg_val = 1;
+    }
+    elsif ($expression =~ /^(\w+)\s+(LIKE)\s+'[^']+'$/i) {
+
+      $field_name       = $1;
+      $operator         = $2;
+      $is_quote_arg_val = 1;
+    }
+    elsif ($expression =~ /^(\w+)\s+(NOT LIKE)\s+'[^']+'$/i) {
 
       $field_name       = $1;
       $operator         = $2;
@@ -6214,7 +6279,7 @@ sub generate_factor_sql_v2 {
   my $returned_sql = '';
   if (length($select_field_part) > 0) {
 
-    $returned_sql = "SELECT ${select_field_part} ";  
+    $returned_sql = "SELECT ${select_field_part} ";
   }
   else {
 
@@ -6380,25 +6445,49 @@ sub parse_filtering_v2 {
       $operator         = $2;
       $is_quote_arg_val = 1;
     }
-    elsif ($expression =~ /^(\w+)\s*(<>)\s*'[\w|\s|\-|\(|\)|\^|\>|\<|\%|\:|\?|\+|\[|\]|\.|\*|\/|\\|\|]*'$/i) {
-
-      $field_name       = $1;
-      $operator         = $2;
-      $is_quote_arg_val = 1;
-    }
     elsif ($expression =~ /^(\w+)\s+(IN)\s+\((\s*'[\w|\s|\-|\(|\)|\^|\>|\<|\%|\:|\?|\+|\[|\]|\.|\*|\/|\\|\|]+'\s*,?)+\)$/i) {
 
       $field_name       = $1;
       $operator         = $2;
       $is_quote_arg_val = 1;
     }
-    elsif ($expression =~ /^(\w+)\s+(LIKE)\s+'[%|\w|\s|\-|\+]+'$/i) {
+
+    #
+
+    elsif ($expression =~ /^(\w+)\s+(NOT IN)\s+\((\s*\d+\s*,?)+\)$/i) {
 
       $field_name       = $1;
       $operator         = $2;
       $is_quote_arg_val = 1;
     }
-    elsif ($expression =~ /^(\w+)\s+(NOT LIKE)\s+'[%|\w|\s|\-|\+]+'$/i) {
+    elsif ($expression =~ /^(\w+)\s+(NOT IN)\s+\((\s*'\d{4}\-\d{2}\-\d{2}( \d{2}\:\d{2}\:\d{2})?'\s*,?)+\)$/i) {
+
+      $field_name       = $1;
+      $operator         = $2;
+      $is_quote_arg_val = 1;
+    }
+    elsif ($expression =~ /^(\w+)\s+(NOT IN)\s+\((\s*'[\w|\s|\-|\(|\)|\^|\>|\<|\%|\:|\?|\+|\[|\]|\.|\*|\/|\\|\|]+'\s*,?)+\)$/i) {
+
+      $field_name       = $1;
+      $operator         = $2;
+      $is_quote_arg_val = 1;
+    }
+
+    #
+
+    elsif ($expression =~ /^(\w+)\s*(<>)\s*'[\w|\s|\-|\(|\)|\^|\>|\<|\%|\:|\?|\+|\[|\]|\.|\*|\/|\\|\|]*'$/i) {
+
+      $field_name       = $1;
+      $operator         = $2;
+      $is_quote_arg_val = 1;
+    }
+    elsif ($expression =~ /^(\w+)\s+(LIKE)\s+'[^']+'$/i) {
+
+      $field_name       = $1;
+      $operator         = $2;
+      $is_quote_arg_val = 1;
+    }
+    elsif ($expression =~ /^(\w+)\s+(NOT LIKE)\s+'[^']+'$/i) {
 
       $field_name       = $1;
       $operator         = $2;
@@ -6823,6 +6912,388 @@ sub get_next_value_for {
   }
 
   return ($err, $err_msg, $next_val);
+}
+
+sub load_config {
+
+  my $err = 0;
+  my $msg = '';
+
+  if ($CONFIG_LOADED) {
+
+    $msg = 'Config has already loaded';
+    return ($err, $msg);
+  }
+
+  if (-e $CFG_FILE_PATH) {
+
+    if (-r $CFG_FILE_PATH) {
+
+      my $config_hash = {};
+
+      Config::Simple->import_from($CFG_FILE_PATH, $config_hash);
+
+      my @block_param_list = keys(%{$config_hash});
+
+      foreach my $block_param (@block_param_list) {
+
+        #$r->log_error("BLOCK: $block_param");
+
+        my $param_val = $config_hash->{$block_param};
+
+        if ($block_param =~ /(\w+)\.(.*)/) {
+
+          my $block_name = $1;
+          my $param_name = $2;
+
+          #$r->log_error("BLOCK NAME: $block_name - PARAM NAME: $param_name - PARAM VALUE: $param_val");
+
+          if (defined $${block_name}) {
+
+            # use plain text variable referencing
+            my $variable_data_type = ref $${block_name};
+            #$r->log_error("Variable data type: $variable_data_type");
+
+            my $local_val = '';
+
+            if ($variable_data_type eq 'HASH') {
+
+              # need   no strict 'refs' to work
+
+              #$r->log_error("Base DIR: " . $main::kddart_base_dir);
+
+              if (defined $${block_name}->{"$main::kddart_base_dir/$param_name"}) {
+
+                $local_val = $${block_name}->{"$main::kddart_base_dir/$param_name"};
+
+                #$r->log_error("Block local before replacement: $local_val");
+
+                if ($local_val eq 'FROM CFG_FILE') {
+
+                  $${block_name}->{"$main::kddart_base_dir/$param_name"} = $param_val;
+                }
+              }
+              else {
+
+                $${block_name}->{"$main::kddart_base_dir/$param_name"} = $param_val;
+              }
+            }
+            elsif (length($variable_data_type) == 0) {
+
+              if (defined $${block_name}) {
+
+                $local_val = $${block_name};
+
+                if ($local_val eq 'FROM CFG_FILE') {
+
+                  $${block_name} = $param_val;
+                }
+              }
+              else {
+
+                $${block_name} = $param_val;
+              }
+            }
+            else {
+
+              #$r->log_error("Variable data type: $variable_data_type for $block_name UNSUPPORTED");
+              $msg = "Variable data type: $variable_data_type for $block_name UNSUPPORTED";
+              $err = 1;
+            }
+          }
+          else {
+
+            #$r->log_error("$block_name is undefined.");
+            $msg = "$block_name is undefined.";
+            $err = 1;
+          }
+        }
+      }
+    }
+    else {
+
+      #$r->log_error("Config file $CFG_FILE_PATH : NOT READABLE");
+      $msg = "Config file $CFG_FILE_PATH : NOT READABLE";
+      $err = 1;
+    }
+  }
+  else {
+
+    #$r->log_error("Config file $CFG_FILE_PATH : NOT FOUND");
+    $msg = "Config file $CFG_FILE_PATH : NOT FOUND";
+    $err = 1;
+  }
+
+  if (!$err) {
+
+    $CONFIG_LOADED = 1;
+  }
+
+  return ($err, $msg);
+}
+
+sub record_existence_bulk {
+
+  my $dbh              = $_[0];
+  my $table_name       = $_[1];
+  my $field_name       = $_[2];
+  my $field_value_aref = $_[3];
+  my $other_where      = '';
+
+  if (defined $_[4]) {
+
+    $other_where = ' AND ' . $_[4];
+  }
+
+  my $err          = 0;
+  my $msg          = '';
+  my $unfound_aref = [];
+  my $found_aref   = [];
+
+  if (scalar(@{$field_value_aref}) == 0) {
+
+    return ($err, $msg, $unfound_aref, $found_aref);
+  }
+
+  my $driver_name = $dbh->{'Driver'}->{'Name'};
+
+  if (lc($driver_name) eq 'monetdb') {
+
+    $field_name = qq|"$field_name"|;
+    $table_name = qq|"$table_name"|;
+  }
+
+  my $field_val_csv = join(',', @{$field_value_aref});
+
+  my $sql = "SELECT $field_name ";
+  $sql   .= "FROM $table_name ";
+  $sql   .= "WHERE $field_name IN ($field_val_csv) ";
+  $sql   .= $other_where;
+
+
+  my $sth = $dbh->prepare($sql);
+  $sth->execute();
+
+  $field_name =~ s/"//g;
+
+  my $db_lookup_href = $sth->fetchall_hashref($field_name);
+
+  if ($dbh->err() || $sth->err()) {
+
+    $err = 1;
+    $msg = "DB failed: $sql";
+
+    return ($err, $msg, $unfound_aref, $found_aref);
+  }
+
+  $sth->finish();
+
+  foreach my $field_val (@{$field_value_aref}) {
+
+    my $cleaned_field_val = $field_val;
+    $cleaned_field_val    =~ s/^'|'$//g;
+
+    if ( !(defined $db_lookup_href->{$cleaned_field_val}) ) {
+
+      push(@{$unfound_aref}, $field_val);
+    }
+    else {
+
+      push(@{$found_aref}, $field_val);
+    }
+  }
+
+  return ($err, $msg, $unfound_aref, $found_aref);
+}
+
+sub get_solr_cores {
+
+  my $browser            = LWP::UserAgent->new();
+  my $solr_server_url    = $SOLR_URL->{$ENV{DOCUMENT_ROOT}};
+  my $solr_list_core_url = $solr_server_url . '/admin/cores?wt=json';
+
+  my $get_req = GET($solr_list_core_url);
+  my $get_res = $browser->request($get_req);
+
+  if ( ! $get_res->is_success) {
+
+    my $err     = 1;
+    my $err_msg = "Error: " . $get_res->status_line() . " - message: " . $get_res->content();
+
+    return ($err, $err_msg, {});
+  }
+
+  my $response_json_txt = $get_res->content();
+
+  my $response_href = eval{ decode_json($response_json_txt); };
+
+  if ( ! (defined $response_href) ) {
+
+    my $err     = 1;
+    my $err_msg = "Error: cannot decode json $@ - " . $response_json_txt;
+
+    return ($err, $err_msg, {});
+  }
+
+  if ( ! (defined $response_href->{'status'}) ) {
+
+    my $err     = 1;
+    my $err_msg = "Error: cannot find Solr status data";
+
+    return ($err, $err_msg, {});
+  }
+
+  my $status_href = $response_href->{'status'};
+
+  my $core_href = {};
+
+  foreach my $core_name (keys(%{$status_href})) {
+
+    my $core_status_href   = $status_href->{$core_name};
+    my $return_status_href = {};
+
+    $return_status_href->{'coreName'}     = $core_name;
+    $return_status_href->{'startTime'}    = $core_status_href->{'startTime'};
+    $return_status_href->{'uptime'}       = $core_status_href->{'uptime'};
+    $return_status_href->{'numDocs'}      = $core_status_href->{'index'}->{'numDocs'};
+    $return_status_href->{'maxDoc'}       = $core_status_href->{'index'}->{'maxDoc'};
+    $return_status_href->{'current'}      = $core_status_href->{'index'}->{'current'};
+    $return_status_href->{'sizeInBytes'}  = $core_status_href->{'index'}->{'sizeInBytes'};
+    $return_status_href->{'size'}         = $core_status_href->{'index'}->{'size'};
+    $return_status_href->{'lastModified'} = $core_status_href->{'index'}->{'lastModified'};
+
+    $core_href->{lc($core_name)} = $return_status_href;
+  }
+
+  return (0, '', $core_href);
+}
+
+sub get_solr_fields {
+
+  my $core_name = $_[0];
+
+  my $browser            = LWP::UserAgent->new();
+  my $solr_server_url    = $SOLR_URL->{$ENV{DOCUMENT_ROOT}};
+  my $solr_schema_url    = $solr_server_url . "/${core_name}/schema?wt=json";
+
+  my $get_req = GET($solr_schema_url);
+  my $get_res = $browser->request($get_req);
+
+  if ( ! $get_res->is_success) {
+
+    my $err     = 1;
+    my $err_msg = "Error: " . $get_res->status_line() . " - message: " . $get_res->content();
+
+    return ($err, $err_msg, []);
+  }
+
+  my $response_json_txt = $get_res->content();
+
+  my $response_href = eval{ decode_json($response_json_txt); };
+
+  if ( ! (defined $response_href) ) {
+
+    my $err     = 1;
+    my $err_msg = "Error: cannot decode json $@ - " . $response_json_txt;
+
+    return ($err, $err_msg, []);
+  }
+
+  if ( ! (defined $response_href->{'schema'}) ) {
+
+    my $err     = 1;
+    my $err_msg = "Error: cannot find schema data";
+
+    return ($err, $err_msg, []);
+  }
+
+  if ( ! (defined $response_href->{'schema'}->{'fields'}) ) {
+
+    my $err     = 1;
+    my $err_msg = "Error: cannot find field data";
+
+    return ($err, $err_msg, []);
+  }
+
+  my $field_aref = $response_href->{'schema'}->{'fields'};
+
+  return (0, '', $field_aref);
+}
+
+sub get_solr_entities {
+
+  my $core_name = $_[0];
+
+  my $browser            = LWP::UserAgent->new();
+  my $solr_server_url    = $SOLR_URL->{$ENV{DOCUMENT_ROOT}};
+  my $solr_config_url    = $solr_server_url . "/${core_name}/dataimport?command=show-config";
+
+  my $get_req = GET($solr_config_url);
+  my $get_res = $browser->request($get_req);
+
+  if ( ! $get_res->is_success) {
+
+    my $err     = 1;
+    my $err_msg = "Error: " . $get_res->status_line() . " - message: " . $get_res->content();
+
+    return ($err, $err_msg, {});
+  }
+
+  my $config_xml_txt = $get_res->content();
+
+  my $solr_config_ref = eval{ XMLin($config_xml_txt, 'ForceArray' => 1); };
+
+  if ( ! (defined $solr_config_ref) ) {
+
+    my $err     = 1;
+    my $err_msg = "Error: cannot decode XML $@ - " . $config_xml_txt;
+
+    return ($err, $err_msg, {});
+  }
+
+  if ( ! (defined $solr_config_ref->{'document'}) ) {
+
+    my $err     = 1;
+    my $err_msg = "Error: cannot find document data";
+
+    return ($err, $err_msg, {});
+  }
+
+  my $entity_name2query_href = {};
+
+  my $document_aref = $solr_config_ref->{'document'};
+
+  foreach my $entity_href (@{$document_aref}) {
+
+    foreach my $entity_key (keys(%{$entity_href})) {
+
+      warn "entity key: $entity_key";
+
+      my $entity_data_href = $entity_href->{$entity_key};
+
+      foreach my $data_key (keys(%{$entity_data_href})) {
+
+        my $query_sql = $entity_data_href->{$data_key}->{'query'};
+        warn "query: $query_sql";
+
+        if ($query_sql =~ /'(\w+)' as "?entity_name"?/i) {
+
+          my $entity_name = $1;
+          $entity_name2query_href->{$entity_name} = {'query'       => $query_sql,
+                                                     'entity_name' => $entity_name};
+        }
+        else {
+
+          my $err     = 1;
+          my $err_msg = "Error: $query_sql - no entity_name field";
+
+          return ($err, $err_msg, {});
+        }
+      }
+    }
+  }
+
+  return (0, '', $entity_name2query_href);
 }
 
 1;

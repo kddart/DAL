@@ -19,5 +19,5 @@
   <Parent CaseFile="xml/add_data_no_vcol/case_00114_add_specimen1.xml" Order="4" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00115_add_specimen2.xml" Order="5" />
   <ReturnId ParaName="SpecimenGroupId" Value="14" />
-  <RunInfo Success="1" Time="1443160996" />
+  <RunInfo Success="1" Time="1474007469" />
 </TestCase>

@@ -1,3 +1,191 @@
+Version 2.3.2
+Date: 23/09/2016
+
+Major:
+
+  * Cookie authentication has been fixed with Apahce2_4::AuthCookie and mod_perl 2.0.9 which is available in openSUSE Leap 42.1 and CentOS 7.
+
+  * Permission fields are added to specimen table and the values of these fields are copied from genotype by DAL when a new specimen is created. When any of the permission fields in the genotype table is updated, all values in all the permission fields in the genotype are replicated to their corresponding fields in the specimen table via SQL after update trigger on genotype table. To help with specimens with multiple genotypes, genotypespecimen table has a new field named InheritanceFlag. This field is used by the trigger script for the permission value replication. This improves the speed of the list specimen with pagination.
+
+  * Table for multiloctrial has been renamed to trialgroup and its fields' name are renamed as well.
+
+  * Search interface via Solr enterprise search engine has been improved with proper error handling. There are 2 new interfaces to list all available Solr cores and list entities in each Solr core.
+
+  * Every DAL interface will return the time the server takes to execute the DAL code at the server side. This time excludes client processing, network traffic, and the web server handling. However, this information will help isolate performance problems and help future performance optimisation work.
+
+  * New interface to list marker data for specific extract across all datasets in the system with a defined dataset type.
+
+Minor:
+
+  * The performance of add/update specimen interfaces has been improved.
+
+  * The performance of list genotype interface for a specific specimen has been improved.
+
+  * The performance of list aliases interface for a specific genotype has been improved.
+
+  * The performance of import item interface has been improved.
+
+  * List specimen keyword interface supports pagination and filtering.
+
+  * There is a new interface to append marker data to an existing dataset to help loading 2GB+ marker data set.
+
+  * Bug regarding missing DateAdded and Active fields in import itemgroup has been fixed.
+
+  * DAL supports a point for a site or a trial as well as polygon and multi polygon as the shape for its geometry object.
+
+Detailed list of changes from version 2.3.0 to 2.3.2:
+
+  User and group related calls:
+* 'user/_username/reset/password' - has been depreciated
+* New calls were added:
+** 'get/userpreference'
+** 'update/userpreference'
+** 'update/group/_id'
+
+Search functionality
+* New calls were added
+** 'list/solrcore'
+** 'solrcore/_core/list/entity'
+** 'search/_core/_nperpage/page/_num'
+
+Item units are now replaced by generalunits - depreciated calls:
+* 'add/itemunit'
+* 'delete/itemunit/_id'
+* 'update/itemunit/_id'
+* 'get/itemunit/_id'
+* 'list/itemunit'
+
+Whole new set of calls related to keywords:
+* 'add/keyword'
+* 'update/keyword/_id'
+* 'list/keyword/_nperpage/page/_num'
+* 'get/keyword/_id'
+* 'delete/keyword/_id'
+* 'add/keywordgroup'
+* 'update/keywordgroup/_id'
+* 'list/keywordgroup/_nperpage/page/_num'
+* 'get/keywordgroup/_id'
+* 'keywordgroup/_id/add/keyword/bulk'
+* 'keywordgroup/_id/list/keyword'
+* 'keywordgroup/_id/remove/keyword/_kwdid'
+* 'delete/keywordgroup/_id'
+
+Attaching keywords to specimens:
+* 'specimen/_id/add/keyword'
+* 'specimen/_id/list/keyword/_nperpage/page/_num'
+* 'specimen/_id/list/keyword'
+* 'list/specimenkeyword/_nperpage/page/_num'
+* 'remove/specimenkeyword/_id'
+
+Attaching keywords to trial units
+* 'import/trialunitkeyword/csv'
+* 'trialunit/_id/list/keyword/_nperpage/page/_num'
+* 'trialunit/_id/list/keyword'
+* 'list/trialunitkeyword/_nperpage/page/_num'
+* 'trialunit/_id/add/keyword'
+* 'remove/trialunitkeyword/_id'
+
+New calls to support more options in genotype pedeigree
+* 'import/genpedigree/csv'
+* 'export/genpedigree'
+* 'update/genpedigree/_id'
+* 'delete/genpedigree/_id'
+
+New calls for crossing design in trial (nursery):
+* 'import/crossing/csv'
+* 'trial/_trialid/list/crossing'
+
+Unit positions has been re-factored, are related calls depreciated:
+* 'add/unitposition'
+* 'list/unitposition'
+* 'get/unitposition/_id'
+* 'update/unitposition/_id'
+* 'list/unitpositionfield'
+* 'delete/unitposition/_id'
+
+Multiloc trials has been renamed to more generic trialgroup
+
+* Depreciated list of calls:
+
+** 'add/multiloctrial'
+** 'update/multiloctrial/_id'
+** 'list/multiloctrial/_nperpage/page/_num'
+** 'get/multiloctrial/_id'
+** 'delete/multiloctrial/_id'
+** 'multiloctrial/_id/add/trial'
+** 'multiloctrial/_id/remove/trial/_tid'
+
+* Replacement calls:
+
+** 'add/trialgroup'
+** 'update/trialgroup/_id'
+** 'list/trialgroup/_nperpage/page/_num'
+** 'get/trialgroup/_id'
+** 'delete/trialgroup/_id'
+** 'trialgroup/_id/add/trial'
+** 'trialgroup/_id/remove/trial/_tid'
+
+New call to bulk import extracts for a plate:
+* 'import/plate/n/extract/xml'
+
+New way to list extracts with pagination:
+* Depreciated call: 'list/extract'
+* Replacement call: 'list/extract/_nperpage/page/_num'
+
+More new ways to list extracts:
+* 'plate/_plateid/list/extract'
+* 'dataset/_dsid/list/extract'
+
+More flexible way to list marker data (removing one marker limit):
+* Depreciated call: 'analysisgroup/_analid/marker/_mrkid/list/data/_nperblock/block/_num'
+* Replacement call: 'list/extractmarkerdata/_nperpage/page/_num/n/_nperblock/block/_bnum'
+
+Depreciated calls from environment module related to valuetype (now use generalunit):
+* 'list/layerattrib/valuetype'
+* 'add/layerattrib/valuetype'
+* 'update/layerattrib/valuetype/_id'
+* 'get/layerattrib/valuetype/_id'
+* 'delete/layerattrib/valuetype/_id'
+
+Error info has been depreciated:
+* 'get/errorinfo/_id'
+
+Version 2.3.1-1
+Date: 16/05/2016
+
+Major:
+
+  * Listing extract marker data across all accessible datasets on the same dataset type with full marker and extract filtering.
+
+  * Optimisation for large (100k+ extract) marker dataset importation.
+
+  * Search prototype based on Solr search solution.
+
+Minor:
+
+  * Listing and exporting marker data from an analysis group or dataset supports filtering on an individual extract score, for example, E_6107=1&CallRate>0.95, which lists all markers that have scored 1 for extract 6107 and have CallRate above 0.95.
+
+  * Exporting marker data supports extract filtering in addition to the existing marker filtering and extract field list.
+
+  * Level attribute in ancestor and descendant records is correctly reported.
+
+Version 2.3.1
+Date: 18/12/2015
+
+Major:
+
+  * Cookie expiry when logging out is reverted to -1d. In version 2.2.7 and 2.3, when DAL session is logged out, DAL keep the expiry of the cookies the same but set the cookie values to empty strings. Before these versions, the logout will set the cookie expiry to -1d. However, there were some issues with multimedia file download. Once easy solution to the multimedia file download issue at the time was not chnage the cookie expiry setting. However, this change caused a problem for the new KDSen online which relies on the logout setting cookie expiry to -1d. In terms of downloading multimedia files, a proper solution was in place. So both issues should be fixed.
+
+  * Support keyword management, trial unit keyword and specimen keyword.
+
+  * Support sub-plot scoring by having TrialUnitSpecimenId as an optional field in samplemeasurement table.
+
+Minor:
+
+  * import/itemgroup/xml is faster by using SQL bulk record insert.
+
+  * add/plate/n/extract is more up-to-date with the schema and faster. It now uses SQL bulk insert to create extract records.
+
 List of CHANGES from version 2.2.5 to 2.3
 
 Feature changes:

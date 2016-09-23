@@ -12,6 +12,6 @@
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00395_add_project_type.xml" Order="3" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00102_add_con.xml" Order="4" />
-  <ReturnId ParaName="ProjectId" Value="8" />
-  <RunInfo Success="1" Time="1444881605" />
+  
+  
 </TestCase>

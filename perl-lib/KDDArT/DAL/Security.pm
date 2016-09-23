@@ -1,10 +1,14 @@
-#$Id: Security.pm 924 2015-06-05 08:05:21Z puthick $
-#$Author: puthick $
+#$Id$
+#$Author$
 
-# Copyright (c) 2015, Diversity Arrays Technology
+# Copyright (c) 2011, Diversity Arrays Technology, All rights reserved.
 
 # Author    : Puthick Hok
 # Created   : 02/06/2010
+# Modified  :
+# Purpose   : 
+#          
+#          
 
 =head1 FORMER NAME
 
@@ -54,6 +58,7 @@ use Log::Log4perl qw(get_logger :levels);
 use KDDArT::DAL::Common;
 use Digest::HMAC_SHA1 qw(hmac_sha1 hmac_sha1_hex);
 use Crypt::Random qw( makerandom );
+use Time::HiRes qw( tv_interval gettimeofday );
 use DateTime;
 use Digest::MD5;
 
@@ -105,7 +110,7 @@ sub CGI::Application::Authen : ATTR(CODE) {
   #
   sub authen {
     my $cgiapp = shift;
-    
+
     if (ref($cgiapp)) {
       return KDDArT::DAL::Security->instance($cgiapp);
     } else {
@@ -119,12 +124,12 @@ package KDDArT::DAL::Security;
 sub config {
   my $self  = shift;
   my $class = ref $self ? ref $self : $self;
-  
+
   die "Calling config after the Authentication object has already been initialized"
       if ref $self && defined $self->{initialized};
 
   my $config = $self->_config;
-  
+
   if (@_) {
     my $props;
     if ( ref( $_[0] ) eq 'HASH' ) {
@@ -133,7 +138,7 @@ sub config {
     } else {
       $props = CGI::Application->_cap_hash( {@_} );
     }
-    
+
     # Check for STORE
     if ( defined $props->{STORE} ) {
       croak "authen config error:  parameter STORE is not a string or arrayref"
@@ -151,7 +156,7 @@ sub config {
           if ref $props->{LOGIN_RUNMODE};
       $config->{LOGIN_RUNMODE} = delete $props->{LOGIN_RUNMODE};
     }
-    
+
     # Check for LOGIN_URL
     if ( defined $props->{LOGIN_URL} ) {
       carp "authen config warning:  parameter LOGIN_URL ignored since we already have LOGIN_RUNMODE"
@@ -167,7 +172,7 @@ sub config {
           if ref $props->{ALREADY_LOGIN_RUNMODE};
       $config->{ALREADY_LOGIN_RUNMODE} = delete $props->{ALREADY_LOGIN_RUNMODE};
     }
-    
+
     # Check for ALREADY_LOGIN_URL
     if ( defined $props->{ALREADY_LOGIN_URL} ) {
       carp "authen config warning:  parameter ALREADY_LOGIN_URL ignored since we already have ALREADY_LOGIN_RUNMODE"
@@ -183,7 +188,7 @@ sub config {
           if ref $props->{LOGOUT_RUNMODE};
       $config->{LOGOUT_RUNMODE} = delete $props->{LOGOUT_RUNMODE};
     }
-    
+
     # Check for LOGOUT_URL
     if ( defined $props->{LOGOUT_URL} ) {
       carp "authen config warning:  parameter LOGOUT_URL ignored since we already have LOGOUT_RUNMODE"
@@ -192,7 +197,7 @@ sub config {
           if ref $props->{LOGOUT_URL};
       $config->{LOGOUT_URL} = delete $props->{LOGOUT_URL};
     }
-    
+
     # Check for LOGIN_SESSION_TIMEOUT
     if ( defined $props->{LOGIN_SESSION_TIMEOUT} ) {
       croak "authen config error:  parameter LOGIN_SESSION_TIMEOUT is not a string or a hashref"
@@ -216,7 +221,7 @@ sub config {
         }
         croak "authen config error: Invalid option(s) (" . join( ', ', keys %{$props->{LOGIN_SESSION_TIMEOUT}} ) . ") passed to LOGIN_SESSION_TIMEOUT" if %{$props->{LOGIN_SESSION_TIMEOUT}};
       }
-      
+
       $config->{LOGIN_SESSION_TIMEOUT} = $options;
       delete $props->{LOGIN_SESSION_TIMEOUT};
     }
@@ -283,7 +288,7 @@ sub check_login_runmodes {
 
     $config->{LOGIN_RUNMODES} ||= [];
   }
-  
+
   return @{$config->{LOGIN_RUNMODES}};
 }
 
@@ -301,13 +306,13 @@ sub check_content_type_runmodes {
 
     $config->{CONTENT_TYPE_RUNMODES} ||= [];
   }
-  
+
   return @{$config->{CONTENT_TYPE_RUNMODES}};
 }
 
 
 sub check_rand_runmodes {
-  
+
   my $self   = shift;
   my $config = $self->_config;
 
@@ -320,15 +325,15 @@ sub check_rand_runmodes {
 
     $config->{RAND_RUNMODES} ||= [];
   }
-  
+
   return @{$config->{RAND_RUNMODES}};
 }
 
 sub check_sign_upload_runmodes {
-  
+
   my $self   = shift;
   my $config = $self->_config;
-  
+
   if (@_) {
 
     $config->{SIGN_UPLOAD_RUNMODES} = [];
@@ -338,15 +343,15 @@ sub check_sign_upload_runmodes {
 
     $config->{SIGN_UPLOAD_RUNMODES} ||= [];
   }
-  
+
   return @{$config->{SIGN_UPLOAD_RUNMODES}};
 }
 
 sub check_signature_runmodes {
-    
+
   my $self   = shift;
   my $config = $self->_config;
-  
+
   if (@_) {
 
     $config->{SIGNATURE_RUNMODES} = [];
@@ -374,7 +379,7 @@ sub check_active_login_runmodes {
 
     $config->{ACTIVE_LOGIN_RUNMODES} ||= [];
   }
-  
+
   return @{$config->{ACTIVE_LOGIN_RUNMODES}};
 }
 
@@ -382,7 +387,7 @@ sub ignore_group_assignment_runmodes {
 
   my $self   = shift;
   my $config = $self->_config;
-  
+
   if (@_) {
 
     $config->{IGNORE_GROUP_ASSIGNMENT} = [];
@@ -392,7 +397,7 @@ sub ignore_group_assignment_runmodes {
 
     $config->{IGNORE_GROUP_ASSIGNMENT} ||= [];
   }
-  
+
   return @{$config->{IGNORE_GROUP_ASSIGNMENT}};
 }
 
@@ -400,7 +405,7 @@ sub ignore_ctrl_char_checking_runmodes {
 
   my $self   = shift;
   my $config = $self->_config;
-  
+
   if (@_) {
 
     $config->{IGNORE_CTRL_CHAR_CHECKING} = [];
@@ -410,7 +415,7 @@ sub ignore_ctrl_char_checking_runmodes {
 
     $config->{IGNORE_CTRL_CHAR_CHECKING} ||= [];
   }
-  
+
   return @{$config->{IGNORE_CTRL_CHAR_CHECKING}};
 }
 
@@ -418,7 +423,7 @@ sub count_session_request_runmodes {
 
   my $self   = shift;
   my $config = $self->_config;
-  
+
   if (@_) {
 
     $config->{SESSION_COUNTER_RUNMODES} = [];
@@ -428,7 +433,7 @@ sub count_session_request_runmodes {
 
     $config->{SESSION_COUNTER_RUNMODES} ||= [];
   }
-  
+
   return @{$config->{SESSION_COUNTER_RUNMODES}};
 }
 
@@ -436,7 +441,7 @@ sub check_gadmin_runmodes {
 
   my $self   = shift;
   my $config = $self->_config;
-  
+
   if (@_) {
 
     $config->{CHECK_GADMIN_RUNMODES} = [];
@@ -446,7 +451,7 @@ sub check_gadmin_runmodes {
 
     $config->{CHECK_GADMIN_RUNMODES} ||= [];
   }
-  
+
   return @{$config->{CHECK_GADMIN_RUNMODES}};
 }
 
@@ -508,9 +513,10 @@ sub init_config_parameters {
 }
 
 sub is_login_runmode {
+
   my $self = shift;
   my $runmode = shift;
-  
+
   foreach my $runmode_test ($self->check_login_runmodes) {
     if (overload::StrVal($runmode_test) =~ /^Regexp=/) {
       # We were passed a regular expression
@@ -526,18 +532,19 @@ sub is_login_runmode {
       return 1 if $runmode eq $runmode_test;
     }
   }
-  
+
   # See if the user is using attributes
   my $sub = $self->_cgiapp->can($runmode);
   return 1 if $sub && $RUNMODES{$sub};
-  
+
   return;
 }
 
 sub is_content_type_runmode {
+
   my $self = shift;
   my $runmode = shift;
-  
+
   foreach my $runmode_test ($self->check_content_type_runmodes) {
     if (overload::StrVal($runmode_test) =~ /^Regexp=/) {
       # We were passed a regular expression
@@ -553,21 +560,21 @@ sub is_content_type_runmode {
       return 1 if $runmode eq $runmode_test;
     }
   }
-  
+
   # See if the user is using attributes
   my $sub = $self->_cgiapp->can($runmode);
   return 1 if $sub && $RUNMODES{$sub};
-  
+
   return;
 }
 
 sub is_rand_runmode {
-  
+
   my $self    = shift;
   my $runmode = shift;
-  
+
   foreach my $runmode_test ($self->check_rand_runmodes) {
-    
+
     if (overload::StrVal($runmode_test) =~ /^Regexp=/) {
       # We were passed a regular expression
       return 1 if $runmode =~ $runmode_test;
@@ -582,21 +589,21 @@ sub is_rand_runmode {
       return 1 if $runmode eq $runmode_test;
     }
   }
-  
+
   # See if the user is using attributes
   my $sub = $self->_cgiapp->can($runmode);
   return 1 if $sub && $RUNMODES{$sub};
-  
+
   return;
 }
 
 sub is_sign_upload_runmode {
-  
+
   my $self    = shift;
   my $runmode = shift;
-  
+
   foreach my $runmode_test ($self->check_sign_upload_runmodes) {
-    
+
     if (overload::StrVal($runmode_test) =~ /^Regexp=/) {
       # We were passed a regular expression
       return 1 if $runmode =~ $runmode_test;
@@ -611,7 +618,7 @@ sub is_sign_upload_runmode {
       return 1 if $runmode eq $runmode_test;
     }
   }
-  
+
   # See if the user is using attributes
   my $sub = $self->_cgiapp->can($runmode);
   return 1 if $sub && $RUNMODES{$sub};
@@ -620,12 +627,12 @@ sub is_sign_upload_runmode {
 }
 
 sub is_signature_runmode {
-  
+
   my $self    = shift;
   my $runmode = shift;
-  
+
   foreach my $runmode_test ($self->check_signature_runmodes) {
-    
+
     if (overload::StrVal($runmode_test) =~ /^Regexp=/) {
       # We were passed a regular expression
       return 1 if $runmode =~ $runmode_test;
@@ -640,7 +647,7 @@ sub is_signature_runmode {
       return 1 if $runmode eq $runmode_test;
     }
   }
-  
+
   # See if the user is using attributes
   my $sub = $self->_cgiapp->can($runmode);
   return 1 if $sub && $RUNMODES{$sub};
@@ -652,9 +659,9 @@ sub is_active_login_runmode {
 
   my $self    = shift;
   my $runmode = shift;
-  
+
   foreach my $runmode_test ($self->check_active_login_runmodes) {
-    
+
     if (overload::StrVal($runmode_test) =~ /^Regexp=/) {
       # We were passed a regular expression
       return 1 if $runmode =~ $runmode_test;
@@ -669,7 +676,7 @@ sub is_active_login_runmode {
       return 1 if $runmode eq $runmode_test;
     }
   }
-  
+
   # See if the user is using attributes
   my $sub = $self->_cgiapp->can($runmode);
   return 1 if $sub && $RUNMODES{$sub};
@@ -681,9 +688,9 @@ sub is_ignore_group_assignment_runmode {
 
   my $self    = shift;
   my $runmode = shift;
-  
+
   foreach my $runmode_test ($self->ignore_group_assignment_runmodes) {
-    
+
     if (overload::StrVal($runmode_test) =~ /^Regexp=/) {
       # We were passed a regular expression
       return 1 if $runmode =~ $runmode_test;
@@ -698,7 +705,7 @@ sub is_ignore_group_assignment_runmode {
       return 1 if $runmode eq $runmode_test;
     }
   }
-  
+
   # See if the user is using attributes
   my $sub = $self->_cgiapp->can($runmode);
   return 1 if $sub && $RUNMODES{$sub};
@@ -710,9 +717,9 @@ sub is_ignore_ctrl_char_checking_runmode {
 
   my $self    = shift;
   my $runmode = shift;
-  
+
   foreach my $runmode_test ($self->ignore_ctrl_char_checking_runmodes) {
-    
+
     if (overload::StrVal($runmode_test) =~ /^Regexp=/) {
       # We were passed a regular expression
       return 1 if $runmode =~ $runmode_test;
@@ -727,7 +734,7 @@ sub is_ignore_ctrl_char_checking_runmode {
       return 1 if $runmode eq $runmode_test;
     }
   }
-  
+
   # See if the user is using attributes
   my $sub = $self->_cgiapp->can($runmode);
   return 1 if $sub && $RUNMODES{$sub};
@@ -739,9 +746,9 @@ sub is_session_counter_runmode {
 
   my $self    = shift;
   my $runmode = shift;
-  
+
   foreach my $runmode_test ($self->count_session_request_runmodes) {
-    
+
     if (overload::StrVal($runmode_test) =~ /^Regexp=/) {
       # We were passed a regular expression
       return 1 if $runmode =~ $runmode_test;
@@ -756,7 +763,7 @@ sub is_session_counter_runmode {
       return 1 if $runmode eq $runmode_test;
     }
   }
-  
+
   # See if the user is using attributes
   my $sub = $self->_cgiapp->can($runmode);
   return 1 if $sub && $RUNMODES{$sub};
@@ -768,9 +775,9 @@ sub is_gadmin_runmode {
 
   my $self    = shift;
   my $runmode = shift;
-  
+
   foreach my $runmode_test ($self->check_gadmin_runmodes) {
-    
+
     if (overload::StrVal($runmode_test) =~ /^Regexp=/) {
       # We were passed a regular expression
       return 1 if $runmode =~ $runmode_test;
@@ -785,7 +792,7 @@ sub is_gadmin_runmode {
       return 1 if $runmode eq $runmode_test;
     }
   }
-  
+
   # See if the user is using attributes
   my $sub = $self->_cgiapp->can($runmode);
   return 1 if $sub && $RUNMODES{$sub};
@@ -795,15 +802,16 @@ sub is_gadmin_runmode {
 
 
 sub setup_runmodes {
+
   my $self   = shift;
   my $config = $self->_config;
-  
+
   $self->_cgiapp->run_modes( login_error => \&login_error_runmode )
       unless $config->{LOGIN_RUNMODE} || $config->{LOGIN_URL};
-  
+
   $self->_cgiapp->run_modes( authen_logout => \&logout_runmode )
       unless $config->{LOGOUT_RUNMODE} || $config->{LOGOUT_URL};
-  
+
   $self->_cgiapp->run_modes( do_nothing               => \&do_nothing_runmode );
   $self->_cgiapp->run_modes( rand_error               => \&rand_error_runmode );
   $self->_cgiapp->run_modes( signature_error          => \&signature_error_runmode );
@@ -815,15 +823,16 @@ sub setup_runmodes {
   $self->_cgiapp->run_modes( require_gadmin           => \&require_gadmin_runmode );
   $self->_cgiapp->run_modes( ctrl_char_not_allowed    => \&ctrl_char_not_allowed_runmode );
   $self->_cgiapp->run_modes( content_type_not_allowed => \&content_type_not_allowed_runmode );
-  
+
   return;
 }
 
 sub last_login {
+
   my $self = shift;
   my $new  = shift;
   $self->initialize;
-  
+
   return unless $self->username;
   my $old = $self->store->fetch('last_login');
   $self->store->save('last_login' => $new) if $new;
@@ -831,10 +840,11 @@ sub last_login {
 }
 
 sub last_access {
+
   my $self = shift;
   my $new  = shift;
   $self->initialize;
-  
+
   return unless $self->username;
   my $old = $self->store->fetch('last_access');
   $self->store->save('last_access' => $new) if $new;
@@ -842,58 +852,62 @@ sub last_access {
 }
 
 sub is_login_timeout {
+
   my $self = shift;
   $self->initialize;
-  
+
   return $self->{is_login_timeout} ? 1 : 0;
 }
 
 sub is_authenticated {
+
   my $self = shift;
   $self->initialize;
-  
+
   return $self->username ? 1 : 0;
 }
 
 sub login_attempts {
+
   my $self = shift;
   $self->initialize;
-  
+
   my $la = $self->store->fetch('login_attempts');
   return $la;
 }
 
 sub remember_me {
-  
+
   my $self = shift;
   $self->initialize;
-  
+
   my $rememberme = $self->store->fetch('remember_me');
-  
+
   if ( $self->_verify_session_checksum ) {
-    
+
     return $rememberme;
   }
   else {
-    
+
     return '';
   }
 }
 
 sub username {
+
   my $self = shift;
   $self->initialize;
-  
+
   my $u = $self->store->fetch('username');
 
   #$self->logger->debug("Retrieving the username");
 
   if ( $self->_verify_session_checksum ) {
-    
+
     return $u;
   }
   else {
-    
+
     return '';
   }
 }
@@ -902,15 +916,15 @@ sub group_id {
 
   my $self = shift;
   $self->initialize;
-  
+
   my $g = $self->store->fetch('group_id');
-  
+
   if ( $self->_verify_session_checksum ) {
-    
+
     return $g;
   }
   else {
-    
+
     return '';
   }
 }
@@ -919,11 +933,11 @@ sub gadmin_status {
 
   my $self = shift;
   $self->initialize;
-  
+
   my $gadmin = $self->store->fetch('gadmin_status');
-  
+
   if ( $self->_verify_session_checksum ) {
-    
+
     if ($gadmin eq '1') {
 
       return '1';
@@ -934,7 +948,7 @@ sub gadmin_status {
     }
   }
   else {
-    
+
     return '';
   }
 }
@@ -943,15 +957,15 @@ sub user_id {
 
   my $self = shift;
   $self->initialize;
-  
+
   my $uid = $self->store->fetch('user_id');
-  
+
   if ( $self->_verify_session_checksum ) {
-    
+
     return $uid;
   }
   else {
-    
+
     return '';
   }
 }
@@ -960,9 +974,9 @@ sub groupname {
 
   my $self = shift;
   $self->initialize;
-  
+
   my $gname = $self->store->fetch('GROUPNAME');
-  
+
   return $gname;
 }
 
@@ -981,18 +995,18 @@ sub is_no_group {
 }
 
 sub write_token {
-  
+
   my $self = shift;
   $self->initialize;
-  
+
   my $wt = $self->store->fetch('write_token');
-  
+
   if ( $self->_verify_session_checksum ) {
-    
+
     return $wt;
   }
   else {
-    
+
     return '';
   }
 }
@@ -1024,10 +1038,10 @@ sub logout {
 sub store {
 
   my $self = shift;
-  
+
   if ( !$self->{store} ) {
     my $config = $self->_config;
-    
+
     # Fetch the configuration parameters for the store
     my ($store_module, @store_config);
     ($store_module, @store_config) = @{ $config->{STORE} } if $config->{STORE} && ref $config->{STORE} eq 'ARRAY';
@@ -1041,18 +1055,18 @@ sub store {
         ($store_module, @store_config) = ( 'Cookie' );
       }
     }
-    
+
     # Load the the class for this store
     my $store_class = _find_deligate_class(
       'KDDArT::DAL::' . $store_module,
       $store_module
         ) || die "Store $store_module can not be found";
-    
+
     # Create the store object
     $self->{store} = $store_class->new( $self, @store_config )
         || die "Could not create new $store_class object";
   }
-  
+
   return $self->{store};
 }
 
@@ -1060,56 +1074,56 @@ sub initialize {
 
   my $self = shift;
   return 1 if $self->{initialized};
-  
+
   # It would seem to make more sense to do this at the /end/ of the routine
   # but that causes an infinite loop. 
   $self->{initialized} = 1;
-  
+
   my $config = $self->_config;
-  
+
   # Check the user name last of all because only this check might create a session behind the scenes.
   # In other words if a website works perfectly well without authentication,
   # then adding a protected run mode should not add session to the unprotected modes.
   # See 60_parsimony.t for the test.
   if ($config->{LOGIN_SESSION_TIMEOUT} && $self->username) {
-    
+
     $self->logger->debug("Session time out plus username");
     # This is not a fresh login, and there are time out rules, so make sure the login is still valid
     if ( $config->{LOGIN_SESSION_TIMEOUT}->{IDLE_FOR} && 
          ($self->remember_me ne 'YES') &&
          time() - $self->last_access >= $config->{LOGIN_SESSION_TIMEOUT}->{IDLE_FOR} ) {
-      
+
       # this login has been idle for too long
       $self->logger->debug("Idle for too long");
       $self->{is_login_timeout} = 1;
       $self->logout;
-      
+
     } elsif ( $config->{LOGIN_SESSION_TIMEOUT}->{EVERY} && 
               ($self->remember_me ne 'YES') &&
               time() - $self->last_login >=  $config->{LOGIN_SESSION_TIMEOUT}->{EVERY} ) {
-      
+
       # it has been too long since the last login
       $self->logger->debug("Has been too long since the last login");
       $self->{is_login_timeout} = 1;
       $self->logout;
-      
+
     } elsif ( $config->{LOGIN_SESSION_TIMEOUT}->{CUSTOM} && 
               ($self->remember_me ne 'YES') &&
               $config->{LOGIN_SESSION_TIMEOUT}->{CUSTOM}->($self) ) {
-      
+
       # this login has timed out
       $self->logger->debug("This login has timed out");
       $self->{is_login_timeout} = 1;
       $self->logout;
-      
+
     }
   }
   else {
-    
+
     Log::Log4perl::MDC->put('client_ip', $ENV{'REMOTE_ADDR'});
     $self->logger->debug("Just session time out, no username");
   }
-  
+
   return 1;
 }
 
@@ -1118,11 +1132,11 @@ sub new {
   my $class  = shift;
   my $cgiapp = shift;
   my $self   = {};
-  
+
   bless $self, $class;
   $self->{cgiapp} = $cgiapp;
   Scalar::Util::weaken($self->{cgiapp}); # weaken circular reference
-  
+
   Log::Log4perl::MDC->put('client_ip', $ENV{'REMOTE_ADDR'});
   my $logger = get_logger();
   $logger->level($DEBUG);
@@ -1159,7 +1173,7 @@ sub instance {
   my $cgiapp = shift;
   die "KDDArT::DAL::Security->instance must be called with a CGI::Application object"
       unless defined $cgiapp && UNIVERSAL::isa( $cgiapp, 'CGI::Application' );
-  
+
   $cgiapp->{__CAP_AUTHENTICATION_INSTANCE} = $class->new($cgiapp) unless defined $cgiapp->{__CAP_AUTHENTICATION_INSTANCE};
   return $cgiapp->{__CAP_AUTHENTICATION_INSTANCE};
 }
@@ -1168,14 +1182,21 @@ sub prerun_callback {
 
   my $self   = shift;
   my $authen = $self->authen;
-  
+
   $authen->initialize;
 
-  #$authen->logger->debug("Prerun callback");
-  
+  $authen->logger->debug("Prerun callback");
+
+  my $rm_start_time = gettimeofday();
+
+  $authen->store->save('rm_start_time' => $rm_start_time);
+
+  $authen->logger->debug("Base dir: " . $main::kddart_base_dir);
+  $authen->logger->debug("Apache Document Root: " . $ENV{DOCUMENT_ROOT});
+
   # setup the default login and logout runmodes
   $authen->setup_runmodes;
-  
+
   my $current_runmode = $self->get_current_runmode;
   my $query           = $self->query();
   my $config          = $authen->_config;
@@ -1215,7 +1236,7 @@ sub prerun_callback {
 
       $authen->logger->debug("After check_counter");
       $authen->update_counter($self->session, 'DEFER_COUNTER', $total_delay);
-      
+
       # This is a condition when the number of requests is double of what is allowed.
       # In this case, don't need to check much, just go to the error message.
       # This is to ensure that minimum computation is consumed.
@@ -1235,7 +1256,7 @@ sub prerun_callback {
         if ( !$authen->should_rand_be_done($self->session, $rand) ) {
 
           $authen->update_rand($self->session, $rand, $total_delay);
-          
+
           $authen->logger->debug("$rand is in the deferred mode");
           # this random number has not waited long enough
           # waiting message 
@@ -1256,7 +1277,7 @@ sub prerun_callback {
     my $now = time;
     $authen->last_access($now);
   }
-  
+
   if ($authen->is_login_runmode($current_runmode)) {
 
     # This runmode requires authentication and group selection
@@ -1281,7 +1302,7 @@ sub prerun_callback {
       if ( $authen->is_no_group ) {
 
         #$self->logger->debug("Haven't chosen a group yet!");
-        
+
         if ( !$authen->is_ignore_group_assignment_runmode($current_runmode) ) {
 
           return $authen->redirect_to_group_assignment;
@@ -1308,12 +1329,12 @@ sub prerun_callback {
       return $authen->redirect_to_gadmin_error;
     }
   }
-  
+
   if ($authen->is_rand_runmode($current_runmode)) {
-   
+
     $authen->logger->debug("Check $rand for completion");
     if ( $authen->is_rand_done($self->session, $rand) ) {
-      
+
       return $authen->redirect_to_rand_error;
     }
     else {
@@ -1323,7 +1344,7 @@ sub prerun_callback {
   }
 
   if ($authen->is_sign_upload_runmode($current_runmode)) {
-    
+
     my $success = $authen->check_sign_upload($query, $current_runmode);
     if (!$success) {
 
@@ -1336,7 +1357,7 @@ sub prerun_callback {
   }
 
   if ($authen->is_signature_runmode($current_runmode)) {
-    
+
     my $success = $authen->check_signature($query, $current_runmode);
     if (!$success) {
 
@@ -1354,7 +1375,7 @@ sub redirect_to_login {
   my $self = shift;
   my $cgiapp = $self->_cgiapp;
   my $config = $self->_config;
-  
+
   if ($config->{LOGIN_RUNMODE}) {
     $cgiapp->prerun_mode($config->{LOGIN_RUNMODE});
   } elsif (length($config->{LOGIN_URL}) > 0) {
@@ -1424,7 +1445,7 @@ sub redirect_to_gadmin_error {
 
   my $self   = shift;
   my $cgiapp = $self->_cgiapp;
-  
+
   $cgiapp->prerun_mode('require_gadmin');
 }
 
@@ -1432,7 +1453,7 @@ sub redirect_to_ctrl_char_error {
 
   my $self   = shift;
   my $cgiapp = $self->_cgiapp;
-  
+
   $cgiapp->prerun_mode('ctrl_char_not_allowed');
 }
 
@@ -1441,21 +1462,21 @@ sub redirect_to_already_login {
   my $self   = shift;
   my $cgiapp = $self->_cgiapp;
   my $config = $self->_config;
-  
+
   #if ($config->{ALREADY_LOGIN_RUNMODE}) {
 
   #  $self->logger->debug("ALREADY_LOGIN_RUNMODE");
   #  $cgiapp->prerun_mode($config->{ALREADY_LOGIN_RUNMODE});
   #}
   #elsif ($config->{ALREADY_LOGIN_URL}) {
-    
+
   #  $self->logger->debug("ALREADY_LOGIN_URL");
   #  $cgiapp->header_add(-location => $config->{ALREADY_LOGIN_URL});
   #  $cgiapp->header_type('redirect');
   #  $cgiapp->prerun_mode('do_nothing');
   #}
   #else {
-    
+
     $self->logger->debug("Nothing defined");
     $cgiapp->prerun_mode('already_login');
   #}
@@ -1465,7 +1486,7 @@ sub redirect_to_over_session_quota {
 
   my $self   = shift;
   my $cgiapp = $self->_cgiapp;
-  
+
   $cgiapp->prerun_mode('over_session_quota');
 }
 
@@ -1827,11 +1848,11 @@ sub _time_to_seconds {
 sub _verify_session_checksum {
 
   my $self = shift;
-  
+
   my $username        = $self->store->fetch('username');
-  
+
   if ( !$username ) { return 0; }
-  
+
   my $session_id      = $self->_cgiapp->session->id();
   my $rememberme      = $self->store->fetch('remember_me');
   my $write_token     = $self->store->fetch('write_token');
@@ -1840,11 +1861,11 @@ sub _verify_session_checksum {
   my $gadmin_status   = $self->store->fetch('gadmin_status');
 
   my $env_cookie      = $ENV{'HTTP_COOKIE'};
-  
+
   my $cookie_key = read_cookie($env_cookie, 'KDDArT_RANDOM_NUMBER');
-  
+
   my $stored_checksum = $self->store->fetch('checksum');
-  
+
   my $hash_data = "$username";
   $hash_data   .= "$session_id";
   $hash_data   .= "$rememberme";
@@ -1852,9 +1873,9 @@ sub _verify_session_checksum {
   $hash_data   .= "$group_id";
   $hash_data   .= "$user_id";
   $hash_data   .= "$gadmin_status";
-  
+
   my $derived_checksum = hmac_sha1_hex($hash_data, $cookie_key);
-  
+
   if ( $derived_checksum eq $stored_checksum ) {
 
     #$self->logger->debug("Stored checksum: $stored_checksum, Derived checksum: $derived_checksum");
@@ -1880,7 +1901,7 @@ sub recalculate_session_checksum {
   my $group_id        = $self->store->fetch('group_id');
   my $user_id         = $self->store->fetch('user_id');
   my $gadmin_status   = $self->store->fetch('gadmin_status');
-  
+
   my $cookie_key = read_cookie($ENV{'HTTP_COOKIE'}, 'KDDArT_RANDOM_NUMBER');
 
   my $hash_data = "$username";
@@ -1913,7 +1934,7 @@ sub contain_ctrl_char {
     # Horizontal tab: \x09, Line feed: \x0a and Carriage return: \x0d are excluded in the regular expression.
 
     if ($para_val =~ /[\x00-\x08]|\x0b|\x0c|[\x0e-\x1f]|\x7f/) {
-      
+
       $self->logger->debug("$para_name value($para_val): containing a control character.");
       $ctrl_char_found = 1;
       last;
@@ -1948,34 +1969,34 @@ sub check_sign_upload {
   my $upload_file = $query->param('uploadfile');
 
   if (!$upload_file && $query->cgi_error()) {
-    
+
     return $self->redirect_to_upload_2large_error;
   }
-  
+
   my $rand = makerandom(Size => 32, Strength => 0);
   my $cur_dt = DateTime->now( time_zone => $TIMEZONE );
   my $saved_upload_fn = "${TMP_DATA_PATH}" . "${current_runmode}-" . "$cur_dt-${rand}";
-  
+
   $self->store->save( "${current_runmode}_upload" => $saved_upload_fn );
-  
+
   my $saved_upload_fhandle;
   open($saved_upload_fhandle, ">$saved_upload_fn") or 
       die "Cannot save upload file to $saved_upload_fn: $!";
-  
+
   while (my $line = <$upload_file>) {
-    
+
     print $saved_upload_fhandle $line;
   }
   close($saved_upload_fhandle);
-  
+
   open($saved_upload_fhandle, "$saved_upload_fn");
   binmode($saved_upload_fhandle);
-  
+
   my $upfile_checksum = Digest::MD5->new->addfile(*$saved_upload_fhandle)->hexdigest();
   close($saved_upload_fhandle);
 
   $self->logger->debug("Upload file MD5: $upfile_checksum");
-  
+
   $self->logger->debug("[$current_runmode] Upload file checksum: $upfile_checksum");
 
   if ( $current_runmode ne 'add_multimedia') {
@@ -1994,17 +2015,17 @@ sub check_sign_upload {
       $self->logger->debug("DOS to UNIX: successful");
     }
   }
-  
+
   my $rand_num       = $query->param('rand_num');
   my $user_signature = $query->param('signature');
   my $signed_url     = $query->param('url');
   my $atomic_order   = $query->param('param_order');
-  
+
   my $atomic_data = '';
-  
+
   my @fields = split(/,/, $atomic_order);
   foreach my $field (@fields) {
-    
+
     my $field_data = $query->param($field);
     if (length($field_data) == 0) {
 
@@ -2016,7 +2037,7 @@ sub check_sign_upload {
     }
     $atomic_data .= "$field_data";
   }
-  
+
   my $data2sign = '';
   $data2sign   .= "$signed_url";
   $data2sign   .= "$rand_num";
@@ -2024,17 +2045,17 @@ sub check_sign_upload {
   $data2sign   .= "$upfile_checksum";
 
   $self->logger->debug("data2sign: $data2sign");
-  
+
   my $key = $self->write_token();
   my $cal_signature = hmac_sha1_hex($data2sign, $key);
-  
+
   if ($user_signature ne $cal_signature) {
-    
+
     $self->logger->debug("Signature verification failed: $user_signature | $cal_signature");
     return 0;
   }
   else {
-    
+
     return 1;
   }
 }
@@ -2049,12 +2070,12 @@ sub check_signature {
   my $user_signature = $query->param('signature');
   my $signed_url     = $query->param('url');
   my $atomic_order   = $query->param('param_order');
-  
+
   my $atomic_data = '';
-  
+
   my @fields = split(/,/, $atomic_order);
   foreach my $field (@fields) {
-    
+
     my $field_data = $query->param($field);
     if (length($field_data) == 0) {
 
@@ -2066,22 +2087,22 @@ sub check_signature {
     }
     $atomic_data .= "$field_data";
   }
-  
+
   my $data2sign = '';
   $data2sign   .= "$signed_url";
   $data2sign   .= "$rand_num";
   $data2sign   .= "$atomic_data";
-  
+
   my $key = $self->write_token();
   my $cal_signature = hmac_sha1_hex($data2sign, $key);
-  
+
   if ($user_signature ne $cal_signature) {
-    
+
     $self->logger->debug("Signature verification failed: $user_signature | $cal_signature");
     return 0;
   }
   else {
-    
+
     $self->logger->debug("Signature passed: $user_signature | $cal_signature");
     return 1;
   }
@@ -2163,7 +2184,7 @@ sub is_rand_done {
   my $rand            = $_[2];
 
   my $rand_delay = $storage->param($rand);
- 
+
   if ( !(defined $rand_delay)  ) {
 
     return 0;
@@ -2346,8 +2367,9 @@ sub list_all_group {
 
   my $dbh = connect_kdb_read();
 
-  my $sql = 'SELECT SystemGroupId, SystemGroupName ';
-  $sql   .= 'FROM systemgroup';
+  my $sql = 'SELECT SystemGroupId, SystemGroupName, SystemGroupDescription ';
+  $sql   .= 'FROM systemgroup ';
+  $sql   .= 'ORDER BY SystemGroupId DESC';
 
   #$self->logger->debug("SQL: $sql");
 
@@ -2395,6 +2417,23 @@ sub get_upload_file {
   my $saved_xml_fn = $self->store->fetch("${current_runmode}_upload");
 
   return $saved_xml_fn;
+}
+
+sub get_current_runmode {
+
+  my $self = shift;
+
+  my $current_runmode = $self->_cgiapp->get_current_runmode();
+  return $current_runmode;
+}
+
+sub get_rm_start_time {
+
+  my $self = shift;
+
+  my $rm_start_time = $self->store->fetch("rm_start_time") + 0; # convert string into number;
+
+  return $rm_start_time;
 }
 
 sub get_session_expiry {

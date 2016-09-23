@@ -11,5 +11,5 @@
   <Parent CaseFile="xml/add_data_no_vcol/case_00114_add_specimen1.xml" Order="4" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00485_add_trial_dimension.xml" Force="1" Order="5" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00489_add_trial_dimension_x.xml" Force="1" Order="6" />
-  <RunInfo Success="1" Time="1439452139" />
+  
 </TestCase>

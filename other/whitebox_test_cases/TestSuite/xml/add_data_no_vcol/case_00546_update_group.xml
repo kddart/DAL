@@ -1,0 +1,12 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Update Group" TargetURL="update/group/:GroupId" Type="BLOCKING" />
+  <INPUT ParaName="GroupId" SrcValue="xml/add_data_no_vcol/case_00547_add_group.xml" />
+  <INPUT ParaName="SystemGroupName" PrefixVal="UpdateGroup_" Random="1" />
+  <INPUT ParaName="SystemGroupDescription" Value="Update group from testing framework" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00547_add_group.xml" Order="3" />
+  <RunInfo Success="1" Time="1474007415" />
+</TestCase>

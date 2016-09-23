@@ -1,24 +1,14 @@
-#$Id: Environment.pm 1030 2015-10-22 02:05:45Z puthick $
-#$Author: puthick $
+#$Id$
+#$Author$
 
-# Copyright (c) 2015, Diversity Arrays Technology, All rights reserved.
-
-# COPYRIGHT AND LICENSE
-# 
-# Copyright (C) 2014 by Diversity Arrays Technology Pty Ltd
-# 
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-# 
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
+# Copyright (c) 2011, Diversity Arrays Technology, All rights reserved.
 
 # Author    : Puthick Hok
-# Version   : 2.3.0 build 1040
+# Created   : 02/06/2010
+# Modified  :
+# Purpose   : 
+#          
+#          
 
 package KDDArT::DAL::Environment;
 
@@ -30,9 +20,9 @@ BEGIN {
 
   my ($volume, $current_dir, $file) = File::Spec->splitpath(__FILE__);
 
-  $main::kddart_base_dir = "${current_dir}../../..";
+  my @current_dir_part = split('/perl-lib/KDDArT/DAL/', $current_dir);
+  $main::kddart_base_dir = $current_dir_part[0];
 }
-
 
 use lib "$main::kddart_base_dir/perl-lib";
 
@@ -1793,7 +1783,11 @@ sub log_environment_data_bulk_runmode {
             $too_long_err_msg   .= "($dev_id, $para_name, $param_val, $env_dt) ";
             $too_long_err_msg   .= "contains parameter value ($param_val) longer than the ";
             $too_long_err_msg   .= "column size definition of layer attribute ($attr_id) on layer ($layer_id).";
-            return $self->error_message($too_long_err_msg);
+
+            $data_for_postrun_href->{'Error'} = 1;
+            $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $too_long_err_msg}]};
+
+            return $data_for_postrun_href;
           }
 
           #$self->logger->debug("Param val: $param_val, validation: $attr_validation");

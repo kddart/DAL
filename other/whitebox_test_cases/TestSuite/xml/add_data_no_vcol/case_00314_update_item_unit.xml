@@ -2,7 +2,7 @@
   <CaseInfo CustomMethod="add_record" Description="Update Unit" TargetURL="update/generalunit/:UnitId" Type="BLOCKING" />
   <INPUT ParaName="UnitId" SrcValue="xml/add_data_no_vcol/case_00225_add_item_unit.xml" />
   <INPUT ParaName="UnitTypeId" SrcValue="xml/add_data_no_vcol/case_00398_add_unit_type.xml" />
-  <INPUT ParaName="UnitName" PrefixVal="U_" Random="1" />
+  <INPUT ParaName="UnitName" PrefixVal="UPDATE_" Random="1" Size="12" />
   <INPUT ParaName="UseByItem" Value="0" />
   <INPUT ParaName="UseByTrait" Value="0" />
   <INPUT ParaName="UseByTrialEvent" Value="0" />
@@ -13,5 +13,5 @@
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00225_add_item_unit.xml" Order="3" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00398_add_unit_type.xml" Order="4" />
-  <RunInfo Success="1" Time="1443160502" />
+  <RunInfo Success="1" Time="1474006908" />
 </TestCase>

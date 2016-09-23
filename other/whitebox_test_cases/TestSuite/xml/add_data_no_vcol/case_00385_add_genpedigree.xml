@@ -1,5 +1,5 @@
 <TestCase>
-  <CaseInfo CustomMethod="add_record" Description="Add Gen Pedigree" TargetURL="add/genpedigree" Type="BLOCKING" />
+  <CaseInfo CustomMethod="add_record" Description="Add Gen Pedigree" OutputFormat="JSON" TargetURL="add/genpedigree" Type="BLOCKING" />
   <Delete TargetURL="delete/genpedigree/:GenPedigreeId" />
   <INPUT ParaName="GenotypeId" SrcValue="xml/add_data_no_vcol/case_00386_add_geno_4_genpedigree.xml" />
   <INPUT ParaName="ParentGenotypeId" SrcValue="xml/add_data_no_vcol/case_00387_add_geno_4_genpedigree.xml" />
@@ -12,6 +12,6 @@
   <Parent CaseFile="xml/add_data_no_vcol/case_00386_add_geno_4_genpedigree.xml" Force="1" Order="3" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00387_add_geno_4_genpedigree.xml" Force="1" Order="4" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00384_add_genparent_type.xml" Order="5" />
-  <ReturnId ParaName="GenPedigreeId" Value="1" />
-  <RunInfo Success="1" Time="1443160950" />
+  <ReturnId ParaName="GenPedigreeId" Value="15" />
+  <RunInfo Success="1" Time="1474007383" />
 </TestCase>

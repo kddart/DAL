@@ -12,5 +12,5 @@
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00481_add_breedingmethod_type.xml" Order="3" />
   <ReturnId ParaName="BreedingMethodId" Value="21" />
-  <RunInfo Success="1" Time="1444952694" />
+  <RunInfo Success="1" Time="1474353382" />
 </TestCase>

@@ -22,6 +22,6 @@
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00397_add_item_unit4add_trait.xml" Order="3" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00424_add_traitgroup_type.xml" Order="4" />
-  <ReturnId ParaName="TraitId" Value="53" />
-  <RunInfo Success="1" Time="1443571293" />
+  <ReturnId ParaName="TraitId" Value="31" />
+  <RunInfo Success="1" Time="1474006804" />
 </TestCase>

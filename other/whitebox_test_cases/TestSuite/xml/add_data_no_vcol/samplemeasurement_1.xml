@@ -14,5 +14,6 @@
 <MeasurementDateTime Value="2011-01-15 14:28:37" />
 <InstanceNumber Value="6" />
 <TraitValue Value="40" />
+<TrialUnitSpecimenId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/case_00525_get_trial_unit_spec_id.xml" />
 </ROW>
 </DATA>

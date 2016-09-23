@@ -1,5 +1,5 @@
 <TestCase>
-  <CaseInfo CustomMethod="add_record_upload" Description="Import Marker Data" TargetURL="analysisgroup/:AnalysisGroupId/import/markerdata/dart" Type="BLOCKING" />
+  <CaseInfo CustomMethod="add_record_upload" Description="Import Marker Data" TargetURL="analysisgroup/:AnalysisGroupId/import/markerdata/csv" Type="BLOCKING" />
   <INPUT ParaName="AnalysisGroupId" SrcValue="xml/add_data_no_vcol/case_00478_add_analysisgroup_10k_col.xml" />
   <INPUT ParaName="DataSetType" SrcValue="xml/add_data_no_vcol/case_00473_add_datasettype.xml" />
   <INPUT ParaName="Forced" Value="1" />
@@ -10,7 +10,7 @@
   <INPUT ParaName="MarkerMetaColEnd" Value="12" />
   <INPUT ParaName="MarkerDataColStart" Value="14" />
   <INPUT ParaName="MarkerDataColEnd" Value="10253" />
-  <INPUT DirectReplacement="1" HeaderRow="1" ParaName="uploadfile" SrcFile="xml/add_data_no_vcol/marker_10k_plus_col_combined.csv" />
+  <INPUT DirectReplacement="1" HeaderRow="1" ParaName="uploadfile" SrcFile="xml/add_data_no_vcol/marker_10k_plus_col_combined_a.csv" />
   <INPUT ParaName="ExtractId1" SrcValue="xml/add_data_no_vcol/extract_tcase/case_00302_add_extract1.xml" />
   <INPUT ParaName="ExtractId2" SrcValue="xml/add_data_no_vcol/extract_tcase/case_00302_add_extract2.xml" />
   <INPUT ParaName="ExtractId3" SrcValue="xml/add_data_no_vcol/extract_tcase/case_00302_add_extract3.xml" />
@@ -20497,6 +20497,6 @@
   <Parent CaseFile="xml/add_data_no_vcol/extract_tcase/case_00302_add_extract10239.xml" Order="10242" />
   <Parent CaseFile="xml/add_data_no_vcol/extract_tcase/case_00302_add_extract10240.xml" Order="10243" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00473_add_datasettype.xml" Order="10244" />
-  <ReturnId ParaName="DataSetId" Value="30" />
-  <RunInfo Success="1" Time="1435123008" />
+  
+  
 </TestCase>

@@ -7,7 +7,6 @@
   <INPUT ParaName="StorageId" SrcValue="xml/add_data_no_vcol/case_00222_add_storage.xml" />
   <INPUT ParaName="SpecimenId" SrcValue="xml/add_data_no_vcol/case_00114_add_specimen1.xml" />
   <INPUT ParaName="ItemTypeId" SrcValue="xml/add_data_no_vcol/case_00308_add_item_type.xml" />
-  <INPUT ParaName="ItemBarcode" PrefixVal="ITM_BARCODE" Random="1" />
   <INPUT ParaName="UnitId" SrcValue="xml/add_data_no_vcol/case_00225_add_item_unit.xml" />
   <INPUT ParaName="ItemStateId" SrcValue="xml/add_data_no_vcol/case_00309_add_item_state.xml" />
   <INPUT ParaName="uploadfile" Process="1" SrcFile="xml/add_data_no_vcol/itemgroup_1.xml" />
@@ -22,5 +21,6 @@
   <Parent CaseFile="xml/add_data_no_vcol/case_00308_add_item_type.xml" Order="7" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00225_add_item_unit.xml" Order="8" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00309_add_item_state.xml" Order="9" />
-  <RunInfo Success="1" Time="1443160960" />
+  <ReturnId FileFormat="xml" IdFile="./import_itemgroup_xml_gadmin_return_id_232.xml" />
+  <RunInfo Success="1" Time="1474007400" />
 </TestCase>

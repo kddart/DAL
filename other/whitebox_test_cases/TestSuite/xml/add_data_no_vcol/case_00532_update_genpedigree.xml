@@ -1,0 +1,17 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Update GenPedigree" TargetURL="update/genpedigree/:GenPedigreeId" Type="BLOCKING" />
+  <Delete TargetURL="delete/genpedigree/:GenPedigreeId" />
+  <INPUT ParaName="GenPedigreeId" SrcValue="xml/add_data_no_vcol/case_00385_add_genpedigree.xml" />
+  <INPUT ParaName="GenotypeId" SrcValue="xml/add_data_no_vcol/case_00361_add_geno3.xml" />
+  <INPUT ParaName="ParentGenotypeId" SrcValue="xml/add_data_no_vcol/case_00362_add_geno4.xml" />
+  <INPUT ParaName="GenParentType" SrcValue="xml/add_data_no_vcol/case_00384_add_genparent_type.xml" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Force="1" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00385_add_genpedigree.xml" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00361_add_geno3.xml" Order="4" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00362_add_geno4.xml" Order="5" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00384_add_genparent_type.xml" Force="1" Order="6" />
+  
+</TestCase>

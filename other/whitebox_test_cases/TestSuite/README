@@ -1,0 +1,10 @@
+# This directory contains all the test cases for DAL.
+
+To run the test cases, please follow the instructions below:
+
+1. Compile (check) Utils.pm, kddart_dal_remove_test_record.pl, and kddart_dal_test.pl by running perl -c against these scripts.
+
+2. Edit the first line in dal_base_url.conf to reflect the target DAL base URL that you want to test.
+
+3. From this directory, run 'perl -w kddart_dal_test.pl 2 xml/add_data_no_vcol/test_order_all.txt'. This command will run all the test cases defined in test_order_all.txt. To run just one test case, please use 'perl -w kddart_dal_test.pl 1 <relative path for the test case>'.
+

@@ -26,7 +26,7 @@ Basic Requirements
 
    * CentOS 7
 
-   * Software package selection: Complete Node !VERY IMPORTANT
+   * Software package selection: Compute Node (VERY IMPORTANT)
 
 Step-by-step Instructions
 -------------------------
@@ -35,7 +35,7 @@ The following instructions will deploy DAL for testing:
 
 1. Install CentOS 7 on the target machine:
 
-   * Compete Node software selection. Choosing other option may result in a failure for DAL deployment.
+   * Compute Node software selection. Choosing other option may result in a failure for DAL deployment.
    * Turn on network
 
    * Specify the root password.

@@ -13,6 +13,6 @@
   <Parent CaseFile="xml/add_data_no_vcol/case_00219_add_spec4pedigree_2.xml" Order="4" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00393_add_spec_4_pedigree.xml" Order="3" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00343_add_parent_type.xml" Order="5" />
-  <ReturnId ParaName="PedigreeId" Value="1" />
-  <RunInfo Success="1" Time="1443160957" />
+  <ReturnId ParaName="PedigreeId" Value="4" />
+  <RunInfo Success="1" Time="1474007387" />
 </TestCase>

@@ -1,24 +1,14 @@
-#$Id: Extract.pm 1035 2015-11-02 04:37:51Z puthick $
-#$Author: puthick $
+#$Id$
+#$Author$
 
-# Copyright (c) 2015, Diversity Arrays Technology, All rights reserved.
-
-# COPYRIGHT AND LICENSE
-# 
-# Copyright (C) 2014 by Diversity Arrays Technology Pty Ltd
-# 
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-# 
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
+# Copyright (c) 2011, Diversity Arrays Technology, All rights reserved.
 
 # Author    : Puthick Hok
-# Version   : 2.3.0 build 1040
+# Created   : 02/09/2013
+# Modified  :
+# Purpose   : 
+#          
+#          
 
 package KDDArT::DAL::Extract;
 
@@ -30,7 +20,8 @@ BEGIN {
 
   my ($volume, $current_dir, $file) = File::Spec->splitpath(__FILE__);
 
-  $main::kddart_base_dir = "${current_dir}../../..";
+  my @current_dir_part = split('/perl-lib/KDDArT/DAL/', $current_dir);
+  $main::kddart_base_dir = $current_dir_part[0];
 }
 
 use lib "$main::kddart_base_dir/perl-lib";
@@ -43,6 +34,7 @@ use CGI::Application::Plugin::Session;
 use Log::Log4perl qw(get_logger :levels);
 use XML::Checker::Parser;
 use Time::HiRes qw( tv_interval gettimeofday );
+use Crypt::Random qw( makerandom );
 
 sub setup {
 
@@ -61,6 +53,7 @@ sub setup {
                                            'del_extract_gadmin',
                                            'add_analysisgroup',
                                            'add_plate_n_extract_gadmin',
+                                           'import_plate_n_extract_gadmin',
       );
   __PACKAGE__->authen->count_session_request_runmodes(':all');
 
@@ -78,11 +71,13 @@ sub setup {
                                              'del_extract_gadmin',
                                              'add_plate_n_extract_gadmin',
                                              'add_plate_gadmin',
+                                             'import_plate_n_extract_gadmin',
 
       );
   __PACKAGE__->authen->check_sign_upload_runmodes('add_analysisgroup',
                                                   'add_plate_n_extract_gadmin',
                                                   'add_plate_gadmin',
+                                                  'import_plate_n_extract_gadmin',
       );
 
   $self->run_modes(
@@ -91,7 +86,7 @@ sub setup {
     'update_plate_gadmin'           => 'update_plate_runmode',
     'del_plate_gadmin'              => 'del_plate_runmode',
     'get_plate'                     => 'get_plate_runmode',
-    'list_extract'                  => 'list_extract_runmode',
+    'list_extract_advanced'         => 'list_extract_advanced_runmode',
     'add_extract_gadmin'            => 'add_extract_runmode',
     'del_extract_gadmin'            => 'del_extract_runmode',
     'update_extract_gadmin'         => 'update_extract_runmode',
@@ -101,6 +96,7 @@ sub setup {
     'get_analysisgroup'             => 'get_analysisgroup_runmode',
     'add_plate_n_extract_gadmin'    => 'add_plate_n_extract_runmode',
     'list_dataset'                  => 'list_dataset_runmode',
+    'import_plate_n_extract_gadmin' => 'import_plate_n_extract_runmode',
       );
 
   my $logger = get_logger();
@@ -377,7 +373,11 @@ sub list_plate_advanced_runmode {
   $dbh_k->disconnect();
   $dbh_m->disconnect();
 
-  $sql  =~ s/GROUP BY/ $filtering_exp GROUP BY /;
+  $sql .= " $filtering_exp ";
+
+  # Disable virtual column
+
+  #$sql  =~ s/GROUP BY/ $filtering_exp GROUP BY /;
 
   my ($sort_err, $sort_msg, $sort_sql) = parse_sorting($sorting, $final_field_list, '"plate"');
 
@@ -455,16 +455,19 @@ sub list_plate {
   my $group_id = $self->authen->group_id();
   my $gadmin_status = $self->authen->gadmin_status();
 
-  my $plate_id_aref = [];
-  my $user_id_href  = {};
+  my $plate_id_aref        = [];
+  my $user_id_href         = {};
+  my $plate_type_id_href   = {};
+  my $plate_status_href    = {};
 
   my $chk_id_err        = 0;
   my $chk_id_msg        = '';
   my $used_id_href      = {};
   my $not_used_id_href  = {};
 
-  my $user_lookup       = {};
-  my $extract_lookup    = {};
+  my $user_lookup         = {};
+  my $plate_type_lookup   = {};
+  my $plate_status_lookup = {};
 
   if ($extra_attr_yes) {
 
@@ -475,6 +478,22 @@ sub list_plate {
       if (defined $plate_row->{'OperatorId'}) {
 
         $user_id_href->{$plate_row->{'OperatorId'}} = 1;
+      }
+
+      if (defined $plate_row->{'PlateType'}) {
+
+        $plate_type_id_href->{$plate_row->{'PlateType'}} = 1;
+      }
+
+      if (defined $plate_row->{'PlateStatus'}) {
+
+        if (length($plate_row->{'PlateStatus'}) > 0) {
+
+          if (uc($plate_row->{'PlateStatus'}) ne 'NULL') {
+
+            $plate_status_href->{$plate_row->{'PlateStatus'}} = 1;
+          }
+        }
       }
     }
 
@@ -493,38 +512,6 @@ sub list_plate {
 
         return ($err, $msg, []);
       }
-
-      my $extract_sql = 'SELECT "PlateId", "ExtractId", "ItemGroupId", "GenotypeId",';
-      $extract_sql   .= '"WellRow", "WellCol" ';
-      $extract_sql   .= 'FROM "extract" ';
-      $extract_sql   .= 'WHERE "PlateId" IN (' . join(',', @{$plate_id_aref}) . ')';
-
-      $self->logger->debug("EXTRACT_SQL: $extract_sql");
-
-      my ($extract_err, $extract_msg, $extract_data) = read_data($dbh_m, $extract_sql, []);
-
-      if ($extract_err) {
-
-        return ($extract_err, $extract_msg, []);
-      }
-
-      for my $extract_row (@{$extract_data}) {
-
-        my $plate_id = $extract_row->{'PlateId'};
-
-        if (defined $extract_lookup->{$plate_id}) {
-
-          my $extract_aref = $extract_lookup->{$plate_id};
-          delete($extract_row->{'PlateId'});
-          push(@{$extract_aref}, $extract_row);
-          $extract_lookup->{$plate_id} = $extract_aref;
-        }
-        else {
-
-          delete($extract_row->{'PlateId'});
-          $extract_lookup->{$plate_id} = [$extract_row];
-        }
-      }
     }
 
     if (scalar(keys(%{$user_id_href})) > 0) {
@@ -539,6 +526,32 @@ sub list_plate {
       $user_lookup = $user_sth->fetchall_hashref('UserId');
       $user_sth->finish();
     }
+
+    if (scalar(keys(%{$plate_type_id_href})) > 0) {
+
+      my $ptype_sql = 'SELECT TypeId, TypeName FROM generaltype ';
+      $ptype_sql   .= 'WHERE TypeId IN (' . join(',', keys(%{$plate_type_id_href})) . ')';
+
+      $self->logger->debug("PLATE TYPE SQL: $ptype_sql");
+
+      my $ptype_sth = $dbh_k->prepare($ptype_sql);
+      $ptype_sth->execute();
+      $plate_type_lookup = $ptype_sth->fetchall_hashref('TypeId');
+      $ptype_sth->finish();
+    }
+
+    if (scalar(keys(%{$plate_status_href})) > 0) {
+
+      my $pstatus_sql = 'SELECT TypeId, TypeName FROM generaltype ';
+      $pstatus_sql   .= 'WHERE TypeId IN (' . join(',', keys(%{$plate_status_href})) . ')';
+
+      $self->logger->debug("PLATE STATUS SQL: $pstatus_sql");
+
+      my $pstatus_sth = $dbh_k->prepare($pstatus_sql);
+      $pstatus_sth->execute();
+      $plate_status_lookup = $pstatus_sth->fetchall_hashref->{'TypeId'};
+      $pstatus_sth->finish();
+    }
   }
 
   my @extra_attr_plate_data;
@@ -552,9 +565,26 @@ sub list_plate {
 
       $plate_row->{'UserName'} = $user_lookup->{$operator_id}->{'UserName'};
 
-      if (defined $extract_lookup->{$plate_id}) {
+      if (defined $plate_row->{'PlateType'}) {
 
-        $plate_row->{'Extract'} = $extract_lookup->{$plate_id};
+        my $plate_type =  $plate_row->{'PlateType'};
+
+        if (defined $plate_type_lookup->{$plate_type}) {
+
+          my $plate_type_name = $plate_type_lookup->{$plate_type}->{'TypeName'};
+          $plate_row->{'PlateTypeName'} = $plate_type_name;
+        }
+      }
+
+      if (defined $plate_row->{'PlateStatus'}) {
+
+        my $plate_status = $plate_row->{'PlateStatus'};
+
+        if (defined $plate_status_lookup->{$plate_status}) {
+
+          my $plate_status_name = $plate_status_lookup->{$plate_status}->{'TypeName'};
+          $plate_row->{'PlateStatusName'} = $plate_status_name;
+        }
       }
 
       if ($gadmin_status eq '1') {
@@ -1083,7 +1113,13 @@ sub get_plate_runmode {
   }
 
   my $where_clause = qq| WHERE "plate"."PlateId"=? |;
-  $sql =~ s/GROUP BY/ $where_clause GROUP BY /;
+
+  $sql .= " $where_clause ";
+
+  # Disable virtual column
+  #$sql =~ s/GROUP BY/ $where_clause GROUP BY /;
+
+  $self->logger->debug("SQL: $sql");
 
   my ($plate_err, $plate_msg, $plate_list_aref) = $self->list_plate(1, $sql, [$plate_id]);
 
@@ -1127,6 +1163,8 @@ sub list_extract {
   my $dbh_m = connect_mdb_read();
   my $dbh_k = connect_kdb_read();
 
+  $self->logger->debug("SQL: $sql");
+
   ($err, $msg, $data_aref) = read_data($dbh_m, $sql, $where_para_aref);
 
   if ($err) {
@@ -1140,6 +1178,7 @@ sub list_extract {
   my $extract_id_aref = [];
   my $itm_grp_id_href = {};
   my $geno_id_href    = {};
+  my $tissue_href     = {};
 
   my $chk_id_err        = 0;
   my $chk_id_msg        = '';
@@ -1149,6 +1188,7 @@ sub list_extract {
   my $analysisgroup_lookup = {};
   my $item_group_lookup    = {};
   my $genotype_lookup      = {};
+  my $tissue_lookup        = {};
 
   if ($extra_attr_yes) {
 
@@ -1164,6 +1204,11 @@ sub list_extract {
       if (defined $extract_row->{'GenotypeId'}) {
 
         $geno_id_href->{$extract_row->{'GenotypeId'}} = 1;
+      }
+
+      if (defined $extract_row->{'Tissue'}) {
+
+        $tissue_href->{$extract_row->{'Tissue'}} = 1;
       }
     }
 
@@ -1193,6 +1238,13 @@ sub list_extract {
       $analysis_grp_sql   .= " AND ((($perm_str) & $READ_PERM) = $READ_PERM)";
 
       $self->logger->debug("AnalysisGroup permission SQL: $analysis_grp_sql");
+
+      $dbh_m->disconnect();
+
+      # Need to disconnect and reconnect again because on a VM the Perl DBD connector to Monetdb does not
+      # work if this is not done this way.
+
+      $dbh_m = connect_mdb_read();
 
       my ($analysis_grp_err, $analysis_grp_msg, $analysis_grp_data) = read_data($dbh_m, $analysis_grp_sql, []);
 
@@ -1247,6 +1299,19 @@ sub list_extract {
       $genotype_lookup = $geno_sth->fetchall_hashref('GenotypeId');
       $geno_sth->finish();
     }
+
+    if (scalar(keys(%{$tissue_href})) > 0) {
+
+      my $tissue_sql = 'SELECT TypeId, TypeName FROM generaltype ';
+      $tissue_sql   .= 'WHERE TypeId IN (' . join(',', keys(%{$tissue_href})) . ')';
+
+      $self->logger->debug("TISSUE SQL: $tissue_sql");
+
+      my $tissue_sth = $dbh_k->prepare($tissue_sql);
+      $tissue_sth->execute();
+      $tissue_lookup = $tissue_sth->fetchall_hashref('TypeId');
+      $tissue_sth->finish();
+    }
   }
 
   my @extra_attr_extract_data;
@@ -1269,6 +1334,17 @@ sub list_extract {
         if (defined $genotype_lookup->{$genotype_id}) {
 
           $extract_row->{'GenotypeName'} = $genotype_lookup->{$genotype_id}->{'GenotypeName'};
+        }
+      }
+
+      if (defined $extract_row->{'Tissue'}) {
+
+        my $tissue = $extract_row->{'Tissue'};
+
+        if (defined $tissue_lookup->{$tissue}) {
+
+          my $tissue_name = $tissue_lookup->{$tissue}->{'TypeName'};
+          $extract_row->{'TissueName'} = $tissue_name;
         }
       }
 
@@ -1296,9 +1372,9 @@ sub list_extract {
   return ($err, $msg, \@extra_attr_extract_data);
 }
 
-sub list_extract_runmode {
+sub list_extract_advanced_runmode {
 
-=pod list_extract_HELP_START
+=pod list_extract_advanced_HELP_START
 {
 "OperationName" : "List extracts",
 "Description": "List DNA extracts available in the system. Use filtering to retrieve desired subset or list current list of extracts attached to analysis group.",
@@ -1311,24 +1387,118 @@ sub list_extract_runmode {
 "SuccessMessageJSON": "{'VCol' : [],'Extract' : [{'PlateName' : null,'WellRow' : 'A','WellCol' : '1','Status' : '','GenotypeId' : '0','Tissue' : '0','PlateId' : '0','ItemGroupName' : 'ITM_GRP6300825','Quality' : '','delete' : 'delete/extract/1','ExtractId' : '1','ParentExtractId' : '0','update' : 'update/extract/1','ItemGroupId' : '1'}],'RecordMeta' : [{'TagName' : 'Extract'}]}",
 "ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
 "ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
-"URLParameter": [{"ParameterName": "analid", "Description": "Existing AnalysisGroupId", "Optional": 1}],
+"URLParameter": [{"ParameterName": "analid", "Description": "Existing AnalysisGroupId", "Optional": 1}, {"ParameterName": "plateid", "Description": "Existing PlateId", "Optional": 1}, {"ParameterName": "nperpage", "Description": "Number of records in a page for pagination", "Optional": 1}, {"ParameterName": "num", "Description": "The page number of the pagination", "Optional": 1}, {"ParameterName": "dsid", "Description": "Existing DataSetId", "Optional": 1}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
 
   my $self  = shift;
+  my $query = $self->query();
 
   my $data_for_postrun_href = {};
 
-  my $dbh_k = connect_kdb_read();
-  my $dbh_m = connect_mdb_read();
-  my $field_list = ['*', '"plate"."PlateName"'];
+  my $pagination  = 0;
+  my $nb_per_page = -1;
+  my $page        = -1;
 
-  my $anal_id = '';
+  if ( (defined $self->param('nperpage')) && (defined $self->param('num')) ) {
+
+    $pagination = 1;
+    $nb_per_page = $self->param('nperpage');
+    $page        = $self->param('num');
+  }
+
+  my $field_list_csv = '';
+
+  if (defined $query->param('FieldList')) {
+
+    $field_list_csv = $query->param('FieldList');
+  }
+
+  my $filtering_csv = '';
+
+  if (defined $query->param('Filtering')) {
+
+    $filtering_csv = $query->param('Filtering');
+  }
+
+  my $anal_id          = -1;
+  my $anal_id_provided = 0;
+  my $anal_where       = '';
 
   if (defined $self->param('analid')) {
 
-    $anal_id = $self->param('analid');
+    $anal_id           = $self->param('analid');
+    $anal_id_provided  = 1;
+    $anal_where        = qq|"analgroupextract"."AnalysisGroupId"=$anal_id|;
+  }
+
+  my $dataset_id          = -1;
+  my $dataset_id_provided = 0;
+  my $ds_where            = '';
+
+  if (defined $self->param('dsid')) {
+
+    $dataset_id          = $self->param('dsid');
+    $dataset_id_provided = 1;
+    $ds_where            = qq|"datasetextract"."DataSetId"=$dataset_id|;
+  }
+
+  my $plate_id           = -1;
+  my $plate_id_provided  = 0;
+
+  if (defined $self->param('plateid')) {
+
+    $plate_id           = $self->param('plateid');
+    $plate_id_provided  = 1;
+
+    if ($filtering_csv =~ /PlateId\s*=\s*(.*),?/) {
+
+      if ( "$plate_id" ne "$1" ) {
+
+        my $err_msg = 'Duplicate filtering condition for PlateId.';
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+        return $data_for_postrun_href;
+      }
+    }
+    else {
+
+      if (length($filtering_csv) > 0) {
+
+        if ($filtering_csv =~ /&$/) {
+
+          $filtering_csv .= "PlateId=$plate_id";
+        }
+        else {
+
+          $filtering_csv .= "&PlateId=$plate_id";
+        }
+      }
+      else {
+
+        $filtering_csv .= "PlateId=$plate_id";
+      }
+    }
+  }
+
+  $self->logger->debug("Filtering csv: $filtering_csv");
+
+  my $sorting = '';
+
+  if (defined $query->param('Sorting')) {
+
+    $sorting = $query->param('Sorting');
+  }
+
+  my $group_id  = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  my $dbh_k = connect_kdb_read();
+  my $dbh_m = connect_mdb_read();
+
+  if ($anal_id_provided) {
 
     if (!record_existence($dbh_m, 'analysisgroup', 'AnalysisGroupId', $anal_id)) {
 
@@ -1339,9 +1509,6 @@ sub list_extract_runmode {
 
       return $data_for_postrun_href;
     }
-
-    my $group_id  = $self->authen->group_id();
-    my $gadmin_status = $self->authen->gadmin_status();
 
     my ($is_anal_grp_ok, $trouble_anal_id_aref) = check_permission($dbh_m, 'analysisgroup', 'AnalysisGroupId',
                                                                    [$anal_id], $group_id, $gadmin_status,
@@ -1359,8 +1526,56 @@ sub list_extract_runmode {
     }
   }
 
+  if ($dataset_id_provided) {
+
+    if (!record_existence($dbh_m, 'dataset', 'DataSetId', $dataset_id)) {
+
+      my $err_msg = "DataSet ($dataset_id): not found.";
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my $db_anal_id = read_cell_value($dbh_m, 'dataset', 'AnalysisGroupId', 'DataSetId', $dataset_id);
+
+    my ($is_anal_grp_ok, $trouble_anal_id_aref) = check_permission($dbh_m, 'analysisgroup', 'AnalysisGroupId',
+                                                                   [$db_anal_id], $group_id, $gadmin_status,
+                                                                   $READ_PERM);
+
+    if (!$is_anal_grp_ok) {
+
+      my $err_msg = "AnalsysiGroup ($db_anal_id) for DataSet ($dataset_id): permission denied.";
+      $self->logger->debug($err_msg);
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  if ($plate_id_provided) {
+
+    if (!record_existence($dbh_m, 'plate', 'PlateId', $plate_id)) {
+
+      my $err_msg = "PlateId ($plate_id): not found.";
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  $self->logger->debug("Before generate VCOL SQL");
+
+  my $field_list = ['*'];
+
   my $other_join = ' LEFT JOIN "plate" ON "extract"."PlateId" = "plate"."PlateId" ';
   $other_join   .= ' LEFT JOIN "analgroupextract" ON "analgroupextract"."ExtractId" = "extract"."ExtractId" ';
+  $other_join   .= ' LEFT JOIN "datasetextract" ON "datasetextract"."AnalGroupExtractId" = "analgroupextract"."AnalGroupExtractId" ';
 
   my ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_mfactor_sql($dbh_m,
                                                                          $dbh_k,
@@ -1368,15 +1583,6 @@ sub list_extract_runmode {
                                                                          'extract',
                                                                          'ExtractId',
                                                                          $other_join);
-
-  $dbh_m->disconnect();
-  $dbh_k->disconnect();
-
-  if (length($anal_id) > 0) {
-
-    my $filter_by_analysis_group = qq| WHERE "AnalysisGroupId" = $anal_id |;
-    $sql  =~ s/GROUP BY/ $filter_by_analysis_group GROUP BY /;
-  }
 
   if ($vcol_err) {
 
@@ -1387,15 +1593,245 @@ sub list_extract_runmode {
     return $data_for_postrun_href;
   }
 
-  $sql   .= ' ORDER BY "extract"."ExtractId" DESC';
+  $sql .= ' LIMIT 1';
 
   $self->logger->debug("SQL with VCol: $sql");
 
-  my ($read_extract_err, $read_extract_msg, $extract_data) = $self->list_extract(1, $sql);
+  $self->logger->debug("Before list_extract");
 
-  if ($read_extract_err) {
+  my ($sam_extract_err, $sam_extract_msg, $sam_extract_data) = $self->list_extract(0, $sql);
 
-    $self->logger->debug($read_extract_msg);
+  if ($sam_extract_err) {
+
+    $self->logger->debug($sam_extract_msg);
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $sample_data_aref = $sam_extract_data;
+
+  my @field_list_all;
+
+  if (scalar(@{$sample_data_aref}) == 1) {
+
+    @field_list_all = keys(%{$sample_data_aref->[0]});
+  }
+  else {
+
+    $self->logger->debug("It reaches here");
+    my ($sfield_err, $sfield_msg, $sfield_data, $pkey_data) = get_static_field($dbh_m, 'extract');
+
+    if ($sfield_err) {
+
+      $self->logger->debug("Get static field failed: $sfield_msg");
+      return $self->_set_error();
+    }
+
+    for my $sfield_rec (@{$sfield_data}) {
+
+      push(@field_list_all, $sfield_rec->{'Name'});
+    }
+
+    for my $pkey_field (@{$pkey_data}) {
+
+      push(@field_list_all, $pkey_field);
+    }
+  }
+
+  $self->logger->debug("Field list all: " . join(',', @field_list_all));
+
+  my $final_field_list     = \@field_list_all;
+  my $sql_field_list       = [];
+  my $filtering_field_list = [];
+
+  if (length($field_list_csv) > 0) {
+
+    my ($sel_field_err, $sel_field_msg, $sel_field_list) = parse_selected_field($field_list_csv,
+                                                                                $final_field_list,
+                                                                                'ExtractId');
+
+    if ($sel_field_err) {
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $sel_field_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    $final_field_list = $sel_field_list;
+  }
+
+  my $sel_field_lookup = {};
+
+  for my $field_name (@{$final_field_list}) {
+
+    $sel_field_lookup->{$field_name} = 1;
+  }
+
+  if (defined $sel_field_lookup->{'PlateId'}) {
+
+    push(@{$final_field_list}, '"plate"."PlateName"');
+  }
+
+  ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_mfactor_sql($dbh_m, $dbh_k,
+                                                                      $final_field_list, 'extract',
+                                                                     'ExtractId', $other_join);
+
+  if ($vcol_err) {
+
+    my $err_msg = "Problem with virtual column ($trouble_vcol) containing space.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my ($filter_err, $filter_msg, $filter_phrase, $where_arg) = parse_filtering('"ExtractId"',
+                                                                              '"extract"',
+                                                                              $filtering_csv,
+                                                                              $final_field_list
+                                                                              );
+
+  $self->logger->debug("Filter phrase: $filter_phrase");
+
+  if ($filter_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $filter_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $filtering_exp = '';
+  if (length($filter_phrase) > 0) {
+
+    $filtering_exp = " WHERE $filter_phrase ";
+  }
+
+  if (length($anal_where) > 0) {
+
+    if (length($filtering_exp) > 0) {
+
+      $filtering_exp .= " AND $anal_where";
+    }
+    else {
+
+      $filtering_exp .= " WHERE $anal_where";
+    }
+  }
+
+  if (length($ds_where) > 0) {
+
+    if (length($filtering_exp) > 0) {
+
+      $filtering_exp .= " AND $ds_where";
+    }
+    else {
+
+      $filtering_exp .= " WHERE $ds_where";
+    }
+  }
+
+  my $pagination_aref    = [];
+  my $paged_limit_clause = '';
+  my $paged_limit_elapsed;
+
+  if ($pagination) {
+
+    my ($int_err, $int_err_msg) = check_integer_value( {'nperpage' => $nb_per_page,
+                                                        'num'      => $page
+                                                       });
+
+    if ($int_err) {
+
+      $int_err_msg .= ' not integer.';
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $int_err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    $self->logger->debug("Filtering expression: $filtering_exp");
+
+    my $paged_limit_start_time = [gettimeofday()];
+
+    my ($pg_id_err, $pg_id_msg, $nb_records,
+        $nb_pages, $limit_clause, $rcount_time) = get_paged_filter($dbh_m,
+                                                                   $nb_per_page,
+                                                                   $page,
+                                                                   '"extract"',
+                                                                   '"ExtractId"',
+                                                                   $filtering_exp,
+                                                                   $where_arg
+                                                                  );
+
+    $paged_limit_elapsed = tv_interval($paged_limit_start_time);
+
+    $self->logger->debug("SQL Row count time: $rcount_time");
+
+    if ($pg_id_err == 1) {
+
+      $self->logger->debug($pg_id_msg);
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    if ($pg_id_err == 2) {
+
+      $page = 0;
+    }
+
+    $pagination_aref = [{'NumOfRecords' => $nb_records,
+                         'NumOfPages'   => $nb_pages,
+                         'Page'         => $page,
+                         'NumPerPage'   => $nb_per_page,
+                        }];
+
+    $paged_limit_clause = $limit_clause;
+  }
+
+  $dbh_m->disconnect();
+  $dbh_k->disconnect();
+
+  $sql .= " $filtering_exp ";
+
+  # Disable virtual column
+
+  #$sql  =~ s/GROUP BY/ $filtering_exp GROUP BY /;
+
+  my ($sort_err, $sort_msg, $sort_sql) = parse_sorting($sorting, $final_field_list, '"extract"');
+
+  if ($sort_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $sort_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (length($sort_sql) > 0) {
+
+    $sql .= " ORDER BY $sort_sql ";
+  }
+  else {
+
+    $sql .= ' ORDER BY "extract"."ExtractId" DESC';
+  }
+
+  $sql .= " $paged_limit_clause ";
+
+  $self->logger->debug("SQL with VCol: $sql");
+
+  my ($r_extract_err, $r_extract_msg, $extract_data) = $self->list_extract(1, $sql, $where_arg);
+
+  if ($r_extract_err) {
+
+    $self->logger->debug($r_extract_msg);
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
@@ -1403,8 +1839,9 @@ sub list_extract_runmode {
   }
 
   $data_for_postrun_href->{'Error'}     = 0;
-  $data_for_postrun_href->{'Data'}      = {'Extract' => $extract_data,
+  $data_for_postrun_href->{'Data'}      = {'Extract'      => $extract_data,
                                            'VCol'         => $vcol_list,
+                                           'Pagination'   => $pagination_aref,
                                            'RecordMeta'   => [{'TagName' => 'Extract'}],
   };
 
@@ -1442,9 +1879,7 @@ sub add_extract_runmode {
 
   my $dbh_read = connect_mdb_read();
 
-  my $skip_field = {'ParentExtractId' => 1,
-                    'Tissue'          => 1,
-                   };
+  my $skip_field = {'ParentExtractId' => 1};
 
   my $field_name_translation = {};
 
@@ -1464,7 +1899,15 @@ sub add_extract_runmode {
 
   # Finish generic required static field checking
 
-  my $ItemGroupId = $query->param('ItemGroupId');
+  my $ItemGroupId = undef;
+
+  if (defined $query->param('ItemGroupId')) {
+
+    if (length($query->param('ItemGroupId')) > 0) {
+
+      $ItemGroupId = $query->param('ItemGroupId');
+    }
+  }
 
   my $ParentExtractId = undef;
 
@@ -1496,7 +1939,7 @@ sub add_extract_runmode {
     }
   }
 
-  my $Tissue = '0';
+  my $Tissue = undef;
 
   if (defined($query->param('Tissue'))) {
 
@@ -1546,6 +1989,15 @@ sub add_extract_runmode {
     }
   }
 
+  if ( (!(defined $ItemGroupId)) && (!(defined $GenotypeId)) ) {
+
+    my $err_msg = "Both ItemGroupId and GenotypeId are missing.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
   my $dbh_k_read = connect_kdb_read();
   my $dbh_m_read = connect_mdb_read();
 
@@ -1561,63 +2013,115 @@ sub add_extract_runmode {
     }
   }
 
-  if (!record_existence($dbh_k_read, 'itemgroup', 'ItemGroupId', $ItemGroupId)) {
+  if (defined $ItemGroupId) {
 
-    my $err_msg = "ItemGroupId ($ItemGroupId) not found.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'ItemGroupId' => $err_msg}]};
+    if (!record_existence($dbh_k_read, 'itemgroup', 'ItemGroupId', $ItemGroupId)) {
 
-    return $data_for_postrun_href;
-  }
-
-  my $get_geno_sql;
-
-  if (defined $GenotypeId) {
-
-    $get_geno_sql    = 'SELECT genotypespecimen.GenotypeId ';
-    $get_geno_sql   .= 'FROM itemgroupentry LEFT JOIN item ON itemgroupentry.ItemId = item.ItemId ';
-    $get_geno_sql   .= 'LEFT JOIN genotypespecimen ON item.SpecimenId = genotypespecimen.SpecimenId ';
-    $get_geno_sql   .= 'WHERE itemgroupentry.ItemGroupId=? AND genotypespecimen.GenotypeId=?';
-
-    my ($verify_geno_err, $verified_geno_id) = read_cell($dbh_k_read, $get_geno_sql, [$ItemGroupId, $GenotypeId]);
-
-    if (length($verified_geno_id) == 0) {
-
-      my $err_msg = "Genotype ($GenotypeId) not found.";
+      my $err_msg = "ItemGroupId ($ItemGroupId) not found.";
       $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'GenotypeId' => $err_msg}]};
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'ItemGroupId' => $err_msg}]};
 
       return $data_for_postrun_href;
     }
   }
 
-  $get_geno_sql    = 'SELECT genotypespecimen.GenotypeId ';
-  $get_geno_sql   .= 'FROM itemgroupentry LEFT JOIN item ON itemgroupentry.ItemId = item.ItemId ';
-  $get_geno_sql   .= 'LEFT JOIN genotypespecimen ON item.SpecimenId = genotypespecimen.SpecimenId ';
-  $get_geno_sql   .= 'WHERE itemgroupentry.ItemGroupId=?';
+  ### Need to copy
+
+  my $get_geno_sql;
 
   my $seen_geno_id    = {};
   my $geno2itemgroup  = {};
 
-  my ($get_geno_err, $get_geno_msg, $geno_data) = read_data($dbh_k_read, $get_geno_sql, [$ItemGroupId]);
+  if (defined $GenotypeId) {
 
-  if ($get_geno_err) {
+    if (defined $ItemGroupId) {
 
-    $self->logger->debug($get_geno_msg);
+      $get_geno_sql    = 'SELECT genotypespecimen.GenotypeId ';
+      $get_geno_sql   .= 'FROM itemgroupentry LEFT JOIN item ON itemgroupentry.ItemId = item.ItemId ';
+      $get_geno_sql   .= 'LEFT JOIN genotypespecimen ON item.SpecimenId = genotypespecimen.SpecimenId ';
+      $get_geno_sql   .= 'WHERE itemgroupentry.ItemGroupId=? AND genotypespecimen.GenotypeId=?';
 
-    my $err_msg = "Unexpected Error.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+      my ($verify_geno_err, $verified_geno_id) = read_cell($dbh_k_read, $get_geno_sql, [$ItemGroupId, $GenotypeId]);
 
-    return $data_for_postrun_href;
+      if (length($verified_geno_id) == 0) {
+
+        my $err_msg = "Genotype ($GenotypeId) not found.";
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'GenotypeId' => $err_msg}]};
+
+        return $data_for_postrun_href;
+      }
+
+      $get_geno_sql    = 'SELECT genotypespecimen.GenotypeId ';
+      $get_geno_sql   .= 'FROM itemgroupentry LEFT JOIN item ON itemgroupentry.ItemId = item.ItemId ';
+      $get_geno_sql   .= 'LEFT JOIN genotypespecimen ON item.SpecimenId = genotypespecimen.SpecimenId ';
+      $get_geno_sql   .= 'WHERE itemgroupentry.ItemGroupId=?';
+
+      my ($get_geno_err, $get_geno_msg, $geno_data) = read_data($dbh_k_read, $get_geno_sql, [$ItemGroupId]);
+
+      if ($get_geno_err) {
+
+        $self->logger->debug($get_geno_msg);
+
+        my $err_msg = "Unexpected Error.";
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+        return $data_for_postrun_href;
+      }
+
+      for my $geno_rec (@{$geno_data}) {
+
+        my $geno_id = $geno_rec->{'GenotypeId'};
+        $seen_geno_id->{$geno_id} = 1;
+
+        $geno2itemgroup->{$geno_id} = $ItemGroupId;
+      }
+    }
+    else {
+
+      if (!record_existence($dbh_k_read, 'genotype', 'GenotypeId', $GenotypeId)) {
+
+        my $err_msg = "GenotypeId ($GenotypeId): not found.";
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'GenotypeId' => $err_msg}]};
+
+        return $data_for_postrun_href;
+      }
+
+      $seen_geno_id->{$GenotypeId} = 1;
+    }
   }
+  else {
 
-  for my $geno_rec (@{$geno_data}) {
+    if (defined $ItemGroupId) {
 
-    my $geno_id = $geno_rec->{'GenotypeId'};
-    $seen_geno_id->{$geno_id} = 1;
+      $get_geno_sql    = 'SELECT genotypespecimen.GenotypeId ';
+      $get_geno_sql   .= 'FROM itemgroupentry LEFT JOIN item ON itemgroupentry.ItemId = item.ItemId ';
+      $get_geno_sql   .= 'LEFT JOIN genotypespecimen ON item.SpecimenId = genotypespecimen.SpecimenId ';
+      $get_geno_sql   .= 'WHERE itemgroupentry.ItemGroupId=?';
 
-    $geno2itemgroup->{$geno_id} = $ItemGroupId;
+      my ($get_geno_err, $get_geno_msg, $geno_data) = read_data($dbh_k_read, $get_geno_sql, [$ItemGroupId]);
+
+      if ($get_geno_err) {
+
+        $self->logger->debug($get_geno_msg);
+
+        my $err_msg = "Unexpected Error.";
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+        return $data_for_postrun_href;
+      }
+
+      for my $geno_rec (@{$geno_data}) {
+
+        my $geno_id = $geno_rec->{'GenotypeId'};
+        $seen_geno_id->{$geno_id} = 1;
+
+        $geno2itemgroup->{$geno_id} = $ItemGroupId;
+      }
+    }
   }
 
   my @geno_id_list = keys(%{$seen_geno_id});
@@ -1638,18 +2142,24 @@ sub add_extract_runmode {
 
     for my $trouble_geno_id (@{$trouble_geno_id_aref}) {
 
-      my $trouble_ig_id = $geno2itemgroup->{$trouble_geno_id};
-      $trouble_itemgroup_id_list{$trouble_ig_id} = 1;
+      if (defined $geno2itemgroup->{$trouble_geno_id}) {
+
+        my $trouble_ig_id = $geno2itemgroup->{$trouble_geno_id};
+        $trouble_itemgroup_id_list{$trouble_ig_id} = 1;
+      }
     }
 
     my $trouble_itemgroup_id_str = join(',', keys(%trouble_itemgroup_id_list));
+    my $trouble_geno_id_str      = join(',', @{$trouble_geno_id_aref});
 
-    my $err_msg = 'Permission denied: ItemGroupId (' . $trouble_itemgroup_id_str . ')';
+    my $err_msg = "Permission denied: ItemGroupId ( $trouble_itemgroup_id_str ) GenotypeId ( $trouble_geno_id_str )";
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
     return $data_for_postrun_href;
   }
+
+  # Finish copy
 
   if (defined $PlateId) {
 
@@ -1695,7 +2205,7 @@ sub add_extract_runmode {
     }
   }
 
-  if ($Tissue ne '0') {
+  if (defined $Tissue) {
 
     if (!type_existence($dbh_k_read, 'tissue', $Tissue)) {
 
@@ -1971,9 +2481,7 @@ sub update_extract_runmode {
 
   my $dbh_read = connect_mdb_read();
 
-  my $skip_field = {'ParentExtractId' => 1,
-                    'Tissue'          => 1,
-                   };
+  my $skip_field = {'ParentExtractId' => 1};
 
   my $field_name_translation = {};
 
@@ -2005,7 +2513,20 @@ sub update_extract_runmode {
     return $data_for_postrun_href;
   }
 
-  my $ItemGroupId = $query->param('ItemGroupId');
+  my $ItemGroupId = read_cell_value($dbh_m_read, 'extract', 'ItemGroupId', 'ExtractId', $ExtractId);
+
+  if (defined $query->param('ItemGroupId')) {
+
+    if (length($query->param('ItemGroupId')) > 0) {
+
+      $ItemGroupId = $query->param('ItemGroupId');
+    }
+  }
+
+  if (length($ItemGroupId) == 0) {
+
+    $ItemGroupId = undef;
+  }
 
   my $ParentExtractId = read_cell_value($dbh_m_read, 'extract', 'ParentExtractId', 'ExtractId', $ExtractId);
 
@@ -2019,11 +2540,11 @@ sub update_extract_runmode {
 
   if (length($ParentExtractId) == 0) {
 
-    $ParentExtractId = '0';
+    $ParentExtractId = undef;
   }
 
   my $PlateId = read_cell_value($dbh_m_read, 'extract', 'PlateId', 'ExtractId', $ExtractId);
- 
+
   if (defined($query->param('PlateId'))) {
 
     if (length($query->param('PlateId')) > 0) {
@@ -2034,7 +2555,7 @@ sub update_extract_runmode {
 
   if (length($PlateId) == 0) {
 
-    $PlateId = '0';
+    $PlateId = undef;
   }
 
   my $GenotypeId = read_cell_value($dbh_m_read, 'extract', 'GenotypeId', 'ExtractId', $ExtractId);
@@ -2049,7 +2570,7 @@ sub update_extract_runmode {
 
   if (length($GenotypeId) == 0) {
 
-    $GenotypeId = '0';
+    $GenotypeId = undef;
   }
 
   my $Tissue = read_cell_value($dbh_m_read, 'extract', 'Tissue', 'ExtractId', $ExtractId);
@@ -2064,7 +2585,7 @@ sub update_extract_runmode {
 
   if (length($Tissue) == 0) {
 
-    $Tissue = '0';
+    $Tissue = undef;
   }
 
   my $WellRow = read_cell_value($dbh_m_read, 'extract', 'WellRow', 'ExtractId', $ExtractId);
@@ -2095,7 +2616,7 @@ sub update_extract_runmode {
     $Status = $query->param('Status');
   }
 
-  if ($ParentExtractId ne '0') {
+  if (defined $ParentExtractId) {
 
     if (!record_existence($dbh_m_read, 'extract', 'ExtractId', $ParentExtractId)) {
 
@@ -2107,63 +2628,124 @@ sub update_extract_runmode {
     }
   }
 
-  if (!record_existence($dbh_k_read, 'itemgroup', 'ItemGroupId', $ItemGroupId)) {
+  if ( (!(defined $ItemGroupId)) && (!(defined $GenotypeId)) ) {
 
-    my $err_msg = "ItemGroupId ($ItemGroupId) not found.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'ItemGroupId' => $err_msg}]};
-
-    return $data_for_postrun_href;
-  }
-
-  my $get_geno_sql;
-
-  if ($GenotypeId ne '0') {
-
-    $get_geno_sql    = 'SELECT genotypespecimen.GenotypeId ';
-    $get_geno_sql   .= 'FROM itemgroupentry LEFT JOIN item ON itemgroupentry.ItemId = item.ItemId ';
-    $get_geno_sql   .= 'LEFT JOIN genotypespecimen ON item.SpecimenId = genotypespecimen.SpecimenId ';
-    $get_geno_sql   .= 'WHERE itemgroupentry.ItemGroupId=? AND genotypespecimen.GenotypeId=?';
-
-    my ($verify_geno_err, $verified_geno_id) = read_cell($dbh_k_read, $get_geno_sql, [$ItemGroupId, $GenotypeId]);
-
-    if (length($verified_geno_id) == 0) {
-
-      my $err_msg = "GenotypeId ($GenotypeId) not found.";
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'GenotypeId' => $err_msg}]};
-
-      return $data_for_postrun_href;
-    }
-  }
-
-  $get_geno_sql    = 'SELECT genotypespecimen.GenotypeId ';
-  $get_geno_sql   .= 'FROM itemgroupentry LEFT JOIN item ON itemgroupentry.ItemId = item.ItemId ';
-  $get_geno_sql   .= 'LEFT JOIN genotypespecimen ON item.SpecimenId = genotypespecimen.SpecimenId ';
-  $get_geno_sql   .= 'WHERE itemgroupentry.ItemGroupId=?';
-
-  my $seen_geno_id    = {};
-  my $geno2itemgroup  = {};
-
-  my ($get_geno_err, $get_geno_msg, $geno_data) = read_data($dbh_k_read, $get_geno_sql, [$ItemGroupId]);
-
-  if ($get_geno_err) {
-
-    $self->logger->debug($get_geno_msg);
-
-    my $err_msg = "Unexpected Error.";
+    my $err_msg = "Both ItemGroupId and GenotypeId are missing.";
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
     return $data_for_postrun_href;
   }
 
-  for my $geno_rec (@{$geno_data}) {
+  if (defined $ItemGroupId) {
 
-    my $geno_id = $geno_rec->{'GenotypeId'};
-    $seen_geno_id->{$geno_id} = 1;
+    if (!record_existence($dbh_k_read, 'itemgroup', 'ItemGroupId', $ItemGroupId)) {
 
-    $geno2itemgroup->{$geno_id} = $ItemGroupId;
+      my $err_msg = "ItemGroupId ($ItemGroupId) not found.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'ItemGroupId' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  #####
+
+  my $get_geno_sql;
+
+  my $seen_geno_id    = {};
+  my $geno2itemgroup  = {};
+
+  if (defined $GenotypeId) {
+
+    if (defined $ItemGroupId) {
+
+      $get_geno_sql    = 'SELECT genotypespecimen.GenotypeId ';
+      $get_geno_sql   .= 'FROM itemgroupentry LEFT JOIN item ON itemgroupentry.ItemId = item.ItemId ';
+      $get_geno_sql   .= 'LEFT JOIN genotypespecimen ON item.SpecimenId = genotypespecimen.SpecimenId ';
+      $get_geno_sql   .= 'WHERE itemgroupentry.ItemGroupId=? AND genotypespecimen.GenotypeId=?';
+
+      my ($verify_geno_err, $verified_geno_id) = read_cell($dbh_k_read, $get_geno_sql, [$ItemGroupId, $GenotypeId]);
+
+      if (length($verified_geno_id) == 0) {
+
+        my $err_msg = "Genotype ($GenotypeId) not found.";
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'GenotypeId' => $err_msg}]};
+
+        return $data_for_postrun_href;
+      }
+
+      $get_geno_sql    = 'SELECT genotypespecimen.GenotypeId ';
+      $get_geno_sql   .= 'FROM itemgroupentry LEFT JOIN item ON itemgroupentry.ItemId = item.ItemId ';
+      $get_geno_sql   .= 'LEFT JOIN genotypespecimen ON item.SpecimenId = genotypespecimen.SpecimenId ';
+      $get_geno_sql   .= 'WHERE itemgroupentry.ItemGroupId=?';
+
+      my ($get_geno_err, $get_geno_msg, $geno_data) = read_data($dbh_k_read, $get_geno_sql, [$ItemGroupId]);
+
+      if ($get_geno_err) {
+
+        $self->logger->debug($get_geno_msg);
+
+        my $err_msg = "Unexpected Error.";
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+        return $data_for_postrun_href;
+      }
+
+      for my $geno_rec (@{$geno_data}) {
+
+        my $geno_id = $geno_rec->{'GenotypeId'};
+        $seen_geno_id->{$geno_id} = 1;
+
+        $geno2itemgroup->{$geno_id} = $ItemGroupId;
+      }
+    }
+    else {
+
+      if (!record_existence($dbh_k_read, 'genotype', 'GenotypeId', $GenotypeId)) {
+
+        my $err_msg = "GenotypeId ($GenotypeId): not found.";
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'GenotypeId' => $err_msg}]};
+
+        return $data_for_postrun_href;
+      }
+
+      $seen_geno_id->{$GenotypeId} = 1;
+    }
+  }
+  else {
+
+    if (defined $ItemGroupId) {
+
+      $get_geno_sql    = 'SELECT genotypespecimen.GenotypeId ';
+      $get_geno_sql   .= 'FROM itemgroupentry LEFT JOIN item ON itemgroupentry.ItemId = item.ItemId ';
+      $get_geno_sql   .= 'LEFT JOIN genotypespecimen ON item.SpecimenId = genotypespecimen.SpecimenId ';
+      $get_geno_sql   .= 'WHERE itemgroupentry.ItemGroupId=?';
+
+      my ($get_geno_err, $get_geno_msg, $geno_data) = read_data($dbh_k_read, $get_geno_sql, [$ItemGroupId]);
+
+      if ($get_geno_err) {
+
+        $self->logger->debug($get_geno_msg);
+
+        my $err_msg = "Unexpected Error.";
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+        return $data_for_postrun_href;
+      }
+
+      for my $geno_rec (@{$geno_data}) {
+
+        my $geno_id = $geno_rec->{'GenotypeId'};
+        $seen_geno_id->{$geno_id} = 1;
+
+        $geno2itemgroup->{$geno_id} = $ItemGroupId;
+      }
+    }
   }
 
   my @geno_id_list = keys(%{$seen_geno_id});
@@ -2184,20 +2766,26 @@ sub update_extract_runmode {
 
     for my $trouble_geno_id (@{$trouble_geno_id_aref}) {
 
-      my $trouble_ig_id = $geno2itemgroup->{$trouble_geno_id};
-      $trouble_itemgroup_id_list{$trouble_ig_id} = 1;
+      if (defined $geno2itemgroup->{$trouble_geno_id}) {
+
+        my $trouble_ig_id = $geno2itemgroup->{$trouble_geno_id};
+        $trouble_itemgroup_id_list{$trouble_ig_id} = 1;
+      }
     }
 
     my $trouble_itemgroup_id_str = join(',', keys(%trouble_itemgroup_id_list));
+    my $trouble_geno_id_str      = join(',', @{$trouble_geno_id_aref});
 
-    my $err_msg = 'Permission denied: ItemGroupId (' . $trouble_itemgroup_id_str . ')';
+    my $err_msg = "Permission denied: ItemGroupId ( $trouble_itemgroup_id_str ) GenotypeId ( $trouble_geno_id_str )";
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
     return $data_for_postrun_href;
   }
 
-  if ($PlateId ne '0') {
+  ####
+
+  if (defined $PlateId) {
 
     if (!record_existence($dbh_m_read, 'plate', 'PlateId', $PlateId)) {
 
@@ -2261,7 +2849,7 @@ sub update_extract_runmode {
     }
   }
 
-  if ($Tissue ne '0') {
+  if (defined $Tissue) {
 
     if (!type_existence($dbh_k_read, 'tissue', $Tissue)) {
 
@@ -2498,7 +3086,11 @@ sub get_extract_runmode {
 
   my $where_clause = qq| WHERE "extract"."ExtractId"=? |;
 
-  $sql =~ s/GROUP BY/ $where_clause GROUP BY /;
+  $sql .= " $where_clause ";
+
+  # Disable virtual column
+
+  #$sql =~ s/GROUP BY/ $where_clause GROUP BY /;
 
   my ($err, $msg, $extract_data) = $self->list_extract(1, $sql, [$ExtractId]);
 
@@ -2790,7 +3382,12 @@ sub list_analysisgroup_advanced_runmode {
 
   my $where_perm = " WHERE ((($perm_str) & $READ_PERM) = $READ_PERM) ";
 
-  $sql  =~ s/GROUP BY/ $where_perm GROUP BY /;
+  $sql .= " $where_perm ";
+
+  # Disable virtual column
+
+  #$sql  =~ s/GROUP BY/ $where_perm GROUP BY /;
+
   $sql .= ' LIMIT 1';
 
   $self->logger->debug("SQL with VCol: $sql");
@@ -2983,7 +3580,11 @@ sub list_analysisgroup_advanced_runmode {
   $dbh_k->disconnect();
   $dbh_m->disconnect();
 
-  $sql  =~ s/GROUP BY/ $filtering_exp GROUP BY /;
+  $sql .= " $filtering_exp ";
+
+  # Disable virtual column
+
+  #$sql  =~ s/GROUP BY/ $filtering_exp GROUP BY /;
 
   my ($sort_err, $sort_msg, $sort_sql) = parse_sorting($sorting, $final_field_list, '"analysisgroup"');
 
@@ -3096,7 +3697,11 @@ sub get_analysisgroup_runmode {
 
   my $where_clause = qq| WHERE ((($perm_str) & $READ_PERM) = $READ_PERM) AND "analysisgroup"."AnalysisGroupId"=? |;
 
-  $sql   =~ s/GROUP BY/ $where_clause GROUP BY /;
+  $sql .= " $where_clause ";
+
+  # Disable virtual column
+
+  #$sql   =~ s/GROUP BY/ $where_clause GROUP BY /;
 
   $self->logger->debug("SQL with VCol: $sql");
 
@@ -3243,6 +3848,8 @@ sub add_analysisgroup_runmode {
     return $data_for_postrun_href;
   }
 
+  my $chk_start_time = [gettimeofday()];
+
   $self->logger->debug("Checking AnalysisGroupName: $AnalysisGroupName");
 
   if (record_existence($dbh_m_read, 'analysisgroup', 'AnalysisGroupName', $AnalysisGroupName)) {
@@ -3254,6 +3861,10 @@ sub add_analysisgroup_runmode {
 
     return $data_for_postrun_href;
   }
+
+  my $chk_elapsed = tv_interval($chk_start_time);
+
+  $self->logger->debug("Check analysisgroup name time: $chk_elapsed seconds");
 
   #check that supplied access group exists
   my $access_grp_existence = record_existence($dbh_k_read, 'systemgroup', 'SystemGroupId', $AccessGroupId);
@@ -3310,6 +3921,9 @@ sub add_analysisgroup_runmode {
     }
   }
 
+  $self->logger->debug("Loading XML file");
+  my $chk_xml_start_time = [gettimeofday()];
+
   my $extract_xml_file = $self->authen->get_upload_file();
 
   my $analysisgroup_dtd_file = $self->get_analysisgroup_dtd_file();
@@ -3343,52 +3957,159 @@ sub add_analysisgroup_runmode {
     return $data_for_postrun_href;
   }
 
+  my $chk_xml_elapsed = tv_interval($chk_xml_start_time);
+
+  $self->logger->debug("Check xml time: $chk_xml_elapsed seconds");
+
+  my $xml_start_time = [gettimeofday()];
+
   my $extract_xml  = read_file($extract_xml_file);
   my $extract_aref = xml2arrayref($extract_xml_file, 'extract');
+
+  my $xml_elapsed = tv_interval($xml_start_time);
+
+  $self->logger->debug("Final xml time: $xml_elapsed seconds");
+
+  my $chk_id_start_time = [gettimeofday()];
 
   my @ExtractIds;
   my $seen_geno_id = {};
   my $geno2extract = {};
 
-  $sql    = 'SELECT genotypespecimen.GenotypeId ';
-  $sql   .= 'FROM itemgroupentry LEFT JOIN item ON itemgroupentry.ItemId = item.ItemId ';
-  $sql   .= 'LEFT JOIN genotypespecimen ON item.SpecimenId = genotypespecimen.SpecimenId ';
-  $sql   .= 'WHERE itemgroupentry.ItemId=?';
+  my $uniq_extract_id_href = {};
 
-  for my $Extract (@{$extract_aref}) {
+  foreach my $extract_rec (@{$extract_aref}) {
 
-    my $ExtractId = $Extract->{'ExtractId'};
+    $uniq_extract_id_href->{$extract_rec->{'ExtractId'}} = 1;
+  }
 
-    if (!record_existence($dbh_m_read, 'extract', 'ExtractId', $ExtractId)) {
+  my @extract_id_list = keys(%{$uniq_extract_id_href});
 
-      my $err_msg = "Extract ($ExtractId) not found.";
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+  if (scalar(@extract_id_list) == 0) {
 
-      return $data_for_postrun_href;
+    my $err_msg = "No extract";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my ($ext_exist_err, $ext_exist_msg,
+      $unfound_ext_aref, $found_ext_aref) = record_existence_bulk($dbh_m_read, 'extract', 'ExtractId', \@extract_id_list);
+
+  if ($ext_exist_err) {
+
+    $self->logger->debug("Check recorod existence bulk failed: $ext_exist_msg");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (scalar(@{$unfound_ext_aref}) > 0) {
+
+    my $unfound_ext_csv = join(',', @{$unfound_ext_aref});
+
+    my $err_msg = "Extract ($unfound_ext_csv): not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sql = qq|SELECT "ExtractId", "ItemGroupId", "GenotypeId" FROM "extract" WHERE "ExtractId" IN (| . join(',', @extract_id_list) . ')';
+
+  my ($db_ext_err, $db_ext_msg, $db_ext_data) = read_data($dbh_m_read, $sql, []);
+
+  if ($db_ext_err) {
+
+    $self->logger->debug("Read extract info failed: $db_ext_msg");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $uniq_itm_grp_id_href = {};
+  my $itm_grp2extract      = {};
+
+  foreach my $db_ext_rec (@{$db_ext_data}) {
+
+    my $extract_id = $db_ext_rec->{'ExtractId'};
+
+    if (defined $db_ext_rec->{'ItemGroupId'}) {
+
+      my $itm_grp_id = $db_ext_rec->{'ItemGroupId'};
+      $uniq_itm_grp_id_href->{$itm_grp_id} = 1;
+
+      if ( !(defined $itm_grp2extract->{$itm_grp_id}) ) {
+
+        $itm_grp2extract->{$itm_grp_id} = [$extract_id];
+      }
+      else {
+
+        my $extr_id_aref = $itm_grp2extract->{$itm_grp_id};
+        push(@{$extr_id_aref}, $extract_id);
+        $itm_grp2extract->{$itm_grp_id} = [$extract_id];
+      }
     }
 
-    my $item_group_id = read_cell_value($dbh_m_read, 'extract', 'ItemGroupId', 'ExtractId', $ExtractId);
+    if (defined $db_ext_rec->{'GenotypeId'}) {
 
-    my ($get_geno_err, $get_geno_msg, $geno_data) = read_data($dbh_k_read, $sql, [$item_group_id]);
+      my $geno_id = $db_ext_rec->{'GenotypeId'};
 
-    if ($get_geno_err) {
-
-      $self->logger->debug($get_geno_msg);
-
-      my $err_msg = "Unexpected Error.";
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-      return $data_for_postrun_href;
-    }
-
-    for my $geno_rec (@{$geno_data}) {
-
-      my $geno_id = $geno_rec->{'GenotypeId'};
       $seen_geno_id->{$geno_id} = 1;
 
-      $geno2extract->{$geno_id} = $ExtractId;
+      if ( !(defined $geno2extract->{$geno_id}) ) {
+
+        $geno2extract->{$geno_id} = [$extract_id];
+      }
+      else {
+
+        my $extr_id_aref = $geno2extract->{$geno_id};
+        push(@{$extr_id_aref}, $extract_id);
+        $geno2extract->{$geno_id} = $extr_id_aref;
+      }
+    }
+  }
+
+  my @itm_grp_id_list = keys(%{$uniq_itm_grp_id_href});
+
+  if (scalar(@itm_grp_id_list) > 0) {
+
+    $sql    = 'SELECT itemgroupentry.ItemGroupId, genotypespecimen.GenotypeId ';
+    $sql   .= 'FROM itemgroupentry LEFT JOIN item ON itemgroupentry.ItemId = item.ItemId ';
+    $sql   .= 'LEFT JOIN genotypespecimen ON item.SpecimenId = genotypespecimen.SpecimenId ';
+    $sql   .= 'WHERE itemgroupentry.ItemGroupId IN (' . join(',', @itm_grp_id_list) . ')';
+
+    my ($itm_grp_err, $itm_grp_msg, $itm_grp_data) = read_data($dbh_k_read, $sql, []);
+
+    if ($itm_grp_err) {
+
+      $self->logger->debug("Read item group failed: $itm_grp_msg");
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    foreach my $itm_grp_rec (@{$itm_grp_data}) {
+
+      my $itm_grp_id   = $itm_grp_rec->{'ItemGroupId'};
+      my $ex_id_aref   = $itm_grp2extract->{$itm_grp_id};
+      my $geno_id      = $itm_grp_rec->{'GenotypeId'};
+
+      $seen_geno_id->{$geno_id} = 1;
+
+      if ( !(defined $geno2extract->{$geno_id}) ) {
+
+        $geno2extract->{$geno_id} = $ex_id_aref;
+      }
+      else {
+
+        my $extr_id_aref = [@{$geno2extract->{$geno_id}}, @{$ex_id_aref}];
+        $geno2extract->{$geno_id} = $extr_id_aref;
+      }
     }
   }
 
@@ -3401,7 +4122,7 @@ sub add_analysisgroup_runmode {
 
     my ($is_ok, $trouble_geno_id_aref) = check_permission($dbh_k_read, 'genotype', 'GenotypeId',
                                                           \@geno_id_list, $group_id, $gadmin_status,
-                                                          $LINK_PERM);
+                                                          $READ_LINK_PERM);
 
     if (!$is_ok) {
 
@@ -3409,13 +4130,13 @@ sub add_analysisgroup_runmode {
 
       for my $trouble_geno_id (@{$trouble_geno_id_aref}) {
 
-        my $trouble_ext_id = $geno2extract->{$trouble_geno_id};
-        push(@trouble_ext_id_list, $trouble_ext_id);
+        my $trouble_ext_id_aref = $geno2extract->{$trouble_geno_id};
+        push(@trouble_ext_id_list, @{$trouble_ext_id_aref});
       }
 
       my $trouble_ext_id_str = join(',', @trouble_ext_id_list);
 
-      my $err_msg = 'Permission denied: ExtractIds (' . $trouble_ext_id_str . ')';
+      my $err_msg = "ExtractIds ( $trouble_ext_id_str ): permission denied";
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
@@ -3425,6 +4146,10 @@ sub add_analysisgroup_runmode {
 
   $dbh_k_read->disconnect();
   $dbh_m_read->disconnect();
+
+  my $chk_id_elapsed = tv_interval($chk_id_start_time);
+
+  $self->logger->debug("Check id time: $chk_id_elapsed seconds");
 
   my $dbh_m_write = connect_mdb_write();
 
@@ -3439,6 +4164,8 @@ sub add_analysisgroup_runmode {
 
     return $data_for_postrun_href;
   }
+
+  $self->logger->debug("New analid: $anal_id");
 
   #insert into main table
   $sql    = 'INSERT INTO "analysisgroup"(';
@@ -3538,32 +4265,54 @@ sub add_analysisgroup_runmode {
     }
   }
 
-  $sql  = 'INSERT INTO "analgroupextract" ';
-  $sql .= '("AnalysisGroupId", "ExtractId") ';
-  $sql .= 'VALUES ';
+  my $nb_extract = scalar(@{$extract_aref});
 
-  my @sql_row;
+  my $i = 0;
 
-  foreach my $extract_rec (@{$extract_aref}) {
+  while($i < $nb_extract) {
 
-    my $ExtractId = $extract_rec->{'ExtractId'};
-    push(@sql_row, "($AnalysisGroupId, $ExtractId)" );
-  }
+    my $i_start_time = [gettimeofday()];
 
-  $sql .= join(',', @sql_row);
+    $sql  = 'INSERT INTO "analgroupextract" ';
+    $sql .= '("AnalysisGroupId", "ExtractId") ';
+    $sql .= 'VALUES ';
 
-  my $extracts_sth = $dbh_m_write->prepare($sql);
-  $extracts_sth->execute();
+    my @sql_row;
 
-  if ($dbh_m_write->err()) {
+    my $j = $i + 10000;
 
-    $self->logger->debug("SQL err: " . $dbh_m_write->errstr());
+    if ($j > $nb_extract) { $j = $nb_extract; };
 
-    my ($rollback_err, $rollback_msg) = rollback_cleanup_multi($self->logger(), $dbh_m_write, $inserted_id);
+    for (my $k = $i; $k < $j; $k++) {
 
-    if ($rollback_err) {
+      my $extract_rec = $extract_aref->[$k];
 
-      $self->logger->debug("Rollback error: $rollback_msg");
+      my $ExtractId = $extract_rec->{'ExtractId'};
+      push(@sql_row, "($AnalysisGroupId, $ExtractId)" );
+    }
+
+    $sql .= join(',', @sql_row);
+
+    my $extracts_sth = $dbh_m_write->prepare($sql);
+    $extracts_sth->execute();
+
+    if ($dbh_m_write->err()) {
+
+      $self->logger->debug("SQL err: " . $dbh_m_write->errstr());
+
+      my ($rollback_err, $rollback_msg) = rollback_cleanup_multi($self->logger(), $dbh_m_write, $inserted_id);
+
+      if ($rollback_err) {
+
+        $self->logger->debug("Rollback error: $rollback_msg");
+
+        my $err_msg = 'Unexpected Error.';
+
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+        return $data_for_postrun_href;
+      }
 
       my $err_msg = 'Unexpected Error.';
 
@@ -3573,12 +4322,11 @@ sub add_analysisgroup_runmode {
       return $data_for_postrun_href;
     }
 
-    my $err_msg = 'Unexpected Error.';
+    my $i_elapsed = tv_interval($i_start_time);
 
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+    $self->logger->debug("I: $i - time: $i_elapsed seconds");
 
-    return $data_for_postrun_href;
+    $i += 10000;
   }
 
   $dbh_m_write->disconnect();
@@ -3630,7 +4378,7 @@ sub add_plate_n_extract_runmode {
 
   my $dbh_read = connect_mdb_read();
 
-  my $skip_field = {'DateCreated' => 1};
+  my $skip_field = {};
 
   my $field_name_translation = {};
 
@@ -3654,7 +4402,7 @@ sub add_plate_n_extract_runmode {
 
   my $OperatorId       = $query->param('OperatorId');
 
-  my $PlateType        = '0';
+  my $PlateType        = undef;
 
   if (defined($query->param('PlateType'))) {
 
@@ -3664,18 +4412,24 @@ sub add_plate_n_extract_runmode {
     }
   }
 
-  my $PlateDescription = '';
+  my $PlateDescription = undef;
 
   if (defined($query->param('PlateDescription'))) {
 
-    $PlateDescription = $query->param('PlateDescription');
+    if (length($query->param('PlateDescription')) > 0) {
+
+      $PlateDescription = $query->param('PlateDescription');
+    }
   }
 
-  my $StorageId        = '0';
+  my $StorageId        = undef;
 
   if (defined($query->param('StorageId'))) {
 
-    $StorageId = $query->param('StorageId');
+    if (length($query->param('StorageId')) > 0) {
+
+      $StorageId = $query->param('StorageId');
+    }
   }
 
   my $PlateWells       = undef;
@@ -3688,11 +4442,36 @@ sub add_plate_n_extract_runmode {
     }
   }
 
-  my $PlateStatus      = '';
+  my $PlateStatus      = undef;
 
   if (defined($query->param('PlateStatus'))) {
 
-    $PlateStatus = $query->param('PlateStatus');
+    if (length($query->param('PlateStatus')) > 0) {
+
+      $PlateStatus = $query->param('PlateStatus');
+    }
+  }
+
+  my $cur_dt = DateTime->now( time_zone => $TIMEZONE );
+  $cur_dt = DateTime::Format::MySQL->format_datetime($cur_dt);
+
+  my $DateCreated = $cur_dt;
+
+  if (defined($query->param('DateCreated'))) {
+
+    if (length($query->param('DateCreated')) > 0) {
+
+      $DateCreated = $query->param('DateCreated');
+      my ($cdate_err, $cdate_href) = check_dt_href( {'DateCreated' => $DateCreated} );
+
+      if ($cdate_err) {
+
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [$cdate_href]};
+
+        return $data_for_postrun_href;
+      }
+    }
   }
 
   if (length($PlateWells) > 0) {
@@ -3762,7 +4541,7 @@ sub add_plate_n_extract_runmode {
     return $data_for_postrun_href;
   }
 
-  if ($PlateType ne '0') {
+  if (defined $PlateType) {
 
     if (!type_existence($dbh_k_read, 'plate', $PlateType)) {
 
@@ -3774,7 +4553,7 @@ sub add_plate_n_extract_runmode {
     }
   }
 
-  if ($StorageId ne '0') {
+  if (defined $StorageId) {
 
     if ( !record_existence($dbh_k_read, 'storage', 'StorageId', $StorageId) ) {
 
@@ -3796,11 +4575,6 @@ sub add_plate_n_extract_runmode {
 
     return $data_for_postrun_href;
   }
-
-  my $cur_dt = DateTime->now( time_zone => $TIMEZONE );
-  $cur_dt = DateTime::Format::MySQL->format_datetime($cur_dt);
-
-  my $DateCreated = $cur_dt;
 
   my $extract_xml_file = $self->authen->get_upload_file();
   my $extract_dtd_file = $self->get_extract_all_field_dtd_file();
@@ -3885,19 +4659,27 @@ sub add_plate_n_extract_runmode {
       return $data_for_postrun_href;
     }
 
-    my $ItemGroupId = $extract_rec->{'ItemGroupId'};
+    my $ItemGroupId = undef;
 
-    my $ParentExtractId = '0';
+    if (defined($extract_rec->{'ItemGroupId'})) {
+
+      if (length($extract_rec->{'ItemGroupId'}) > 0) {
+
+        $ItemGroupId = $extract_rec->{'ItemGroupId'};
+      }
+    }
+
+    my $ParentExtractId = undef;
 
     if (defined($extract_rec->{'ParentExtractId'})) {
 
-      if ($extract_rec->{'ParentExtractId'} ne '0') {
+      if (length($extract_rec->{'ParentExtractId'}) > 0) {
 
         $ParentExtractId = $extract_rec->{'ParentExtractId'};
       }
     }
 
-    my $PlateId = '0';
+    my $PlateId = undef;
 
     if (defined($extract_rec->{'PlateId'})) {
 
@@ -3907,7 +4689,7 @@ sub add_plate_n_extract_runmode {
       }
     }
 
-    my $GenotypeId = '0';
+    my $GenotypeId = undef;
 
     if (defined($extract_rec->{'GenotypeId'})) {
 
@@ -3917,17 +4699,9 @@ sub add_plate_n_extract_runmode {
       }
     }
 
-    my $Tissue = '0';
+    my $Tissue = $extract_rec->{'Tissue'};
 
-    if (defined($extract_rec->{'Tissue'})) {
-
-      if (length($extract_rec->{'Tissue'}) > 0) {
-
-        $Tissue = $extract_rec->{'Tissue'};
-      }
-    }
-
-    my $WellRow = '';
+    my $WellRow = undef;
 
     if (defined($extract_rec->{'WellRow'})) {
 
@@ -3937,7 +4711,7 @@ sub add_plate_n_extract_runmode {
       }
     }
 
-    my $WellCol = '';
+    my $WellCol = undef;
 
     if (defined($extract_rec->{'WellCol'})) {
 
@@ -3947,7 +4721,7 @@ sub add_plate_n_extract_runmode {
       }
     }
 
-    my $Quality = '';
+    my $Quality = undef;
 
     if (defined($extract_rec->{'Quality'})) {
 
@@ -3957,7 +4731,7 @@ sub add_plate_n_extract_runmode {
       }
     }
 
-    my $Status = '';
+    my $Status = undef;
 
     if (defined($extract_rec->{'Status'})) {
 
@@ -3967,7 +4741,7 @@ sub add_plate_n_extract_runmode {
       }
     }
 
-    my ($missing_err, $missing_msg) = check_missing_value( {'ItemGroupId' => $ItemGroupId} );
+    my ($missing_err, $missing_msg) = check_missing_value( {'Tissue' => $Tissue} );
 
     if ($missing_err) {
 
@@ -3978,7 +4752,7 @@ sub add_plate_n_extract_runmode {
       return $data_for_postrun_href;
     }
 
-    if ($ParentExtractId ne '0') {
+    if (defined $ParentExtractId) {
 
       if (!record_existence($dbh_m_read, 'extract', 'ExtractId', $ParentExtractId)) {
 
@@ -3990,29 +4764,11 @@ sub add_plate_n_extract_runmode {
       }
     }
 
-    if (!record_existence($dbh_k_read, 'itemgroup', 'ItemGroupId', $ItemGroupId)) {
+    if (defined $ItemGroupId) {
 
-      my $err_msg = "ItemGroupId ($ItemGroupId) not found.";
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+      if (!record_existence($dbh_k_read, 'itemgroup', 'ItemGroupId', $ItemGroupId)) {
 
-      return $data_for_postrun_href;
-    }
-
-    my $get_geno_sql = '';
-
-    if ($GenotypeId ne '0') {
-
-      $get_geno_sql    = 'SELECT genotypespecimen.GenotypeId ';
-      $get_geno_sql   .= 'FROM itemgroupentry LEFT JOIN item ON itemgroupentry.ItemId = item.ItemId ';
-      $get_geno_sql   .= 'LEFT JOIN genotypespecimen ON item.SpecimenId = genotypespecimen.SpecimenId ';
-      $get_geno_sql   .= 'WHERE itemgroupentry.ItemGroupId=? AND genotypespecimen.GenotypeId=?';
-
-      my ($verify_geno_err, $verified_geno_id) = read_cell($dbh_k_read, $get_geno_sql, [$ItemGroupId, $GenotypeId]);
-
-      if (length($verified_geno_id) == 0) {
-
-        my $err_msg = "GenotypeId ($GenotypeId) invalid.";
+        my $err_msg = "ItemGroupId ($ItemGroupId) not found.";
         $data_for_postrun_href->{'Error'} = 1;
         $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
@@ -4020,62 +4776,124 @@ sub add_plate_n_extract_runmode {
       }
     }
 
-    $get_geno_sql    = 'SELECT genotypespecimen.GenotypeId ';
-    $get_geno_sql   .= 'FROM itemgroupentry LEFT JOIN item ON itemgroupentry.ItemId = item.ItemId ';
-    $get_geno_sql   .= 'LEFT JOIN genotypespecimen ON item.SpecimenId = genotypespecimen.SpecimenId ';
-    $get_geno_sql   .= 'WHERE itemgroupentry.ItemGroupId=?';
+    my $get_geno_sql = '';
 
-    my ($get_geno_err, $get_geno_msg, $geno_data) = read_data($dbh_k_read, $get_geno_sql, [$ItemGroupId]);
+    if (defined $GenotypeId ) {
 
-    if ($get_geno_err) {
+      if (defined $ItemGroupId) {
 
-      $self->logger->debug($get_geno_msg);
+        $get_geno_sql    = 'SELECT genotypespecimen.GenotypeId ';
+        $get_geno_sql   .= 'FROM itemgroupentry LEFT JOIN item ON itemgroupentry.ItemId = item.ItemId ';
+        $get_geno_sql   .= 'LEFT JOIN genotypespecimen ON item.SpecimenId = genotypespecimen.SpecimenId ';
+        $get_geno_sql   .= 'WHERE itemgroupentry.ItemGroupId=? AND genotypespecimen.GenotypeId=?';
 
-      my $err_msg = "Unexpected Error.";
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+        my ($verify_geno_err, $verified_geno_id) = read_cell($dbh_k_read, $get_geno_sql, [$ItemGroupId, $GenotypeId]);
 
-      return $data_for_postrun_href;
-    }
+        if (length($verified_geno_id) == 0) {
 
-    for my $geno_rec (@{$geno_data}) {
+          my $err_msg = "GenotypeId ($GenotypeId): not found";
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
-      my $geno_id = $geno_rec->{'GenotypeId'};
-      $seen_geno_id->{$geno_id} = 1;
+          return $data_for_postrun_href;
+        }
 
-      $geno2itemgroup->{$geno_id} = $ItemGroupId;
-    }
+        $get_geno_sql    = 'SELECT genotypespecimen.GenotypeId ';
+        $get_geno_sql   .= 'FROM itemgroupentry LEFT JOIN item ON itemgroupentry.ItemId = item.ItemId ';
+        $get_geno_sql   .= 'LEFT JOIN genotypespecimen ON item.SpecimenId = genotypespecimen.SpecimenId ';
+        $get_geno_sql   .= 'WHERE itemgroupentry.ItemGroupId=?';
 
-    if (length($WellRow) == 0) {
+        my ($get_geno_err, $get_geno_msg, $geno_data) = read_data($dbh_k_read, $get_geno_sql, [$ItemGroupId]);
 
-      my $err_msg = "WellRow is missing.";
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+        if ($get_geno_err) {
 
-      return $data_for_postrun_href;
-    }
+          $self->logger->debug($get_geno_msg);
 
-    if (length($WellCol) == 0) {
+          my $err_msg = "Unexpected Error.";
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
-      my $err_msg = "WellCol is missing.";
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+          return $data_for_postrun_href;
+        }
 
-      return $data_for_postrun_href;
-    }
+        for my $geno_rec (@{$geno_data}) {
 
-    my $well = $WellRow . $WellCol;
-    if (defined($uniq_well->{$well})) {
+          my $geno_id = $geno_rec->{'GenotypeId'};
+          $seen_geno_id->{$geno_id} = 1;
 
-      my $err_msg = "Well ($well) has been used in more than one extract.";
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+          $geno2itemgroup->{$geno_id} = $ItemGroupId;
+        }
+      }
+      else {
 
-      return $data_for_postrun_href;
+        if (!record_existence($dbh_k_read, 'genotype', 'GenotypeId', $GenotypeId)) {
+
+          my $err_msg = "GenotypeId ($GenotypeId): not found.";
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'GenotypeId' => $err_msg}]};
+
+          return $data_for_postrun_href;
+        }
+
+        $seen_geno_id->{$GenotypeId} = 1;
+      }
     }
     else {
 
-      $uniq_well->{$well} = 1;
+      if (defined $ItemGroupId) {
+
+        $get_geno_sql    = 'SELECT genotypespecimen.GenotypeId ';
+        $get_geno_sql   .= 'FROM itemgroupentry LEFT JOIN item ON itemgroupentry.ItemId = item.ItemId ';
+        $get_geno_sql   .= 'LEFT JOIN genotypespecimen ON item.SpecimenId = genotypespecimen.SpecimenId ';
+        $get_geno_sql   .= 'WHERE itemgroupentry.ItemGroupId=?';
+
+        my ($get_geno_err, $get_geno_msg, $geno_data) = read_data($dbh_k_read, $get_geno_sql, [$ItemGroupId]);
+
+        if ($get_geno_err) {
+
+          $self->logger->debug($get_geno_msg);
+
+          my $err_msg = "Unexpected Error.";
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+          return $data_for_postrun_href;
+        }
+
+        for my $geno_rec (@{$geno_data}) {
+
+          my $geno_id = $geno_rec->{'GenotypeId'};
+          $seen_geno_id->{$geno_id} = 1;
+
+          $geno2itemgroup->{$geno_id} = $ItemGroupId;
+        }
+      }
+    }
+
+    if ( (defined $WellRow) && (defined $WellCol) ) {
+
+      my $well = $WellRow . $WellCol;
+      if (defined($uniq_well->{$well})) {
+
+        my $err_msg = "Well ($well) has been used in more than one extract.";
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+        return $data_for_postrun_href;
+      }
+      else {
+
+        $uniq_well->{$well} = 1;
+      }
+    }
+
+    if ( (!(defined $ItemGroupId)) && (!(defined $GenotypeId)) ) {
+
+      my $err_msg = "GenotypeId and ItemGroupId: both missing.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
     }
   }
 
@@ -4093,8 +4911,11 @@ sub add_plate_n_extract_runmode {
 
     for my $trouble_geno_id (@{$trouble_geno_id_aref}) {
 
-      my $trouble_ig_id = $geno2itemgroup->{$trouble_geno_id};
-      $trouble_itemgroup_id{$trouble_ig_id} = 1;
+      if (defined $geno2itemgroup->{$trouble_geno_id}) {
+
+        my $trouble_ig_id = $geno2itemgroup->{$trouble_geno_id};
+        $trouble_itemgroup_id{$trouble_ig_id} = 1;
+      }
     }
 
     my @trouble_itemgroup_id_list = keys(%trouble_itemgroup_id);
@@ -4103,7 +4924,7 @@ sub add_plate_n_extract_runmode {
 
     $self->logger->debug("Permission denied: ItemId $trouble_itemgroup_id_str");
 
-    my $err_msg = 'Permission denied: ItemGroupId (' . $trouble_itemgroup_id_str . ')';
+    my $err_msg = 'Permission denied: GenotypeId (' . join(',', @{$trouble_geno_id_aref}) . ')';
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
@@ -4219,21 +5040,35 @@ sub add_plate_n_extract_runmode {
     }
   }
 
+  $sql  = q|INSERT INTO "extract"("ExtractId","ParentExtractId","PlateId","ItemGroupId","GenotypeId","Tissue",|;
+  $sql .= q|"WellRow","WellCol","Quality","Status")|;
+  $sql .= ' VALUES ';
+
+  my @extract_sql_rec_list;
+
   for my $extract_rec (@{$extract_aref}) {
 
-    my $ItemGroupId        = $extract_rec->{'ItemGroupId'};
+    my $ItemGroupId        = 'NULL';
 
-    my $ParentExtractId = '0';
+    if (defined $extract_rec->{'ItemGroupId'}) {
+
+      if (length($extract_rec->{'ItemGroupId'}) > 0) {
+
+        $ItemGroupId        = $extract_rec->{'ItemGroupId'};
+      }
+    }
+
+    my $ParentExtractId = 'NULL';
 
     if (defined($extract_rec->{'ParentExtractId'})) {
 
-      if ($extract_rec->{'ParentExtractId'} ne '0') {
+      if (length($extract_rec->{'ParentExtractId'}) > 0) {
 
         $ParentExtractId = $extract_rec->{'ParentExtractId'};
       }
     }
 
-    my $GenotypeId = '0';
+    my $GenotypeId = 'NULL';
 
     if (defined($extract_rec->{'GenotypeId'})) {
 
@@ -4243,53 +5078,45 @@ sub add_plate_n_extract_runmode {
       }
     }
 
-    my $Tissue = '0';
+    my $Tissue = $extract_rec->{'Tissue'};
 
-    if (defined($extract_rec->{'Tissue'})) {
-
-      if (length($extract_rec->{'Tissue'}) > 0) {
-
-        $Tissue = $extract_rec->{'Tissue'};
-      }
-    }
-
-    my $WellRow = '';
+    my $WellRow = 'NULL';
 
     if (defined($extract_rec->{'WellRow'})) {
 
       if (length($extract_rec->{'WellRow'}) > 0) {
 
-        $WellRow = $extract_rec->{'WellRow'};
+        $WellRow = $dbh_m_write->quote($extract_rec->{'WellRow'});
       }
     }
 
-    my $WellCol = '';
+    my $WellCol = 'NULL';
 
     if (defined($extract_rec->{'WellCol'})) {
 
       if (length($extract_rec->{'WellCol'}) > 0) {
 
-        $WellCol = $extract_rec->{'WellCol'};
+        $WellCol = $dbh_m_write->quote($extract_rec->{'WellCol'});
       }
     }
 
-    my $Quality = '';
+    my $Quality = 'NULL';
 
     if (defined($extract_rec->{'Quality'})) {
 
       if (length($extract_rec->{'Quality'}) > 0) {
 
-        $Quality = $extract_rec->{'Quality'};
+        $Quality = $dbh_m_write->quote($extract_rec->{'Quality'});
       }
     }
 
-    my $Status = '';
+    my $Status = 'NULL';
 
     if (defined($extract_rec->{'Status'})) {
 
       if (length($extract_rec->{'Status'}) > 0) {
 
-        $Status = $extract_rec->{'Status'};
+        $Status = $dbh_m_write->quote($extract_rec->{'Status'});
       }
     }
 
@@ -4305,42 +5132,21 @@ sub add_plate_n_extract_runmode {
       return $data_for_postrun_href;
     }
 
-    $sql  = 'INSERT INTO "extract"(';
-    $sql .= '"ExtractId", ';
-    $sql .= '"ParentExtractId", ';
-    $sql .= '"PlateId", ';
-    $sql .= '"ItemGroupId", ';
-    $sql .= '"GenotypeId", ';
-    $sql .= '"Tissue", ';
-    $sql .= '"WellRow", ';
-    $sql .= '"WellCol", ';
-    $sql .= '"Quality", ';
-    $sql .= '"Status") ';
-    $sql .= 'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
+    my $extract_sql_rec_str = qq|(${ext_id},${ParentExtractId},${plate_id},${ItemGroupId},${GenotypeId},${Tissue},|;
+    $extract_sql_rec_str   .= qq|${WellRow},${WellCol},${Quality},${Status})|;
+
+    push(@extract_sql_rec_list, $extract_sql_rec_str);
+  }
+
+  if (scalar(@extract_sql_rec_list) > 0) {
+
+    $sql .= join(',', @extract_sql_rec_list);
 
     $sth = $dbh_m_write->prepare($sql);
-    $sth->execute($ext_id, $ParentExtractId, $plate_id, $ItemGroupId, $GenotypeId,
-                  $Tissue, $WellRow, $WellCol, $Quality, $Status);
+    $sth->execute();
 
     my $extract_id = -1;
-    if (!$dbh_m_write->err()) {
-
-      $extract_id = $ext_id;
-      $self->logger->debug("ExtractId: $extract_id");
-
-      if ( !(defined($inserted_id->{'extract'})) ) {
-
-        $inserted_id->{'extract'} = { 'IdField' => 'ExtractId',
-                                      'IdValue' => [$extract_id] };
-      }
-      else {
-
-        my $id_val_sofar_aref = $inserted_id->{'extract'}->{'IdValue'};
-        push(@{$id_val_sofar_aref}, $extract_id);
-        $inserted_id->{'extract'}->{'IdValue'} = $id_val_sofar_aref;
-      }
-    }
-    else {
+    if ($dbh_m_write->err()) {
 
       $self->logger->debug("SQL err: " . $dbh_m_write->errstr());
 
@@ -4996,6 +5802,939 @@ sub list_dataset {
   return ($err, $msg, \@extra_attr_dataset_data);
 }
 
+sub import_plate_n_extract_runmode {
+
+=pod import_plate_n_extract_gadmin_HELP_START
+{
+"OperationName" : "Import plates and extracts at the same time",
+"Description": "Import DNA plates and extracts together. Allows to define entire plate and contents in one call.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 1,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"KDDArTModule": "marker",
+"KDDArTTable": "plate",
+"KDDArTFactorTable": "platefactor",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='1 plates and 2 extracts have been inserted successfully.' /><ReturnIdFile xml='http://blackbox.diversityarrays.com/data/admin/import_plate_n_extract_gadmin_return_id_182.xml' /><StatInfo ServerElapsedTime='0.069' Unit='second' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : '1 plates and 2 extracts have been inserted successfully.'}],'ReturnIdFile' : [{'json' : 'http://blackbox.diversityarrays.com/data/admin/import_plate_n_extract_gadmin_return_id_190.json'}],'StatInfo' : [{'Unit' : 'second','ServerElapsedTime' : '0.089'}]}",
+"ErrorMessageXML": [{}],
+"ErrorMessageJSON": [{}],
+"RequiredUpload": 1,
+"UploadFileFormat": "XML",
+"UploadFileParameterName": "uploadfile",
+"DTDFileNameForUploadXML": "import_plate_n_extract.dtd",
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self  = shift;
+  my $query = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  my $impt_plt_ext_xml_file = $self->authen->get_upload_file();
+  my $impt_plt_ext_dtd_file = $self->get_import_plate_n_extract_dtd_file();
+
+  add_dtd($impt_plt_ext_dtd_file, $impt_plt_ext_xml_file);
+
+  $self->logger->debug("Impt_Plt_Ext XML file: $impt_plt_ext_xml_file");
+
+  my $xml_checker_parser = new XML::Checker::Parser( Handlers => { } );
+
+  eval {
+
+    local $XML::Checker::FAIL = sub {
+
+      my $code = shift;
+      my $err_str = XML::Checker::error_string ($code, @_);
+      $self->logger->debug("XML Parsing ERR: $code : $err_str");
+      die $err_str;
+    };
+    $xml_checker_parser->parsefile($impt_plt_ext_xml_file);
+  };
+
+  if ($@) {
+
+    my $err_msg = $@;
+    $self->logger->debug("Parsing XML error: $err_msg");
+    my $user_err_msg = "Import plate and extract xml upload file does not comply with its definition.\n";
+    $user_err_msg   .= "Details: $err_msg";
+
+    $data_for_postrun_href->{'Error'}       = 1;
+    $data_for_postrun_href->{'Data'}        = {'Error' => [{'Message' => $user_err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $dbh_m_read = connect_mdb_read();
+  my $dbh_k_read = connect_kdb_read();
+
+  my ($get_ext_scol_err, $get_ext_scol_msg, $ext_scol_data, $ext_pkey_data) = get_static_field($dbh_m_read, 'extract');
+
+  if ($get_ext_scol_err) {
+
+    $self->logger->debug("Get static field info failed: $get_ext_scol_msg");
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my ($get_plt_scol_err, $get_plt_scol_msg, $plt_scol_data, $plt_pkey_data) = get_static_field($dbh_m_read, 'plate');
+
+  if ($get_plt_scol_err) {
+
+    $self->logger->debug("Get static field info failed: $get_plt_scol_msg");
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $impt_plt_ext_xml = read_file($impt_plt_ext_xml_file);
+  my $plate_aref       = xml2arrayref($impt_plt_ext_xml, 'plate');
+
+  my $cur_dt = DateTime->now( time_zone => $TIMEZONE );
+  $cur_dt = DateTime::Format::MySQL->format_datetime($cur_dt);
+
+  my $uniq_plate_name_href        = {};
+
+  my $uniq_user_id_href           = {};
+  my $uniq_plate_type_href        = {};
+  my $uniq_storage_id_href        = {};
+
+  my $uniq_itm_grp_id_geno_id_href     = {};
+  my $uniq_itm_grp_id_href             = {};
+  my $uniq_geno_id_href                = {};
+  my $uniq_parent_extract_id_href      = {};
+
+  my $user_id = $self->authen->user_id();
+
+  my $all_extract_aref = [];
+
+  foreach my $plate_rec (@{$plate_aref}) {
+
+    my $uniq_well_href = {};
+
+    my $PlateName       = $plate_rec->{'PlateName'};
+    my $OperatorId      = $user_id;
+
+    if (defined $plate_rec->{'OperatorId'}) {
+
+      if (length($plate_rec->{'OperatorId'}) > 0) {
+
+        $OperatorId = $plate_rec->{'OperatorId'};
+      }
+    }
+
+    $uniq_user_id_href->{$OperatorId} = 1;
+
+    my $PlateType        = undef;
+
+    if ( defined($plate_rec->{'PlateType'}) ) {
+
+      if (length($plate_rec->{'PlateType'}) > 0) {
+
+        $PlateType = $plate_rec->{'PlateType'};
+        $uniq_plate_type_href->{$PlateType} = 1;
+      }
+    }
+
+    my $StorageId        = undef;
+
+    if (defined($plate_rec->{'StorageId'})) {
+
+      if (length($plate_rec->{'StorageId'}) > 0) {
+
+        $StorageId = $plate_rec->{'StorageId'};
+        $uniq_storage_id_href->{$StorageId} = 1;
+      }
+    }
+
+    my $PlateWells       = undef;
+
+    if (defined($plate_rec->{'PlateWells'})) {
+
+      if (length($plate_rec->{'PlateWells'}) > 0) {
+
+        $PlateWells = $plate_rec->{'PlateWells'};
+      }
+    }
+
+    if (defined($plate_rec->{'DateCreated'})) {
+
+      if (length($plate_rec->{'DateCreated'}) > 0) {
+
+        my ($cdate_err, $cdate_href) = check_dt_href( {'DateCreated' => $plate_rec->{'DateCreated'}} );
+
+        if ($cdate_err) {
+
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [$cdate_href]};
+
+          return $data_for_postrun_href;
+        }
+      }
+    }
+
+    if (length($PlateWells) > 0) {
+
+      my ($int_err, $int_href) = check_integer_href( {'PlateWells' => $PlateWells} );
+
+      if ($int_err) {
+
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [$int_href]};
+
+        return $data_for_postrun_href;
+      }
+    }
+
+    my $colsize_info          = {};
+    my $chk_maxlen_field_href = {};
+
+    for my $static_field (@{$plt_scol_data}) {
+
+      my $field_name  = $static_field->{'Name'};
+      my $field_dtype = $static_field->{'DataType'};
+
+      if (lc($field_dtype) eq 'varchar') {
+
+        $colsize_info->{$field_name}           = $static_field->{'ColSize'};
+        $chk_maxlen_field_href->{$field_name}  = $plate_rec->{$field_name};
+      }
+    }
+
+    my ($maxlen_err, $maxlen_msg) = check_maxlen($chk_maxlen_field_href, $colsize_info);
+
+    if ($maxlen_err) {
+
+      $maxlen_msg .= 'longer than its maximum length';
+
+      $data_for_postrun_href->{'Error'}       = 1;
+      $data_for_postrun_href->{'Data'}        = {'Error' => [{'Message' => $maxlen_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    $self->logger->debug("PlateName: $PlateName");
+
+    if (defined $uniq_plate_name_href->{qq|'$PlateName'|}) {
+
+      my $err_msg = "PlateName ($PlateName): duplicate";
+
+      $data_for_postrun_href->{'Error'}       = 1;
+      $data_for_postrun_href->{'Data'}        = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+    }
+    else {
+
+      $uniq_plate_name_href->{qq|'$PlateName'|} = 1;
+    }
+
+    my $extract_aref = $plate_rec->{'extract'};
+
+    foreach my $extract_rec (@{$extract_aref}) {
+
+      $extract_rec->{'PlateName'} = $PlateName;
+
+      push(@{$all_extract_aref}, $extract_rec);
+
+      my $colsize_info          = {};
+      my $chk_maxlen_field_href = {};
+
+      for my $static_field (@{$ext_scol_data}) {
+
+        my $field_name  = $static_field->{'Name'};
+        my $field_dtype = $static_field->{'DataType'};
+
+        if (lc($field_dtype) eq 'varchar') {
+
+          $colsize_info->{$field_name}           = $static_field->{'ColSize'};
+          $chk_maxlen_field_href->{$field_name}  = $extract_rec->{$field_name};
+        }
+      }
+
+      my ($maxlen_err, $maxlen_msg) = check_maxlen($chk_maxlen_field_href, $colsize_info);
+
+      if ($maxlen_err) {
+
+        $maxlen_msg .= 'longer than its maximum length';
+
+        $data_for_postrun_href->{'Error'}       = 1;
+        $data_for_postrun_href->{'Data'}        = {'Error' => [{'Message' => $maxlen_msg}]};
+
+        return $data_for_postrun_href;
+      }
+
+      my $ItemGroupId = undef;
+
+      if (defined($extract_rec->{'ItemGroupId'})) {
+
+        if (length($extract_rec->{'ItemGroupId'}) > 0) {
+
+          $ItemGroupId = $extract_rec->{'ItemGroupId'};
+          $uniq_itm_grp_id_href->{$ItemGroupId} = 1;
+        }
+      }
+
+      my $ParentExtractId = undef;
+
+      if (defined($extract_rec->{'ParentExtractId'})) {
+
+        if (length($extract_rec->{'ParentExtractId'}) > 0) {
+
+          $ParentExtractId = $extract_rec->{'ParentExtractId'};
+          $uniq_parent_extract_id_href->{$ParentExtractId} = 1;
+        }
+      }
+
+      my $GenotypeId = undef;
+
+      if (defined($extract_rec->{'GenotypeId'})) {
+
+        if (length($extract_rec->{'GenotypeId'}) > 0) {
+
+          $GenotypeId = $extract_rec->{'GenotypeId'};
+          $uniq_geno_id_href->{$GenotypeId} = 1;
+        }
+      }
+
+      my $Tissue = $extract_rec->{'Tissue'};
+
+      my $WellRow = undef;
+
+      if (defined($extract_rec->{'WellRow'})) {
+
+        if (length($extract_rec->{'WellRow'}) > 0) {
+
+          $WellRow = $extract_rec->{'WellRow'};
+        }
+      }
+
+      my $WellCol = undef;
+
+      if (defined($extract_rec->{'WellCol'})) {
+
+        if (length($extract_rec->{'WellCol'}) > 0) {
+
+          $WellCol = $extract_rec->{'WellCol'};
+        }
+      }
+
+      if ( (defined $WellRow) && (defined $WellCol) ) {
+
+        my $well = $WellRow . $WellCol;
+        if (defined($uniq_well_href->{$well})) {
+
+          my $err_msg = "PlateName ($PlateName) - Well ($well) has been used in more than one extract.";
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+          return $data_for_postrun_href;
+        }
+        else {
+
+          $uniq_well_href->{$well} = 1;
+        }
+      }
+
+      if ( (!(defined $ItemGroupId)) && (!(defined $GenotypeId)) ) {
+
+        my $err_msg = "GenotypeId and ItemGroupId: both missing.";
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+        return $data_for_postrun_href;
+      }
+      elsif ( (defined $ItemGroupId) && (defined $GenotypeId) ) {
+
+        $uniq_itm_grp_id_geno_id_href->{qq|($ItemGroupId,$GenotypeId)|} = 1;
+      }
+    }
+  }
+
+  my $group_id       = $self->authen->group_id();
+  my $gadmin_status  = $self->authen->gadmin_status();
+
+  my $sql = '';
+  my $sth;
+
+  my @user_id_list = keys(%{$uniq_user_id_href});
+
+  $self->logger->debug("UserId list: " . join(',', @user_id_list));
+
+  my ($user_id_exist_err, $user_id_exist_msg,
+      $unfound_user_id_aref, $found_user_id_aref) = record_existence_bulk($dbh_k_read, 'systemuser', 'UserId', \@user_id_list);
+
+  if ($user_id_exist_err) {
+
+    $self->logger->debug("Check recorod existence bulk failed: $user_id_exist_msg");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (scalar(@{$unfound_user_id_aref}) > 0) {
+
+    my $unfound_user_id_csv = join(',', @{$unfound_user_id_aref});
+
+    my $err_msg = "UserId ($unfound_user_id_csv): not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my @plate_name_list = keys(%{$uniq_plate_name_href});
+
+  my ($plt_name_exist_err, $plt_name_exist_msg,
+      $unfound_plt_name_aref, $found_plt_name_aref) = record_existence_bulk($dbh_m_read, 'plate', 'PlateName', \@plate_name_list);
+
+  if ($plt_name_exist_err) {
+
+    $self->logger->debug("Check recorod existence bulk failed: $plt_name_exist_msg");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (scalar(@{$found_plt_name_aref}) > 0) {
+
+    my $found_plt_name_csv = join(',', @{$found_plt_name_aref});
+
+    my $err_msg = "PlateName ($found_plt_name_csv): already exist.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my @plate_type_list = keys(%{$uniq_plate_type_href});
+
+  my ($plt_type_exist_err, $plt_type_exist_msg,
+      $unfound_plt_type_aref, $found_plt_type_aref) = record_existence_bulk($dbh_k_read, 'generaltype',
+                                                                            'TypeId', \@plate_type_list, qq|Class='plate'|);
+
+  if ($plt_type_exist_err) {
+
+    $self->logger->debug("Check recorod existence bulk failed: $plt_type_exist_msg");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (scalar(@{$unfound_plt_type_aref}) > 0) {
+
+    my $unfound_plt_type_csv = join(',', @{$unfound_plt_type_aref});
+
+    my $err_msg = "PlateType ($unfound_plt_type_csv): not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my @storage_id_list = keys(%{$uniq_storage_id_href});
+
+  my ($storage_id_exist_err, $storage_id_exist_msg,
+      $unfound_storage_id_aref, $found_storage_id_aref) = record_existence_bulk($dbh_k_read, 'storage',
+                                                                                'StorageId', \@storage_id_list);
+
+  if ($storage_id_exist_err) {
+
+    $self->logger->debug("Check recorod existence bulk failed: $storage_id_exist_msg");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (scalar(@{$unfound_storage_id_aref}) > 0) {
+
+    my $unfound_storage_id_csv = join(',', @{$unfound_storage_id_aref});
+
+    my $err_msg = "StorageId ($unfound_storage_id_csv): not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my @parent_ext_id_list = keys(%{$uniq_parent_extract_id_href});
+
+  my ($parent_ext_id_exist_err, $parent_ext_id_exist_msg,
+      $unfound_parent_ext_id_aref, $found_parent_ext_id_aref) = record_existence_bulk($dbh_m_read, 'storage',
+                                                                                      'ExtractId', \@parent_ext_id_list);
+
+  if ($parent_ext_id_exist_err) {
+
+    $self->logger->debug("Check recorod existence bulk failed: $parent_ext_id_exist_msg");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (scalar(@{$unfound_parent_ext_id_aref}) > 0) {
+
+    my $unfound_parent_ext_id_csv = join(',', @{$unfound_parent_ext_id_aref});
+
+    my $err_msg = "ParentExtractId ($unfound_parent_ext_id_csv): not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my @geno_id_list = keys(%{$uniq_geno_id_href});
+
+  if (scalar(@geno_id_list) > 0) {
+
+    my ($geno_id_exist_err, $geno_id_exist_msg,
+        $unfound_geno_id_aref, $found_geno_id_aref) = record_existence_bulk($dbh_k_read, 'genotype', 'GenotypeId', \@geno_id_list);
+
+    if ($geno_id_exist_err) {
+
+      $self->logger->debug("Check recorod existence bulk failed: $geno_id_exist_msg");
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    if (scalar(@{$unfound_geno_id_aref}) > 0) {
+
+      my $unfound_geno_id_csv = join(',', @{$unfound_geno_id_aref});
+
+      my $err_msg = "GenotypeId ($unfound_geno_id_csv): not found.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my ($is_ok, $trouble_geno_id_aref) = check_permission($dbh_k_read, 'genotype', 'GenotypeId',
+                                                          \@geno_id_list, $group_id, $gadmin_status,
+                                                          $LINK_PERM);
+    if (!$is_ok) {
+
+      my $perm_denied_geno_id_csv = join(',', @{$trouble_geno_id_aref});
+
+      my $err_msg = "GenotypeId ($perm_denied_geno_id_csv): permission denied.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  my @itm_grp_id_list = keys(%{$uniq_itm_grp_id_href});
+
+  if (scalar(@itm_grp_id_list) > 0) {
+
+    my ($itm_grp_id_exist_err, $itm_grp_id_exist_msg,
+        $unfound_itm_grp_id_aref, $found_itm_grp_id_aref) = record_existence_bulk($dbh_k_read, 'itemgroup', 'ItemGroupId', \@itm_grp_id_list);
+
+    if ($itm_grp_id_exist_err) {
+
+      $self->logger->debug("Check recorod existence bulk failed: $itm_grp_id_exist_msg");
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    if (scalar(@{$unfound_itm_grp_id_aref}) > 0) {
+
+      my $unfound_itm_grp_id_csv = join(',', @{$unfound_itm_grp_id_aref});
+
+      my $err_msg = "ItemGroupId ($unfound_itm_grp_id_csv): not found.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my $itm_grp_id_csv = join(',', @itm_grp_id_list);
+
+    my $perm_str = permission_phrase($group_id, 0, $gadmin_status, 'genotype');
+
+    $sql    = "SELECT itemgroupentry.ItemGroupId, genotypespecimen.GenotypeId ";
+    $sql   .= "FROM itemgroupentry LEFT JOIN item ON itemgroupentry.ItemId = item.ItemId ";
+    $sql   .= "LEFT JOIN genotypespecimen ON item.SpecimenId = genotypespecimen.SpecimenId ";
+    $sql   .= "LEFT JOIN genotype ON genotypespecimen.GenotypeId = genotype.GenotypeId ";
+    $sql   .= "WHERE itemgroupentry.ItemGroupId IN ($itm_grp_id_csv) AND ";
+    $sql   .= "(($perm_str) & $READ_PERM) = $READ_PERM";
+
+    $sth = $dbh_k_read->prepare($sql);
+    $sth->execute();
+
+    my $db_perm_itm_grp_id2geno_id_href = $sth->fetchall_hashref('ItemGroupId');
+
+    if ($dbh_k_read->err()) {
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    $sth->finish();
+
+    my @perm_denied_itm_grp_id_list;
+    my @conflict_itm_grp_id_list;
+
+    foreach my $itm_grp_id (@itm_grp_id_list) {
+
+      if ( !(defined $db_perm_itm_grp_id2geno_id_href->{$itm_grp_id}) ) {
+
+        push(@perm_denied_itm_grp_id_list, $itm_grp_id);
+      }
+      else {
+
+        my $geno_id = $db_perm_itm_grp_id2geno_id_href->{$itm_grp_id}->{'GenotypeId'};
+
+        if ( !(defined $uniq_itm_grp_id_geno_id_href->{qq|(${itm_grp_id},${geno_id})|}) ) {
+
+          push(@conflict_itm_grp_id_list, $itm_grp_id);
+        }
+      }
+    }
+
+    if (scalar(@perm_denied_itm_grp_id_list) > 0) {
+
+      my $perm_denied_itm_grp_id_csv = join(',', @perm_denied_itm_grp_id_list);
+
+      my $err_msg = "ItemGroupId ($perm_denied_itm_grp_id_csv): permission denied.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    if (scalar(@conflict_itm_grp_id_list) > 0) {
+
+      my $conflict_itm_grp_id_csv = join(',', @conflict_itm_grp_id_list);
+
+      my $err_msg = "ItemGroupId ($conflict_itm_grp_id_csv): conflicted genotype.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  $dbh_k_read->disconnect();
+  $dbh_m_read->disconnect();
+
+  my $dbh_m_write = connect_mdb_write();
+
+  my @plate_sql_list;
+
+  foreach my $plate_rec (@{$plate_aref}) {
+
+    my $PlateName       = $plate_rec->{'PlateName'};
+    my $OperatorId      = $user_id;
+
+    if (defined $plate_rec->{'OperatorId'}) {
+
+      if (length($plate_rec->{'OperatorId'}) > 0) {
+
+        $OperatorId = $plate_rec->{'OperatorId'};
+      }
+    }
+
+    my $PlateType       = 'NULL';
+
+    if ( defined($plate_rec->{'PlateType'}) ) {
+
+      if (length($plate_rec->{'PlateType'}) > 0) {
+
+        $PlateType = $plate_rec->{'PlateType'};
+      }
+    }
+
+    my $StorageId        = 'NULL';
+
+    if (defined($plate_rec->{'StorageId'})) {
+
+      if (length($plate_rec->{'StorageId'}) > 0) {
+
+        $StorageId = $plate_rec->{'StorageId'};
+      }
+    }
+
+    my $PlateWells       = 'NULL';
+
+    if (defined($plate_rec->{'PlateWells'})) {
+
+      if (length($plate_rec->{'PlateWells'}) > 0) {
+
+        $PlateWells = $plate_rec->{'PlateWells'};
+      }
+    }
+
+    my $DateCreated = $cur_dt;
+
+    if (defined($plate_rec->{'DateCreated'})) {
+
+      if (length($plate_rec->{'DateCreated'}) > 0) {
+
+        $DateCreated = $plate_rec->{'DateCreated'};
+      }
+    }
+
+    my $PlateDesc = 'NULL';
+
+    if (defined($plate_rec->{'PlateDescription'})) {
+
+      if (length($plate_rec->{'PlateDescription'}) > 0) {
+
+        $PlateDesc = $dbh_m_write->quote($plate_rec->{'PlateDescription'});
+      }
+    }
+
+    my $PlateStatus = 'NULL';
+
+    if (defined($plate_rec->{'PlateStatus'})) {
+
+      if (length($plate_rec->{'PlateStatus'}) > 0) {
+
+        $PlateStatus = $dbh_m_write->quote($plate_rec->{'PlateStatus'});
+      }
+    }
+
+    my ($next_val_err, $next_val_msg, $plt_id) = get_next_value_for($dbh_m_write, 'plate', 'PlateId');
+
+    if ($next_val_err) {
+
+      $self->logger->debug($next_val_msg);
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    $uniq_plate_name_href->{qq|'$PlateName'|} = $plt_id;
+
+    my $plate_row_sql = qq|($plt_id,'$PlateName','$DateCreated',$OperatorId,$PlateType,$PlateDesc,$StorageId,$PlateWells,$PlateStatus)|;
+    push(@plate_sql_list, $plate_row_sql);
+  }
+
+  $sql  = qq|INSERT INTO "plate" |;
+  $sql .= qq|("PlateId","PlateName","DateCreated","OperatorId","PlateType","PlateDescription","StorageId","PlateWells","PlateStatus") |;
+  $sql .= qq|VALUES | . join(',', @plate_sql_list);
+
+  $self->logger->debug("SQL: $sql");
+
+  my ($imp_plt_err, $imp_plt_msg) = execute_sql($dbh_m_write, $sql, []);
+
+  if ($imp_plt_err) {
+
+    $self->logger->debug("Import plate failed: $imp_plt_msg");
+    my $err_msg = "Unexpected Error.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $return_id_aref = [];
+
+  my @extract_sql_list;
+
+  foreach my $extract_rec (@{$all_extract_aref}) {
+
+    my $plt_name = $extract_rec->{'PlateName'};
+    my $plt_id   = $uniq_plate_name_href->{qq|'$plt_name'|};
+
+    my $ItemGroupId = 'NULL';
+
+    if (defined($extract_rec->{'ItemGroupId'})) {
+
+      if (length($extract_rec->{'ItemGroupId'}) > 0) {
+
+        $ItemGroupId = $extract_rec->{'ItemGroupId'};
+      }
+    }
+
+    my $ParentExtractId = 'NULL';
+
+    if (defined($extract_rec->{'ParentExtractId'})) {
+
+      if (length($extract_rec->{'ParentExtractId'}) > 0) {
+
+        $ParentExtractId = $extract_rec->{'ParentExtractId'};
+      }
+    }
+
+    my $GenotypeId = 'NULL';
+
+    if (defined($extract_rec->{'GenotypeId'})) {
+
+      if (length($extract_rec->{'GenotypeId'}) > 0) {
+
+        $GenotypeId = $extract_rec->{'GenotypeId'};
+      }
+    }
+
+    my $Tissue    = $extract_rec->{'Tissue'};
+    my $WellRow   = $extract_rec->{'WellRow'};
+    my $WellCol   = $extract_rec->{'WellCol'};
+
+    my $Quality   = 'NULL';
+
+    if (defined($extract_rec->{'Quality'})) {
+
+      if (length($extract_rec->{'Quality'}) > 0) {
+
+        $Quality = $dbh_m_write->quote($extract_rec->{'Quality'});
+      }
+    }
+
+    my $Status = 'NULL';
+
+    if (defined($extract_rec->{'Status'})) {
+
+      if (length($extract_rec->{'Status'}) > 0) {
+
+        $Status = $dbh_m_write->quote($extract_rec->{'Status'});
+      }
+    }
+
+    my ($next_val_err, $next_val_msg, $ext_id) = get_next_value_for($dbh_m_write, 'extract', 'ExtractId');
+
+    if ($next_val_err) {
+
+      $self->logger->debug($next_val_msg);
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my $returned_extract_rec = {'ExtractId' => $ext_id,
+                                'PlateName' => $plt_name,
+                                'PlateId'   => $plt_id,
+                                'WellRow'   => $WellRow,
+                                'WellCol'   => $WellCol
+                                };
+
+    my $ext_sql_row = qq|($ext_id,$ParentExtractId,$plt_id,$ItemGroupId,$GenotypeId,$Tissue,'$WellRow','$WellCol',$Quality,$Status)|;
+
+    push(@{$return_id_aref}, $returned_extract_rec);
+    push(@extract_sql_list, $ext_sql_row);
+  }
+
+  $sql  = qq|INSERT INTO "extract" |;
+  $sql .= qq|("ExtractId","ParentExtractId","PlateId","ItemGroupId","GenotypeId","Tissue","WellRow","WellCol","Quality","Status") |;
+  $sql .= qq|VALUES | . join(',', @extract_sql_list);
+
+  $self->logger->debug("SQL: $sql");
+
+  my ($imp_ext_err, $imp_ext_msg) = execute_sql($dbh_m_write, $sql, []);
+
+  if ($imp_ext_err) {
+
+    $self->logger->debug("Import extract failed: $imp_ext_msg");
+    my $err_msg = "Unexpected Error.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh_m_write->disconnect();
+
+  my $nb_plate    = scalar(@{$plate_aref});
+  my $nb_extract  = scalar(@{$all_extract_aref});
+
+  my $return_id_data = {};
+  $return_id_data->{'ReturnId'}     = $return_id_aref;
+  $return_id_data->{'AlternateKey'} = [{'FieldName' => 'PlateId'}, {'FieldName' => 'WellRow'}, {'FieldName' => 'WellCol'}];
+
+  my $content_type = '';
+
+  if ($self->authen->is_content_type_valid()) {
+
+    $content_type = $self->authen->get_content_type();
+  }
+
+  if (length($content_type) == 0) {
+
+    $content_type = 'xml';
+  }
+  else {
+
+    $content_type = lc($content_type);
+  }
+
+  my $file_rand            = makerandom(Size => 8, Strength => 0);
+  my $username             = $self->authen->username();
+  my $doc_root             = $ENV{'DOCUMENT_ROOT'};
+  my $export_data_path     = "${doc_root}/data/$username";
+  my $return_id_filename   = $self->get_current_runmode() . "_return_id_${file_rand}.${content_type}";
+  my $return_id_file       = "${export_data_path}/$return_id_filename";
+
+  if ( !(-e $export_data_path) ) {
+
+    mkdir($export_data_path);
+  }
+
+  my $return_id_content = '';
+
+  $self->logger->debug("Content type: $content_type");
+
+  if ($content_type eq 'xml') {
+
+    $return_id_content = make_empty_xml();
+    for my $xml_tag (keys(%{$return_id_data})) {
+
+      my $this_xml_content = arrayref2xml($return_id_data->{$xml_tag}, $xml_tag);
+      $return_id_content = merge_xml($this_xml_content, $return_id_content);
+    }
+  }
+  elsif ($content_type eq 'json') {
+
+    my $json_encoder = JSON::XS->new();
+    $json_encoder->pretty(1);
+    $json_encoder->utf8(1);
+    $return_id_content = $json_encoder->encode($return_id_data);
+  }
+
+  #$self->logger->debug("Return ID content: $return_id_content");
+
+  my $return_id_fh;
+  open($return_id_fh, ">:encoding(utf8)", "$return_id_file") or die "$return_id_file: $!";
+  print $return_id_fh $return_id_content;
+  close($return_id_fh);
+
+  my $url = reconstruct_server_url();
+  my $output_file_href = { "$content_type"  => "$url/data/$username/$return_id_filename" };
+
+  my $info_msg = "$nb_plate plates and $nb_extract extracts have been inserted successfully.";
+
+  my $info_msg_aref = [{'Message' => $info_msg}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info' => $info_msg_aref, 'ReturnIdFile' => [$output_file_href]};
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
 sub get_extract_dtd_file {
 
   my $dtd_path = $ENV{DOCUMENT_ROOT} . '/' . $DTD_PATH;
@@ -5015,6 +6754,13 @@ sub get_analysisgroup_dtd_file {
   my $dtd_path = $ENV{DOCUMENT_ROOT} . '/' . $DTD_PATH;
 
   return "${dtd_path}/analysisgroup.dtd";
+}
+
+sub get_import_plate_n_extract_dtd_file {
+
+  my $dtd_path = $ENV{DOCUMENT_ROOT} . '/' . $DTD_PATH;
+
+  return "${dtd_path}/import_plate_n_extract.dtd";
 }
 
 sub _set_error {

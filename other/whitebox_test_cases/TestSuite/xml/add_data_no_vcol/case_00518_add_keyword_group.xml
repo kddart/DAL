@@ -1,0 +1,15 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record_upload" Description="Add Keyword Group" TargetURL="add/keywordgroup" Type="BLOCKING" />
+  <Delete TargetURL="delete/keywordgroup/:KeywordGroupId" />
+  <INPUT ParaName="KeywordGroupName" PrefixVal="KeywordGroup_" Random="1" />
+  <INPUT ParaName="keywordgroupentry" Process="1" SrcFile="xml/add_data_no_vcol/keywordgroup.xml" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Match Attr="ParaName" Tag="ReturnId" Value="KeywordGroupId" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00517_add_keyword1.xml" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00515_add_keyword.xml" Order="4" />
+  <ReturnId ParaName="KeywordGroupId" Value="19" />
+  <RunInfo Success="1" Time="1474007408" />
+</TestCase>

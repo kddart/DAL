@@ -1,9 +1,9 @@
 <TestCase>
-  <CaseInfo CustomMethod="add_record_upload" Description="Import Marker Data" TargetURL="analysisgroup/:AnalysisGroupId/import/markerdata/dart" Type="BLOCKING" />
+  <CaseInfo CustomMethod="add_record_upload" Description="Import Marker Data" TargetURL="analysisgroup/:AnalysisGroupId/import/markerdata/csv" Type="BLOCKING" />
   <INPUT ParaName="AnalysisGroupId" SrcValue="xml/add_data_no_vcol/case_00463_add_analysisgroup_brassica.xml" />
   <INPUT ParaName="DataSetType" SrcValue="xml/add_data_no_vcol/case_00473_add_datasettype.xml" />
   <INPUT ParaName="Forced" Value="1" />
-  <INPUT ParaName="HeaderRow" Value="1" />
+  <INPUT ParaName="HeaderRow" Value="0" />
   <INPUT ParaName="MarkerNameCol" Value="0" />
   <INPUT ParaName="SequenceCol" Value="1" />
   <INPUT ParaName="MarkerMetaColStart" Value="2" />
@@ -545,6 +545,6 @@
   <Parent CaseFile="xml/add_data_no_vcol/extract_tcase/case_00302_add_extract263.xml" Order="266" />
   <Parent CaseFile="xml/add_data_no_vcol/extract_tcase/case_00302_add_extract264.xml" Order="267" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00473_add_datasettype.xml" Order="268" />
-  <ReturnId ParaName="DataSetId" Value="2" />
-  <RunInfo Success="1" Time="1443160847" />
+  <ReturnId ParaName="DataSetId" Value="8" />
+  <RunInfo Success="1" Time="1474007199" />
 </TestCase>

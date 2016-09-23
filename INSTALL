@@ -78,6 +78,19 @@ password = monetdb
  - now DAL should be available under the base url: http://kddart.example.com/dal/
  - in your browser you may put address: 'http://kddart.example.com/dal/get/login/status' and you should see tiny xml output informing you that you are not yet logged in
 
+* Setting Default Permission on DAL temporary directory
+
+   In the marker module, DAL uses the COPY INTO file SQL statement supported by MonetDB to export the marker dataset into a file stored in DAL temporary directory '/tmp/kddart'. By default, upon creation, the file from MonetDB is readable only by root which causes a problem in the export marker dataset functionality. So, DAL relies on the file system Access Control List (ACL) to change the default permission of the file when it is created. Although ACLs are supported by most of the GNU/Linux file systems including ext4, its support is really dependent on the setting on the individual GNU/Linux system setting in /etc/fstab. 
+
+   To enable export marker dataset functionality, the mount arguments for / or the parent mount point where DAL temporary directory resides must contain an ACL like:
+
+   UUID=80bb67b8-288f-493e-9f18-2da9e8ea7420 / ext4 acl,user_xattr 1 1
+
+   If this is already in place, the following commands must be executed:
+
+ - setfacl -d -m g::rx /tmp/kddart
+ - setfacl -d -m o::rx /tmp/kddart
+
 * Test your installation
 
  - Perl script other/dal_access_test.pl is a good example of how to use DAL programmatically. Initial DAL installation is done with user named 'admin' and password 'kddartadmin' and this user belongs to the group with id '0' (zero). To test your installation go to folder 'other' and issue a command:

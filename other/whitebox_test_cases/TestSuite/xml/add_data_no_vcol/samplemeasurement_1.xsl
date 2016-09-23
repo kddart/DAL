@@ -12,7 +12,8 @@
   <xsl:value-of select="TraitId/@Value"/><xsl:text>,</xsl:text>
   <xsl:value-of select="MeasurementDateTime/@Value"/><xsl:text>,</xsl:text>
   <xsl:value-of select="InstanceNumber/@Value"/><xsl:text>,</xsl:text>
-  <xsl:value-of select="TraitValue/@Value"/>
+  <xsl:value-of select="TraitValue/@Value"/><xsl:text>,</xsl:text>
+  <xsl:value-of select="TrialUnitSpecimenId/@Value"/>
   <xsl:text>&#10;</xsl:text>
 </xsl:template>
 

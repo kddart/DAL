@@ -12,5 +12,5 @@
   <Parent CaseFile="xml/add_data_no_vcol/case_00104_add_geno.xml" Order="3" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00383_add_genotypealias_type.xml" Order="4" />
   <ReturnId ParaName="GenotypeAliasId" Value="4" />
-  <RunInfo Success="1" Time="1443160611" />
+  <RunInfo Success="1" Time="1474007015" />
 </TestCase>

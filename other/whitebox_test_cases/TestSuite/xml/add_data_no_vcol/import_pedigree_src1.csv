@@ -1,2 +1,2 @@
-SpecimenId,ParentSpecimenId,ParentType,SelectionReason,NumberOfSpecimens
-|:SpecimenIdVal:|,|:ParentSpecimenIdVal:|,|:ParentTypeVal:|,'Testing DAL',2
+SpecimenId,ParentSpecimenId,ParentType,SelectionReason
+|:SpecimenIdVal:|,|:ParentSpecimenIdVal:|,|:ParentTypeVal:|,'Testing DAL'

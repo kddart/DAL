@@ -1,24 +1,14 @@
-#$Id: VirtualColumn.pm 1016 2015-10-08 06:06:28Z puthick $
-#$Author: puthick $
+#$Id$
+#$Author$
 
-# Copyright (c) 2015, Diversity Arrays Technology, All rights reserved.
-
-# COPYRIGHT AND LICENSE
-# 
-# Copyright (C) 2014 by Diversity Arrays Technology Pty Ltd
-# 
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-# 
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
+# Copyright (c) 2011, Diversity Arrays Technology, All rights reserved.
 
 # Author    : Puthick Hok
-# Version   : 2.3.0 build 1040
+# Created   : 02/06/2010
+# Modified  :
+# Purpose   : 
+#          
+#          
 
 package KDDArT::DAL::VirtualColumn;
 
@@ -30,7 +20,8 @@ BEGIN {
 
   my ($volume, $current_dir, $file) = File::Spec->splitpath(__FILE__);
 
-  $main::kddart_base_dir = "${current_dir}../../..";
+  my @current_dir_part = split('/perl-lib/KDDArT/DAL/', $current_dir);
+  $main::kddart_base_dir = $current_dir_part[0];
 }
 
 use lib "$main::kddart_base_dir/perl-lib";
@@ -1412,7 +1403,7 @@ sub add_general_type_runmode {
 "SuccessMessageJSON": "{'ReturnId' : [{'Value' : '225', 'ParaName' : 'TypeId'}], 'Info' : [{'Message' : 'GeneralType (225) has been added successfully.'}]}",
 "ErrorMessageXML": [{"NameAlreadyExists": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Type (Research Station) for class (site) already exists.' /></DATA>"}],
 "ErrorMessageJSON": [{"NameAlreadyExists": "{'Error' : [{'Message' : 'Type (Research Station) for class (site) already exists.'}]}"}],
-"URLParameter": [{"ParameterName": "class", "Description": "Value from a predefined list of values for classification of the type. This list of values is site, item, container, deviceregister, trial, trialevent, sample, specimengroup, state, parent, itemparent, genotypespecimen, dataset, workflow, project, itemlog, plate, genmap, multimedia, tissue, genotypealias, genparent, genotypealiasstatus, traitgroup, unittype and multilocation."}],
+"URLParameter": [{"ParameterName": "class", "Description": "Value from a predefined list of values for classification of the type. This list of values is site, item, container, deviceregister, trial, trialevent, sample, specimengroup, state, parent, itemparent, genotypespecimen, dataset, workflow, project, itemlog, plate, genmap, multimedia, tissue, genotypealias, genparent, genotypealiasstatus, traitgroup, unittype and trialgroup."}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
@@ -1506,7 +1497,7 @@ sub add_general_type_runmode {
                        'genotypespecimen'     => 1,
                        'traitgroup'           => 1,
                        'unittype'             => 1,
-                       'multilocation'        => 1,
+                       'trialgroup'           => 1,
                        'breedingmethod'       => 1,
                        'specimengroupstatus'  => 1,
   };
@@ -1685,7 +1676,7 @@ sub list_general_type {
                                  'traitgroup'          => [{'TableName' => 'trait', 'FieldName' => 'TraitGroupTypeId'}],
                                  'unittype'            => [{'TableName' => 'itemunit', 'FieldName' => 'UnitTypeId'}],
                                  'breedingmethod'      => [{'TableName' => 'breedingmethod', 'FieldName' => 'BreedingMethodTypeId'}],
-                                 'multilocation'       => [],
+                                 'trialgroup'          => [{'TableName' => 'trialgroup', 'FieldName' => 'TrialGroupType'}],
                                  'specimengroupstatus' => [{'TableName' => 'specimengroup', 'FieldName' => 'SpecimenGroupStatus'}]
   };
 
@@ -1801,12 +1792,13 @@ sub list_general_type_runmode {
 "SuccessMessageJSON": "{'VCol' : [], 'RecordMeta' : [{'TagName' : 'GeneralType'}], 'GeneralType' : [{'IsTypeActive' : '0', 'TypeId' : '225', 'TypeName' : 'Farm', 'Class' : 'site', 'update' : 'update/type/site/225', 'TypeNote' : ''},{'IsTypeActive' : '1', 'TypeId' : '224', 'TypeName' : 'Research Station', 'Class' : 'site', 'update' : 'update/type/site/224', 'TypeNote' : ''}]}",
 "ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Class (contact) not supported.' /></DATA>"}],
 "ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Class (contact) not supported.'}]}"}],
-"URLParameter": [{"ParameterName": "class", "Description": "Value from a predefined list of values for classification of the type. This list of values is site, item, container, deviceregister, trial, trialevent, sample, specimengroup, state, parent, itemparent, genotypespecimen, dataset, workflow, project, itemlog, plate, genmap, multimedia, tissue, genotypealias, genparent, genotypealiasstatus, traitgroup, unittype and multilocation."}, {"ParameterName": "status", "Description": "Status filtering value which can be 'active', 'inactive' or 'all'."}],
+"URLParameter": [{"ParameterName": "class", "Description": "Value from a predefined list of values for classification of the type. This list of values is site, item, container, deviceregister, trial, trialevent, sample, specimengroup, state, parent, itemparent, genotypespecimen, dataset, workflow, project, itemlog, plate, genmap, multimedia, tissue, genotypealias, genparent, genotypealiasstatus, traitgroup, unittype and trialgroup."}, {"ParameterName": "status", "Description": "Status filtering value which can be 'active', 'inactive' or 'all'."}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
 
   my $self     = shift;
+  my $query    = $self->query();
   my $class    = $self->param('class');
   my $status   = lc($self->param('status'));
 
@@ -1819,6 +1811,13 @@ sub list_general_type_runmode {
 
     my $err_msg = "Status ($status) not supported";
     return $self->_set_error($err_msg);
+  }
+
+  my $filtering_csv = '';
+
+  if (defined $query->param('Filtering')) {
+
+    $filtering_csv = $query->param('Filtering');
   }
 
   my $data_for_postrun_href = {};
@@ -1848,7 +1847,7 @@ sub list_general_type_runmode {
                        'genotypespecimen'     => 1,
                        'traitgroup'           => 1,
                        'unittype'             => 1,
-                       'multilocation'        => 1,
+                       'trialgroup'           => 1,
                        'breedingmethod'       => 1,
                        'specimengroupstatus'  => 1,
                        'any'                  => 1,
@@ -1862,7 +1861,7 @@ sub list_general_type_runmode {
 
   my $dbh = connect_kdb_read();
   my $field_list = ['generaltype.*', 'VCol*'];
-  
+
   my ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_sql($dbh, $field_list, 'generaltype',
                                                                         'TypeId', '');
   $dbh->disconnect();
@@ -1873,7 +1872,29 @@ sub list_general_type_runmode {
     return $self->_set_error($err_msg);
   }
 
+  my $filter_field_list = ['TypeId', 'TypeName', 'TypeNote', 'IsFixed'];
+
+  my ($filter_err, $filter_msg, $filter_phrase, $where_arg) = parse_filtering('TypeId',
+                                                                              'generaltype',
+                                                                              $filtering_csv,
+                                                                              $filter_field_list);
+
+  if ($filter_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $filter_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
   my $sql_where_arg = [];
+
+  if (length($filter_phrase) > 0) {
+
+    $sql =~ s/GROUP BY/ WHERE $filter_phrase GROUP BY /;
+
+    $sql_where_arg = $where_arg;
+  }
 
   if ( lc($class) eq 'any' ) {
 
@@ -1998,7 +2019,7 @@ sub update_general_type_runmode {
 "SuccessMessageJSON": "{'Info' : [{'Message' : 'GeneralType (224) has been updated successfully.'}]}",
 "ErrorMessageXML": [{"NameAlreadyExists": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Type (Farm) for class (site) already exists.' /></DATA>"}],
 "ErrorMessageJSON": [{"NameAlreadyExists": "{'Error' : [{'Message' : 'Type (Farm) for class (site) already exists.'}]}"}],
-"URLParameter": [{"ParameterName": "class", "Description": "Value from a predefined list of values for classification of the type. This list of values is site, item, container, deviceregister, trial, trialevent, sample, specimengroup, state, parent, itemparent, genotypespecimen, dataset, workflow, project, itemlog, plate, genmap, multimedia, tissue, genotypealias, genparent, genotypealiasstatus, traitgroup, unittype and multilocation."}, {"ParameterName": "id", "Description": "Existing GeneralTypeId"}],
+"URLParameter": [{"ParameterName": "class", "Description": "Value from a predefined list of values for classification of the type. This list of values is site, item, container, deviceregister, trial, trialevent, sample, specimengroup, state, parent, itemparent, genotypespecimen, dataset, workflow, project, itemlog, plate, genmap, multimedia, tissue, genotypealias, genparent, genotypealiasstatus, traitgroup, unittype and trialgroup."}, {"ParameterName": "id", "Description": "Existing GeneralTypeId"}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
@@ -2279,7 +2300,7 @@ sub del_general_type_runmode {
 "SuccessMessageJSON": "{ 'Info' : [{ 'Message' : 'GeneralType (225) has been deleted successfully.'} ]}",
 "ErrorMessageXML": [{"IdUsed": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Type (9) used in trial table.' /></DATA>"}],
 "ErrorMessageJSON": [{"IdUsed": "{ 'Error' : [{ 'Message' : 'Type (9) used in trial table.'} ]}"}],
-"URLParameter": [{"ParameterName": "class", "Description": "Value from a predefined list of values for classification of the type. This list of values is site, item, container, deviceregister, trial, trialevent, sample, specimengroup, state, parent, itemparent, genotypespecimen, dataset, workflow, project, itemlog, plate, genmap, multimedia, tissue, genotypealias, genparent, genotypealiasstatus, traitgroup, unittype and multilocation."}, {"ParameterName": "id", "Description": "Existing GeneralTypeId"}],
+"URLParameter": [{"ParameterName": "class", "Description": "Value from a predefined list of values for classification of the type. This list of values is site, item, container, deviceregister, trial, trialevent, sample, specimengroup, state, parent, itemparent, genotypespecimen, dataset, workflow, project, itemlog, plate, genmap, multimedia, tissue, genotypealias, genparent, genotypealiasstatus, traitgroup, unittype and trialgroup."}, {"ParameterName": "id", "Description": "Existing GeneralTypeId"}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut

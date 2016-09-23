@@ -19,6 +19,6 @@
   <Parent CaseFile="xml/add_data_no_vcol/case_00377_add_extract3.xml" Force="1" Order="7" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00378_add_extract4.xml" Force="1" Order="8" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00379_add_extract5.xml" Force="1" Order="9" />
-  <ReturnId ParaName="PlateId" Value="5" />
-  <RunInfo Success="1" Time="1444698438" />
+  <ReturnId ParaName="PlateId" Value="4" />
+  <RunInfo Success="1" Time="1474007048" />
 </TestCase>

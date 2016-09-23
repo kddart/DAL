@@ -1,5 +1,5 @@
 <TestCase>
-  <CaseInfo CustomMethod="add_record_upload" Description="Import Marker Data" TargetURL="analysisgroup/:AnalysisGroupId/import/markerdata/dart" Type="BLOCKING" />
+  <CaseInfo CustomMethod="add_record_upload" Description="Import Marker Data" TargetURL="analysisgroup/:AnalysisGroupId/import/markerdata/csv" Type="BLOCKING" />
   <INPUT ParaName="AnalysisGroupId" SrcValue="xml/add_data_no_vcol/case_00476_add_analysisgroup_big.xml" />
   <INPUT ParaName="DataSetType" SrcValue="xml/add_data_no_vcol/case_00473_add_datasettype.xml" />
   <INPUT ParaName="Forced" Value="1" />

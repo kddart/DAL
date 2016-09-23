@@ -1,24 +1,14 @@
-#$Id: Session.pm 927 2015-06-22 07:39:51Z puthick $
-#$Author: puthick $
+#$Id$
+#$Author$
 
-# Copyright (c) 2015, Diversity Arrays Technology, All rights reserved.
-
-# COPYRIGHT AND LICENSE
-# 
-# Copyright (C) 2014 by Diversity Arrays Technology Pty Ltd
-# 
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-# 
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
+# Copyright (c) 2011, Diversity Arrays Technology, All rights reserved.
 
 # Author    : Puthick Hok
-# Version   : 2.3.0 build 1040
+# Created   : 02/06/2010
+# Modified  :
+# Purpose   : 
+#          
+#          
 
 package KDDArT::DAL::Session;
 
@@ -77,7 +67,7 @@ sub fetch {
     my @items;
 
     foreach my $param (@params) {
-      
+
       my $key = &_names_to_keys($param);
       push @items, $self->_session->param($key);
     }
@@ -126,32 +116,16 @@ sub clear {
     my $cgisession_cookie = $q->cookie(
             -name      => "$cookie_name",
             -values    => '',
-            -expires   => '+10y',
+            -expires   => '-1d',
         );
 
     my $kddart_cookie = $q->cookie(
             -name      => 'KDDArT_RANDOM_NUMBER',
             -values    => '',
-            -expires   => '+10y',
+            -expires   => '-1d',
         );
 
-    my $kddart_download_cookie = $q->cookie(
-            -name      => 'KDDArT_DOWNLOAD',
-            -values    => '',
-            -expires   => '+10y',
-        );
-
-    my $kddart_download_sess_cookie = $q->cookie(
-            -name      => 'KDDArT_DOWNLOAD_SESSID',
-            -values    => '',
-            -expires   => '+10y',
-        );
-
-    $cgiapp->header_add(-cookie => [$cgisession_cookie,
-                                    $kddart_cookie,
-                                    $kddart_download_cookie,
-                                    $kddart_download_sess_cookie,
-                        ]);
+    $cgiapp->header_add(-cookie => [$cgisession_cookie, $kddart_cookie]);
 }
 
 #

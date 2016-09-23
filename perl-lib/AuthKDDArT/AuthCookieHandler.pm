@@ -1,45 +1,19 @@
-# COPYRIGHT AND LICENSE
-# 
-# Copyright (C) 2015 by Diversity Arrays Technology Pty Ltd
-# 
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-# 
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-
-# Author    : Puthick Hok
-# Version   : 2.3.0 build 1040
-
 package AuthKDDArT::AuthCookieHandler;
 
 use strict;
 use warnings;
 
-BEGIN {
-  use File::Spec;
-
-  my ($volume, $current_dir, $file) = File::Spec->splitpath(__FILE__);
-
-  $main::kddart_base_dir = "${current_dir}..";
-}
-
 use KDDArT::DAL::Common;
+use base 'Apache2_4::AuthCookie';
+
 use Apache2::Const qw(:common HTTP_FORBIDDEN);
-use Apache2::AuthCookie;
+use Apache2_4::AuthCookie;
 use Apache2::RequestRec;
 use Apache2::RequestIO;
 use Apache2::RequestUtil;
 use CGI::Session;
 use Digest::HMAC_SHA1 qw(hmac_sha1 hmac_sha1_hex);
 use vars qw($VERSION @ISA);
-
-$VERSION = substr(q$Revision: 1.2 $, 10);
-@ISA = qw(Apache2::AuthCookie);
 
 sub authen_cred ($$\@) {
   my $self = shift;
@@ -58,13 +32,12 @@ sub authen_ses_key ($$$) {
   my $user = '';
 
   $cookie = ($r->headers_in->get("Cookie") || "");
-  my $session_id = read_cookie($cookie, 'KDDArT_DOWNLOAD_SESSID');
 
-  if (length($session_id) == 0) {
+  my $sess_id_cookie_name = $self->cookie_name($r);
 
-    $r->log_error("FILEAUTH: SESSIONID EMPTY");
-  }
+  my $session_id = read_cookie($cookie, $sess_id_cookie_name);
 
+  $r->log_error("FILEAUTH: SessionId: $session_id");
   $r->log_error("FILEAUTH: Cookie: $cookie");
 
   my $filename     = $r->filename();
@@ -75,8 +48,28 @@ sub authen_ses_key ($$$) {
 
   my $args_txt     = $r->args();
 
+  my $args_txt_print = '';
+
+  if (defined $args_txt) {
+
+    $args_txt_print = $args_txt;
+  }
+
   $r->log_error("FILEAUTH: DOCUMENT_ROOT: $document_root");
-  $r->log_error("FILEAUTH: uri: $uri - unparsed_uri: $unparsed_uri - filename: $filename - args: $args_txt");
+  $r->log_error("FILEAUTH: uri: $uri - unparsed_uri: $unparsed_uri - filename: $filename - args: $args_txt_print");
+
+  $r->log_error("FILEAUTH: CFG FILE: $CFG_FILE_PATH");
+
+  my ($load_conf_err, $load_conf_msg) = load_config();
+
+  $r->log_error("LOAD CONFIG MSG: $load_conf_msg");
+
+  if ($load_conf_err) {
+
+    die "Cannot load config file: $CFG_FILE_PATH";
+  }
+
+  $r->log_error("FILEAUTH: SESSION STORAGE PATH: $SESSION_STORAGE_PATH");
 
   my $rememberme          = '';
   my $write_token         = '';
@@ -86,7 +79,8 @@ sub authen_ses_key ($$$) {
 
   if (length($session_id) > 0) {
 
-    my $session = new CGI::Session("driver:file", $session_id, {Directory=>"$main::kddart_base_dir/session/kddart"});
+    my $session = new CGI::Session("driver:file", $session_id, {Directory=>"$SESSION_STORAGE_PATH"});
+
     my $username = $session->param('USERNAME');
 
     if (length($username) > 0) {
@@ -97,44 +91,68 @@ sub authen_ses_key ($$$) {
       $user_id             = $session->param('USER_ID');
       $gadmin_status       = $session->param('GADMIN_STATUS');
 
-      my $sign_key_cookie_name = $self->cookie_name($r);
-      my $sign_key             = read_cookie($cookie, $sign_key_cookie_name);
+      my $sign_key_cookie_name = 'KDDArT_RANDOM_NUMBER';
+      my $sign_key_aref        = read_cookies($cookie, $sign_key_cookie_name);
 
-      my $stored_checksum = $session->param('CHECKSUM');
+      foreach my $sign_key (@{$sign_key_aref}) {
 
-      my $hash_data = "$username";
-      $hash_data   .= "$session_id";
-      $hash_data   .= "$rememberme";
-      $hash_data   .= "$write_token";
-      $hash_data   .= "$group_id";
-      $hash_data   .= "$user_id";
-      $hash_data   .= "$gadmin_status";
+        $r->log_error("SIGN KEY: $sign_key");
 
-      my $derived_checksum = hmac_sha1_hex($hash_data, $sign_key);
+        my $stored_checksum = $session->param('CHECKSUM');
 
-      $r->log_error("FILEAUTH: Stored checksum ($username) : $stored_checksum");
-      $r->log_error("FILEAUTH: Derived checksum ($username): $derived_checksum");
+        my $hash_data = "$username";
+        $hash_data   .= "$session_id";
+        $hash_data   .= "$rememberme";
+        $hash_data   .= "$write_token";
+        $hash_data   .= "$group_id";
+        $hash_data   .= "$user_id";
+        $hash_data   .= "$gadmin_status";
 
-      if ($derived_checksum eq $stored_checksum) {
+        my $derived_checksum = hmac_sha1_hex($hash_data, $sign_key);
 
-        $user = $username;
-      }
-      else {
+        $r->log_error("FILEAUTH: Stored checksum ($username) : $stored_checksum");
+        $r->log_error("FILEAUTH: Derived checksum ($username): $derived_checksum");
 
-        $r->log_error("FILEAUTH: CHECKSUM MISMATCHED");
+        if ($derived_checksum eq $stored_checksum) {
+
+          $user = $username;
+          last;
+        }
+        else {
+
+          $r->log_error("FILEAUTH: CHECKSUM MISMATCHED FOR $sign_key");
+        }
       }
 
       $r->log_error("FILEAUTH: Username: $username");
       $r->log_error("FILEAUTH: SessionId: $session_id");
     }
+    else {
+
+      $r->log_error("FILEAUTH: Username not found from Session $session_id");
+    }
+  }
+  else {
+
+    $r->log_error("FILEAUTH: SESSIONID EMPTY");
   }
 
   $r->log_error("FILEAUTH: user in authen_ses_key: $user");
   $r->log_error("FILEAUTH: " . $self->cookie_name($r));
 
-  if ($self->check_file_permission($r, $group_id, $gadmin_status)) {
+  $r->log_error("KDDArT BASE DIR:  $main::kddart_base_dir ");
+  $r->log_error("FILEAUTH: ------ END CHECKING SESSION AND USER NAME --------");
 
-    return $user;
+  if (length($user) > 0) {
+
+    if ($self->check_file_permission($r, $group_id, $gadmin_status)) {
+
+      return $user;
+    }
+    else {
+
+      return '';
+    }
   }
   else {
 
@@ -163,10 +181,10 @@ sub check_file_permission {
 
   my $multimedia_href = {};
 
-  $multimedia_href->{'genotype'}      = sub { return $self->check_geno_perm(@_); };
-  $multimedia_href->{'specimen'}      = sub { return $self->check_spec_perm(@_); };
-  $multimedia_href->{'trial'}         = sub { return $self->check_trial_perm(@_); };
-  $multimedia_href->{'trialunit'}     = sub { return $self->check_trialunit_perm(@_); };
+  $multimedia_href->{'genotype'}      = sub { return $self->check_geno_perm($r, @_); };
+  $multimedia_href->{'specimen'}      = sub { return $self->check_spec_perm($r, @_); };
+  $multimedia_href->{'trial'}         = sub { return $self->check_trial_perm($r, @_); };
+  $multimedia_href->{'trialunit'}     = sub { return $self->check_trialunit_perm($r, @_); };
   $multimedia_href->{'site'}          = sub { return 1; };
   $multimedia_href->{'project'}       = sub { return 1; };
   $multimedia_href->{'item'}          = sub { return 1; };
@@ -344,11 +362,12 @@ sub check_file_permission {
 sub check_geno_perm {
 
   my $self          = $_[0];
-  my $dbh           = $_[1];
-  my $geno_id       = $_[2];
-  my $perm          = $_[3];
-  my $group_id      = $_[4];
-  my $gadmin_status = $_[5];
+  my $r             = $_[1];
+  my $dbh           = $_[2];
+  my $geno_id       = $_[3];
+  my $perm          = $_[4];
+  my $group_id      = $_[5];
+  my $gadmin_status = $_[6];
 
   my $perm_str = permission_phrase($group_id, 0, $gadmin_status);
 
@@ -362,7 +381,7 @@ sub check_geno_perm {
 
     my $perm_err_msg = '';
     $perm_err_msg   .= "Permission denied: Group ($group_id) and Genotype ($trouble_geno_id_str).";
-    $self->logger->debug($perm_err_msg);
+    $r->log_error($perm_err_msg);
 
     return 0;
   }
@@ -375,11 +394,12 @@ sub check_geno_perm {
 sub check_spec_perm {
 
   my $self          = $_[0];
-  my $dbh           = $_[1];
-  my $spec_id       = $_[2];
-  my $perm          = $_[3];
-  my $group_id      = $_[4];
-  my $gadmin_status = $_[5];
+  my $r             = $_[1];
+  my $dbh           = $_[2];
+  my $spec_id       = $_[3];
+  my $perm          = $_[4];
+  my $group_id      = $_[5];
+  my $gadmin_status = $_[6];
 
   my $perm_str      = permission_phrase($group_id, 0, $gadmin_status, 'genotype');
 
@@ -391,7 +411,7 @@ sub check_spec_perm {
 
   if ($r_spec_id_err) {
 
-    $self->logger->debug("Read SpecimenId from database failed");
+    $r->log_error("Read SpecimenId from database failed");
     return 0;
   }
   else {
@@ -410,11 +430,14 @@ sub check_spec_perm {
 sub check_trial_perm {
 
   my $self          = $_[0];
-  my $dbh           = $_[1];
-  my $trial_id      = $_[2];
-  my $perm          = $_[3];
-  my $group_id      = $_[4];
-  my $gadmin_status = $_[5];
+  my $r             = $_[1];
+  my $dbh           = $_[2];
+  my $trial_id      = $_[3];
+  my $perm          = $_[4];
+  my $group_id      = $_[5];
+  my $gadmin_status = $_[6];
+
+  #$r->log_error("Testing");
 
   my $perm_str      = permission_phrase($group_id, 0, $gadmin_status);
 
@@ -428,7 +451,7 @@ sub check_trial_perm {
 
     my $perm_err_msg = '';
     $perm_err_msg   .= "Permission denied: Group ($group_id) and Trial ($trouble_trial_id_str).";
-    $self->logger->debug($perm_err_msg);
+    $r->log_error($perm_err_msg);
 
     return 0;
   }
@@ -441,11 +464,12 @@ sub check_trial_perm {
 sub check_trialunit_perm {
 
   my $self          = $_[0];
-  my $dbh           = $_[1];
-  my $trial_unit_id = $_[2];
-  my $perm          = $_[3];
-  my $group_id      = $_[4];
-  my $gadmin_status = $_[5];
+  my $r             = $_[1];
+  my $dbh           = $_[2];
+  my $trial_unit_id = $_[3];
+  my $perm          = $_[4];
+  my $group_id      = $_[5];
+  my $gadmin_status = $_[6];
 
   my $perm_str      = permission_phrase($group_id, 0, $gadmin_status);
 
@@ -461,7 +485,7 @@ sub check_trialunit_perm {
 
     my $perm_err_msg = '';
     $perm_err_msg   .= "Permission denied: Group ($group_id) and Trial ($trouble_trial_id_str).";
-    $self->logger->debug($perm_err_msg);
+    $r->log_error($perm_err_msg);
 
     return 0;
   }

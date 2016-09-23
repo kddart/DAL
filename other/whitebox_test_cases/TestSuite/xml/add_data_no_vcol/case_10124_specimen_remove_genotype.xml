@@ -9,5 +9,5 @@
   <Parent CaseFile="xml/add_data_no_vcol/case_00108_add_specimen.xml" Order="3" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00104_add_geno.xml" Order="4" />
   <Parent CaseFile="xml/add_data_no_vcol/case_10123_specimen_add_genotype.xml" Force="1" Order="5" />
-  <RunInfo Success="1" Time="1443160949" />
+  <RunInfo Success="1" Time="1474007379" />
 </TestCase>

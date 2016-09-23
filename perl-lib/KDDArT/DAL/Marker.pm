@@ -1,24 +1,14 @@
-#$Id: Marker.pm 1034 2015-11-02 03:54:10Z puthick $
-#$Author: puthick $
+#$Id$
+#$Author$
 
-# Copyright (c) 2015, Diversity Arrays Technology, All rights reserved.
-
-# COPYRIGHT AND LICENSE
-# 
-# Copyright (C) 2014 by Diversity Arrays Technology Pty Ltd
-# 
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-# 
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
+# Copyright (c) 2011, Diversity Arrays Technology, All rights reserved.
 
 # Author    : Puthick Hok
-# Version   : 2.3.0 build 1040
+# Created   : 20/10/2013
+# Modified  :
+# Purpose   :
+#
+#
 
 package KDDArT::DAL::Marker;
 
@@ -33,10 +23,12 @@ use Digest::MD5 qw(md5 md5_hex md5_base64);
 use Storable;
 
 BEGIN {
-
   use File::Spec;
-  my ( $volume, $current_dir, $file ) = File::Spec->splitpath(__FILE__);
-  $main::kddart_base_dir = "${current_dir}../../..";
+
+  my ($volume, $current_dir, $file) = File::Spec->splitpath(__FILE__);
+
+  my @current_dir_part = split('/perl-lib/KDDArT/DAL/', $current_dir);
+  $main::kddart_base_dir = $current_dir_part[0];
 }
 
 use lib "$main::kddart_base_dir/perl-lib";
@@ -49,7 +41,7 @@ use CGI::Application::Plugin::Session;
 use Log::Log4perl qw(get_logger :levels);
 use Time::HiRes qw( tv_interval gettimeofday );
 use File::Lockfile;
-use feature qw(switch);
+use Crypt::Random qw( makerandom );
 
 sub setup {
 
@@ -59,10 +51,11 @@ sub setup {
 
   __PACKAGE__->authen->init_config_parameters();
   __PACKAGE__->authen->check_login_runmodes(':all');
-  __PACKAGE__->authen->check_rand_runmodes('import_marker_dart',
+  __PACKAGE__->authen->check_rand_runmodes('import_markerdata_dart',
                                            'add_markermap_gadmin',
                                            'update_markermap_gadmin',
                                            'import_markermap_position_gadmin',
+                                           'append_markerdata_csv',
                                           );
   __PACKAGE__->authen->count_session_request_runmodes(':all');
   __PACKAGE__->authen->check_content_type_runmodes(':all');
@@ -73,8 +66,9 @@ sub setup {
                                              'update_markermap_gadmin',
                                              'import_markermap_position_gadmin',
                                              );
-  __PACKAGE__->authen->check_sign_upload_runmodes('import_marker_dart',
+  __PACKAGE__->authen->check_sign_upload_runmodes('import_markerdata_dart',
                                                   'import_markermap_position_gadmin',
+                                                  'append_markerdata_csv',
                                                  );
 
   my $logger = get_logger();
@@ -98,7 +92,7 @@ sub setup {
 
   $self->run_modes(
     'export_marker_dart'                              => 'export_marker_dart_runmode',
-    'import_marker_dart'                              => 'import_marker_dart_runmode',
+    'import_markerdata_dart'                          => 'import_markerdata_dart_runmode',
     'list_marker_meta_field'                          => 'list_marker_meta_field_runmode',
     'list_marker'                                     => 'list_marker_runmode',
     'get_marker'                                      => 'get_marker_runmode',
@@ -109,12 +103,14 @@ sub setup {
     'get_markermap'                                   => 'get_markermap_runmode',
     'import_markermap_position_gadmin'                => 'import_markermap_position_runmode',
     'list_markermap_position_advanced'                => 'list_markermap_position_advanced_runmode',
+    'list_extract_marker_data'                        => 'list_extract_marker_data_advanced_runmode',
+    'append_markerdata_csv'                           => 'append_markerdata_csv_runmode',
       );
 }
 
-sub import_marker_dart_runmode {
+sub import_markerdata_dart_runmode {
 
-=pod import_marker_dart_HELP_START
+=pod import_markerdata_dart_HELP_START
 {
 "OperationName" : "Import marker dataset",
 "Description": "Import scoring marker dataset from a CSV file.",
@@ -1066,8 +1062,8 @@ sub export_marker_dart_runmode {
 "SuccessMessageJSON": "{'OutputFileMeta' : [{'MarkerNameFieldName' : 'markerName', 'MarkerDataColEnd' : 268, 'MarkerMetaColEnd' : 4, 'LastHeaderRow' : 4, 'MarkerDataColStart' : 5, 'MarkerSequenceCol' : 1, 'MarkerNameCol' : 0, 'MarkerMetaColStart' : 2, 'MarkerSequenceFieldName' : 'TrimmedSequence', 'NumberOfMarkers' : '15626'}], 'Info' : [{'Message' : 'Time taken in seconds: 1.66073.'}], 'OutputFile' : [{'csv' : 'http://kddart-d.diversityarrays.com/data/admin/export_marker_data_17.csv'}]}",
 "ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
 "ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
-"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a marker metadata field name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "FieldList", "Description": "Comma separated value of wanted fields."}, {"Required": 0, "Name": "MarkerMetaFieldList", "Description": "CSV value for the list of wanted marker meta data columns if this parameter is not provided, DAL will export all marker meta data columns available in the dataset."}, {"Required": 0, "Name": "MarkerDataFieldList", "Description": "CSV value for the list of wanted sample/extract columns. If this parameter is not provided, DAL will export all samples/extracts available in the dataset."}],
-"URLParameter": [{"ParameterName": "id", "Description": "Existing AnalysisGroupId"}],
+"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a marker metadata field name or extract field name like E_6017, a filtering operator and the filtering value."}, {"Required": 0, "Name": "FieldList", "Description": "Comma separated value of wanted fields."}, {"Required": 0, "Name": "MarkerMetaFieldList", "Description": "CSV value for the list of wanted marker meta data columns if this parameter is not provided, DAL will export all marker meta data columns available in the dataset."}, {"Required": 0, "Name": "MarkerDataFieldList", "Description": "CSV value for the list of wanted sample/extract columns. If this parameter is not provided, DAL will export all samples/extracts available in the dataset."}, {"Required": 0, "Name": "ExtractFiltering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a field in the extract table, a filtering operator and the filtering value"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing AnalysisGroupId if there is only one dataset"}, {"ParameterName": "datasetid", "Description": "Existing specific DataSetId"}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
@@ -1102,6 +1098,13 @@ sub export_marker_dart_runmode {
   if (defined $query->param('Filtering')) {
 
     $filtering_csv = $query->param('Filtering');
+  }
+
+  my $extract_filtering_csv = '';
+
+  if (defined $query->param('ExtractFiltering')) {
+
+    $extract_filtering_csv = $query->param('ExtractFiltering');
   }
 
   $self->logger->debug("Filtering String: $filtering_csv");
@@ -1296,21 +1299,89 @@ sub export_marker_dart_runmode {
     push(@geno_header_row, '*');
   }
 
-  $sql  = 'SELECT "analgroupextract"."ExtractId", "datasetextract"."FieldName", "plate"."PlateName", ';
-  $sql .= '"extract"."ItemGroupId", "extract"."GenotypeId", ';
-  $sql .= 'CONCAT("extract"."WellRow", "extract"."WellCol") AS "WellPosition" ';
-  $sql .= 'FROM "datasetextract" LEFT JOIN "analgroupextract" ';
-  $sql .= 'ON "datasetextract"."AnalGroupExtractId" = "analgroupextract"."AnalGroupExtractId" ';
-  $sql .= 'LEFT JOIN "extract" ON "analgroupextract"."ExtractId" = "extract"."ExtractId" ';
-  $sql .= 'LEFT JOIN "plate" ON "extract"."PlateId" = "plate"."PlateId" ';
-  $sql .= 'WHERE "DataSetId" = ? ORDER BY "analgroupextract"."ExtractId" ASC';
+  my $extract_field_list = [];
 
-  my ($r_extract_err, $r_extract_msg, $extract_data) = read_data($dbh_m_read, $sql, [$dataset_id]);
+  my ($ex_sfield_err, $ex_sfield_msg, $extract_sfield_data, $extract_pkey_data) = get_static_field($dbh_m_read, 'extract');
+
+  if ($ex_sfield_err) {
+
+    $self->logger->debug("Get static field failed: $ex_sfield_msg");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  for my $sfield_rec (@{$extract_sfield_data}) {
+
+    push(@{$extract_field_list}, $sfield_rec->{'Name'});
+  }
+
+  for my $pkey_field (@{$extract_pkey_data}) {
+
+    push(@{$extract_field_list}, $pkey_field);
+  }
+
+  my ($ex_filter_err, $ex_filter_msg, $extract_filter_phrase, $extract_where_arg) = parse_filtering('"ExtractId"',
+                                                                                                    '"extract"',
+                                                                                                    $extract_filtering_csv,
+                                                                                                    $extract_field_list
+                                                                                                   );
+
+  $self->logger->debug("Extract Filter phrase: $extract_filter_phrase");
+
+  if ($ex_filter_err) {
+
+    $self->logger->debug("Parsing extract filtering failed: $ex_filter_msg");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $ex_filter_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $extract_filtering_exp = '';
+  if (length($extract_filter_phrase) > 0) {
+
+    $extract_filtering_exp = " AND $extract_filter_phrase ";
+  }
+
+  $sql  = qq|SELECT "analgroupextract"."ExtractId", "datasetextract"."FieldName", "plate"."PlateName", |;
+  $sql .= qq|"extract"."ItemGroupId", "extract"."GenotypeId", |;
+  $sql .= qq|CONCAT("extract"."WellRow", "extract"."WellCol") AS "WellPosition" |;
+  $sql .= qq|FROM "datasetextract" LEFT JOIN "analgroupextract" |;
+  $sql .= qq|ON "datasetextract"."AnalGroupExtractId" = "analgroupextract"."AnalGroupExtractId" |;
+  $sql .= qq|LEFT JOIN "extract" ON "analgroupextract"."ExtractId" = "extract"."ExtractId" |;
+  $sql .= qq|LEFT JOIN "plate" ON "extract"."PlateId" = "plate"."PlateId" |;
+  $sql .= qq|WHERE "DataSetId" = ? $extract_filtering_exp |;
+  $sql .= qq|ORDER BY "analgroupextract"."ExtractId" ASC|;
+
+  $self->logger->debug("SQL: $sql");
+
+  my $extract_start_time = [gettimeofday()];
+
+  my ($r_extract_err, $r_extract_msg, $extract_data) = read_data($dbh_m_read, $sql, [$dataset_id, @{$extract_where_arg}]);
+
+  my $extract_elapsed = tv_interval($extract_start_time);
+
+  $self->logger->debug("Extract time: $extract_elapsed");
 
   if ($r_extract_err) {
 
     $self->logger->debug("Read extract failed: $r_extract_msg");
     my $err_msg = "Unexpected error.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $nb_extract_returned = scalar(@{$extract_data});
+
+  if ($nb_extract_returned == 0) {
+
+    $self->logger->debug("Extract filtering for dataset ($dataset_id) returns no data");
+    my $err_msg = "Extract filtering ($extract_filtering_csv) on dataset ($dataset_id): no extract found.";
 
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
@@ -1326,6 +1397,67 @@ sub export_marker_dart_runmode {
 
   $self->logger->debug("Extract Field Index Counter Start: $extractfield_idx_counter");
 
+  my @itm_grp_id_list;
+  my @geno_id_list;
+
+  for my $extract_rec (@{$extract_data}) {
+
+    if (defined $extract_rec->{'ItemGroupId'}) {
+
+      push(@itm_grp_id_list, $extract_rec->{'ItemGroupId'});
+    }
+
+    if (defined $extract_rec->{'GenotypeId'}) {
+
+      push(@geno_id_list, $extract_rec->{'GenotypeId'});
+    }
+  }
+
+  my $itm_grp_lookup_href = {};
+  my $geno_lookup_href    = {};
+
+  if (scalar(@itm_grp_id_list) > 0) {
+
+    my $itm_grp_sql = 'SELECT ItemGroupId, ItemGroupName FROM itemgroup WHERE ItemGroupId IN (';
+    $itm_grp_sql   .= join(',', @itm_grp_id_list) . ')';
+
+    my $itm_grp_sth = $dbh_k_read->prepare($itm_grp_sql);
+    $itm_grp_sth->execute();
+
+    $itm_grp_lookup_href = $itm_grp_sth->fetchall_hashref('ItemGroupId');
+
+    if ($dbh_k_read->err()) {
+
+      $self->logger->debug("Retrieving ItemGroupName failed");
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error.'}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  if (scalar(@geno_id_list) > 0) {
+
+    my $geno_sql = 'SELECT GenotypeId, GenotypeName FROM genotype WHERE GenotypeId IN (';
+    $geno_sql   .= join(',', @geno_id_list) . ')';
+
+    my $geno_sth = $dbh_k_read->prepare($geno_sql);
+    $geno_sth->execute();
+
+    $geno_lookup_href = $geno_sth->fetchall_hashref('GenotypeId');
+
+    if ($dbh_k_read->err()) {
+
+      $self->logger->debug("Retrieving GenotypeName failed");
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error.'}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
   for my $extract_rec (@{$extract_data}) {
 
     my $extract_id    = $extract_rec->{'ExtractId'};
@@ -1336,8 +1468,26 @@ sub export_marker_dart_runmode {
     my $itm_grp_id    = $extract_rec->{'ItemGroupId'};
     my $geno_id       = $extract_rec->{'GenotypeId'};
 
-    my $itm_grp_name = read_cell_value($dbh_k_read, 'itemgroup', 'ItemGroupName', 'ItemGroupId', $itm_grp_id);
-    my $geno_name    = read_cell_value($dbh_k_read, 'genotype', 'GenotypeName', 'GenotypeId', $geno_id);
+    my $itm_grp_name = '';
+    my $geno_name    = '';
+
+    if (defined $itm_grp_id) {
+
+      if (defined $itm_grp_lookup_href->{$itm_grp_id}) {
+
+        $itm_grp_name = $itm_grp_lookup_href->{$itm_grp_id}->{'ItemGroupName'};
+      }
+    }
+
+    if (defined $geno_id) {
+
+      if (defined $geno_lookup_href->{$geno_id}) {
+
+        $geno_name = $geno_lookup_href->{$geno_id}->{'GenotypeName'};
+      }
+    }
+
+    push(@filterable_fieldlist, $ext_fieldname);
 
     push(@plate_header_row, $plate_name);
     push(@well_header_row, $well_pos);
@@ -1413,12 +1563,18 @@ sub export_marker_dart_runmode {
 
     my %sel_field_idx2name;
 
+    my $nb_selected_extract;
+
     for my $sel_fieldname (@{$sel_field_list}) {
+
+      if ($sel_fieldname =~ /^E_\d+$/) { $nb_selected_extract += 1; }
 
       my $field_idx = $field_idx_lookup_href->{$sel_fieldname};
 
       $sel_field_idx2name{$field_idx} = $sel_fieldname;
     }
+
+    $nb_extract_returned = $nb_selected_extract;
 
     my $idx_sorted_sel_field_aref = [];
     my $sel_field_idx_aref = [];
@@ -1469,11 +1625,14 @@ sub export_marker_dart_runmode {
   my $export_data_path  = "${doc_root}/data/$username";
   my $current_runmode   = $self->get_current_runmode();
   my $lock_filename     = "${current_runmode}.lock";
-  my $filename          = "export_marker_data_${anal_id}";
+  my $filename          = "export_marker_data_${dataset_id}";
   my $csv_file          = "${export_data_path}/${filename}.csv";
   my $result_filename   = "${filename}.csv";
 
-  my $content_file      = "${export_data_path}/${filename}_content.csv";
+  my $user_id           = $self->authen->user_id();
+  my $file_rand         = makerandom(Size => 8, Strength => 0);
+
+  my $content_file      = "${TMP_DATA_PATH}${filename}_content_${user_id}_${file_rand}.csv";
 
   my $eol          = "\r\n";
   my $monetdb_eol  = '\\r\\n';
@@ -1568,6 +1727,8 @@ sub export_marker_dart_runmode {
 
   $sql = qq|SELECT COUNT(*) FROM "markerdata${dataset_id}"|;
 
+  $self->logger->debug("SQL: $sql");
+
   my ($r_nb_marker_err, $nb_marker) = read_cell($dbh_m_read, $sql, []);
 
   if ($r_nb_marker_err) {
@@ -1584,12 +1745,30 @@ sub export_marker_dart_runmode {
 
   my $sql_select_field_csv = join(',', @sql_select_field_list);
 
+  $sql  = qq|SELECT COUNT(*) FROM "markerdata${dataset_id}" $filtering_exp|;
+
+  my ($r_nb_mrk_matched, $nb_mrk_matched) = read_cell($dbh_m_read, $sql, $where_arg);
+
+  if ($r_nb_mrk_matched) {
+
+    $self->logger->debug("Count the number of markers matched failed");
+
+    my $err_msg = "Unexpected Error.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
   $sql  = qq/COPY (SELECT $sql_select_field_csv FROM "markerdata${dataset_id}" $filtering_exp) /;
   $sql .= qq/INTO '$content_file' USING DELIMITERS ',','$monetdb_eol',''/;
 
   $self->logger->debug("COPY INTO FILE SQL: $sql");
 
   my ($copy_to_file_err, $copy_to_file_msg) = execute_sql($dbh_m_read, $sql, $where_arg);
+
+  $self->logger->debug($copy_to_file_msg);
 
   if ($copy_to_file_err) {
 
@@ -1628,6 +1807,8 @@ sub export_marker_dart_runmode {
   $output_meta_href->{'MarkerDataColStart'}      = $mrk_data_start_col;
   $output_meta_href->{'MarkerDataColEnd'}        = $mrk_data_end_col;
 
+  $output_meta_href->{'NumberOfMarkersInFile'}   = $nb_mrk_matched;
+  $output_meta_href->{'NumberOfExtractsInFile'}  = $nb_extract_returned;
   $output_meta_href->{'NumberOfMarkers'}         = $nb_marker;
   $output_meta_href->{'LastHeaderRow'}           = scalar(@{$header_row_aref}) - 1;
   $output_meta_href->{'MarkerNameFieldName'}     = $mrk_name_fieldname;
@@ -2331,8 +2512,8 @@ sub list_marker_data_runmode {
 "SuccessMessageJSON": "{'Pagination' : [{'NumOfRecords' : '15626', 'NumOfPages' : 7813, 'NumPerPage' : '2', 'Page' : '1'}], 'MetaDataField' : [{'FieldName' : 'markerName'},{'FieldName' : 'TrimmedSequence'},{'FactorId' : '19', 'FieldName' : 'callrate'},{'FactorId' : '20', 'FieldName' : 'Chrom_Brassica_v41_napus'},{'FactorId' : '21', 'FieldName' : 'ChromPos_Brassica_v41_napus'}], 'Extract' : [{'PlateName' : null, 'GenotypeName' : '', 'FieldName' : 'E_1650', 'GenotypeId' : '0', 'WellPosition' : 'A1', 'ItemGroupName' : 'ITM_GRPN8750251', 'ExtractId' : '1650', 'ItemGroupId' : '1595'},{'PlateName' : null, 'GenotypeName' : '', 'FieldName' : 'E_1649', 'GenotypeId' : '0', 'WellPosition' : 'A1', 'ItemGroupName' : 'ITM_GRPN0980556', 'ExtractId' : '1649', 'ItemGroupId' : '1594'}], 'DataSet' : [{'MarkerNameFieldName' : 'markerName', 'MarkerSequenceFieldName' : 'TrimmedSequence', 'DataSetType' : '86', 'AnalysisGroupId' : '17', 'DataSetId' : '14', 'ParentDataSetId' : '0', 'Description' : ''}], 'RecordMeta' : [{'TagName' : 'MarkerData'}], 'Blocksination' : [{'Block' : '1', 'NumOfExtracts' : '264', 'NumPerBlock' : '2', 'NumOfBlocks' : 132}], 'MarkerData' : [{'markerName' : '3112443', 'ChromPos_Brassica_v41_napus' : '3549294', 'E_1649' : '0', 'TrimmedSequence' : 'CTGCAGACATGAGGATCCCATATCTCCGGTTTTGGTTTGTTCTGAGGCTTAGAGAAGAAAAACATTTAGG', 'callrate' : '1', 'E_1650' : '0', 'Chrom_Brassica_v41_napus' : 'chrA10'},{'markerName' : '3122247', 'ChromPos_Brassica_v41_napus' : '0', 'E_1649' : '1', 'TrimmedSequence' : 'CTGCAGTTACTAAACCAGATGGCACAGCCTCTAGAGCATCAAAATCTGGAACTTTATCTTTAC', 'callrate' : '1', 'E_1650' : '1', 'Chrom_Brassica_v41_napus' : ''}]}",
 "ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='AnalysisGroup (18) not found.' /></DATA>"}],
 "ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'AnalysisGroup (18) not found.'}]}"}],
-"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a marker metadata field name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "MarkerMetaFieldList", "Description": "CSV value for the list of wanted marker meta data columns if this parameter is not provided, DAL will export all marker meta data columns available in the dataset."}, {"Required": 0, "Name": "MarkerDataFieldList", "Description": "CSV value for the list of wanted sample/extract columns. If this parameter is not provided, DAL will export all samples/extracts available in the dataset."}, {"Required": 0, "Name": "Sorting", "Description": "Sorting parameter string consisting of sorting expressions separated by comma. Each sorting expression is composed of a marker metadata field name and a sorting operation which can be either ASC (Ascending), DESC (Descending), NASC (Ascending order for text that works like sorting numbers - NASC will make '99' before '222') and NASC (Descending order for text that works like sorting nuumbers - NDESC will make '222' before '99'."}],
-"URLParameter": [{"ParameterName": "analid", "Description": "Existing AnalysisGroupId"}],
+"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a marker metadata field name or extract field name like E_6017, a filtering operator and the filtering value."}, {"Required": 0, "Name": "MarkerMetaFieldList", "Description": "CSV value for the list of wanted marker meta data columns if this parameter is not provided, DAL will export all marker meta data columns available in the dataset."}, {"Required": 0, "Name": "MarkerDataFieldList", "Description": "CSV value for the list of wanted sample/extract columns. If this parameter is not provided, DAL will export all samples/extracts available in the dataset."}, {"Required": 0, "Name": "Sorting", "Description": "Sorting parameter string consisting of sorting expressions separated by comma. Each sorting expression is composed of a marker metadata field name and a sorting operation which can be either ASC (Ascending), DESC (Descending), NASC (Ascending order for text that works like sorting numbers - NASC will make '99' before '222') and NASC (Descending order for text that works like sorting nuumbers - NDESC will make '222' before '99'."}],
+"URLParameter": [{"ParameterName": "analid", "Description": "Existing AnalysisGroupId"}, {"ParameterName": "nperpage", "Description": "Number of records in a page for pagination"}, {"ParameterName": "num", "Description": "The page number of the pagination"}, {"ParameterName": "nperblock", "Description": "Number of extracts in the block"}, {"ParameterName": "bnum", "Description": "The page number of the block of extracts"}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
@@ -2522,11 +2703,19 @@ sub list_marker_data_runmode {
   # free up memory for factor id data
   $factor_data = [];
 
+  $self->logger->debug("First read of extract info");
+
   $sql  = 'SELECT "FieldName" ';
   $sql .= 'FROM "datasetextract" ';
   $sql .= 'WHERE "DataSetId" = ?';
 
+  my $extract_first_start_time = [gettimeofday()];
+
   my ($r_ext_err, $r_ext_msg, $all_extract_data) = read_data($dbh_m, $sql, [$dataset_id]);
+
+  my $extract_first_elapsed = tv_interval($extract_first_start_time);
+
+  $self->logger->debug("Extract first time: $extract_first_elapsed");
 
   if ($r_ext_err) {
 
@@ -2546,6 +2735,7 @@ sub list_marker_data_runmode {
     my $ext_fieldname = $extract_rec->{'FieldName'};
 
     push(@extract_fieldname_list, $ext_fieldname);
+    push(@filterable_fieldlist, $ext_fieldname);
   }
 
   my $all_mrk_data_field_csv = join(',', @extract_fieldname_list);
@@ -2553,11 +2743,6 @@ sub list_marker_data_runmode {
   if (length($mrk_meta_field_list_csv) == 0) {
 
     $mrk_meta_field_list_csv = $all_mrk_meta_field_csv;
-  }
-
-  if (length($mrk_data_field_list_csv) == 0) {
-
-    $mrk_data_field_list_csv = $all_mrk_data_field_csv;
   }
 
   my ($sel_meta_field_err, $sel_meta_field_msg, $sel_meta_field_list) = parse_selected_field($mrk_meta_field_list_csv,
@@ -2588,18 +2773,38 @@ sub list_marker_data_runmode {
     return $data_for_postrun_href;
   }
 
+  my $extract_filtering_exp = qq|WHERE "DataSetId"=? |;
+
+  my $asterik_found = 0;
   my @sql_data_field_list;
 
   for my $data_field (@{$sel_data_field_list}) {
 
+    if ($data_field eq '*') { # no data field list is provided, no need for field list that's why it's *
+
+      $asterik_found = 1;
+      last;
+    }
+
     push(@sql_data_field_list, qq|'$data_field'|);
   }
 
-  my $sql_sel_data_field_csv = join(',', @sql_data_field_list);
+  if ($asterik_found == 0) {
 
-  my $extract_filtering_exp = qq|WHERE "DataSetId"=? AND "FieldName" IN ($sql_sel_data_field_csv)|;
+    my $sql_sel_data_field_csv = join(',', @sql_data_field_list);
+
+    $extract_filtering_exp .= qq| AND "FieldName" IN ($sql_sel_data_field_csv)|;
+  }
 
   my $blocination_aref = [];
+
+  $dbh_m->disconnect();
+  $dbh_m = connect_mdb_read();
+  # Need to disconnect and reconnect for the VM to work due to problem with Perl connector to Monetdb
+
+  $self->logger->debug("Extract pagination: $extract_filtering_exp");
+
+  my $extract_pg_start_time = [gettimeofday()];
 
   my ($pg_extract_err, $pg_extract_msg, $nb_extract,
       $nb_blocks, $extract_limit_clause, $extract_count_time) = get_paged_filter($dbh_m,
@@ -2609,6 +2814,11 @@ sub list_marker_data_runmode {
                                                                                  '"DataSetExtractId"',
                                                                                  $extract_filtering_exp,
                                                                                  [$dataset_id]);
+
+  my $extract_pg_elapsed = tv_interval($extract_pg_start_time);
+
+  $self->logger->debug("Extract count time: $extract_count_time");
+  $self->logger->debug("Extract pagination time: $extract_pg_elapsed");
 
   if ($pg_extract_err == 1) {
 
@@ -2648,7 +2858,19 @@ sub list_marker_data_runmode {
   $sql .= 'ORDER BY "analgroupextract"."ExtractId" DESC ';
   $sql .= $extract_limit_clause;
 
+  $dbh_m->disconnect();
+  $dbh_m = connect_mdb_read();
+  # Need to disconnect and reconnect for the VM to work due to problem with Perl connector to Monetdb
+
+  #$self->logger->debug("Extract INFO SQL: $sql");
+
+  my $extract_info_start_time = [gettimeofday()];
+
   my ($r_extract_err, $r_extract_msg, $extract_data) = read_data($dbh_m, $sql, [$dataset_id]);
+
+  my $extract_info_elapsed = tv_interval($extract_info_start_time);
+
+  $self->logger->debug("Extract INFO SQL time: $extract_info_elapsed");
 
   if ($r_extract_err) {
 
@@ -2663,7 +2885,42 @@ sub list_marker_data_runmode {
 
   my @selected_extract_fieldname_list;
 
+  my $geno_item_lookup_start_time = [gettimeofday()];
+
   my $extract_info_aref = [];
+
+  my $uniq_geno_id    = {};
+  my $uniq_itm_grp_id = {};
+
+  my $geno_lookup    = {};
+  my $itm_grp_lookup = {};
+
+  for my $extract_rec (@{$extract_data}) {
+
+    my $itm_grp_id    = $extract_rec->{'ItemGroupId'};
+    my $geno_id       = $extract_rec->{'GenotypeId'};
+
+    $uniq_geno_id->{$geno_id}       = 1;
+    $uniq_itm_grp_id->{$itm_grp_id} = 1;
+  }
+
+  if (scalar(keys(%{$uniq_geno_id})) > 0) {
+
+    my $geno_sql = 'SELECT GenotyeId, GenotypeName ';
+    $geno_sql   .= 'FROM genotype WHERE GenotypeId IN (' . join(',', keys(%{$uniq_geno_id})) . ')';
+
+    $self->logger->debug("GENO SQL: $geno_sql");
+    $geno_lookup = $dbh_k->selectall_hashref($geno_sql, 'GenotypeId');
+  }
+
+  if (scalar(keys(%{$uniq_itm_grp_id})) > 0) {
+
+    my $itm_grp_sql = 'SELECT ItemGroupId, ItemGroupName ';
+    $itm_grp_sql   .= 'FROM itemgroup WHERE ItemGroupId IN (' . join(',', keys(%{$uniq_itm_grp_id})) . ')';
+
+    $self->logger->debug("ITM GRP SQL: $itm_grp_sql");
+    $itm_grp_lookup = $dbh_k->selectall_hashref($itm_grp_sql, 'ItemGroupId');
+  }
 
   for my $extract_rec (@{$extract_data}) {
 
@@ -2675,8 +2932,8 @@ sub list_marker_data_runmode {
     my $itm_grp_id    = $extract_rec->{'ItemGroupId'};
     my $geno_id       = $extract_rec->{'GenotypeId'};
 
-    my $itm_grp_name = read_cell_value($dbh_k, 'itemgroup', 'ItemGroupName', 'ItemGroupId', $itm_grp_id);
-    my $geno_name    = read_cell_value($dbh_k, 'genotype', 'GenotypeName', 'GenotypeId', $geno_id);
+    my $itm_grp_name = $itm_grp_lookup->{$itm_grp_id}->{'ItemGroupName'};
+    my $geno_name    = $geno_lookup->{$geno_id}->{'GenotypeName'};
 
     $extract_rec->{'ItemGroupName'} = $itm_grp_name;
     $extract_rec->{'GenotypeName'}  = $geno_name;
@@ -2684,6 +2941,10 @@ sub list_marker_data_runmode {
     push(@{$extract_info_aref}, $extract_rec);
     push(@selected_extract_fieldname_list, $ext_fieldname);
   }
+
+  my $geno_item_lookup_elapsed = tv_interval($geno_item_lookup_start_time);
+
+  $self->logger->debug("Genotype and Item Lookup time: $geno_item_lookup_elapsed");
 
   my $field_name2table_name  = { $mrk_name_fieldname => qq|"markerdata${dataset_id}"|,
                                  $seq_fieldname      => qq|"markerdata${dataset_id}"| };
@@ -2798,8 +3059,6 @@ sub list_marker_data_runmode {
     push(@sql_final_meta_field_list, qq|"$meta_field"|);
   }
 
-  my $sql_final_meta_field_csv = join(',', @sql_final_meta_field_list);
-
   my @sql_final_extract_field_list;
 
   for my $extract_field (@selected_extract_fieldname_list) {
@@ -2807,17 +3066,33 @@ sub list_marker_data_runmode {
     push(@sql_final_extract_field_list, qq|"$extract_field"|);
   }
 
-  my $sql_final_extract_field_csv = join(',', @sql_final_extract_field_list);
+  my @sql_all_field_list = (@sql_final_meta_field_list, @sql_final_extract_field_list);
 
-  $sql  = qq|SELECT ${sql_final_meta_field_csv}, ${sql_final_extract_field_csv} |;
+  if (scalar(@sql_all_field_list) == 0) {
+
+    $self->logger->debug("Number of final fields is zero");
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $sql_all_field_csv = join(',', @sql_all_field_list);
+
+  $sql  = qq|SELECT $sql_all_field_csv |;
   $sql .= qq|FROM "markerdata${dataset_id}" |;
   $sql .= qq|$filtering_exp |;
   $sql .= qq|$sorting_exp |;
   $sql .= qq|$limit_clause|;
 
-  $self->logger->debug("DATA SQL: $sql");
+  #$self->logger->debug("DATA SQL: $sql");
 
   my $data_start_time = [gettimeofday()];
+
+  $dbh_m->disconnect();
+  $dbh_m = connect_mdb_read();
+  # Need to disconnect and reconnect for the VM to work due to problem with Perl connector to Monetdb
 
   # where_arg here in the list function because of the filtering 
   my ($read_mrk_data_err, $read_mrk_data_msg, $mrk_data) = read_data($dbh_m, $sql, $where_arg);
@@ -3551,6 +3826,10 @@ sub import_markermap_position_runmode {
     return $data_for_postrun_href;
   }
 
+  $dbh_m_read->disconnect();
+  $dbh_m_read = connect_mdb_read();
+  # Disconnect and reconnect to fix problem with Perl connector to Monetdb in vm
+
   my $dbh_m_write = connect_mdb_write();
 
   my $count_sql = 'SELECT COUNT(*) FROM "markermapposition" WHERE "MarkerMapId"=?';
@@ -3694,6 +3973,10 @@ sub import_markermap_position_runmode {
 
     my $mrk_name_count_lookup = $dbh_m_read->selectall_hashref($chk_mrk_name_sql, 'MarkerName');
 
+    $dbh_m_read->disconnect();
+    $dbh_m_read = connect_mdb_read();
+    # Disconnect and reconnect to fix problem with Perl connector to Monetdb in vm
+
     $sql  = 'SELECT "MarkerName", "AnalysisGroupMarkerId" ';
     $sql .= 'FROM "analysisgroupmarker" LEFT JOIN "dataset" ON ';
     $sql .= '"analysisgroupmarker"."DataSetId" = "dataset"."DataSetId" ';
@@ -3755,6 +4038,9 @@ sub import_markermap_position_runmode {
 
   my $total_row_inserted = 0;
 
+  $dbh_m_write->disconnect();
+  # Disconnect the write handler for reconnection inside the while loop to fix the problem with Perl connector to Monetdb for vm
+
   while ($i < $nb_of_row) {
 
     my $start_j = $i;
@@ -3799,6 +4085,8 @@ sub import_markermap_position_runmode {
 
     #$self->logger->debug("INSET Map position SQL: $sql");
 
+    $dbh_m_write = connect_mdb_write();
+
     my $nbrow_inserted = $dbh_m_write->do($sql);
 
     if ($dbh_m_write->err()) {
@@ -3815,9 +4103,11 @@ sub import_markermap_position_runmode {
     $total_row_inserted += $nbrow_inserted;
 
     $i += $nb_bulk_insert;
+
+    $dbh_m_write->disconnect();
+    # Need to disconnect and reconnect inside the loop because Perl connector to Monetdb has a problem on vm
   }
 
-  $dbh_m_write->disconnect();
 
   my $info_msg = "$total_row_inserted records of marker map positions have been inserted successfully.";
   my $info_msg_aref = [{'Message' => $info_msg}];
@@ -4040,6 +4330,1324 @@ sub list_markermap_position_advanced_runmode {
                                            'Pagination'          => $pagination_aref,
                                            'RecordMeta'          => [{'TagName' => 'MarkerMapPosition'}],
   };
+
+  return $data_for_postrun_href;
+}
+
+sub list_extract_marker_data_advanced_runmode {
+
+=pod list_extract_marker_data_HELP_START
+{
+"OperationName" : "List marker data for extract",
+"Description": "List marker data  for extract across all datasets that the user has read permission.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><MarkerData DataSetId='9' E_1125='0' CallrateSNP='1' MarkerName='1033160|F|0--35:C&gt;T' MarkerSequence='TGCAGTGTACAGTAGCCTACAAGTGGGAGTCCCTACGCGTCTGATACAGCTGCAAACACTGCTATGCGG' /><MarkerData DataSetId='9' MarkerName='1033160|F|0-35:C&gt;T-35:C&gt;T' MarkerSequence='TGCAGTGTACAGTAGCCTACAAGTGGGAGTCCCTACGCGTCTGATACAGCTGCAAACACTGCTATGCGG' CallrateSNP='1' E_1125='1' /><MarkerData E_1125='0' CallrateSNP='1' MarkerName='1034802|F|0--21:T&gt;C' MarkerSequence='TGCAGAGGGCAAGGCTATGATTTGCCAATCAGCAGATTTCTTGATTAAATATGCTGTGGAAACAAGACC' DataSetId='9' /><MarkerData CallrateSNP='1' MarkerSequence='TGCAGAGGGCAAGGCTATGATTTGCCAATCAGCAGATTTCTTGATTAAATATGCTGTGGAAACAAGACC' MarkerName='1034802|F|0-21:T&gt;C-21:T&gt;C' E_1125='1' DataSetId='9' /><MarkerData DataSetId='9' E_1125='0' CallrateSNP='0.98999999999999999' MarkerName='1020912|F|0--59:T&gt;C' MarkerSequence='TGCAGCCCACATGAGAGAAGACACAGGATGAGCAATGGACAGGTTCCACTTAAAACAAGTTTGTCCGAG' /><MarkerData DataSetId='9' MarkerSequence='TGCAGCCCACATGAGAGAAGACACAGGATGAGCAATGGACAGGTTCCACTTAAAACAAGTTTGTCCGAG' MarkerName='1020912|F|0-59:T&gt;C-59:T&gt;C' CallrateSNP='0.98999999999999999' E_1125='1' /><MarkerData DataSetId='9' E_1125='1' CallrateSNP='0.98999999999999999' MarkerName='1034428|F|0--35:A&gt;T' MarkerSequence='TGCAGGGCGAATCAATACACCCAGCTGTCATGCAAACACATAATGGCACCCAGAAAGCCATCAATGCAC' /><MarkerData MarkerName='1034428|F|0-35:A&gt;T-35:A&gt;T' MarkerSequence='TGCAGGGCGAATCAATACACCCAGCTGTCATGCAAACACATAATGGCACCCAGAAAGCCATCAATGCAC' CallrateSNP='0.98999999999999999' E_1125='0' DataSetId='9' /><MarkerData DataSetId='9' E_1125='0' MarkerName='1043194|F|0--59:C&gt;G' MarkerSequence='TGCAGTGTCGTCTCAGTCAGTCTTACTCGTTAGCAACTTAACATGACTGCCATTTTTCTCTGAATAAAA' CallrateSNP='0.98999999999999999' /><MarkerData DataSetId='9' E_1125='1' MarkerSequence='TGCAGTGTCGTCTCAGTCAGTCTTACTCGTTAGCAACTTAACATGACTGCCATTTTTCTCTGAATAAAA' MarkerName='1043194|F|0-59:C&gt;G-59:C&gt;G' CallrateSNP='0.98999999999999999' /><Extract GenotypeId='' WellPosition='A5' ExtractId='1125' ItemGroupId='1080' PlateName='' /><MetaDataField FactorCaption='CallrateSNP' FactorId='6' FactorName='CallrateSNP' FactorDescription='Created automatically by import/makerdata/csv for CallrateSNP' /><DataSet AnalysisGroupId='9' ParentDataSetId='' Description='' DataSetTypeName='DataSetType - 94884285523' DataSetType='487' AnalysisGroupName='Analsysigroup_37942843727' DataSetId='9' /><RecordMeta TagName='MarkerData' /><Blocksination Block='1' NumOfBlocks='1' NumPerBlock='10' NumOfExtracts='1' /><Pagination NumOfRecords='376' Page='1' NumOfPages='38' NumPerPage='10' /><StatInfo ServerElapsedTime='0.093' Unit='second' /></DATA>",
+"SuccessMessageJSON": "{'Blocksination' : [{'NumOfBlocks' : 1,'Block' : '1','NumPerBlock' : '10','NumOfExtracts' : '1'}],'RecordMeta' : [{'TagName' : 'MarkerData'}],'StatInfo' : [{'Unit' : 'second','ServerElapsedTime' : '0.079'}],'Pagination' : [{'NumPerPage' : '10','Page' : '1','NumOfRecords' : '376','NumOfPages' : 38}],'Extract' : [{'PlateName' : null,'ItemGroupId' : '1080','ExtractId' : '1125','WellPosition' : 'A5','GenotypeId' : null}],'MarkerData' : [{'DataSetId' : '9','E_1125' : '0','MarkerName' : '1033160|F|0--35:C>T','MarkerSequence' : 'TGCAGTGTACAGTAGCCTACAAGTGGGAGTCCCTACGCGTCTGATACAGCTGCAAACACTGCTATGCGG','CallrateSNP' : '1'},{'DataSetId' : '9','E_1125' : '1','MarkerName' : '1033160|F|0-35:C>T-35:C>T','MarkerSequence' : 'TGCAGTGTACAGTAGCCTACAAGTGGGAGTCCCTACGCGTCTGATACAGCTGCAAACACTGCTATGCGG','CallrateSNP' : '1'},{'DataSetId' : '9','MarkerSequence' : 'TGCAGAGGGCAAGGCTATGATTTGCCAATCAGCAGATTTCTTGATTAAATATGCTGTGGAAACAAGACC','MarkerName' : '1034802|F|0--21:T>C','CallrateSNP' : '1','E_1125' : '0'},{'CallrateSNP' : '1','MarkerName' : '1034802|F|0-21:T>C-21:T>C','MarkerSequence' : 'TGCAGAGGGCAAGGCTATGATTTGCCAATCAGCAGATTTCTTGATTAAATATGCTGTGGAAACAAGACC','E_1125' : '1','DataSetId' : '9'},{'DataSetId' : '9','E_1125' : '0','CallrateSNP' : '0.98999999999999999','MarkerName' : '1020912|F|0--59:T>C','MarkerSequence' : 'TGCAGCCCACATGAGAGAAGACACAGGATGAGCAATGGACAGGTTCCACTTAAAACAAGTTTGTCCGAG'},{'CallrateSNP' : '0.98999999999999999','MarkerName' : '1020912|F|0-59:T>C-59:T>C','MarkerSequence' : 'TGCAGCCCACATGAGAGAAGACACAGGATGAGCAATGGACAGGTTCCACTTAAAACAAGTTTGTCCGAG','E_1125' : '1','DataSetId' : '9'},{'CallrateSNP' : '0.98999999999999999','MarkerName' : '1034428|F|0--35:A>T','MarkerSequence' : 'TGCAGGGCGAATCAATACACCCAGCTGTCATGCAAACACATAATGGCACCCAGAAAGCCATCAATGCAC','E_1125' : '1','DataSetId' : '9'},{'CallrateSNP' : '0.98999999999999999','MarkerSequence' : 'TGCAGGGCGAATCAATACACCCAGCTGTCATGCAAACACATAATGGCACCCAGAAAGCCATCAATGCAC','MarkerName' : '1034428|F|0-35:A>T-35:A>T','E_1125' : '0','DataSetId' : '9'},{'MarkerName' : '1043194|F|0--59:C>G','MarkerSequence' : 'TGCAGTGTCGTCTCAGTCAGTCTTACTCGTTAGCAACTTAACATGACTGCCATTTTTCTCTGAATAAAA','CallrateSNP' : '0.98999999999999999','E_1125' : '0','DataSetId' : '9'},{'DataSetId' : '9','CallrateSNP' : '0.98999999999999999','MarkerSequence' : 'TGCAGTGTCGTCTCAGTCAGTCTTACTCGTTAGCAACTTAACATGACTGCCATTTTTCTCTGAATAAAA','MarkerName' : '1043194|F|0-59:C>G-59:C>G','E_1125' : '1'}],'DataSet' : [{'AnalysisGroupId' : '9','DataSetTypeName' : 'DataSetType - 94884285523','Description' : '','ParentDataSetId' : null,'DataSetId' : '9','DataSetType' : '487','AnalysisGroupName' : 'Analsysigroup_37942843727'}],'MetaDataField' : [{'FactorCaption' : 'CallrateSNP','FactorName' : 'CallrateSNP','FactorDescription' : 'Created automatically by import/makerdata/csv for CallrateSNP','FactorId' : '6'}]}",
+"ErrorMessageXML": [{"MissingParameter": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error DataSetType='DataSetType is missing.' /><StatInfo ServerElapsedTime='0.003' Unit='second' /></DATA>"}],
+"ErrorMessageJSON": [{"MissingParameter": "{'Error' : [{'DataSetType' : 'DataSetType is missing.'}],'StatInfo' : [{'ServerElapsedTime' : '0.002','Unit' : 'second'}]}"}],
+"HTTPParameter": [{"Name": "ExtractFiltering", "Description": "Extract filtering parameter. It an ampersand (&) separated value consisting of DAL filtering express on extract table", "Required": 1}, {"Name": "MarkerFiltering", "Description": "Marker filtering parameter. It is an ampersand (&) separated value consisting of filtering expression. Each filtering expression is composed of a marker meta data field name, a filtering operator and the filtering value.", "Required": 1}, {"Name": "MarkerMetaFieldList", "Description": "Comma separated value of marker meta data field names", "Required": "1"}, {"Name": "DataSetType", "Description": "Single value for the marker dataset type", "Required": 1}],
+"URLParameter": [{"ParameterName": "nperpage", "Description": "Number of records in a page for pagination"}, {"ParameterName": "num", "Description": "The page number of the pagination"}, {"ParameterName": "nperblock", "Description": "Number of extracts in the block"}, {"ParameterName": "bnum", "Description": "The page number of the block of extracts"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self   = shift;
+  my $query  = $self->query();
+
+  my $extract_filtering_csv      = $query->param('ExtractFiltering');
+  my $marker_filtering_csv       = $query->param('MarkerFiltering');
+  my $marker_meta_field_list_csv = $query->param('MarkerMetaFieldList');
+  my $dataset_type               = $query->param('DataSetType');
+
+  my $data_for_postrun_href = {};
+
+  my $sorting_csv = '';
+
+  if (defined $query->param('Sorting')) {
+
+    $sorting_csv = $query->param('Sorting');
+  }
+
+  $self->logger->debug("Sorting CSV: $sorting_csv");
+
+  my $nb_extract_per_block = $self->param('nperblock');
+  my $block                = $self->param('bnum');
+
+  my ($filtering_missing_err, $filtering_missing_href) = check_missing_href( { 'ExtractFiltering'    => $extract_filtering_csv,
+                                                                               'MarkerFiltering'     => $marker_filtering_csv,
+                                                                               'MarkerMetaFieldList' => $marker_meta_field_list_csv,
+                                                                               'DataSetType'         => $dataset_type
+                                                                             });
+
+  if ($filtering_missing_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$filtering_missing_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  my ($int_err, $int_err_msg) = check_integer_value( {'nperblock' => $nb_extract_per_block,
+                                                      'num'       => $block
+                                                       });
+
+  if ($int_err) {
+
+    $int_err_msg .= ' not integer.';
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $int_err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $nb_per_page = $self->param('nperpage');
+  my $page        = $self->param('num');
+
+  ($int_err, $int_err_msg) = check_integer_value( {'nperpage' => $nb_per_page,
+                                                   'num'      => $page
+                                                  });
+
+  if ($int_err) {
+
+    $int_err_msg .= ' not integer.';
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $int_err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  #get database handles
+  my $dbh_k = connect_kdb_read();
+  my $dbh_m = connect_mdb_read();
+
+  if (!type_existence($dbh_k, 'markerdataset', $dataset_type)) {
+
+    my $err_msg = "DataSetType ($dataset_type): not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'DataSetType' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $sql = 'SELECT DISTINCT "FactorId", "FieldName" FROM "datasetmarkermeta"';
+
+  my ($r_factor_err, $r_factor_msg, $factor_data) = read_data($dbh_m, $sql, []);
+
+  if ($r_factor_err) {
+
+    $self->logger->debug("Read factor failed: $r_factor_msg");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $factor_name2id_href = {};
+
+  foreach my $factor_rec (@{$factor_data}) {
+
+    my $factor_name = $factor_rec->{'FieldName'};
+    my $factor_id   = $factor_rec->{'FactorId'};
+
+    $factor_name2id_href->{$factor_name} = $factor_id;
+  }
+
+  $factor_name2id_href->{'MarkerName'}     = -1;
+  $factor_name2id_href->{'MarkerSequence'} = -1;
+
+  my @marker_meta_field_list = split(',', $marker_meta_field_list_csv);
+
+  my @invalid_meta_field_list;
+
+  my @marker_meta_field_id_list;
+  my $marker_meta_id2name_href = {};
+
+  foreach my $marker_meta_field (@marker_meta_field_list) {
+
+    if ( !(defined $factor_name2id_href->{$marker_meta_field}) ) {
+
+      push(@invalid_meta_field_list, $marker_meta_field);
+    }
+    else {
+
+      my $factor_id = $factor_name2id_href->{$marker_meta_field};
+      $marker_meta_id2name_href->{$factor_id} = $marker_meta_field;
+      push(@marker_meta_field_id_list, $factor_id);
+    }
+  }
+
+  if (scalar(@invalid_meta_field_list) > 0) {
+
+    my $invalid_meta_field_err_msg = "MarkerMetaField (" . join(',', @invalid_meta_field_list) . "): not found.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $invalid_meta_field_err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (scalar(@marker_meta_field_id_list) > 0) {
+
+    my $marker_meta_field_id_csv = join(',', @marker_meta_field_id_list);
+    my $nb_meta_field            = scalar(@marker_meta_field_id_list);
+
+    $sql  = qq|SELECT "DataSetId" FROM "datasetmarkermeta" WHERE "FactorId" IN ( $marker_meta_field_id_csv ) |;
+    $sql .= qq|GROUP BY "DataSetId" HAVING COUNT("DataSetId")= $nb_meta_field|;
+  }
+  else {
+
+    $sql = 'SELECT DISTINCT "DataSetId" FROM "datasetmarkermeta"';
+  }
+
+  my ($r_ds_meta_err, $r_ds_meta_msg, $ds_meta_data) = read_data($dbh_m, $sql, []);
+
+  if ($r_ds_meta_err) {
+
+    $self->logger->debug("Read DataSetId based on meta data field failed: $r_ds_meta_msg");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (scalar(@{$ds_meta_data}) == 0) {
+
+    my $err_msg = "No marker dataset found for selected marker meta fields";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my @meta_field_ds_id_list;
+
+  foreach my $ds_rec (@{$ds_meta_data}) {
+
+    push(@meta_field_ds_id_list, $ds_rec->{'DataSetId'});
+  }
+
+  my $meta_field_ds_filtering = '';
+
+  if (scalar(@meta_field_ds_id_list) > 0) {
+
+    $meta_field_ds_filtering = qq|AND "DataSetId" IN (| . join(',', @meta_field_ds_id_list) . qq|)|;
+  }
+
+  my $group_id      = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  my $perm_str = permission_phrase($group_id, 2, 'analysisgroup');
+
+  $sql  = qq|SELECT "DataSetId" FROM "dataset" |;
+  $sql .= qq|LEFT JOIN "analysisgroup" ON "dataset"."AnalysisGroupId" = "analysisgroup"."AnalysisGroupId" |;
+  $sql .= qq|WHERE ( (($perm_str) & $READ_PERM) = $READ_PERM ) AND "dataset"."DataSetType" = $dataset_type |;
+  $sql .= qq|$meta_field_ds_filtering|;
+
+  $self->logger->debug("SQL: $sql");
+
+  ($r_ds_meta_err, $r_ds_meta_msg, $ds_meta_data) = read_data($dbh_m, $sql, []);
+
+  if ($r_ds_meta_err) {
+
+    $self->logger->debug("Read DataSetId based on meta data field and permission failed: $r_ds_meta_msg");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (scalar(@{$ds_meta_data}) == 0) {
+
+    my $err_msg = "No marker dataset found accessible for selected marker meta fields";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my @final_meta_field_ds_id_list;
+
+  foreach my $ds_rec (@{$ds_meta_data}) {
+
+    push(@final_meta_field_ds_id_list, $ds_rec->{'DataSetId'});
+  }
+
+  $self->logger->debug("List of dataset Id (markermeta): " . join(',', @final_meta_field_ds_id_list));
+
+  my $extract_field_list = [];
+
+  my ($ex_sfield_err, $ex_sfield_msg, $extract_sfield_data, $extract_pkey_data) = get_static_field($dbh_m, 'extract');
+
+  if ($ex_sfield_err) {
+
+    $self->logger->debug("Get static field failed: $ex_sfield_msg");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  for my $sfield_rec (@{$extract_sfield_data}) {
+
+    push(@{$extract_field_list}, $sfield_rec->{'Name'});
+  }
+
+  for my $pkey_field (@{$extract_pkey_data}) {
+
+    push(@{$extract_field_list}, $pkey_field);
+  }
+
+  my ($ex_filter_err, $ex_filter_msg, $extract_filter_phrase, $extract_where_arg) = parse_filtering('"ExtractId"',
+                                                                                                    '"extract"',
+                                                                                                    $extract_filtering_csv,
+                                                                                                    $extract_field_list
+                                                                                                   );
+
+  $self->logger->debug("Extract Filter phrase: $extract_filter_phrase");
+
+  if ($ex_filter_err) {
+
+    $self->logger->debug("Parsing extract filtering failed: $ex_filter_msg");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $ex_filter_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $extract_filtering_exp = qq|WHERE ( (($perm_str) & $READ_PERM) = $READ_PERM ) AND "dataset"."DataSetType" = $dataset_type |;
+  $extract_filtering_exp   .= qq|AND "dataset"."DataSetId" IN (| . join(',', @final_meta_field_ds_id_list) . qq|) |;
+  if (length($extract_filter_phrase) > 0) {
+
+    $extract_filtering_exp = " AND $extract_filter_phrase ";
+  }
+
+  # Do blocination
+
+  my $count_sql = qq|SELECT COUNT(DISTINCT "extract"."ExtractId") |;
+  $count_sql   .= qq|FROM "dataset" LEFT JOIN "analysisgroup" ON "dataset"."AnalysisGroupId" = "analysisgroup"."AnalysisGroupId" |;
+  $count_sql   .= qq|LEFT JOIN "datasetextract" ON "dataset"."DataSetId" = "datasetextract"."DataSetId" |;
+  $count_sql   .= qq|LEFT JOIN "analgroupextract" ON "datasetextract"."AnalGroupExtractId" = "analgroupextract"."AnalGroupExtractId" |;
+  $count_sql   .= qq|LEFT JOIN "extract" ON "analgroupextract"."ExtractId" = "extract"."ExtractId" |;
+  $count_sql   .= qq| $extract_filtering_exp |;
+
+  my ($pg_extract_err, $pg_extract_msg, $nb_extract,
+      $nb_blocks, $extract_limit_clause, $extract_count_time) = get_paged_filter_sql($dbh_m,
+                                                                                     $nb_extract_per_block,
+                                                                                     $block,
+                                                                                     $count_sql,
+                                                                                     $extract_where_arg);
+
+  if ($pg_extract_err == 1) {
+
+    $self->logger->debug("Paging extracts failed: $pg_extract_msg");
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if ($pg_extract_err == 2) {
+
+    my $err_msg = "Block ($block): out of range";
+    $self->logger->debug("Extract limit clause: $extract_limit_clause");
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $blocination_aref = [{'NumOfExtracts' => $nb_extract,
+                           'NumOfBlocks'   => $nb_blocks,
+                           'Block'         => $block,
+                           'NumPerBlock'   => $nb_extract_per_block,
+                          }];
+
+  $sql  = qq|SELECT "extract"."ExtractId", COUNT("extract"."ExtractId") |;
+  $sql .= qq|FROM "dataset" INNER JOIN "analysisgroup" ON "dataset"."AnalysisGroupId" = "analysisgroup"."AnalysisGroupId" |;
+  $sql .= qq|INNER JOIN "datasetextract" ON "dataset"."DataSetId" = "datasetextract"."DataSetId" |;
+  $sql .= qq|INNER JOIN "analgroupextract" ON "datasetextract"."AnalGroupExtractId" = "analgroupextract"."AnalGroupExtractId" |;
+  $sql .= qq|INNER JOIN "extract" ON "analgroupextract"."ExtractId" = "extract"."ExtractId" |;
+  $sql .= qq| $extract_filtering_exp |;
+  $sql .= qq|GROUP BY "extract"."ExtractId" |;
+  $sql .= qq|ORDER BY "extract"."ExtractId" DESC |;
+  $sql .= qq|$extract_limit_clause|;
+
+  $self->logger->debug("SQL: $sql");
+
+  my ($r_ext_err, $r_ext_msg, $extract_data) = read_data($dbh_m, $sql, $extract_where_arg);
+
+  if ($r_ext_err) {
+
+    $self->logger->debug("Read extract id based on extract filtering failed: $r_ext_msg");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (scalar(@{$extract_data}) == 0) {
+
+    my $err_msg = "No extract found";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my @final_extract_field_list;
+  my @final_extract_id_list;
+
+  foreach my $extract_rec (@{$extract_data}) {
+
+    if ( defined $extract_rec->{'ExtractId'} ) {
+
+      push(@final_extract_field_list, q|E_| . $extract_rec->{'ExtractId'});
+      push(@final_extract_id_list, $extract_rec->{'ExtractId'});
+    }
+    else {
+
+      $self->logger->debug("ExtractId not defined");
+    }
+  }
+
+  $self->logger->debug("Extract Field: " . join(',', @final_extract_field_list));
+
+  $sql  = qq|SELECT "dataset"."DataSetId" |;
+  $sql .= qq|FROM "dataset" INNER JOIN "analysisgroup" ON "dataset"."AnalysisGroupId" = "analysisgroup"."AnalysisGroupId" |;
+  $sql .= qq|INNER JOIN "datasetextract" ON "dataset"."DataSetId" = "datasetextract"."DataSetId" |;
+  $sql .= qq|INNER JOIN "analgroupextract" ON "datasetextract"."AnalGroupExtractId" = "analgroupextract"."AnalGroupExtractId" |;
+  $sql .= qq|INNER JOIN "extract" ON "analgroupextract"."ExtractId" = "extract"."ExtractId" |;
+  $sql .= qq| $extract_filtering_exp |;
+  $sql .= qq|ORDER BY "extract"."ExtractId" DESC |;
+  $sql .= qq|$extract_limit_clause|;
+
+  $self->logger->debug("SQL: $sql");
+
+  my ($r_ext_ds_err, $r_ext_ds_msg, $ext_dataset_id_data) = read_data($dbh_m, $sql, $extract_where_arg);
+
+  if ($r_ext_ds_err) {
+
+    $self->logger->debug("Read dataset id based on extract filtering failed: $r_ext_ds_msg");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (scalar(@{$ext_dataset_id_data}) == 0) {
+
+    my $err_msg = "No marker dataset found for selected extracts";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $unique_ds_id_href = {};
+
+  foreach my $ds_rec (@{$ext_dataset_id_data}) {
+
+    $unique_ds_id_href->{$ds_rec->{"DataSetId"}} = 1;
+  }
+
+  my @final_ds_id_list = keys(%{$unique_ds_id_href});
+
+  $self->logger->debug("List of dataset Id (extract filtering): " . join(',', @final_ds_id_list));
+
+  if (scalar(@final_ds_id_list) == 0) {
+
+    my $err_msg = "No marker dataset found for selected extracts and selected marker meta data fields";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sql  = 'SELECT "extract"."ExtractId", "plate"."PlateName", ';
+  $sql .= '"extract"."ItemGroupId", "extract"."GenotypeId", ';
+  $sql .= 'CONCAT("extract"."WellRow", "extract"."WellCol") AS "WellPosition" ';
+  $sql .= 'FROM "extract" LEFT JOIN "plate" ON "extract"."PlateId" = "plate"."PlateId" ';
+  $sql .= 'WHERE "ExtractId" IN (' . join(',', @final_extract_id_list) . ')';
+
+  my ($r_extract_err, $r_extract_msg, $final_extract_data) = read_data($dbh_m, $sql, []);
+
+  if ($r_extract_err) {
+
+    $self->logger->debug("Read final extract info failed: $r_extract_msg");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sql  = qq|SELECT "DataSetId", "MarkerNameFieldName", "MarkerSequenceFieldName" |;
+  $sql .= qq|FROM "dataset" |;
+  $sql .= qq|WHERE "DataSetId" IN (| . join(',', @final_ds_id_list) . qq|)|;
+
+  my $ds_id2mrk_name_seq_field_name_lookup = $dbh_m->selectall_hashref($sql, 'DataSetId');
+
+  if ($dbh_m->err()) {
+
+    $self->logger->debug("Get MarkerNameFieldName and MarkerSequenceFieldName failed");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sql  = qq|SELECT "DataSetId", "FactorId", "FieldName" |;
+  $sql .= qq|FROM "datasetmarkermeta" |;
+  $sql .= qq|WHERE "DataSetId" IN (| . join(',', @final_ds_id_list) . qq|)|;
+
+  my ($r_fn_err, $r_fn_msg, $fieldname_data) = read_data($dbh_m, $sql, []);
+
+  if ($r_fn_err) {
+
+    $self->logger->debug("Read fieldname failed: $r_fn_msg");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $ds_id_factor_id2field_name_href = {};
+
+  foreach my $fn_rec (@{$fieldname_data}) {
+
+    my $ds_id      = $fn_rec->{'DataSetId'};
+    my $factor_id  = $fn_rec->{'FactorId'};
+    my $field_name = $fn_rec->{'FieldName'};
+
+    $ds_id_factor_id2field_name_href->{"(${ds_id},${factor_id})"} = $field_name;
+  }
+
+  $sql  = 'SELECT FactorId, FactorName, FactorCaption, FactorDescription ';
+  $sql .= 'FROM factor WHERE FactorId IN (' . join(',', @marker_meta_field_id_list) . ')';
+
+  $self->logger->debug("SQL: $sql");
+
+  my ($r_finfo_err, $r_finfo_msg, $factor_info_aref) = read_data($dbh_k, $sql, []);
+
+  if ($r_finfo_err) {
+
+    $self->logger->debug("Read factor info failed: $r_finfo_msg");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $dataset_type_name = read_cell_value($dbh_k, 'generaltype', 'TypeName', 'TypeId', $dataset_type);
+
+  $sql  = qq|SELECT "DataSetId", "dataset"."AnalysisGroupId", "DataSetType", |;
+  $sql .= qq|'$dataset_type_name' AS "DataSetTypeName", "Description", "ParentDataSetId", |;
+  $sql .= qq|"AnalysisGroupName" |;
+  $sql .= qq|FROM "dataset" LEFT JOIN "analysisgroup" ON "dataset"."AnalysisGroupId" = "analysisgroup"."AnalysisGroupId" |;
+  $sql .= qq|WHERE "DataSetId" IN (| . join(',', @final_ds_id_list) . qq|)|;
+
+  my ($r_ds_info_err, $r_ds_info_msg, $ds_info_aref) = read_data($dbh_m, $sql, []);
+
+  if ($r_ds_info_err) {
+
+    $self->logger->debug("Read dataset info failed: $r_ds_info_msg");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $dataset_sql_n_arg_aref = [];
+
+  my $final_field_list_aref  = [];
+
+  foreach my $ds_id (sort(@final_ds_id_list)) {
+
+    my ($ds_sfield_err, $ds_sfield_msg, $ds_sfield_data, $ds_pkey_data) = get_static_field($dbh_m, "markerdata${ds_id}");
+
+    if ($ds_sfield_err) {
+
+      $self->logger->debug("Get static field for markerdata${ds_id} failed: $ds_sfield_msg");
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my $ds_field_list = [];
+
+    for my $sfield_rec (@{$ds_sfield_data}) {
+
+      push(@{$ds_field_list}, $sfield_rec->{'Name'});
+    }
+
+    for my $pkey_field (@{$ds_pkey_data}) {
+
+      push(@{$ds_field_list}, $pkey_field);
+    }
+
+    my $mrk_name_field_name = $ds_id2mrk_name_seq_field_name_lookup->{$ds_id}->{"MarkerNameFieldName"};
+    my $mrk_seq_field_name  = $ds_id2mrk_name_seq_field_name_lookup->{$ds_id}->{"MarkerSequenceFieldName"};
+
+    $self->logger->debug("DS: $ds_id - MarkerNameFieldName: $mrk_name_field_name");
+    $self->logger->debug("DS: $ds_id - MarkerSequenceFieldName: $mrk_seq_field_name");
+
+    my ($mrk_filter_err, $mrk_filter_msg, $mrk_filter_phrase, $mrk_where_arg) = parse_filtering(qq|"$mrk_name_field_name"|,
+                                                                                                qq|"markerdata${ds_id}"|,
+                                                                                                $marker_filtering_csv,
+                                                                                                $ds_field_list
+                                                                                               );
+
+    $self->logger->debug("DS: $ds_id - Marker Filter phrase: $mrk_filter_phrase");
+
+    if ($mrk_filter_err) {
+
+      $self->logger->debug("Parsing marker filtering failed - ds: $ds_id : $mrk_filter_msg");
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => "DS: $ds_id - $mrk_filter_msg"}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my $ds_sql = qq|SELECT "$mrk_name_field_name" AS "MarkerName", |;
+    $ds_sql   .= qq|"$mrk_seq_field_name" AS "MarkerSequence", $ds_id AS "DataSetId", |;
+
+    my $new_field_list_aref = [q|"MarkerName"|, q|"MarkerSequence"|, q|"DataSetId"|];
+
+    my @ds_sql_field_list;
+
+    foreach my $meta_field_id (@marker_meta_field_id_list) {
+
+      my $ds_field_name   = $ds_id_factor_id2field_name_href->{"(${ds_id},${meta_field_id})"};
+      my $user_field_name = $marker_meta_id2name_href->{$meta_field_id};
+
+      push(@ds_sql_field_list, qq|"$ds_field_name" AS "$user_field_name"|);
+      push(@{$new_field_list_aref}, qq|"$user_field_name"|);
+    }
+
+    foreach my $extract_fieldname (@final_extract_field_list) {
+
+      push(@ds_sql_field_list, qq|"$extract_fieldname"|);
+      push(@{$new_field_list_aref}, qq|"$extract_fieldname"|);
+    }
+
+    my $mrk_filter_exp = '';
+    if (length($mrk_filter_phrase) > 0) {
+
+      $mrk_filter_exp = "WHERE $mrk_filter_phrase";
+    }
+
+    $final_field_list_aref = $new_field_list_aref;
+
+    $ds_sql  .= join(',', @ds_sql_field_list);
+    $ds_sql  .= qq| FROM "markerdata${ds_id}" |;
+    $ds_sql  .= $mrk_filter_exp;
+
+    $self->logger->debug("DS: $ds_id - SQL: $ds_sql");
+    $self->logger->debug("DS: $ds_id - ARG: " . join(',', @{$mrk_where_arg}));
+
+    my $ds_sql_href = {'SQL' => $ds_sql,
+                       'ARG' => $mrk_where_arg};
+
+    push(@{$dataset_sql_n_arg_aref}, $ds_sql_href);
+  }
+
+  my $data4md5sum = '';
+  foreach my $ds_sql_href (@{$dataset_sql_n_arg_aref}) {
+
+    $data4md5sum .= $ds_sql_href->{'SQL'};
+    $data4md5sum .= join('___', @{$ds_sql_href->{'ARG'}});
+    $self->logger->debug("DS SQL: " . $ds_sql_href->{'SQL'});
+  }
+
+  $self->logger->debug("DATA 4 TMP TABLE NAME MD5SUM: $data4md5sum");
+
+  my $tmp_table_name = "TMP_MRK_DATA_" . md5_hex($data4md5sum);
+
+  $self->logger->debug("TMP MARKER DATA TABLE NAME: $tmp_table_name");
+
+  if ( table_existence($dbh_m, $tmp_table_name ) ) {
+
+    $self->logger->debug("Table $tmp_table_name already exists");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $first_sql      = $dataset_sql_n_arg_aref->[0]->{'SQL'};
+  my $first_arg_aref = $dataset_sql_n_arg_aref->[0]->{'ARG'};
+
+  my $create_tmp_sql = qq|CREATE LOCAL TEMPORARY TABLE "$tmp_table_name" |;
+  $create_tmp_sql   .= qq|AS ($first_sql) WITH NO DATA ON COMMIT PRESERVE ROWS|;
+
+  $self->logger->debug("CREATE SQL: $create_tmp_sql");
+
+  my ($create_tbl_err, $create_tbl_msg) = execute_sql($dbh_m, $create_tmp_sql, $first_arg_aref);
+
+  if ($create_tbl_err) {
+
+    $self->logger->debug("CREATE TMP TABLE: $tmp_table_name failed: $create_tbl_msg");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $self->logger->debug("CREATE SQL: $create_tmp_sql");
+
+  foreach my $ds_sql_href (@{$dataset_sql_n_arg_aref}) {
+
+    my $select_sql = $ds_sql_href->{'SQL'};
+    my $arg_aref   = $ds_sql_href->{'ARG'};
+
+    $sql  = qq|INSERT INTO "$tmp_table_name"(| . join(',', @{$final_field_list_aref}) . qq|) |;
+    $sql .= $select_sql;
+
+    $self->logger->debug("COPY SQL: $sql");
+
+    my ($copy_mrk_data_err, $copy_mrk_data_msg) = execute_sql($dbh_m, $sql, $arg_aref);
+
+    if ($copy_mrk_data_err) {
+
+      $self->logger->debug("COPY MRK DATA failed: $copy_mrk_data_msg");
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  my ($sort_err, $sort_msg, $sort_sql) = parse_sorting($sorting_csv, $final_field_list_aref, qq|"$tmp_table_name"|);
+
+  if ($sort_err) {
+
+    $self->logger->debug("Parse sorting failed: $sort_msg");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $sorting_exp = '';
+
+  if (length($sort_sql) > 0) {
+
+    $sorting_exp = "ORDER BY $sort_sql";
+  }
+
+  $self->logger->debug("Sorting SQL: $sort_sql");
+
+  $sql = qq|SELECT COUNT(*) FROM "$tmp_table_name"|;
+
+  my ($r_count_err, $count_mrk) = read_cell($dbh_m, $sql, []);
+
+  if ($r_count_err) {
+
+    $self->logger->debug("Count marker failed");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $self->logger->debug("Number of markers: $count_mrk");
+
+  my ($final_mrk_filter_err, $final_mrk_filter_msg,
+      $final_mrk_filter_phrase, $final_mrk_where_arg) = parse_filtering(qq|"MarkerName"|,
+                                                                        qq|"$tmp_table_name"|,
+                                                                        $marker_filtering_csv,
+                                                                        $final_field_list_aref
+                                                                       );
+
+  if ($final_mrk_filter_err) {
+
+    $self->logger->debug("Parsing filtering failed: $final_mrk_filter_msg");
+
+    my $err_msg = $final_mrk_filter_msg;
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $final_mrk_filter_exp = '';
+
+  if (length($final_mrk_filter_phrase) > 0) {
+
+    $final_mrk_filter_exp = "WHERE $final_mrk_filter_phrase";
+  }
+
+  my ($pg_id_err, $pg_id_msg, $nb_records,
+      $nb_pages, $limit_clause, $rcount_time) = get_paged_filter($dbh_m,
+                                                                 $nb_per_page,
+                                                                 $page,
+                                                                 qq|"$tmp_table_name"|,
+                                                                 qq|"MarkerName"|,
+                                                                 $final_mrk_filter_exp,
+                                                                 $final_mrk_where_arg
+                                                                );
+
+  if ($pg_id_err == 1) {
+
+    $self->logger->debug($pg_id_msg);
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if ($pg_id_err == 2) {
+
+    my $err_msg = "Page ($page): out of range";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $pagination_aref = [{'NumOfRecords' => $nb_records,
+                          'NumOfPages'   => $nb_pages,
+                          'Page'         => $page,
+                          'NumPerPage'   => $nb_per_page,
+                         }];
+
+  $sql  = qq|SELECT * FROM "$tmp_table_name" |;
+  $sql .= qq|$final_mrk_filter_exp |;
+  $sql .= qq|$sorting_exp |;
+  $sql .= qq|$limit_clause|;
+
+  $self->logger->debug("FINAL SQL: $sql");
+
+  my ($read_mrk_data_err, $read_mrk_data_msg, $mrk_data) = read_data($dbh_m, $sql, $final_mrk_where_arg);
+
+  if ($read_mrk_data_err) {
+
+    $self->logger->debug($read_mrk_data_msg);
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh_k->disconnect();
+  $dbh_m->disconnect();
+
+  $data_for_postrun_href->{'Error'} = 0;
+  $data_for_postrun_href->{'Data'}  = {'MarkerData'      => $mrk_data,
+                                       'Extract'         => $final_extract_data,
+                                       'MetaDataField'   => $factor_info_aref,
+                                       'DataSet'         => $ds_info_aref,
+                                       'Blocksination'   => $blocination_aref,
+                                       'Pagination'      => $pagination_aref,
+                                       'RecordMeta'      => [{'TagName' => 'MarkerData'}],
+  };
+
+  return $data_for_postrun_href;
+}
+
+sub append_markerdata_csv_runmode {
+
+=pod append_markerdata_csv_HELP_START
+{
+"OperationName" : "Append markerdata into an existing dataset",
+"Description": "Append markerdata into an existing dataset from a CSV file. If more than 10 of the top 100 lines in the upload CSV already exist, it will stop and return an error without appending the data into the dataset",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><StatInfo Unit='second' ServerElapsedTime='0.665' /><Info RunTime='0.485275' Message='Appending marker data into DataSet (9) is successful. Number of markers: 8382. Number of extracts: 6. Number of meta fields: 18' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'Appending marker data into DataSet (9) is successful. Number of markers: 8382. Number of extracts: 6. Number of meta fields: 18','RunTime' : '4.023782'}],'StatInfo' : [{'ServerElapsedTime' : '4.182','Unit' : 'second'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><StatInfo Unit='second' ServerElapsedTime='0.166' /><Error Message='DataSet (10): not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'StatInfo' : [{'Unit' : 'second','ServerElapsedTime' : '0.211'}],'Error' : [{'Message' : 'DataSet (10): not found.'}]}"}],
+"RequiredUpload": 1,
+"UploadFileFormat": "CSV",
+"UploadFileParameterName": "uploadfile",
+"HTTPParameter": [{"Required": 1, "Name": "HeaderRow", "Description": "Line number in the CSV file counting from zero where column headers can be found."}, {"Required": 1, "Name": "MarkerNameCol", "Description": "Column number counting from zero which has marker names."}, {"Required": 1, "Name": "SequenceCol", "Description": "Column number counting from zero which has marker sequences."}, {"Required": 1, "Name": "MarkerMetaColStart", "Description": "Column number counting from zero for the starting of marker meta data column. Marker meta data columns must be adjacent to each other."}, {"Required": 1, "Name": "MarkerMetaColEnd", "Description": "Column number counting from zero for the last marker meta data column."}, {"Required": 1, "Name": "MarkerDataColStart", "Description": "Column number counting from zero for the starting of marker data column."}, {"Required": 1, "Name": "MarkerDataColEnd", "Description": "Column number counting from zero for the last marker data column."}, {"Required": 1, "Name": "DataSetType", "Description": "ID of dataset type which can represent scoring dataset, count dataset, or other marker quality dataset type."}, {"Required": 0, "Name": "ParentDataSetId", "Description": "ID of parent dataset if exists. Marker quality dataset like count needs a parent scoring dataset, to which the quality dataset complements."}, {"Required": 0, "Name": "Description", "Description": "Description of the dataset to be imported."}, {"Required": 0, "Name": "Forced", "Description": "0|1 switch to do forced importation on a dataset which already has data in the system. This parameter should be used for the importation to update the dataset."}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing DataSetId"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self    = shift;
+  my $query   = $self->query();
+
+  my $dataset_id = $self->param('id');
+
+  my $start_time = [gettimeofday()];
+
+  my $header_row            = $query->param('HeaderRow');
+
+  my $marker_name_col       = $query->param('MarkerNameCol');
+  my $sequence_col          = $query->param('SequenceCol');
+
+  my $marker_meta_scol      = $query->param('MarkerMetaColStart');
+  my $marker_meta_ecol      = $query->param('MarkerMetaColEnd');
+
+  my $marker_data_scol      = $query->param('MarkerDataColStart');
+  my $marker_data_ecol      = $query->param('MarkerDataColEnd');
+
+  my $data_for_postrun_href = {};
+
+  my $dbh_m_read = connect_mdb_read();
+
+  my $anal_id = read_cell_value($dbh_m_read, 'dataset', 'AnalysisGroupId', 'DataSetId', $dataset_id);
+
+  if (length($anal_id) == 0) {
+
+    my $err_msg = "DataSet ($dataset_id): not found.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $group_id  = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  my ($is_anal_ok, $trouble_anal_id_aref) = check_permission($dbh_m_read, 'analysisgroup', 'AnalysisGroupId',
+                                                             [$anal_id], $group_id, $gadmin_status,
+                                                             $READ_WRITE_PERM);
+
+  if (!$is_anal_ok) {
+
+    my $err_msg = "Permission denied: Group ($group_id) and AnalysisGroup ($anal_id).";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $data_csv_file = $self->authen->get_upload_file();
+
+  my $num_of_col = get_csvfile_num_of_col($data_csv_file);
+
+  $self->logger->debug("Number of columns: $num_of_col");
+
+  my $chk_col_def_data = { 'MarkerNameCol'          => $marker_name_col,
+                           'SequenceCol'            => $sequence_col,
+                           'MarkerMetaColStart'     => $marker_meta_scol,
+                           'MarkerMetaColEnd'       => $marker_meta_ecol,
+                           'MarkerDataColStart'     => $marker_data_scol,
+                           'MarkerDataColEnd'       => $marker_data_ecol,
+  };
+
+  my ($col_def_err, $col_def_err_href) = check_col_def_href( $chk_col_def_data, $num_of_col );
+
+  if ($col_def_err) {
+
+    $self->logger->debug("Check column definition error");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$col_def_err_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  my ($missing_err, $missing_href) = check_missing_href( {'HeaderRow' => $header_row } );
+
+  if ($missing_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $sql = '';
+
+  $dbh_m_read->disconnect();
+
+  my $dbh_m_write = connect_mdb_write();
+
+  my $markerdata_tablename = "markerdata${dataset_id}";
+
+  my ($mrk_tbl_sfield_err, $mrk_tbl_sfield_msg,
+      $mrk_tbl_sfield_data, $mrk_tbl_pkey_data) = get_static_field($dbh_m_write, $markerdata_tablename);
+
+  if ($mrk_tbl_sfield_err) {
+
+    $self->logger->debug("Retrieve $markerdata_tablename static fields failed: $mrk_tbl_sfield_msg");
+    my $err_msg = "Unexpected Error.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $fieldname2info_href = {};
+
+  foreach my $sfield_rec (@{$mrk_tbl_sfield_data}) {
+
+    my $field_name = $sfield_rec->{'Name'};
+    $fieldname2info_href->{$field_name} = $sfield_rec;
+  }
+
+  my @first_fieldname_list;
+
+  for (my $i = 0; $i < $num_of_col; $i++) {
+
+    push(@first_fieldname_list, "Col$i");
+  }
+
+  my $csv_filehandle;
+  open($csv_filehandle, "$data_csv_file") or die "Cannot open $data_csv_file: $!";
+
+  my $check_empty_col   = 0;
+  my $nb_line_wanted    = $header_row + 1 + 100; # get the top 100 lines plus the header
+  my $ignore_line0      = 0;
+  my $ignore_header     = 0;
+
+  my ($csv_header_err, $csv_header_msg, $top100_section_aref) = csvfh2aref($csv_filehandle,
+                                                                           \@first_fieldname_list,
+                                                                           $check_empty_col,
+                                                                           $nb_line_wanted,
+                                                                           $ignore_line0,
+                                                                           $ignore_header);
+
+  if ($csv_header_err) {
+
+    $self->logger->debug("Error reading header");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $csv_header_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  close($csv_filehandle);
+
+  my $header_href = $top100_section_aref->[$header_row];
+
+  my @empty_header_col_list;
+  for (my $i = 0; $i < $num_of_col; $i++) {
+
+    my $header_name = $header_href->{"Col$i"};
+    if (length($header_name) == 0) {
+
+      push(@empty_header_col_list, $i);
+    }
+  }
+
+  if (scalar(@empty_header_col_list) > 0) {
+
+    my $empty_header_col_csv = join(',', @empty_header_col_list);
+    my $err_msg = "Column ($empty_header_col_csv): no header";
+
+    $self->logger->debug("Empty header columns: $empty_header_col_csv");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $matched_col = {};
+
+  $matched_col->{$marker_name_col}         = $header_href->{"Col$marker_name_col"};
+  $matched_col->{$sequence_col}            = $header_href->{"Col$sequence_col"};
+
+  my $mrk_name_col_name = $header_href->{"Col${marker_name_col}"};
+  my $mrk_seq_col_name  = $header_href->{"Col${sequence_col}"};
+
+  if ( !(defined $fieldname2info_href->{$mrk_name_col_name}) ) {
+
+    my $err_msg = "Marker name column ($mrk_name_col_name): not found in dataset ($dataset_id).";
+    $self->logger->debug($err_msg);
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if ( !(defined $fieldname2info_href->{$mrk_seq_col_name}) ) {
+
+    my $err_msg = "Marker sequence column ($mrk_seq_col_name): not found in dataset ($dataset_id).";
+    $self->logger->debug($err_msg);
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my @marker_meta_field_list = (qq|"$mrk_name_col_name"|, qq|"$mrk_seq_col_name"|);
+
+  for (my $i = $marker_meta_scol; $i <= $marker_meta_ecol; $i++) {
+
+    my $col_name = $header_href->{"Col$i"};
+
+    if ( !(defined $fieldname2info_href->{$col_name}) ) {
+
+      my $err_msg = "Meta data column ($col_name): not found in dataset ($dataset_id).";
+      $self->logger->debug($err_msg);
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    push(@marker_meta_field_list, qq|"$col_name"|);
+    $matched_col->{"$i"} = $col_name;
+  }
+
+  $self->logger->debug("Marker meta field: " . join(',', @marker_meta_field_list));
+
+  my @marker_data_field_list;
+
+  for (my $i = $marker_data_scol; $i <= $marker_data_ecol; $i++) {
+
+    my $extract_id = $header_href->{"Col$i"};
+    my $field_name = "E_${extract_id}";
+
+    if ( !(defined $fieldname2info_href->{$field_name}) ) {
+
+      my $err_msg = "Extract ($extract_id): not found in dataset ($dataset_id).";
+      $self->logger->debug($err_msg);
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    push(@marker_data_field_list, qq|"$field_name"|);
+    $matched_col->{"$i"} = $field_name;
+  }
+
+  my @unused_col_list;
+
+  for (my $i = 0; $i < $num_of_col; $i++) {
+
+    if (!defined($matched_col->{"$i"})) {
+
+      push(@unused_col_list, $i);
+    }
+  }
+
+  if (scalar(@unused_col_list) > 0) {
+
+    my $unused_col_csv = join(',', @unused_col_list);
+
+    my $err_msg = "Column ($unused_col_csv): unused - please remove these columns and append again.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $uniq_mrk_name_href = {};
+
+  for (my $j = $header_row + 1; $j < scalar(@{$top100_section_aref}); $j++) {
+
+    my $marker_name = $top100_section_aref->[$j]->{"Col${marker_name_col}"};
+    $uniq_mrk_name_href->{qq|'$marker_name'|} = 1;
+  }
+
+  if (scalar(keys(%{$uniq_mrk_name_href})) == 0) {
+
+    my $err_msg = "No marker name found in the top 100 lines in the CSV file.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $uniq_mrk_name_csv = join(',', keys(%{$uniq_mrk_name_href}));
+
+  my $ds_mrk_name_fieldname = read_cell_value($dbh_m_write, 'dataset', 'MarkerNameFieldName', 'DataSetId', $dataset_id);
+
+  $sql  = qq|SELECT COUNT(*) FROM "$markerdata_tablename" |;
+  $sql .= qq|WHERE "$ds_mrk_name_fieldname" IN ($uniq_mrk_name_csv)|;
+
+  my ($r_count_err, $dup_count) = read_cell($dbh_m_write, $sql, []);
+
+  if ($r_count_err) {
+
+    my $err_msg = "Unexpected Error.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if ($dup_count > 10) {
+
+    my $err_msg = "More than 10 markers from the top 100 lines already exist.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $tmp_tablename = "${markerdata_tablename}_tmp";
+
+  my $create_tmp_sql = qq|CREATE LOCAL TEMPORARY TABLE "$tmp_tablename" (|;
+
+  my @field_sql_def_list;
+  for (my $i = 0; $i < $num_of_col; $i++) {
+
+    my $fieldname      = $matched_col->{"$i"};
+
+    my $field_datatype = $fieldname2info_href->{$fieldname}->{'DataType'};
+    my $field_colsize  = $fieldname2info_href->{$fieldname}->{'ColSize'};
+
+    my $full_datatype  = $field_datatype;
+
+    if (lc($field_datatype) eq 'varchar') {
+
+      $full_datatype = qq|${field_datatype}(${field_colsize})|;
+    }
+
+    my $field_sql = qq|"$fieldname" $full_datatype NULL|;
+    push(@field_sql_def_list, $field_sql);
+  }
+
+  $create_tmp_sql   .= join(',', @field_sql_def_list);
+
+  $create_tmp_sql   .= qq|) ON COMMIT PRESERVE ROWS|;
+
+  $self->logger->debug("CREATE TMP SQL: $create_tmp_sql");
+
+  my ($mk_tmp_tbl_err, $mk_tmp_tbl_msg) = execute_sql($dbh_m_write, $create_tmp_sql, []);
+
+  if ($mk_tmp_tbl_err) {
+
+    $self->logger->debug("Create temporary table failed: $mk_tmp_tbl_msg");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $monetdb_csv_file = $TMP_DATA_PATH . "csv4monetdb${dataset_id}.csv";
+
+  my $copy_file_start_time = [gettimeofday()];
+
+  # first line is number one in copy_file
+  copy_file($data_csv_file, $monetdb_csv_file, $header_row + 1 + 1);
+
+  my $copy_file_elapsed_time = tv_interval($copy_file_start_time);
+
+  $self->logger->debug("Copy file takes: $copy_file_elapsed_time");
+
+  my $copy_into_start_time = [gettimeofday()];
+
+  $sql  = qq|COPY INTO "$tmp_tablename" FROM '$monetdb_csv_file' |;
+  $sql .= q|USING DELIMITERS ',','\\n','"'|;
+
+  $self->logger->debug("SQL: $sql");
+
+  my ($copy_into_err, $copy_into_msg) = execute_sql($dbh_m_write, $sql, []);
+
+  my $copy_into_elapsed_time = tv_interval($copy_into_start_time);
+
+  $self->logger->debug("MonetDB COPY INTO takes: $copy_into_elapsed_time");
+
+  if ($copy_into_err) {
+
+    $copy_into_msg =~ s/failed to import table at.*//g;
+
+    $self->logger->debug("Loading data into table $tmp_tablename failed: $copy_into_msg");
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $copy_into_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sql = qq|SELECT COUNT(*) FROM "$tmp_tablename"|;
+
+  my ($r_nb_rec_err, $nb_rec) = read_cell($dbh_m_write, $sql, []);
+
+  if ($r_nb_rec_err) {
+
+    my $err_msg = "Unexpected Error.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $self->logger->debug("NB REC: $nb_rec");
+
+  if ($nb_rec == 0) {
+
+    my $err_msg = "Unexpected Error.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sql  = qq|INSERT INTO "analysisgroupmarker"("DataSetId","MarkerName","MarkerSequence") |;
+  $sql .= qq|SELECT $dataset_id AS "DataSetId", "$mrk_name_col_name", "$mrk_seq_col_name" |;
+  $sql .= qq|FROM "$tmp_tablename"|;
+
+  $self->logger->debug("SQL: $sql");
+
+  my ($copy_mrk_err, $copy_mrk_msg) = execute_sql($dbh_m_write, $sql, []);
+
+  if ($copy_mrk_err) {
+
+    $self->logger->debug("Copy markers failed: $copy_mrk_msg");
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $all_field_csv = join(',', (@marker_meta_field_list, @marker_data_field_list));
+
+  $sql  = qq|INSERT INTO "$markerdata_tablename" ( $all_field_csv ) |;
+  $sql .= qq|SELECT $all_field_csv FROM "$tmp_tablename"|;
+
+  $self->logger->debug("SQL: $sql");
+
+  my ($copy_mrk_data_err, $copy_mrk_data_msg) = execute_sql($dbh_m_write, $sql, []);
+
+  if ($copy_mrk_data_err) {
+
+    $self->logger->debug("Copy marker data failed: $copy_mrk_data_msg");
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh_m_write->disconnect();
+
+  my $elapsed_time = tv_interval($start_time);
+
+  my $nb_extract = scalar(@marker_data_field_list);
+  my $nb_mrkmeta = scalar(@marker_meta_field_list) - 2;
+
+  my $info_msg = "Appending marker data into DataSet ($dataset_id) is successful. ";
+  $info_msg   .= "Number of markers: $nb_rec. Number of extracts: $nb_extract. Number of meta fields: $nb_mrkmeta";
+
+  my $info_msg_aref = [{'Message' => $info_msg, 'RunTime' => "$elapsed_time"}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'     => $info_msg_aref};
+  $data_for_postrun_href->{'ExtraData'} = 0;
 
   return $data_for_postrun_href;
 }

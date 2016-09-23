@@ -16,6 +16,7 @@
   <INPUT ParaName="Genotype2" SrcValue="xml/add_data_no_vcol/case_00107_add_geno2_4_specimen.xml" />
   <INPUT ParaName="Genotype3" SrcValue="xml/add_data_no_vcol/case_00361_add_geno3.xml" />
   <INPUT ParaName="Genotype4" SrcValue="xml/add_data_no_vcol/case_00362_add_geno4.xml" />
+  <INPUT ParaName="InheritanceGenotype" Value="9" />
   <INPUT ParaName="RandomNum" PrefixVal="" Random="1" />
   <INPUT ParaName="uploadfile" SrcFile="xml/add_data_no_vcol/import_specimen_src1.csv" />
   <Match Attr="StatusCode" Value="200" />
@@ -27,5 +28,6 @@
   <Parent CaseFile="xml/add_data_no_vcol/case_00107_add_geno2_4_specimen.xml" Order="5" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00361_add_geno3.xml" Order="6" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00362_add_geno4.xml" Order="7" />
-  <RunInfo Success="1" Time="1443160467" />
+  <ReturnId FileFormat="xml" IdFile="./import_specimen_csv_return_id_209.xml" />
+  <RunInfo Success="1" Time="1474006865" />
 </TestCase>

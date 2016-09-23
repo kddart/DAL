@@ -1,0 +1,21 @@
+<!ELEMENT DATA ( plate+ ) >
+
+<!ELEMENT plate ( extract+ ) >
+<!ATTLIST plate PlateName CDATA #REQUIRED >
+<!ATTLIST plate DateCreated NMTOKEN #REQUIRED >
+<!ATTLIST plate PlateType NMTOKEN #IMPLIED >
+<!ATTLIST plate PlateDescription CDATA #IMPLIED >
+<!ATTLIST plate StorageId NMTOKEN #IMPLIED >
+<!ATTLIST plate PlateWells NMTOKEN #IMPLIED >
+<!ATTLIST plate PlateStatus CDATA #IMPLIED >
+<!ATTLIST plate OperatorId NMTOKEN #IMPLIED >
+
+<!ELEMENT extract EMPTY >
+<!ATTLIST extract ItemGroupId NMTOKEN #IMPLIED >
+<!ATTLIST extract GenotypeId NMTOKEN #IMPLIED >
+<!ATTLIST extract ParentExtractId NMTOKEN #IMPLIED >
+<!ATTLIST extract Quality CDATA #IMPLIED >
+<!ATTLIST extract Status CDATA #IMPLIED >
+<!ATTLIST extract Tissue NMTOKEN #REQUIRED >
+<!ATTLIST extract WellCol CDATA #REQUIRED >
+<!ATTLIST extract WellRow CDATA #REQUIRED >

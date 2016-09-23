@@ -1,24 +1,14 @@
-#$Id: Trait.pm 1016 2015-10-08 06:06:28Z puthick $
-#$Author: puthick $
+#$Id$
+#$Author$
 
-# Copyright (c) 2015, Diversity Arrays Technology, All rights reserved.
-
-# COPYRIGHT AND LICENSE
-# 
-# Copyright (C) 2014 by Diversity Arrays Technology Pty Ltd
-# 
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-# 
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
+# Copyright (c) 2011, Diversity Arrays Technology, All rights reserved.
 
 # Author    : Puthick Hok
-# Version   : 2.3.0 build 1040
+# Created   : 02/06/2010
+# Modified  :
+# Purpose   : 
+#          
+#          
 
 package KDDArT::DAL::Trait;
 
@@ -30,7 +20,8 @@ BEGIN {
 
   my ($volume, $current_dir, $file) = File::Spec->splitpath(__FILE__);
 
-  $main::kddart_base_dir = "${current_dir}../../..";
+  my @current_dir_part = split('/perl-lib/KDDArT/DAL/', $current_dir);
+  $main::kddart_base_dir = $current_dir_part[0];
 }
 
 use lib "$main::kddart_base_dir/perl-lib";
@@ -463,21 +454,21 @@ sub update_treatment_runmode {
       if (length($factor_value) > 0) {
 
         if ($count > 0) {
-        
+
           $sql  = 'UPDATE treatmentfactor SET ';
           $sql .= 'FactorValue=? ';
           $sql .= 'WHERE TreatmentId=? AND FactorId=?';
           my $factor_sth = $dbh_k_write->prepare($sql);
           $factor_sth->execute($factor_value, $treatment_id, $vcol_id);
-          
+
           if ($dbh_k_write->err()) {
-        
+
             $data_for_postrun_href->{'Error'} = 1;
             $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
             return $data_for_postrun_href;
           }
-          
+
           $factor_sth->finish();
         }
         else {
@@ -488,15 +479,15 @@ sub update_treatment_runmode {
           $sql .= 'FactorValue=?';
           my $factor_sth = $dbh_k_write->prepare($sql);
           $factor_sth->execute($treatment_id, $vcol_id, $factor_value);
-          
+
           if ($dbh_k_write->err()) {
-            
+
             $data_for_postrun_href->{'Error'} = 1;
             $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
             return $data_for_postrun_href;
           }
-          
+
           $factor_sth->finish();
         }
       }
@@ -509,9 +500,9 @@ sub update_treatment_runmode {
 
           my $factor_sth = $dbh_k_write->prepare($sql);
           $factor_sth->execute($treatment_id, $vcol_id);
-      
+
           if ($dbh_k_write->err()) {
-        
+
             $data_for_postrun_href->{'Error'} = 1;
             $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
@@ -768,7 +759,7 @@ sub import_samplemeasurement_csv_runmode {
 "RequiredUpload": 1,
 "UploadFileFormat": "CSV",
 "UploadFileParameterName": "uploadfile",
-"HTTPParameter": [{"Required": 1, "Name": "TrialUnitId", "Description": "Column number counting from zero for TrialUnitId column in the upload CSV file"}, {"Required": 1, "Name": "SampleTypeId", "Description": "Column number counting from zero for SampleTypeId column in the upload CSV file"}, {"Required": 1, "Name": "TraitId", "Description": "Column number counting from zero for TraitId column in the upload CSV file"}, {"Required": 1, "Name": "OperatorId", "Description": "Column number counting from zero for OperatorId column for the upload CSV file"}, {"Required": 1, "Name": "MeasureDateTime", "Description": "Column number counting from zero for MeasureDateTime column in the upload CSV file"}, {"Required": 1, "Name": "InstanceNumber", "Description": "Column number counting from zero for InstanceNumber column in the upload CSV file"}, {"Required": 1, "Name": "TraitValue", "Description": "Column number counting from zero for TraitValue column in the upload CSV file"}],
+"HTTPParameter": [{"Required": 1, "Name": "TrialUnitId", "Description": "Column number counting from zero for TrialUnitId column in the upload CSV file"}, {"Required": 1, "Name": "SampleTypeId", "Description": "Column number counting from zero for SampleTypeId column in the upload CSV file"}, {"Required": 1, "Name": "TraitId", "Description": "Column number counting from zero for TraitId column in the upload CSV file"}, {"Required": 1, "Name": "OperatorId", "Description": "Column number counting from zero for OperatorId column for the upload CSV file"}, {"Required": 1, "Name": "MeasureDateTime", "Description": "Column number counting from zero for MeasureDateTime column in the upload CSV file"}, {"Required": 1, "Name": "InstanceNumber", "Description": "Column number counting from zero for InstanceNumber column in the upload CSV file"}, {"Required": 1, "Name": "TraitValue", "Description": "Column number counting from zero for TraitValue column in the upload CSV file"}, {"Required": 0, "Name": "TrialUnitSpecimenId", "Description": "Column number counting from zero for TrialUnitSpecimenId column in the upload CSV file for sub-plot scoring"}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
@@ -792,23 +783,13 @@ sub import_samplemeasurement_csv_runmode {
   my $InstanceNumber_col  = $query->param('InstanceNumber');
   my $TraitValue_col      = $query->param('TraitValue');
 
-  my ($col_def_err, $col_def_err_href) = check_col_def_href( { 'TrialUnitId'     => $TrialUnitId_col,
-                                                               'SampleTypeId'    => $SampleTypeId_col,
-                                                               'TraitId'         => $TraitId_col,
-                                                               'MeasureDateTime' => $MeasureDateTime_col,
-                                                               'InstanceNumber'  => $InstanceNumber_col,
-                                                               'TraitValue'      => $TraitValue_col,
-                                                             },
-                                                             $num_of_col
-      );
-
-  if ($col_def_err) {
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$col_def_err_href]};
-
-    return $data_for_postrun_href;
-  }
+  my $chk_col_href = { 'TrialUnitId'     => $TrialUnitId_col,
+                       'SampleTypeId'    => $SampleTypeId_col,
+                       'TraitId'         => $TraitId_col,
+                       'MeasureDateTime' => $MeasureDateTime_col,
+                       'InstanceNumber'  => $InstanceNumber_col,
+                       'TraitValue'      => $TraitValue_col,
+                     };
 
   my $matched_col = {};
 
@@ -818,6 +799,29 @@ sub import_samplemeasurement_csv_runmode {
   $matched_col->{$MeasureDateTime_col} = 'MeasureDateTime';
   $matched_col->{$InstanceNumber_col}  = 'InstanceNumber';
   $matched_col->{$TraitValue_col}      = 'TraitValue';
+
+  my $TrialUnitSpecimenId_col = undef;
+
+  if (defined $query->param('TrialUnitSpecimenId')) {
+
+    if (length($query->param('TrialUnitSpecimenId')) > 0) {
+
+      $TrialUnitSpecimenId_col = $query->param('TrialUnitSpecimenId');
+      $chk_col_href->{'TrialUnitSpecimenId'} = $TrialUnitSpecimenId_col;
+
+      $matched_col->{$TrialUnitSpecimenId_col} = 'TrialUnitSpecimenId';
+    }
+  }
+
+  my ($col_def_err, $col_def_err_href) = check_col_def_href( $chk_col_href, $num_of_col);
+
+  if ($col_def_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$col_def_err_href]};
+
+    return $data_for_postrun_href;
+  }
 
   if (length($OperatorId_col) > 0) {
 
@@ -978,7 +982,7 @@ sub list_treatment {
         $row->{'update'} = "update/treatment/$treatment_id";
 
         if ( $not_used_id_href->{$treatment_id} ) {
-          
+
           $row->{'delete'}   = "delete/treatment/$treatment_id";
         }
       }
@@ -2347,7 +2351,7 @@ sub export_samplemeasurement_csv_runmode {
     $self->logger->debug("$lock_filename exists in $export_data_path");
     my $msg = 'Lockfile exists: either another process of this export is running or ';
     $msg   .= 'there was an unexpected error regarding clearing this lockfile.';
-    
+
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $msg}]};
 
@@ -2377,13 +2381,13 @@ sub export_samplemeasurement_csv_runmode {
 
     push(@field_headers, $sth->{NAME}->[$i]);
   }
-  
+
   print $smeasure_csv_fh '#' . join(',', @field_headers) . "\n";
 
   while ( my $row_aref = $sth->fetchrow_arrayref() ) {
 
     my $csv_line = join(',', @{$row_aref});
-    
+
     print $smeasure_csv_fh "$csv_line\n";
   }
 
@@ -3152,7 +3156,10 @@ sub del_treatment_runmode {
 
   if ($dbh_k_write->err()) {
 
-    return $self->error_message('Unexpected error.');
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error.'}]};
+
+    return $data_for_postrun_href;
   }
 
   $sth->finish();
@@ -3598,6 +3605,8 @@ sub export_datakapture_template_runmode {
 
     # save the number of trait column only in the first row
     $record_nb_trait_col = 0;
+
+    #$self->logger->debug("Template row: " . join(',', keys(%{$template_row})));
 
     push(@{$template_data}, $template_row);
   }
@@ -4626,7 +4635,7 @@ sub insert_samplemeasurement_data {
   }
 
   my $bulk_sql = 'INSERT INTO samplemeasurement ';
-  $bulk_sql   .= '(TrialUnitId,SampleTypeId,TraitId,OperatorId,MeasureDateTime,InstanceNumber,TraitValue) ';
+  $bulk_sql   .= '(TrialUnitId,SampleTypeId,TraitId,OperatorId,MeasureDateTime,InstanceNumber,TraitValue,TrialUnitSpecimenId) ';
   $bulk_sql   .= 'VALUES ';
 
   my $sql;
@@ -4639,6 +4648,8 @@ sub insert_samplemeasurement_data {
     my $trialunit_id      = $data_row->{'TrialUnitId'};
     my $samp_type_id      = $data_row->{'SampleTypeId'};
     my $trait_id          = $data_row->{'TraitId'};
+
+    my $tu_spec_id        = 'NULL';
 
     if ($chk_non_trait_field) {
 
@@ -4722,7 +4733,7 @@ sub insert_samplemeasurement_data {
 
       my ($is_trial_perm_ok, $trouble_trial_id_aref) = check_permission($dbh_write, 'trial', 'TrialId',
                                                                         [$trial_id], $group_id, $gadmin_status,
-                                                                        $LINK_PERM);
+                                                                        $READ_WRITE_PERM);
 
       if (!$is_trial_perm_ok) {
 
@@ -4782,6 +4793,39 @@ sub insert_samplemeasurement_data {
       $effective_user_id = $data_row->{'OperatorId'};
     }
 
+    if (defined $data_row->{'TrialUnitSpecimenId'}) {
+
+      if (length($data_row->{'TrialUnitSpecimenId'}) > 0) {
+
+        $tu_spec_id = $data_row->{'TrialUnitSpecimenId'};
+
+        my $tu_spec_sql = 'SELECT TrialUnitSpecimenId FROM trialunitspecimen ';
+        $tu_spec_sql   .= 'WHERE TrialUnitId=? AND TrialUnitSpecimenId=?';
+
+        my ($r_tu_spec_err, $db_tu_spec_id) = read_cell($dbh_write, $tu_spec_sql, [$trialunit_id, $tu_spec_id]);
+
+        if ($r_tu_spec_err) {
+
+          $self->logger->debug("Read to verify TrialUnitSpecimenId from db failed");
+
+          my $err_msg = "Unexpected Error.";
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+          return $data_for_postrun_href;
+        }
+
+        if (length($db_tu_spec_id) == 0) {
+
+          my $perm_err_msg = "Row ($row_counter): TrialUnitSpecimenId ($tu_spec_id): not found or not part of TrialUnit ($trialunit_id).";
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $perm_err_msg}]};
+
+          return $data_for_postrun_href;
+        }
+      }
+    }
+
     my $trait_val = $data_row->{'TraitValue'};
 
     if ($validate_trait) {
@@ -4819,7 +4863,7 @@ sub insert_samplemeasurement_data {
     my $instance_num = $data_row->{'InstanceNumber'};
 
     $bulk_sql .= "($trialunit_id,$samp_type_id,$trait_id,$effective_user_id,";
-    $bulk_sql .= "'$measure_dt',$instance_num,'$trait_val'),";
+    $bulk_sql .= "'$measure_dt',$instance_num,'$trait_val',$tu_spec_id),";
 
     $row_counter += 1;
   }
@@ -5182,6 +5226,8 @@ sub export_datakapture_data_runmode {
                                                                         \@instance_num_list,
           );
 
+  $self->logger->debug("Trait field order: " . join(',', @{$tfield_order_aref}));
+
   if ($tdata_sql_err) {
 
     $self->logger->debug("Generate samplemeasurement row into column SQL failed: $tdata_sql_msg");
@@ -5306,7 +5352,14 @@ sub export_datakapture_data_runmode {
 
     my $trialunit_id = $trial_unit_rec->{'TrialUnitId'};
 
-    if ( !(defined $trialunit2specimen_lookup->{$trialunit_id}) ) { next; }
+    if ( !(defined $trialunit2specimen_lookup->{$trialunit_id}) ) {
+
+      #next;
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error.'}]};
+
+      return $data_for_postrun_href;
+    }
 
     my $output_data_row  = {};
     my $trial_start_dt   = DateTime::Format::MySQL->parse_datetime($trial_unit_rec->{'TrialStartDate'});
@@ -5346,8 +5399,12 @@ sub export_datakapture_data_runmode {
 
     for my $trial_data_field (keys(%{$trial_data_rec})) {
 
+      #my $trait_val = $trial_data_rec->{$trial_data_field};
+      #$self->logger->debug("Trial data field: $trial_data_field - $trait_val");
       $output_data_row->{$trial_data_field}  = $trial_data_rec->{$trial_data_field};
     }
+
+    #$self->logger->debug("Output data keys: " . join(',', keys(%{$output_data_row})));
 
     push(@{$output_data_aref}, $output_data_row);
   }
@@ -5403,6 +5460,9 @@ sub export_datakapture_data_runmode {
     $field_order_href->{$other_field} = $other_field_order_counter;
     $other_field_order_counter += 1;
   }
+
+  $self->logger->debug("Field order keys: " . join(',', keys(%{$field_order_href})));
+  $self->logger->debug("Data field keys: " . join(',', keys(%{$output_data_aref->[0]})));
 
   arrayref2csvfile($csv_file, $field_order_href, $output_data_aref);
 

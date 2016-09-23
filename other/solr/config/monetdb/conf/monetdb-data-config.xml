@@ -1,0 +1,10 @@
+<dataConfig>
+  <dataSource type="JdbcDataSource"
+            driver="nl.cwi.monetdb.jdbc.MonetDriver"
+            url="jdbc:monetdb://192.168.9.17/kddart_marker_v2_3_1"
+            user="monetdb"
+            password="monetdb" />
+  <document>
+    <entity name="marker_info" query='select &apos;marker_info&apos; as "entity_name", "AnalysisGroupMarkerId" as "SolrId", "DataSetId", "MarkerName", "MarkerSequence", "MarkerDescription", "MarkerExtRef" from "analysisgroupmarker";' />
+  </document>
+</dataConfig>

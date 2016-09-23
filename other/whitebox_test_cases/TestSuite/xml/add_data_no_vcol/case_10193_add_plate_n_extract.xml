@@ -5,6 +5,8 @@
   <INPUT ParaName="PlateDescription" Value="Testing Plate" />
   <INPUT ParaName="PlateType" SrcValue="xml/add_data_no_vcol/case_10196_add_plate_type.xml" />
   <INPUT ParaName="OperatorId" Value="0" />
+  <INPUT ParaName="DateCreated" Value="2015-12-16" />
+  <INPUT ParaName="Tissue" SrcValue="xml/add_data_no_vcol/case_00419_add_tissue_type.xml" />
   <INPUT ParaName="extract" Process="1" SrcFile="xml/add_data_no_vcol/plate_extract.xml" />
   <Match Attr="StatusCode" Value="200" />
   <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
@@ -14,6 +16,7 @@
   <Parent CaseFile="xml/add_data_no_vcol/case_10196_add_plate_type.xml" Order="3" />
   <Parent CaseFile="xml/add_data_no_vcol/case_10194_add_itemgroup1_plate_extract.xml" Order="4" />
   <Parent CaseFile="xml/add_data_no_vcol/case_10195_add_itemgroup2_plate_extract.xml" Order="5" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00419_add_tissue_type.xml" Order="6" />
   
   
 </TestCase>

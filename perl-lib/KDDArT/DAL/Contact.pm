@@ -1,24 +1,14 @@
-#$Id: Contact.pm 1016 2015-10-08 06:06:28Z puthick $
-#$Author: puthick $
+#$Id$
+#$Author$
 
-# Copyright (c) 2015, Diversity Arrays Technology, All rights reserved.
-
-# COPYRIGHT AND LICENSE
-# 
-# Copyright (C) 2014 by Diversity Arrays Technology Pty Ltd
-# 
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-# 
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
+# Copyright (c) 2011, Diversity Arrays Technology, All rights reserved.
 
 # Author    : Puthick Hok
-# Version   : 2.3.0 build 1040
+# Created   : 02/06/2010
+# Modified  :
+# Purpose   : 
+#          
+#          
 
 package KDDArT::DAL::Contact;
 
@@ -30,7 +20,8 @@ BEGIN {
 
   my ($volume, $current_dir, $file) = File::Spec->splitpath(__FILE__);
 
-  $main::kddart_base_dir = "${current_dir}../../..";
+  my @current_dir_part = split('/perl-lib/KDDArT/DAL/', $current_dir);
+  $main::kddart_base_dir = $current_dir_part[0];
 }
 
 use lib "$main::kddart_base_dir/perl-lib";
@@ -119,7 +110,7 @@ sub list_organisation_advanced_runmode {
 =pod list_organisation_advanced_HELP_START
 {
 "OperationName" : "List organisation(s)",
-"Description": "Return a list of organistations currently present in the system.",
+"Description": "Return a list of organisations currently present in the system.",
 "AuthRequired": 1,
 "GroupRequired": 1,
 "GroupAdminRequired": 0,
@@ -253,7 +244,10 @@ sub list_organisation_advanced_runmode {
 
     if ($sel_field_err) {
 
-      return $self->error_message($sel_field_msg);
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $sel_field_msg}]};
+
+      return $data_for_postrun_href;
     }
 
     $final_field_list = $sel_field_list;
@@ -530,7 +524,7 @@ sub list_organisation {
       else {
 
         for my $row (@{$data_aref}) {
-      
+
           my $org_id = $row->{'OrganisationId'};
           $row->{'update'}   = "update/organisation/$org_id";
 
@@ -539,7 +533,7 @@ sub list_organisation {
 
             $row->{'delete'}   = "delete/organisation/$org_id";
           }
-        
+
           push(@{$extra_attr_org_data}, $row);
         }
       }
@@ -1657,7 +1651,7 @@ sub add_contact_runmode {
     my $dbh_gis_write = connect_gis_write();
 
     $sql  = "INSERT INTO contactloc (contactid, contactlocation) ";
-    $sql .= "VALUES (?, ST_GeomFromText(?, -1))";
+    $sql .= "VALUES (?, ST_Multi(ST_GeomFromText(?, -1)))";
 
     $self->logger->debug("ContactId: $contact_id");
 
