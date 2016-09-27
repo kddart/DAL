@@ -34,7 +34,6 @@
     - name: Install supporting binaries
       yum: state=present pkg={{ item }}
       with_items:
-        - git
         - make
         - gcc
         - bison
@@ -155,19 +154,6 @@
         make;
         make install;
         rm -rf /tmp/XML-Checker-0.13
-
-    - name: Copy the tar.gz file
-      copy: src={{ local_tar_gz_file }} dest={{ src_file }}
-
-    - name: Create local_dir
-      shell: "[[ -d {{ local_dir }} ]] || mkdir {{ local_dir }}"
-
-    - name: Untar and decompress KDDart source
-      shell: >
-        if [ -d {{ local_dir }} ]; then 
-        cd {{ local_dir }};
-        tar -zxvf {{ src_file }} --strip 1;
-        fi;
 
     - name: Install MonetDB release package
       shell: "[[ `rpm -qa | grep 'MonetDB-release-epel-1.1-1'` ]] || rpm -ivh https://www.monetdb.org/downloads/epel/MonetDB-release-epel-1.1-1.monetdb.noarch.rpm"

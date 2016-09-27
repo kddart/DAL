@@ -16,10 +16,6 @@
   gather_facts: no
 
   vars_prompt:
-    - name: "local_tar_gz_file"
-      prompt: "Enter the source tar.gz file of KDDart wih either relative or full path."
-      private: no
-
     - name: "mysqlrootpass"
       prompt: "Enter MySQL root password. If you run this ansible playbook for the first time, this will be your MySQL password and it can be anything as long as it is 8 characters long with number, captial letter and symbol. If you run this playbook before, this password must be the same as the one you used in the very first run."
       private: yes
@@ -48,6 +44,11 @@
     dal_address_name: kddart.example.com
 
   tasks:
+
+    - name: Install GIT
+      yum: state=present pkg={{ item }}
+      with_items:
+        - git
 
     - name: Clone DAL repo
       git: repo={{ dal_repo }}
