@@ -5309,14 +5309,14 @@ sub update_trial_geography_runmode {
   my $query    = $self->query();
 
   my $data_for_postrun_href = {};
-  
+
   my $dbh_k_read = connect_kdb_read();
 
   my $group_id = $self->authen->group_id();
   my $gadmin_status = $self->authen->gadmin_status();
 
   my $sql;
-  
+
   if (!(record_existence($dbh_k_read, 'trial', 'TrialId', $trial_id))) {
 
     my $err_msg = "Trial ($trial_id) not found.";
@@ -5415,21 +5415,39 @@ sub update_trial_geography_runmode {
     }
   }
 
+  my $postgres_trial_id = read_cell_value($dbh_gis_write, 'trialloc', 'trialid', 'trialid', $trial_id);
+
   if ($does_actual_update) {
 
     if ($trial_location =~ /^POINT/i) {
 
       my $st_buffer_val = $POINT2POLYGON_BUFFER4TRIAL->{$ENV{DOCUMENT_ROOT}};
 
-      $sql  = "UPDATE trialloc SET ";
-      $sql .= "triallocation = ST_Multi(ST_Buffer(ST_GeomFromText(?, -1), $st_buffer_val, 1)) ";
-      $sql .= "WHERE trialid=?";
+      if (length($postgres_trial_id) > 0) {
+
+        $sql  = "UPDATE trialloc SET ";
+        $sql .= "triallocation = ST_Multi(ST_Buffer(ST_GeomFromText(?, -1), $st_buffer_val, 1)) ";
+        $sql .= "WHERE trialid=?";
+      }
+      else {
+
+        $sql  = "INSERT INTO trialloc (triallocation, trialid) ";
+        $sql .= "VALUES (ST_Multi(ST_Buffer(ST_GeomFromText(?, -1), $st_buffer_val, 1)), ?)";
+      }
     }
     else {
 
-      $sql  = 'UPDATE trialloc SET ';
-      $sql .= 'triallocation = ST_Multi(ST_GeomFromText(?, -1)) ';
-      $sql .= 'WHERE trialid=?';
+      if (length($postgres_trial_id) > 0) {
+
+        $sql  = 'UPDATE trialloc SET ';
+        $sql .= 'triallocation = ST_Multi(ST_GeomFromText(?, -1)) ';
+        $sql .= 'WHERE trialid=?';
+      }
+      else {
+
+        $sql  = 'INSERT INTO trialloc (triallocation, trialid) ';
+        $sql .= 'VALUES (ST_Multi(ST_GeomFromText(?, -1)), ?)';
+      }
     }
 
     my $gis_sth = $dbh_gis_write->prepare($sql);
