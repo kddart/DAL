@@ -64,25 +64,3 @@
 
     - include: ./kddart_dal_v2_3_2_server_deployment_centos7.yml
       static: yes
-
-  handlers:
-
-    - name: stop firewall
-      service:
-        name: firewalld
-        state: stopped
-
-    - name: start mysql
-      service:
-        name: mysqld
-        state: restarted
-
-    - name: start postgresql
-      service:
-        name: postgresql-9.5
-        state: restarted
-
-    - name: restart apache2
-      service:
-        name: httpd
-        state: restarted

@@ -318,3 +318,15 @@
 
     - name: Remove timestamp from all test cases to prevent time issue - this cannot be done from repo
       shell: find {{ local_dir }}/other/whitebox_test_cases/TestSuite -iname 'case*.*' -exec sed -i 's|<RunInfo.*||' {} ";"
+
+    - name: Stop firewall
+      shell: systemctl stop firewalld
+
+    - name: Restart mysql
+      shell: systemctl restart mysqld
+
+    - name: Restart postgresql
+      shell: systemctl restart postgresql-9.5
+
+    - name: Restart apache
+      shell: systemctl restart httpd

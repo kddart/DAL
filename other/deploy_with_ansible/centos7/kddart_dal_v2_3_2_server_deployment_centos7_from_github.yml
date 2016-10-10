@@ -28,6 +28,10 @@
       prompt: "Enter IP network of the target machine, eg. 192.168.78.0/24"
       private: no
 
+    - name: "git_tag_name"
+      prompt: "Enter DAL tag name on GITHUB. Only bug fixing tag which is fully compatible with the target DAL version would work."
+      private: no
+
   vars:
     dal_repo: https://github.com/kddart/DAL.git
     dal_version: v2.3.2
@@ -53,29 +57,7 @@
     - name: Clone DAL repo
       git: repo={{ dal_repo }}
            dest={{ local_dir }}
-           version={{ dal_version }}
+           version={{ git_tag_name }}
 
     - include: ./kddart_dal_v2_3_2_server_deployment_centos7.yml
       static: yes
-
-  handlers:
-
-    - name: stop firewall
-      service:
-        name: firewalld
-        state: stopped
-
-    - name: start mysql
-      service:
-        name: mysqld
-        state: restarted
-
-    - name: start postgresql
-      service:
-        name: postgresql-9.5
-        state: restarted
-
-    - name: restart apache2
-      service:
-        name: httpd
-        state: restarted
