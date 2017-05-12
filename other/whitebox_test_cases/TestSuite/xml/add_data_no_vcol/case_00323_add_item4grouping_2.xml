@@ -28,6 +28,6 @@
   <Parent CaseFile="xml/add_data_no_vcol/case_00307_add_item_unit4add_item.xml" Order="8" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00308_add_item_type.xml" Order="9" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00309_add_item_state.xml" Order="10" />
-  <ReturnId ParaName="ItemId" Value="49" />
-  <RunInfo Success="1" Time="1474346219" />
+  <ReturnId ParaName="ItemId" Value="7" />
+  
 </TestCase>

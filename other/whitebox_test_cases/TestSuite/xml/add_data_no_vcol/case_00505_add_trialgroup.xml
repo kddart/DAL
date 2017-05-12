@@ -12,6 +12,6 @@
   <Parent CaseFile="xml/add_data_no_vcol/case_00428_add_trialgroup_type.xml" Order="3" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00502_add_trial4trialgroup.xml" Order="4" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00503_add_trial4trialgroup1.xml" Order="5" />
-  <ReturnId ParaName="TrialGroupId" Value="19" />
-  <RunInfo Success="1" Time="1474344086" />
+  <ReturnId ParaName="TrialGroupId" Value="2" />
+  
 </TestCase>

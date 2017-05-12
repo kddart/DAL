@@ -10,5 +10,5 @@
   <Parent CaseFile="xml/add_data_no_vcol/case_00358_add_trialunit.xml" Force="1" Order="3" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00515_add_keyword.xml" Order="4" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00517_add_keyword1.xml" Order="5" />
-  <RunInfo Success="1" Time="1474007419" />
+  
 </TestCase>

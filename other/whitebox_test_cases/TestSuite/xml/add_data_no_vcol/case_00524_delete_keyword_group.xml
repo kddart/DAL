@@ -8,5 +8,5 @@
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00522_add_keyword_group4deletion.xml" Force="1" Order="3" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00523_remove_keyword_from_group4deletion.xml" Force="1" Order="4" />
-  <RunInfo Success="1" Time="1474007410" />
+  
 </TestCase>

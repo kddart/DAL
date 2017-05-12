@@ -19,6 +19,6 @@
   <Parent CaseFile="xml/add_data_no_vcol/case_00377_add_extract3.xml" Order="8" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00378_add_extract4.xml" Order="9" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00379_add_extract5.xml" Order="10" />
-  <ReturnId ParaName="AnalysisGroupId" Value="9" />
-  <RunInfo Success="1" Time="1474346221" />
+  <ReturnId ParaName="AnalysisGroupId" Value="4" />
+  
 </TestCase>

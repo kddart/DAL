@@ -90,18 +90,22 @@ sub setup {
         );
 
     my $layout = Log::Log4perl::Layout::PatternLayout->new("[%d] [%H] [%X{client_ip}] [%p] [%F{1}:%L] [%M] [%m]%n");
-    
+
     $app->layout($layout);
-    
+
     $logger->add_appender($app);
   }
   $logger->level($DEBUG);
 
   $self->{logger} = $logger;
 
+  my $domain_name = $COOKIE_DOMAIN->{$ENV{DOCUMENT_ROOT}};
+  $self->logger->debug("COOKIE DOMAIN: $domain_name");
+
   $self->authen->config(LOGIN_URL => '');
   $self->session_config(
-          CGI_SESSION_OPTIONS => [ "driver:File", $self->query, {Directory=>$SESSION_STORAGE_PATH} ],
+          CGI_SESSION_OPTIONS => [ "driver:File", $self->query, {Directory => $SESSION_STORAGE_PATH} ],
+          SEND_COOKIE         => 0,
       );
 }
 
@@ -109,7 +113,7 @@ sub list_organisation_advanced_runmode {
 
 =pod list_organisation_advanced_HELP_START
 {
-"OperationName" : "List organisation(s)",
+"OperationName": "List organisation(s)",
 "Description": "Return a list of organisations currently present in the system.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -553,7 +557,7 @@ sub get_organisation_runmode {
 
 =pod get_organisation_HELP_START
 {
-"OperationName" : "Get organisation",
+"OperationName": "Get organisation",
 "Description": "Return detailed information about organisation specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -628,7 +632,7 @@ sub update_organisation_runmode {
 
 =pod update_organisation_gadmin_HELP_START
 {
-"OperationName" : "Update organisation",
+"OperationName": "Update organisation",
 "Description": "Update organisation in the database using specified id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -860,7 +864,7 @@ sub list_contact_advanced_runmode {
 
 =pod list_contact_advanced_HELP_START
 {
-"OperationName" : "List contact(s)",
+"OperationName": "List contact(s)",
 "Description": "Return list of contacts currently present in the system.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -1160,9 +1164,9 @@ sub list_contact_advanced_runmode {
     $self->logger->debug("SQL Count time: $rcount_time");
 
     if ($pg_id_err == 1) {
-    
+
       $self->logger->debug($pg_id_msg);
-    
+
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
@@ -1170,7 +1174,7 @@ sub list_contact_advanced_runmode {
     }
 
     if ($pg_id_err == 2) {
-      
+
       $page = 0;
     }
 
@@ -1427,7 +1431,7 @@ sub add_contact_runmode {
 
 =pod add_contact_gadmin_HELP_START
 {
-"OperationName" : "Add contact",
+"OperationName": "Add contact",
 "Description": "Add a new contact into a database. Contacts are related to organisations.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -1518,7 +1522,7 @@ sub add_contact_runmode {
   if (length($contactlocation) > 0) {
 
     my $dbh_gis_read = connect_gis_read();
-    my ($is_wkt_err, $wkt_err_href) = is_valid_wkt_href($dbh_gis_read, {'contactlocation' => $contactlocation}, 'POINT');
+    my ($is_wkt_err, $wkt_err_href) = is_valid_wkt_href($dbh_gis_read, {'contactlocation' => $contactlocation}, ['POINT', 'MULTIPOINT']);
     $dbh_gis_read->disconnect();
 
     if ($is_wkt_err) {
@@ -1631,15 +1635,15 @@ sub add_contact_runmode {
       $sql .= 'FactorValue=?';
       my $factor_sth = $dbh_k_write->prepare($sql);
       $factor_sth->execute($contact_id, $vcol_id, $factor_value);
-      
+
       if ($dbh_k_write->err()) {
-        
+
         $data_for_postrun_href->{'Error'} = 1;
         $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
         return $data_for_postrun_href;
       }
-    
+
       $factor_sth->finish();
     }
   }
@@ -1688,7 +1692,7 @@ sub add_organisation_runmode {
 
 =pod add_organisation_gadmin_HELP_START
 {
-"OperationName" : "Add organisation",
+"OperationName": "Add organisation",
 "Description": "Add a new organisation into a database.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -1850,7 +1854,7 @@ sub del_organisation_runmode {
 
 =pod del_organisation_gadmin_HELP_START
 {
-"OperationName" : "Delete organisation",
+"OperationName": "Delete organisation",
 "Description": "Delete organisation from the database using specified id. Organisation can be deleted only if not attached to any lower level record.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -1940,7 +1944,7 @@ sub del_contact_runmode {
 
 =pod del_contact_gadmin_HELP_START
 {
-"OperationName" : "Delete contact",
+"OperationName": "Delete contact",
 "Description": "Delete contact from the database using specified id. Contact can be deleted only if not attached to any lower level record.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -2099,7 +2103,7 @@ sub update_contact_runmode {
 
 =pod update_contact_gadmin_HELP_START
 {
-"OperationName" : "Update contact",
+"OperationName": "Update contact",
 "Description": "Update a contact in the database using specified id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -2158,36 +2162,68 @@ sub update_contact_runmode {
   my $fname           = $query->param('ContactFirstName');
   my $lname           = $query->param('ContactLastName');
   my $org_id          = $query->param('OrganisationId');
+ 
+  my $read_contact_sql      =  'SELECT ContactAcronym, ContactAddress, ContactTelephone, ContactMobile, ContactEmail ';
+     $read_contact_sql     .=  'FROM contact WHERE ContactId=? ';
 
-  my $acronym         = read_cell_value($dbh_k_read, 'contact', 'ContactAcronym', 'ContactId', $contact_id);
+  my ($r_df_val_err, $r_df_val_msg, $contact_df_val_data) = read_data($dbh_k_read, $read_contact_sql, [$contact_id]);
+
+  if ($r_df_val_err) {
+
+    $self->logger->debug("Retrieve contact default values for optional fields failed: $r_df_val_msg");
+    $data_for_postrun_href->{'Error'}  = 1;
+    $data_for_postrun_href->{'Data'}   = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $acronym     =  undef;
+  my $address     =  undef;
+  my $telephone   =  undef;
+  my $mobile      =  undef;
+  my $email       =  undef;
+
+  my $nb_df_val_rec    =  scalar(@{$contact_df_val_data});
+
+  if ($nb_df_val_rec != 1)  {
+
+     $self->logger->debug("Retrieve contact default values - number of records unacceptable: $nb_df_val_rec");
+     $data_for_postrun_href->{'Error'} = 1;
+     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+     return $data_for_postrun_href;
+  }
+
+  $acronym     =  $contact_df_val_data->[0]->{'ContactAcronym'};
+  $address     =  $contact_df_val_data->[0]->{'ContactAddress'};
+  $telephone   =  $contact_df_val_data->[0]->{'ContactTelephone'};
+  $mobile      =  $contact_df_val_data->[0]->{'ContactMobile'};
+  $email       =  $contact_df_val_data->[0]->{'ContactEmail'};
+
 
   if (defined $query->param('ContactAcronym')) {
 
     $acronym = $query->param('ContactAcronym');
   }
 
-  my $address         = read_cell_value($dbh_k_read, 'contact', 'ContactAddress', 'ContactId', $contact_id);
 
   if (defined $query->param('ContactAddress')) {
 
     $address = $query->param('ContactAddress');
   }
   
-  my $telephone       = read_cell_value($dbh_k_read, 'contact', 'ContactTelephone', 'ContactId', $contact_id);
 
   if (defined $query->param('ContactTelephone')) {
 
     $telephone = $query->param('ContactTelephone');
   }
   
-  my $mobile          = read_cell_value($dbh_k_read, 'contact', 'ContactMobile', 'ContactId', $contact_id);
 
   if (defined $query->param('ContactMobile')) {
 
     $mobile = $query->param('ContactMobile');
   }
 
-  my $email           = read_cell_value($dbh_k_read, 'contact', 'ContactEMail', 'ContactId', $contact_id);;
 
   if (defined $query->param('ContactEMail')) {
 
@@ -2204,14 +2240,14 @@ sub update_contact_runmode {
   if (length($contactlocation) > 0) {
 
     my $dbh_gis_read = connect_gis_read();
-    my ($is_wkt_err, $wkt_err_href) = is_valid_wkt_href($dbh_gis_read, {'contactlocation' => $contactlocation}, 'POINT');
+    my ($is_wkt_err, $wkt_err_href) = is_valid_wkt_href($dbh_gis_read, {'contactlocation' => $contactlocation}, ['POINT', 'MULTIPOINT']);
     $dbh_gis_read->disconnect();
 
     if ($is_wkt_err) {
 
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [$wkt_err_href]};
-      
+
       return $data_for_postrun_href;
     }
   }
@@ -2253,7 +2289,7 @@ sub update_contact_runmode {
   my ($vcol_maxlen_err, $vcol_maxlen_href) = check_maxlen_href($vcol_param_data_maxlen, $vcol_len_info);
 
   if ($vcol_maxlen_err) {
-    
+
     $data_for_postrun_href->{'Error'}       = 1;
     $data_for_postrun_href->{'Data'}        = {'Error' => [$vcol_maxlen_href]};
 
@@ -2315,18 +2351,18 @@ sub update_contact_runmode {
           $sql  = 'UPDATE contactfactor SET ';
           $sql .= 'FactorValue=? ';
           $sql .= 'WHERE ContactId=? AND FactorId=?';
-      
+
           my $factor_sth = $dbh_k_write->prepare($sql);
           $factor_sth->execute($factor_value, $contact_id, $vcol_id);
-      
+
           if ($dbh_k_write->err()) {
-        
+
             $data_for_postrun_href->{'Error'} = 1;
             $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
             return $data_for_postrun_href;
           }
-    
+
           $factor_sth->finish();
         }
         else {
@@ -2335,18 +2371,18 @@ sub update_contact_runmode {
           $sql .= 'ContactId=?, ';
           $sql .= 'FactorId=?, ';
           $sql .= 'FactorValue=?';
-      
+
           my $factor_sth = $dbh_k_write->prepare($sql);
           $factor_sth->execute($contact_id, $vcol_id, $factor_value);
-      
+
           if ($dbh_k_write->err()) {
-        
+
             $data_for_postrun_href->{'Error'} = 1;
             $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
             return $data_for_postrun_href;
           }
-    
+
           $factor_sth->finish();
         }
       }
@@ -2359,9 +2395,9 @@ sub update_contact_runmode {
 
           my $factor_sth = $dbh_k_write->prepare($sql);
           $factor_sth->execute($contact_id, $vcol_id);
-      
+
           if ($dbh_k_write->err()) {
-        
+
             $data_for_postrun_href->{'Error'} = 1;
             $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
@@ -2376,11 +2412,11 @@ sub update_contact_runmode {
   $dbh_k_write->disconnect();
 
   my $dbh_gis_write = connect_gis_write();
-  
+
   if (length($contactlocation) > 0) {
 
     $sql  = "UPDATE contactloc ";
-    $sql .= "SET contactlocation=ST_GeomFromText(?, -1) ";
+    $sql .= "SET contactlocation=ST_Multi(ST_GeomFromText(?, -1)) ";
     $sql .= 'WHERE contactid=?';
 
     my $gis_sth = $dbh_gis_write->prepare($sql);
@@ -2431,7 +2467,7 @@ sub get_contact_runmode {
 
 =pod get_contact_HELP_START
 {
-"OperationName" : "Get contact",
+"OperationName": "Get contact",
 "Description": "Return detailed information about contact specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -2463,9 +2499,9 @@ sub get_contact_runmode {
 
     return $data_for_postrun_href;
   }
-  
+
   my $field_list = ['contact.*', 'VCol*', 'LCol*', 'organisation.OrganisationName'];
-  
+
   my $other_join = ' LEFT JOIN organisation ON contact.OrganisationId = organisation.OrganisationId ';
 
   my ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_sql($dbh, $field_list, 'contact',
@@ -2480,9 +2516,9 @@ sub get_contact_runmode {
 
     return $data_for_postrun_href;
   }
-  
+
   $sql  =~ s/GROUP BY/ WHERE contact.ContactId=? GROUP BY /;
-  
+
   $self->logger->debug("SQL with VCol: $sql");
 
   my ($read_contact_err, $read_contact_msg, $contact_data) = $self->list_contact(1, $field_list, $sql, [$contact_id]);
@@ -2496,7 +2532,13 @@ sub get_contact_runmode {
     return $data_for_postrun_href;
   }
 
-  $data_for_postrun_href->{'Error'} = 0;
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'geojson'}   = 1;
+  $data_for_postrun_href->{'GJSonInfo'} = {'GeometryField' => 'contactlocation',
+                                           'FeatureName'   => 'ContactFirstName ContactLastName [ id: ContactId ]',
+                                           'FeatureId'     => 'ContactId',
+  };
+
   $data_for_postrun_href->{'Data'}  = {'Contact'    => $contact_data,
                                        'VCol'       => $vcol_list,
                                        'RecordMeta' => [{'TagName' => 'Contact'}],

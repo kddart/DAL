@@ -12,5 +12,6 @@
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00499_add_trial_with_workflow.xml" Order="3" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00497_add_workflow_def.xml" Order="4" />
+  <ReturnId ParaName="TrialWorkflowId" Value="1" />
   
 </TestCase>

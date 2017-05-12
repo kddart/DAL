@@ -1089,18 +1089,19 @@ sub initialize {
 
     $self->logger->debug("Session time out plus username");
     # This is not a fresh login, and there are time out rules, so make sure the login is still valid
-    if ( $config->{LOGIN_SESSION_TIMEOUT}->{IDLE_FOR} && 
+    if ( $config->{LOGIN_SESSION_TIMEOUT}->{IDLE_FOR} &&
          ($self->remember_me ne 'YES') &&
-         time() - $self->last_access >= $config->{LOGIN_SESSION_TIMEOUT}->{IDLE_FOR} ) {
+         (time() - $self->last_access) >= $config->{LOGIN_SESSION_TIMEOUT}->{IDLE_FOR} ) {
 
       # this login has been idle for too long
       $self->logger->debug("Idle for too long");
       $self->{is_login_timeout} = 1;
       $self->logout;
 
-    } elsif ( $config->{LOGIN_SESSION_TIMEOUT}->{EVERY} && 
-              ($self->remember_me ne 'YES') &&
-              time() - $self->last_login >=  $config->{LOGIN_SESSION_TIMEOUT}->{EVERY} ) {
+    }
+    elsif ( $config->{LOGIN_SESSION_TIMEOUT}->{EVERY} &&
+            ($self->remember_me ne 'YES') &&
+            (time() - $self->last_login) >=  $config->{LOGIN_SESSION_TIMEOUT}->{EVERY} ) {
 
       # it has been too long since the last login
       $self->logger->debug("Has been too long since the last login");
@@ -1153,9 +1154,9 @@ sub new {
 
     $logger->add_appender($app);
   }
-  
+
   $self->{logger} = $logger;
-  
+
   $self->config(
     STORE                  => 'Session',
     LOGIN_SESSION_TIMEOUT  => {
@@ -1314,6 +1315,10 @@ sub prerun_callback {
   if ($authen->is_active_login_runmode($current_runmode)) {
 
     if ($authen->is_authenticated) {
+
+      my $session_id = $self->session->id();
+
+      $self->logger->debug("SESSID: $session_id");
 
       $self->logger->debug("Already login, should return 420 instead of 200");
       return $authen->redirect_to_already_login;
@@ -1847,22 +1852,31 @@ sub _time_to_seconds {
 
 sub _verify_session_checksum {
 
-  my $self = shift;
+  my $self  = shift;
+  my $query = $self->_cgiapp->query();
+
+  my $env_cookie      = $ENV{'HTTP_COOKIE'};
+
+  my $cookie_key      = read_cookie($env_cookie, 'KDDArT_RANDOM_NUMBER');
+
+  if (defined $query->param('KDDArT_RANDOM_NUMBER')) {
+
+    $cookie_key = trim($query->param('KDDArT_RANDOM_NUMBER'));
+  }
 
   my $username        = $self->store->fetch('username');
 
   if ( !$username ) { return 0; }
 
   my $session_id      = $self->_cgiapp->session->id();
+
+  $self->logger->debug("SessionID: $session_id - Username: $username");
+
   my $rememberme      = $self->store->fetch('remember_me');
   my $write_token     = $self->store->fetch('write_token');
   my $group_id        = $self->store->fetch('group_id');
   my $user_id         = $self->store->fetch('user_id');
   my $gadmin_status   = $self->store->fetch('gadmin_status');
-
-  my $env_cookie      = $ENV{'HTTP_COOKIE'};
-
-  my $cookie_key = read_cookie($env_cookie, 'KDDArT_RANDOM_NUMBER');
 
   my $stored_checksum = $self->store->fetch('checksum');
 
@@ -1885,24 +1899,30 @@ sub _verify_session_checksum {
 
     $self->logger->debug("COOKIE: $env_cookie");
     $self->logger->debug("Checksum failed: $hash_data Key: $cookie_key");
+    $self->logger->debug("Stored checksum: $stored_checksum, Derived checksum: $derived_checksum");
     return 0;
   }
 }
 
 sub recalculate_session_checksum {
 
-  my $self = shift;
+  my $self  = shift;
+  my $query = $self->_cgiapp->query();
 
   my $session_id      = $self->_cgiapp->session->id();
+  my $cookie_key      = read_cookie($ENV{'HTTP_COOKIE'}, 'KDDArT_RANDOM_NUMBER');
 
-  my $username        = $self->store->fetch('username'); 
+  if (defined $query->param('KDDArT_RANDOM_NUMBER')) {
+
+    $cookie_key = trim($query->param('KDDArT_RANDOM_NUMBER'));
+  }
+
+  my $username        = $self->store->fetch('username');
   my $rememberme      = $self->store->fetch('remember_me');
   my $write_token     = $self->store->fetch('write_token');
   my $group_id        = $self->store->fetch('group_id');
   my $user_id         = $self->store->fetch('user_id');
   my $gadmin_status   = $self->store->fetch('gadmin_status');
-
-  my $cookie_key = read_cookie($ENV{'HTTP_COOKIE'}, 'KDDArT_RANDOM_NUMBER');
 
   my $hash_data = "$username";
   $hash_data   .= "$session_id";
@@ -2227,7 +2247,7 @@ sub should_rand_be_done {
     return 1;
   }
   elsif ( $rand_delay > 0 ) {
-    
+
     my $now = time();
     my $last_seen = $storage->param("${rand}_LAST_SEEN");
     if ( ($now - $rand_delay) >= $last_seen  ) {

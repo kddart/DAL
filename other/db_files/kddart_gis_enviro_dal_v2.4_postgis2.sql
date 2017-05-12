@@ -1,8 +1,8 @@
--- generated on: Mon Sep 12 12:02:14 2016
+-- generated on: Fri May 12 15:24:35 2017
 -- input file: ER_dbmodel_GIS_Enviro.xml
 
 
--- Copyright (C) 2016 by Diversity Arrays Technology Pty Ltd
+-- Copyright (C) 2017 by Diversity Arrays Technology Pty Ltd
 --
 -- This program is free software: you can redistribute it and/or modify
 -- it under the terms of the GNU General Public License as published by
@@ -16,7 +16,7 @@
 
 
 -- model name: GIS enviro ER diagram
--- model version: 2.3.2.86
+-- model version: 2.4.0.95
 
 
 -- postgis definition for version 2.x

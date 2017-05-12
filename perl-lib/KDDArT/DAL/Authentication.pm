@@ -44,6 +44,7 @@ use Mozilla::CA;
 use LWP::UserAgent;
 use HTTP::Request::Common qw(POST GET);
 use JSON qw(decode_json);
+use CGI::Session;
 
 BEGIN {
 
@@ -65,7 +66,8 @@ sub setup {
   __PACKAGE__->authen->init_config_parameters();
   __PACKAGE__->authen->check_content_type_runmodes(':all');
   __PACKAGE__->authen->check_login_runmodes('switch_to_group',
-                                            'switch_extra_data'
+                                            'switch_extra_data',
+                                            'clone',
                                            );
   __PACKAGE__->authen->check_active_login_runmodes('login');
   __PACKAGE__->authen->count_session_request_runmodes(':all');
@@ -79,6 +81,7 @@ sub setup {
     'get_login_status'          => 'get_login_status_runmode',
     'switch_extra_data'         => 'switch_extra_data_runmode',
     'oauth2_google'             => 'oauth2_google_runmode',
+    'clone'                     => 'clone_runmode',
       );
 
   my $logger = get_logger();
@@ -100,14 +103,17 @@ sub setup {
 
   $self->{logger} = $logger;
 
+  my $domain_name = $COOKIE_DOMAIN->{$ENV{DOCUMENT_ROOT}};
+  $self->logger->debug("COOKIE DOMAIN: $domain_name");
+
   $self->authen->config(LOGIN_URL => '');
   $self->session_config(
-          CGI_SESSION_OPTIONS => [ "driver:File", $self->query, {Directory=>$SESSION_STORAGE_PATH} ],
-          COOKIE_PARAMS       => {
-                                   -path      => '/',
-                                   -expires   => '+10y',
-                                 },
-          SEND_COOKIE         => 1,
+          CGI_SESSION_OPTIONS => [ "driver:File", $self->query,
+                                   {
+                                    Directory => $SESSION_STORAGE_PATH
+                                   }
+                                 ],
+          SEND_COOKIE         => 0,
       );
 
   my $setup_elapsed = tv_interval($start_time);
@@ -118,15 +124,15 @@ sub login_runmode {
 
 =pod login_HELP_START
 {
-"OperationName" : "Login user into a system",
-"Description": "Authenticate user in the KDDart system and issues security features allowing user to operate withing the system.",
+"OperationName": "Login user into a system",
+"Description": "Authenticate user in the KDDart system and issues security features allowing user to operate within the system.",
 "AuthRequired": 0,
 "GroupRequired": 0,
 "GroupAdminRequired": 0,
 "SignatureRequired": 1,
 "AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><WriteToken Value='4f7f9a08a64a7dc85d2d61c8ca79f9871894de1c' /><User UserId='0' /></DATA>",
-"SuccessMessageJSON": "{'WriteToken' : [{'Value' : '72511995dab16297994265b627700a82b88c72b0'}],'User' : [{'UserId' : '0'}]}",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><User UserName='admin' UserId='0' /><StatInfo Unit='second' ServerElapsedTime='0.071' /><RecordMeta TagName='SessionToken' /><WriteToken Value='2bb7602e3b6290ee2403df8c4445e8834b1d4676' /><SessionToken KDDArT_DAL_SESSID='b169d1deecdee4b731e63ac86f539f3a' KDDArT_RANDOM_NUMBER='2731032673' /></DATA>",
+"SuccessMessageJSON": "{'WriteToken' : [{'Value' : 'dc9544d610dbb69bb7abc06b9aaed514abfa6789'}], 'SessionToken' : [{'KDDArT_RANDOM_NUMBER' : '3403500693', 'KDDArT_DAL_SESSID' : '27a5c4f66ca68f85fb21fcb54040052e'}], 'StatInfo' : [{'Unit' : 'second', 'ServerElapsedTime' : '0.077'}], 'User' : [{'UserId' : '0', 'UserName' : 'admin'}], 'RecordMeta' : [{'TagName' : 'SessionToken'}]}",
 "ErrorMessageXML": [{"IncorrectCredential": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Incorrect username or password.' /></DATA>"}],
 "ErrorMessageJSON": [{"IncorrectCredential": "{'Error' : [{'Message' : 'Incorrect username or password.'}]}"}],
 "URLParameter": [{"ParameterName": "username", "Description": "Username"}, {"ParameterName": "rememberme", "Description": "A value either yes or no. If the value is yes, the login session will be permanent. If the value is no, the login session will expire due to inactivity."}],
@@ -160,6 +166,11 @@ sub login_runmode {
   my $err_msg = '';
   my $write_token;
   my $user_id;
+  my $sess_id = '';
+  my $rand_number = '';
+
+  my $domain_name = $COOKIE_DOMAIN->{$ENV{DOCUMENT_ROOT}};
+  $self->logger->debug("COOKIE DOMAIN: $domain_name");
 
   if ( !$dbh->err() ) {
 
@@ -179,13 +190,18 @@ sub login_runmode {
       if ($signature_db eq $signature) {
 
         my $start_time = [gettimeofday()];
-        my $cookie_only_rand = makerandom(Size => 128, Strength => 0);
+        my $cookie_only_rand = makerandom(Size => 32, Strength => 0);
+
+        $rand_number = $cookie_only_rand;
+
         my $f_rand_elapsed = tv_interval($start_time);
         $self->logger->debug("First random number elapsed: $f_rand_elapsed");
 
         $self->logger->debug("Password in DB: $pass_db");
 
         my $session_id = $self->session->id();
+
+        $sess_id = $session_id;
 
         my $now = time();
 
@@ -226,9 +242,17 @@ sub login_runmode {
 
         my $cookie = $q->cookie(
           -name        => 'KDDArT_RANDOM_NUMBER',
+          -domain      => $domain_name,
           -value       => "$cookie_only_rand",
           -expires     => '+10y',
             );
+
+        my $sessid_cookie = $q->cookie(
+                                       -name        => 'KDDArT_DAL_SESSID',
+                                       -domain      => $domain_name,
+                                       -value       => "$session_id",
+                                       -expires     => '+10y',
+                                      );
 
         my $dbh_write = connect_kdb_write();
 
@@ -246,8 +270,7 @@ sub login_runmode {
         log_activity($dbh_write, $user_id, 0, 'LOGIN');
         $dbh_write->disconnect();
 
-        $self->header_add(-cookie => [$cookie]);
-        $self->session_cookie();
+        $self->header_add(-cookie => [$sessid_cookie, $cookie]);
 
         $self->logger->debug("$username");
         $self->logger->debug("random number: $cookie_only_rand");
@@ -257,8 +280,16 @@ sub login_runmode {
 
         my $now = time();
 
+        my $sessid_cookie = $q->cookie(
+                                       -name        => 'KDDArT_DAL_SESSID',
+                                       -domain      => $domain_name,
+                                       -value       => '',
+                                       -expires     => '+10y',
+            );
+
         my $cookie = $q->cookie(
           -name        => 'KDDArT_RANDOM_NUMBER',
+          -domain      => $domain_name,
           -value       => '',
           -expires     => '+10y',
             );
@@ -277,8 +308,7 @@ sub login_runmode {
                                     'EXTRA_DATA'     => '0',
             );
 
-        $self->header_add(-cookie => [$cookie]);
-        $self->session_cookie();
+        $self->header_add(-cookie => [$sessid_cookie, $cookie]);
 
         $self->logger->debug("Password signature verification failed db: $signature_db, user: $signature");
         $err = 1;
@@ -313,16 +343,22 @@ sub login_runmode {
     $data_for_postrun_href->{'HTTPErrorCode'} = 401;
     $data_for_postrun_href->{'Data'}          = {'Error' => $err_msg_aref};
   }
-  else { 
+  else {
 
     $self->logger->debug("Return WriteToken for Transformation");
-    my $write_token_aref = [{'Value' => $write_token}];
+    my $write_token_aref    = [{'Value' => $write_token}];
+
+    my $session_token_aref  = [{ 'KDDArT_DAL_SESSID'    => "$sess_id",
+                                 'KDDArT_RANDOM_NUMBER' => "$rand_number" }];
 
     my $user_info_aref   = [{'UserId' => $user_id, 'UserName' => $username}];
 
-    $data_for_postrun_href->{'Data'}      = {'WriteToken' => $write_token_aref,
-                                             'User'       => $user_info_aref
-    };
+    $data_for_postrun_href->{'Data'}      = { 'WriteToken'   => $write_token_aref,
+                                              'SessionToken' => $session_token_aref,
+                                              'User'         => $user_info_aref,
+                                              'RecordMeta'   => [{'TagName' => 'SessionToken'}]
+                                            };
+
     $data_for_postrun_href->{'ExtraData'} = 0;
   }
 
@@ -333,7 +369,7 @@ sub switch_to_group_runmode {
 
 =pod switch_to_group_HELP_START
 {
-"OperationName" : "Change group",
+"OperationName": "Change group",
 "Description": "Change current group. Each user can be a member of more than one group and data access privileges depend on group membership and admin privileges within a group. This action is always required after user logs into a system.",
 "AuthRequired": 1,
 "GroupRequired": 0,
@@ -437,7 +473,7 @@ sub switch_to_group_runmode {
 
   $sth->finish();
   $dbh->disconnect();
-  
+
   my $data_for_postrun_href = {};
 
   $data_for_postrun_href->{'Error'}       = 0;
@@ -448,7 +484,7 @@ sub switch_to_group_runmode {
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => $err_msg_aref};
   }
-  else { 
+  else {
 
     my ($gadmin_st_str, $grp_name) = split(/,/, $msg);
     my $msg_aref = [{'GAdmin'    => $gadmin_st_str,
@@ -467,7 +503,7 @@ sub logout_runmode {
 
 =pod logout_HELP_START
 {
-"OperationName" : "Logout user from a system",
+"OperationName": "Logout user from a system",
 "Description": "Securely logging out of the system and ending the current session.",
 "AuthRequired": 0,
 "GroupRequired": 0,
@@ -480,6 +516,7 @@ sub logout_runmode {
 =cut
 
   my $self = shift;
+  my $q    = $self->query();
 
   my $user_id = $self->authen->user_id();
 
@@ -491,6 +528,27 @@ sub logout_runmode {
   }
 
   $self->authen->logout();
+
+  my $domain_name = $COOKIE_DOMAIN->{$ENV{DOCUMENT_ROOT}};
+  $self->logger->debug("COOKIE DOMAIN: $domain_name");
+
+  my $cookie_name = CGI::Session->name();
+
+  my $cgisession_cookie = $q->cookie(
+            -name      => "$cookie_name",
+            -domain    => $domain_name,
+            -values    => '',
+            -expires   => '-1d',
+        );
+
+  my $kddart_cookie = $q->cookie(
+            -name      => 'KDDArT_RANDOM_NUMBER',
+            -domain    => $domain_name,
+            -values    => '',
+            -expires   => '-1d',
+        );
+
+  $self->header_add(-cookie => [$cgisession_cookie, $kddart_cookie]);
 
   my $msg_aref = [{'Message' => 'You have logged out successfully.'}];
 
@@ -507,7 +565,7 @@ sub get_login_status_runmode {
 
 =pod get_login_status_HELP_START
 {
-"OperationName" : "Login status",
+"OperationName": "Login status",
 "Description": "Return information about current login and group status",
 "AuthRequired": 0,
 "GroupRequired": 0,
@@ -573,7 +631,7 @@ sub switch_extra_data_runmode {
 
 =pod switch_extra_data_HELP_START
 {
-"OperationName" : "Switch extradata",
+"OperationName": "Switch extradata",
 "Description": "Change a mode of the returned output. By switching to extradata ON there will be more information returned in get and list calls. By switching in OFF packets of data can be smaller, but as a trade off some system information will not be present in the output.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -633,8 +691,8 @@ sub oauth2_google_runmode {
 
 =pod oauth2_google_HELP_START
 {
-"OperationName" : "Login to DAL using Google Auth2",
-"Description": "Login to DAL using Google Auth2 from a valid access token.",
+"OperationName": "Login to DAL using Google OAuth2",
+"Description": "Login to DAL using Google OAuth2 from a valid access token.",
 "AuthRequired": 0,
 "GroupRequired": 0,
 "GroupAdminRequired": 0,
@@ -820,6 +878,123 @@ sub oauth2_google_runmode {
 
     return $data_for_postrun_href;
   }
+}
+
+sub clone_runmode {
+
+=pod clone_HELP_START
+{
+"OperationName": "Clone session",
+"Description": "Clone the current session.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><SessionToken KDDArT_RANDOM_NUMBER='2852333918' KDDArT_DAL_SESSID='6c107b3633dd7410bc67556192de63b9' /><RecordMeta TagName='SessionToken' /><WriteToken Value='6b7d92fe956da32fd581f5a8059f24f18390dcd1' /><StatInfo ServerElapsedTime='0.005' Unit='second' /><User UserId='0' UserName='admin' /></DATA>",
+"SuccessMessageJSON": "{'RecordMeta' : [{'TagName' : 'SessionToken'}],'SessionToken' : [{'KDDArT_DAL_SESSID' : '6f0437cebe4e587fd31a8f7bde7ecb02','KDDArT_RANDOM_NUMBER' : '2201862084'}],'WriteToken' : [{'Value' : 'f8e051b695ab4791813cada066b0984cbcd71730'}],'User' : [{'UserId' : '0','UserName' : 'admin'}],'StatInfo' : [{'ServerElapsedTime' : '0.005','Unit' : 'second'}]}",
+"ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
+"ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self           = shift;
+  my $query          = $self->query;
+
+  my $user_id        = $self->authen->user_id();
+  my $group_id       = $self->authen->group_id();
+  my $gadmin_status  = $self->authen->gadmin_status();
+  my $group_name     = $self->authen->groupname();
+  my $username       = $self->authen->username();
+  my $extra_data     = $self->authen->is_extra_data();
+
+  my $rememberme     = 'YES';
+
+  my $data_for_postrun_href = {};
+
+  my $new_session = CGI::Session->new("driver:File", '', {Directory => "$SESSION_STORAGE_PATH"});
+
+  my $session_id = $new_session->id();
+
+  my $old_session_id = $self->session->id();
+
+  if ("$session_id" eq "$old_session_id") {
+
+    my $err_msg = "Unexpected Error.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $self->logger->debug("New session id: $session_id");
+
+  my $start_time = [gettimeofday()];
+  my $cookie_only_rand = makerandom(Size => 32, Strength => 0);
+
+  my $rand_number = $cookie_only_rand;
+
+  my $f_rand_elapsed = tv_interval($start_time);
+  $self->logger->debug("First random number elapsed: $f_rand_elapsed");
+
+  $start_time = [gettimeofday()];
+  my $write_token_rand = makerandom(Size => 128, Strength => 0);
+  my $s_rand_elapsed = tv_interval($start_time);
+  $self->logger->debug("Second random number elapsed: $s_rand_elapsed");
+
+  my $write_token = hmac_sha1_hex("$cookie_only_rand", "$write_token_rand");
+
+  my $hash_data = '';
+  $hash_data   .= "$username";
+  $hash_data   .= "$session_id";
+  $hash_data   .= "$rememberme";
+  $hash_data   .= "$write_token";
+  $hash_data   .= "$group_id";
+  $hash_data   .= "$user_id";
+  $hash_data   .= "$gadmin_status";
+
+  $self->logger->debug("Hash data: $hash_data");
+
+  my $session_checksum = hmac_sha1_hex($hash_data, "$cookie_only_rand");
+
+  $self->logger->debug("New session checksum: $session_checksum");
+
+  my $now = time();
+
+  $new_session->param('USERNAME', $username);
+  $new_session->param('LOGIN_ATTEMPTS', 0);
+  $new_session->param('LAST_LOGIN', $now);
+  $new_session->param('LAST_ACCESS', $now);
+  $new_session->param('REMEMBER_ME', $rememberme);
+  $new_session->param('CHECKSUM', $session_checksum);
+  $new_session->param('WRITE_TOKEN', $write_token);
+  $new_session->param('GROUP_ID', $group_id);
+  $new_session->param('USER_ID', $user_id);
+  $new_session->param('GADMIN_STATUS', $gadmin_status);
+  $new_session->param('EXTRA_DATA', $extra_data);
+  $new_session->save_param();
+
+  my $write_token_aref    = [{'Value' => $write_token}];
+
+  my $retrieve_write_token = $new_session->param('WRITE_TOKEN');
+
+  $self->logger->debug("Write Token: $retrieve_write_token");
+
+  my $session_token_aref  = [{ 'KDDArT_DAL_SESSID'    => "$session_id",
+                               'KDDArT_RANDOM_NUMBER' => "$rand_number" }];
+
+  my $user_info_aref   = [{'UserId' => $user_id, 'UserName' => $username}];
+
+  $data_for_postrun_href->{'Data'}      = { 'WriteToken'   => $write_token_aref,
+                                            'SessionToken' => $session_token_aref,
+                                            'User'         => $user_info_aref,
+                                            'RecordMeta'   => [{'TagName' => 'SessionToken'}]
+                                          };
+
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
 }
 
 sub logger {

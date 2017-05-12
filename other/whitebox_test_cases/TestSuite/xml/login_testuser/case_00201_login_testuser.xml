@@ -5,5 +5,5 @@
   <Match Attr="Message" Exception="1" Order="1" Tag="Error" Value="Already login." />
   <Match Attr="StatusCode" Order="2" Value="200" />
   <Match Attr="WriteToken" Order="3" Value="regex(^\w+$)" />
-  <RunInfo Success="1" Time="1474353740" />
+  
 </TestCase>

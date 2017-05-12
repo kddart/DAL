@@ -76,9 +76,13 @@ sub setup {
 
   $self->{logger} = $logger;
 
+  my $domain_name = $COOKIE_DOMAIN->{$ENV{DOCUMENT_ROOT}};
+  $self->logger->debug("COOKIE DOMAIN: $domain_name");
+
   $self->authen->config(LOGIN_URL => '');
   $self->session_config(
-          CGI_SESSION_OPTIONS => [ "driver:File", $self->query, {Directory=>$SESSION_STORAGE_PATH} ],
+          CGI_SESSION_OPTIONS => [ "driver:File", $self->query, {Directory => $SESSION_STORAGE_PATH} ],
+          SEND_COOKIE         => 0,
       );
 }
 
@@ -86,7 +90,7 @@ sub help_runmode {
 
 =pod help_HELP_START
 {
-"OperationName" : "Help",
+"OperationName": "Help",
 "Description": "This interface is for DAL operation documentation.",
 "AuthRequired": 0,
 "GroupRequired": 0,
@@ -364,7 +368,7 @@ sub get_dal_error_info_runmode {
 
 =pod get_dal_error_info_HELP_START
 {
-"OperationName" : "Get DAL Error Code",
+"OperationName": "Get DAL Error Code",
 "Description": "This interface is for getting the details of a particular DAL error code.",
 "AuthRequired": 0,
 "GroupRequired": 0,
@@ -421,7 +425,7 @@ sub list_dal_error_info_runmode {
 
 =pod list_dal_error_info_HELP_START
 {
-"OperationName" : "List all DAL Error Codes",
+"OperationName": "List all DAL Error Codes",
 "Description": "This interface is for retrieving the details of all DAL error codes.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -456,7 +460,7 @@ sub get_version_runmode {
 
 =pod get_version_HELP_START
 {
-"OperationName" : "Get version",
+"OperationName": "Get version",
 "Description": "Get version information of the system.",
 "AuthRequired": 0,
 "GroupRequired": 0,

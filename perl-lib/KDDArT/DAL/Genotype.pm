@@ -231,9 +231,13 @@ sub setup {
 
   $self->{logger} = $logger;
 
+  my $domain_name = $COOKIE_DOMAIN->{$ENV{DOCUMENT_ROOT}};
+  $self->logger->debug("COOKIE DOMAIN: $domain_name");
+
   $self->authen->config(LOGIN_URL => '');
   $self->session_config(
-          CGI_SESSION_OPTIONS => [ "driver:File", $self->query, {Directory=>$SESSION_STORAGE_PATH} ],
+          CGI_SESSION_OPTIONS => [ "driver:File", $self->query, {Directory => $SESSION_STORAGE_PATH} ],
+          SEND_COOKIE         => 0,
       );
 }
 
@@ -241,7 +245,7 @@ sub add_genotype_runmode {
 
 =pod add_genotype_HELP_START
 {
-"OperationName" : "Add Genotype",
+"OperationName": "Add Genotype",
 "Description": "Add a new genotype record into the system",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -523,7 +527,7 @@ sub add_genus_runmode {
 
 =pod add_genus_gadmin_HELP_START
 {
-"OperationName" : "Add Genus",
+"OperationName": "Add Genus",
 "Description": "This interface can be used to add a genus to KDDart",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -946,7 +950,7 @@ sub get_genotype_runmode {
 
 =pod get_genotype_HELP_START
 {
-"OperationName" : "Get Genotype",
+"OperationName": "Get Genotype",
 "Description": "Return detailed information about genotype specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -1043,7 +1047,7 @@ sub list_genus_runmode {
 
 =pod list_genus_HELP_START
 {
-"OperationName" : "List genus",
+"OperationName": "List genus",
 "Description": "Return list of genuses (organisms) in the system.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -1087,7 +1091,7 @@ sub add_specimen_runmode {
 
 =pod add_specimen_HELP_START
 {
-"OperationName" : "Add Specimen",
+"OperationName": "Add Specimen",
 "Description": "Adds a new specimen to the database. Specimen needs to be linked with at least one genotype. DAL has a configuration what relations are possible between genotypes and specimens: one-to-one, many-to-one, many-to-many.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -1150,6 +1154,7 @@ sub add_specimen_runmode {
   my $pedigree              = '';
   my $selection_history     = '';
   my $filial_generation     = undef;
+  my $specimen_note         = undef;
 
   my $chk_int_href = {};
   if ( length($query->param('IsActive')) > 0 ) {
@@ -1158,7 +1163,16 @@ sub add_specimen_runmode {
     $chk_int_href->{'IsActive'} = $is_active;
   }
 
-  if ( length($query->param('Pedigree')) > 0 ) { $pedigree  = $query->param('Pedigree'); }
+  if ( length($query->param('Pedigree')) > 0 ) {
+
+    $pedigree  = $query->param('Pedigree');
+  }
+
+  if ( length($query->param('SpecimenNote')) > 0) {
+
+    $specimen_note = $query->param('SpecimenNote');
+  }
+
   if ( length($query->param('SelectionHistory')) > 0 ) { $selection_history     = $query->param('SelectionHistory'); }
 
   if ( length($query->param('FilialGeneration')) > 0 ) {
@@ -1508,6 +1522,7 @@ sub add_specimen_runmode {
   $sql   .= 'Pedigree=?, ';
   $sql   .= 'SelectionHistory=?, ';
   $sql   .= 'FilialGeneration=?, ';
+  $sql   .= 'SpecimenNote=?, ';
   $sql   .= 'OwnGroupId=?, ';
   $sql   .= 'OwnGroupPerm=?, ';
   $sql   .= 'AccessGroupId=?, ';
@@ -1516,7 +1531,7 @@ sub add_specimen_runmode {
 
   my $sth = $dbh_write->prepare($sql);
   $sth->execute($breed_method_id, $specimen_name, $specimen_barcode,
-                $is_active, $pedigree, $selection_history, $filial_generation,
+                $is_active, $pedigree, $selection_history, $filial_generation, $specimen_note,
                 $inh_own_grp_id, $inh_own_grp_perm, $inh_acc_grp_id, $inh_acc_grp_perm, $inh_oth_perm
                );
 
@@ -1884,7 +1899,7 @@ sub list_specimen_advanced_runmode {
 
 =pod list_specimen_advanced_HELP_START
 {
-"OperationName" : "List specimens",
+"OperationName": "List specimens",
 "Description": "List specimens. This listing requires pagination information.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -2226,7 +2241,7 @@ sub get_specimen_runmode {
 
 =pod get_specimen_HELP_START
 {
-"OperationName" : "Get specimen",
+"OperationName": "Get specimen",
 "Description": "Get detailed information about a specimen specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -2324,7 +2339,7 @@ sub update_genotype_runmode {
 
 =pod update_genotype_HELP_START
 {
-"OperationName" : "Update genotype",
+"OperationName": "Update genotype",
 "Description": "Update information about the genotype specified by genotype id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -2655,7 +2670,7 @@ sub update_specimen_runmode {
 
 =pod update_specimen_HELP_START
 {
-"OperationName" : "Update specimen",
+"OperationName": "Update specimen",
 "Description": "Updates information about the specimen specified by specimen id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -2752,8 +2767,8 @@ sub update_specimen_runmode {
 
   my $df_val_start_time = [gettimeofday()];
 
-  my $read_sql = 'SELECT SpecimenBarcode, IsActive, Pedigree, SelectionHistory, FilialGeneration ';
-  $read_sql   .= 'FROM specimen WHERE SpecimenId=?';
+  my $read_sql = 'SELECT SpecimenBarcode, IsActive, Pedigree, SelectionHistory, FilialGeneration, ';
+  $read_sql   .= 'SpecimenNote FROM specimen WHERE SpecimenId=?';
 
   my ($r_df_val_err, $r_df_val_msg, $spec_df_val_data) = read_data($dbh_k_read, $read_sql, [$specimen_id]);
 
@@ -2771,6 +2786,7 @@ sub update_specimen_runmode {
   my $pedigree              = undef;
   my $selection_history     = undef;
   my $filial_generation     = undef;
+  my $specimen_note         = undef;
 
   my $nb_df_val_rec = scalar(@{$spec_df_val_data});
 
@@ -2788,6 +2804,7 @@ sub update_specimen_runmode {
   $pedigree          = $spec_df_val_data->[0]->{'Pedigree'};
   $selection_history = $spec_df_val_data->[0]->{'SelectionHistory'};
   $filial_generation = $spec_df_val_data->[0]->{'FilialGeneration'};
+  $specimen_note     = $spec_df_val_data->[0]->{'SpecimenNote'};
 
   my $df_val_elapsed = tv_interval($df_val_start_time);
 
@@ -2798,6 +2815,11 @@ sub update_specimen_runmode {
     $filial_generation = undef;
   }
 
+  if (length($specimen_note) == 0) {
+
+    $specimen_note = undef;
+  }
+
   my $chk_int_href = {};
   if ( length($query->param('IsActive')) > 0 ) {
 
@@ -2805,8 +2827,20 @@ sub update_specimen_runmode {
     $chk_int_href->{'IsActive'} = $is_active;
   }
 
-  if ( length($query->param('Pedigree')) > 0 ) { $pedigree  = $query->param('Pedigree'); }
-  if ( length($query->param('SelectionHistory')) > 0 ) { $selection_history     = $query->param('SelectionHistory'); }
+  if ( length($query->param('Pedigree')) > 0 ) {
+
+    $pedigree  = $query->param('Pedigree');
+  }
+
+  if ( length($query->param('SpecimenNote')) > 0) {
+
+    $specimen_note = $query->param('SpecimenNote');
+  }
+
+  if ( length($query->param('SelectionHistory')) > 0 ) {
+
+    $selection_history     = $query->param('SelectionHistory');
+  }
 
   if ( length($query->param('FilialGeneration')) > 0 ) {
 
@@ -2926,12 +2960,14 @@ sub update_specimen_runmode {
   $sql   .= 'IsActive=?, ';
   $sql   .= 'Pedigree=?, ';
   $sql   .= 'SelectionHistory=?, ';
-  $sql   .= 'FilialGeneration=? ';
+  $sql   .= 'FilialGeneration=?, ';
+  $sql   .= 'SpecimenNote=? ';
   $sql   .= 'WHERE SpecimenId=?';
 
   my $sth = $dbh_write->prepare($sql);
   $sth->execute($breed_method_id, $specimen_name, $specimen_barcode,
-                $is_active, $pedigree, $selection_history, $filial_generation, $specimen_id);
+                $is_active, $pedigree, $selection_history, $filial_generation, $specimen_note,
+                $specimen_id);
 
   if ($dbh_write->err()) {
 
@@ -3032,7 +3068,7 @@ sub add_genotype_to_specimen_runmode {
 
 =pod add_genotype_to_specimen_HELP_START
 {
-"OperationName" : "Attach genotype to specimen",
+"OperationName": "Attach genotype to specimen",
 "Description": "Adds genotype to the specimen specified by. In some crops (hybrid plants) one specimen can be composed of more than one genotype. Requires relevant (many-to-many) DAL configuration.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -3206,7 +3242,7 @@ sub remove_genotype_from_specimen_runmode {
 
 =pod remove_genotype_from_specimen_gadmin_HELP_START
 {
-"OperationName" : "Detach specimen from genotype",
+"OperationName": "Detach specimen from genotype",
 "Description": "Removes genotype (genoid) from specimen specified by id. Genotype is no longer the 'parent' of the specimen. At least one genotype has to remain attached to the specimen.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -3332,7 +3368,7 @@ sub add_genotype_alias_runmode {
 
 =pod add_genotype_alias_HELP_START
 {
-"OperationName" : "Add alias to the genotype",
+"OperationName": "Add alias to the genotype",
 "Description": "Add an alias (name) to the genotype specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -3503,7 +3539,7 @@ sub update_genotype_alias_runmode {
 
 =pod update_genotype_alias_HELP_START
 {
-"OperationName" : "Update genotype alias",
+"OperationName": "Update genotype alias",
 "Description": "Updates genotype alias (alternative name) for specified alias id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -3550,68 +3586,70 @@ sub update_genotype_alias_runmode {
 
   my $dbh_write = connect_kdb_write();
 
-  my $geno_id = read_cell_value($dbh_write, 'genotypealias', 'GenotypeId', 'GenotypeAliasId', $geno_alias_id);
+  my $read_sql   = 'SELECT GenotypeId, GenotypeAliasName, GenotypeAliasType, GenotypeAliasStatus, GenotypeAliasLang ';
+     $read_sql  .= 'FROM genotypealias WHERE GenotypeAliasId=? ';
+
+  my ($r_df_val_err, $r_df_val_msg, $geno_df_val_data) = read_data($dbh_write, $read_sql, [$geno_alias_id]);
+
+  if ($r_df_val_err) {
+
+    $self->logger->debug("Retrieve genoalias default values for optional fields failed: $r_df_val_msg");
+    $data_for_postrun_href->{'Error'}  = 1;
+    $data_for_postrun_href->{'Data'}   = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $geno_id            = undef;
+  my $geno_alias_name    = undef;
+  my $geno_alias_type    = undef;
+  my $geno_alias_status  = undef;
+  my $geno_alias_lang    = undef;
+
+  my $nb_df_val_rec    =  scalar(@{$geno_df_val_data});
+
+  if ($nb_df_val_rec != 1)  {
+
+     $self->logger->debug("Retrieve genoalias default values - number of records unacceptable: $nb_df_val_rec");
+     $data_for_postrun_href->{'Error'} = 1;
+     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+     return $data_for_postrun_href;
+  }
+ 
+  $geno_id           = $geno_df_val_data->[0]->{'GenotypeId'};
+  $geno_alias_name   = $geno_df_val_data->[0]->{'GenotypeAliasName'};
+  $geno_alias_type   = $geno_df_val_data->[0]->{'GenotypeAliasType'};
+  $geno_alias_status = $geno_df_val_data->[0]->{'GenotypeAliasStatus'};
+  $geno_alias_lang   = $geno_df_val_data->[0]->{'GenotypeAliasLang'};
 
   if (length($geno_id) == 0) {
-
+  
     my $err_msg = "GenotypeAlias ($geno_alias_id) not found.";
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
+    
     return $data_for_postrun_href;
-  }
-
+  } 
+  
   my $group_id = $self->authen->group_id();
   my $gadmin_status = $self->authen->gadmin_status();
-
+  
   my ($is_geno_ok, $trouble_geno_id_aref) = check_permission($dbh_write, 'genotype', 'GenotypeId',
                                                              [$geno_id], $group_id, $gadmin_status,
                                                              $READ_WRITE_PERM);
-
-  if (!$is_geno_ok) {
-
+                                                             
+  if (!$is_geno_ok) {                                        
+  
     my $trouble_geno_id = $trouble_geno_id_aref->[0];
     my $err_msg = "Permission denied: Group ($group_id) and genotype ($geno_id).";
-
+    
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
+    
     return $data_for_postrun_href;
   }
 
-  my $geno_alias_name = $query->param('GenotypeAliasName');
-
-  my $geno_alias_type   = read_cell_value($dbh_write, 'genotypealias', 'GenotypeAliasType',
-                                          'GenotypeAliasId', $geno_alias_id);
-  my $geno_alias_status = read_cell_value($dbh_write, 'genotypealias', 'GenotypeAliasStatus',
-                                          'GenotypeAliasId', $geno_alias_id);
-  my $geno_alias_lang   = read_cell_value($dbh_write, 'genotypealias', 'GenotypeAliasLang',
-                                          'GenotypeAliasId', $geno_alias_id);
-
-  if (defined $query->param('GenotypeAliasType')) {
-
-    if (length($query->param('GenotypeAliasType')) > 0) {
-
-      $geno_alias_type = $query->param('GenotypeAliasType');
-    }
-  }
-
-  if (defined $query->param('GenotypeAliasStatus')) {
-
-    if (length($query->param('GenotypeAliasStatus')) > 0) {
-
-      $geno_alias_status = $query->param('GenotypeAliasStatus');
-    }
-  }
-
-  if (defined $query->param('GenotypeAliasLang')) {
-
-    if (length($query->param('GenotypeAliasLang')) > 0) {
-
-      $geno_alias_lang = $query->param('GenotypeAliasLang');
-    }
-  }
-  
   if (length($geno_alias_type) > 0) {
 
     if (!type_existence($dbh_write, 'genotypealias', $geno_alias_type)) {
@@ -3652,11 +3690,11 @@ sub update_genotype_alias_runmode {
   }
 
   my $sql = 'UPDATE genotypealias SET ';
-  $sql   .= 'GenotypeAliasName=?, ';
-  $sql   .= 'GenotypeAliasType=?, ';
-  $sql   .= 'GenotypeAliasStatus=?, ';
-  $sql   .= 'GenotypeAliasLang=? ';
-  $sql   .= 'WHERE GenotypeAliasId=?';
+     $sql   .= 'GenotypeAliasName=?, ';
+     $sql   .= 'GenotypeAliasType=?, ';
+     $sql   .= 'GenotypeAliasStatus=?, ';
+     $sql   .= 'GenotypeAliasLang=? ';
+     $sql   .= 'WHERE GenotypeAliasId=?';
 
   my $sth = $dbh_write->prepare($sql);
   $sth->execute($geno_alias_name, $geno_alias_type, $geno_alias_status, $geno_alias_lang, $geno_alias_id);
@@ -3751,7 +3789,7 @@ sub list_genotype_alias_advanced_runmode {
 
 =pod list_genotype_alias_advanced_HELP_START
 {
-"OperationName" : "List genotype aliases",
+"OperationName": "List genotype aliases",
 "Description": "Return a list of aliases (alternative names) for genotypes. This listing requires pagination definition.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -4108,7 +4146,7 @@ sub get_genotype_alias_runmode {
 
 =pod get_genotype_alias_HELP_START
 {
-"OperationName" : "Get genotype alias",
+"OperationName": "Get genotype alias",
 "Description": "Returns detailed information for genotype alias specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -4187,7 +4225,7 @@ sub update_genus_runmode {
 
 =pod update_genus_gadmin_HELP_START
 {
-"OperationName" : "Update genus",
+"OperationName": "Update genus",
 "Description": "Update genus (organism) information using specified id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -4303,7 +4341,7 @@ sub get_genus_runmode {
 
 =pod get_genus_HELP_START
 {
-"OperationName" : "Get genus",
+"OperationName": "Get genus",
 "Description": "Return detailed information about a genus (organism) specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -4361,7 +4399,7 @@ sub add_trait2genotype_runmode {
 
 =pod add_trait2genotype_HELP_START
 {
-"OperationName" : "Add trait value for genotype",
+"OperationName": "Add trait value for genotype",
 "Description": "Add known value of the trait for a genotype. Usually known feature/value of the particular genotype (not generated as a direct measurement).",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -4614,7 +4652,7 @@ sub list_genotype_trait_runmode {
 
 =pod list_genotype_trait_HELP_START
 {
-"OperationName" : "List trait values for genotype",
+"OperationName": "List trait values for genotype",
 "Description": "Returns full list of trait values for a genotype. Usually known feature/value of the particular genotype (not generated as a direct measurement).",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -4698,7 +4736,7 @@ sub get_genotype_trait_runmode {
 
 =pod get_genotype_trait_HELP_START
 {
-"OperationName" : "Get trait value for genotype",
+"OperationName": "Get trait value for genotype",
 "Description": "Returns known value of the trait for a genotype. Usually known feature/value of the particular genotype (not generated as a direct measurement).",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -4777,7 +4815,7 @@ sub update_genotype_trait_runmode {
 
 =pod update_genotype_trait_HELP_START
 {
-"OperationName" : "Update trait value for genotype",
+"OperationName": "Update trait value for genotype",
 "Description": "Update known value of the trait for a genotype. Usually known feature/value of the particular genotype (not generated as a direct measurement).",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -4898,7 +4936,7 @@ sub remove_genotype_trait_runmode {
 
 =pod remove_genotype_trait_HELP_START
 {
-"OperationName" : "Delete trait value for genotype",
+"OperationName": "Delete trait value for genotype",
 "Description": "Deletes known value of the trait for a genotype. Usually known feature/value of the particular genotype (not generated as a direct measurement).",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -5014,7 +5052,7 @@ sub add_specimen_group_runmode {
 
 =pod add_specimen_group_HELP_START
 {
-"OperationName" : "Add specimen group",
+"OperationName": "Add specimen group",
 "Description": "Add a new specimen group.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -5063,10 +5101,33 @@ sub add_specimen_group_runmode {
   my $specimen_group_name         = $query->param('SpecimenGroupName');
   my $specimen_group_type         = $query->param('SpecimenGroupTypeId');
   my $date_created                = $query->param('SpecimenGroupCreated');
-  my $access_group                = $query->param('AccessGroupId');
-  my $own_perm                    = $query->param('OwnGroupPerm');
-  my $access_perm                 = $query->param('AccessGroupPerm');
-  my $other_perm                  = $query->param('OtherPerm');
+
+  my $group_id      = $self->authen->group_id();
+
+  my $own_perm      = 7;
+  my $access_group  = $group_id;
+  my $access_perm   = 5;
+  my $other_perm    = 0;
+
+  if (length($query->param('OwnGroupPerm')) > 0) {
+
+    $own_perm = $query->param('OwnGroupPerm');
+  }
+
+  if (length($query->param('AccessGroupId')) > 0) {
+
+    $access_group = $query->param('AccessGroupId');
+  }
+
+  if (length($query->param('AccessGroupPerm')) > 0) {
+
+    $access_perm = $query->param('AccessGroupPerm');
+  }
+
+  if (length($query->param('OtherPerm')) > 0) {
+
+    $other_perm = $query->param('OtherPerm');
+  }
 
   my $specimen_group_status       = undef;
 
@@ -5197,7 +5258,6 @@ sub add_specimen_group_runmode {
     return $data_for_postrun_href;
   }
 
-  my $group_id      = $self->authen->group_id();
   my $gadmin_status = $self->authen->gadmin_status();
 
   my $specimen_info_xml  = read_file($specimen_info_xml_file);
@@ -5396,6 +5456,7 @@ sub list_specimen_group {
   my $extra_attr_yes    = $_[1];
   my $sql               = $_[2];
   my $where_para_aref   = $_[3];
+  my $extra_param       = $_[4];
 
   my $err = 0;
   my $msg = '';
@@ -5403,6 +5464,7 @@ sub list_specimen_group {
   my $data_aref = [];
 
   my $dbh = connect_kdb_read();
+  my $specimen_aref  = [];
 
   ($err, $msg, $data_aref) = read_data($dbh, $sql, $where_para_aref);
 
@@ -5449,7 +5511,7 @@ sub list_specimen_group {
       $group_lookup = $dbh->selectall_hashref($group_sql, 'SystemGroupId');
     }
 
-    if (scalar(@{$spec_grp_id_aref}) > 0) {
+    if ( $extra_param eq 0 ) {
 
       my $specimen_sql = 'SELECT SpecimenGroupId, specimengroupentry.SpecimenId, ';
       $specimen_sql   .= 'specimengroupentry.SpecimenNote, specimen.SpecimenName FROM specimengroupentry ';
@@ -5504,13 +5566,29 @@ sub list_specimen_group {
     my $oth_perm     = $specimen_group_row->{'OtherPerm'};
     my $ulti_perm    = $specimen_group_row->{'UltimatePerm'};
 
+    if ( $extra_param eq 1 ) {
+       my $count_sql_specimen      =  "SELECT COUNT(*) FROM specimengroupentry ";
+          $count_sql_specimen     .=  "LEFT JOIN specimen ON specimengroupentry.SpecimenId = specimen.SpecimenId ";
+          $count_sql_specimen     .=  "WHERE SpecimenGroupId='$specimen_group_id' ";
+
+       my $count_specimen  =    $dbh->prepare($count_sql_specimen);        #$dbh->selectrow_array($count_sql_specimen);
+          $count_specimen  -> execute();
+          $count_specimen  -> bind_col(1, \$specimen_aref);
+          $count_specimen  -> fetch();
+          $count_specimen  -> finish();
+
+       if (length($specimen_aref) == 0) {
+
+          return ($err, $msg, []);
+       }
+    }
+
     if ($extra_attr_yes) {
 
       if (defined $spec_lookup->{$specimen_group_id}) {
 
         my $specimen_id_aref = $spec_lookup->{$specimen_group_id};
 
-        my $specimen_aref = [];
         for my $specimen_info (@{$specimen_id_aref}) {
 
           my $specimen_id = $specimen_info->{'SpecimenId'};
@@ -5522,15 +5600,15 @@ sub list_specimen_group {
 
           push(@{$specimen_aref}, $specimen_info);
         }
-        $specimen_group_row->{'Specimen'} = $specimen_aref;
+      } 
+      $specimen_group_row->{'Specimen'} = $specimen_aref;
 
-        $specimen_group_row->{'OwnGroupName'}          = $group_lookup->{$own_grp_id}->{'SystemGroupName'};
-        $specimen_group_row->{'AccessGroupName'}       = $group_lookup->{$acc_grp_id}->{'SystemGroupName'};
-        $specimen_group_row->{'OwnGroupPermission'}    = $perm_lookup->{$own_perm};
-        $specimen_group_row->{'AccessGroupPermission'} = $perm_lookup->{$acc_perm};
-        $specimen_group_row->{'OtherPermission'}       = $perm_lookup->{$oth_perm};
-        $specimen_group_row->{'UltimatePermission'}    = $perm_lookup->{$ulti_perm};
-      }
+      $specimen_group_row->{'OwnGroupName'}          = $group_lookup->{$own_grp_id}->{'SystemGroupName'};
+      $specimen_group_row->{'AccessGroupName'}       = $group_lookup->{$acc_grp_id}->{'SystemGroupName'};
+      $specimen_group_row->{'OwnGroupPermission'}    = $perm_lookup->{$own_perm};
+      $specimen_group_row->{'AccessGroupPermission'} = $perm_lookup->{$acc_perm};
+      $specimen_group_row->{'OtherPermission'}       = $perm_lookup->{$oth_perm};
+      $specimen_group_row->{'UltimatePermission'}    = $perm_lookup->{$ulti_perm};
 
       if (($ulti_perm & $READ_WRITE_PERM) == $READ_WRITE_PERM) {
 
@@ -5561,7 +5639,7 @@ sub list_specimen_group_advanced_runmode {
 
 =pod list_specimen_group_advanced_HELP_START
 {
-"OperationName" : "List specimen groups",
+"OperationName": "List specimen groups",
 "Description": "List existing specimen groups.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -5856,7 +5934,7 @@ sub list_specimen_group_advanced_runmode {
 
   $self->logger->debug("Final list specimengroup SQL: $sql");
 
-  my ($spec_grp_err, $spec_grp_msg, $spec_grp_data) = $self->list_specimen_group(1, $sql, $where_arg);
+  my ($spec_grp_err, $spec_grp_msg, $spec_grp_data) = $self->list_specimen_group(1, $sql, $where_arg, 1);
 
   if ($spec_grp_err) {
 
@@ -5881,7 +5959,7 @@ sub get_specimen_group_runmode {
 
 =pod get_specimen_group_HELP_START
 {
-"OperationName" : "Get specimen group",
+"OperationName": "Get specimen group",
 "Description": "Get detailed information about specimen group specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -5944,7 +6022,7 @@ sub get_specimen_group_runmode {
   $sql   .= 'LEFT JOIN generaltype AS generaltypestatus ON specimengroup.SpecimenGroupStatus = generaltypestatus.TypeId ';
   $sql   .= "WHERE (($perm_str) & $READ_PERM) = $READ_PERM AND SpecimenGroupId=?";
 
-  my ($specimen_grp_err, $specimen_grp_msg, $specimen_grp_data) = $self->list_specimen_group(1, $sql, [$specimen_grp_id]);
+  my ($specimen_grp_err, $specimen_grp_msg, $specimen_grp_data) = $self->list_specimen_group(1, $sql, [$specimen_grp_id], 0);
 
   if ($specimen_grp_err) {
 
@@ -5966,7 +6044,7 @@ sub update_specimen_group_runmode {
 
 =pod update_specimen_group_gadmin_HELP_START
 {
-"OperationName" : "Update specimen group",
+"OperationName": "Update specimen group",
 "Description": "Update information about specimen group specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -6082,8 +6160,37 @@ sub update_specimen_group_runmode {
     return $data_for_postrun_href;
   }
 
-  my $specimen_group_note = read_cell_value($dbh_write, 'specimengroup', 'SpecimenGroupNote',
-                                            'SpecimenGroupId', $specimen_grp_id);
+  my $read_sql     =  'SELECT SpecimenGroupNote, SpecimenGroupStatus ';
+     $read_sql    .=  'FROM specimengroup WHERE SpecimenGroupId=? ';
+
+  my ($r_df_val_err, $r_df_val_msg, $specimen_df_val_data) = read_data($dbh_write, $read_sql, [$specimen_grp_id]);
+
+  if ($r_df_val_err) {
+
+    $self->logger->debug("Retrieve specimen group default values for optional fields failed: $r_df_val_msg");
+    $data_for_postrun_href->{'Error'}  = 1;
+    $data_for_postrun_href->{'Data'}   = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $specimen_group_note   = undef;
+  my $specimen_group_status = undef;
+
+  my $nb_df_val_rec      =  scalar(@{$specimen_df_val_data});
+
+  if ($nb_df_val_rec != 1) {
+
+     $self->logger->debug("Retrieve specimen group default values - number of records unacceptable: $nb_df_val_rec");
+     $data_for_postrun_href->{'Error'} = 1;
+     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+     return $data_for_postrun_href;
+
+  }
+
+  $specimen_group_note   =   $specimen_df_val_data->[0]->{'SpecimenGroupNote'};
+  $specimen_group_status =   $specimen_df_val_data->[0]->{'SpecimenGroupStatus'};
 
   if (defined $query->param('SpecimenGroupNote')) {
 
@@ -6091,14 +6198,6 @@ sub update_specimen_group_runmode {
 
       $specimen_group_note = $query->param('SpecimenGroupNote');
     }
-  }
-
-  my $specimen_group_status = read_cell_value($dbh_write, 'specimengroup', 'SpecimenGroupStatus',
-                                              'SpecimenGroupId', $specimen_grp_id);
-
-  if (length($specimen_group_status) == 0) {
-
-    $specimen_group_status = undef;
   }
 
   if (defined $query->param('SpecimenGroupStatus')) {
@@ -6160,7 +6259,7 @@ sub remove_specimen_from_specimen_group_runmode {
 
 =pod remove_specimen_from_specimen_group_gadmin_HELP_START
 {
-"OperationName" : "Remove specimen from specimen group",
+"OperationName": "Remove specimen from specimen group",
 "Description": "Removes specimen specified by id from a specimen group.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -6270,7 +6369,7 @@ sub remove_specimen_from_specimen_group_bulk_runmode {
 
 =pod remove_specimen_from_specimen_group_bulk_gadmin_HELP_START
 {
-"OperationName" : "Remove a number of specimens from specimen group",
+"OperationName": "Remove a number of specimens from specimen group",
 "Description": "Remove specimens specified by their ids in an upload XML file from a specimen group.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -6409,7 +6508,7 @@ sub list_genotype_advanced_runmode {
 
 =pod list_genotype_advanced_HELP_START
 {
-"OperationName" : "List genotypes",
+"OperationName": "List genotypes",
 "Description": "Return list of genotypes. This listing requires pagination definition.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -6784,7 +6883,7 @@ sub add_specimen2specimen_group_runmode {
 
 =pod add_specimen2specimen_group_gadmin_HELP_START
 {
-"OperationName" : "Add specimens to specimen group",
+"OperationName": "Add specimens to specimen group",
 "Description": "Add a number of specimens to a specimen group.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -7091,7 +7190,7 @@ sub del_genus_runmode {
 
 =pod del_genus_gadmin_HELP_START
 {
-"OperationName" : "Delete genus",
+"OperationName": "Delete genus",
 "Description": "Delete genus (organism) using specified id. Genus can be deleted only if not attached to any lower level related record.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -7170,7 +7269,7 @@ sub del_specimen_runmode {
 
 =pod del_specimen_gadmin_HELP_START
 {
-"OperationName" : "Delete specimen",
+"OperationName": "Delete specimen",
 "Description": "Delete specimen using specified id. Specimen can be deleted only if not attached to any lower level related record.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -7327,7 +7426,7 @@ sub del_specimen_group_runmode {
 
 =pod del_specimen_group_gadmin_HELP_START
 {
-"OperationName" : "Delete specimen group",
+"OperationName": "Delete specimen group",
 "Description": "Delete specimen group specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -7426,7 +7525,7 @@ sub del_genotype_runmode {
 
 =pod del_genotype_gadmin_HELP_START
 {
-"OperationName" : "Delete genotype",
+"OperationName": "Delete genotype",
 "Description": "Delete genotype specified by genotype id. Genotype can be deleted only if not attached to any lower level related record.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -7521,7 +7620,7 @@ sub list_genotype_in_specimen_runmode {
 
 =pod list_genotype_in_specimen_HELP_START
 {
-"OperationName" : "List genotypes for specimen",
+"OperationName": "List genotypes for specimen",
 "Description": "List which genotypes belong to specimen specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -7672,7 +7771,7 @@ sub import_genotype_csv_runmode {
 
 =pod import_genotype_csv_HELP_START
 {
-"OperationName" : "Import geneotypes",
+"OperationName": "Import genotypes",
 "Description": "Import genotype data using a csv file.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -8238,7 +8337,7 @@ sub export_genotype_runmode {
 
 =pod export_genotype_HELP_START
 {
-"OperationName" : "Export genotypes",
+"OperationName": "Export genotypes",
 "Description": "Export genotype data into a csv file.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -8542,7 +8641,7 @@ sub import_specimen_csv_runmode {
 
 =pod import_specimen_csv_HELP_START
 {
-"OperationName" : "Import specimens",
+"OperationName": "Import specimens",
 "Description": "Import specimens using a csv file.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -9482,7 +9581,7 @@ sub add_breedingmethod_runmode {
 
 =pod add_breedingmethod_gadmin_HELP_START
 {
-"OperationName" : "Add breeding method",
+"OperationName": "Add breeding method",
 "Description": "Add a new breeding method definition to the system.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -9822,7 +9921,7 @@ sub list_breedingmethod_runmode {
 
 =pod list_breedingmethod_HELP_START
 {
-"OperationName" : "List breeding method",
+"OperationName": "List breeding method",
 "Description": "Lists all available breeding methods in the system. This listing does not require pagination information.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -9894,7 +9993,7 @@ sub update_breedingmethod_runmode {
 
 =pod update_breedingmethod_gadmin_HELP_START
 {
-"OperationName" : "Update breeding method",
+"OperationName": "Update breeding method",
 "Description": "Update breeding method using specified id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -9954,35 +10053,54 @@ sub update_breedingmethod_runmode {
   my $breedingmethod_type = $query->param('BreedingMethodTypeId');
   my $breedingmethod_name = $query->param('BreedingMethodName');
 
-  my $breedingmethod_note    = read_cell_value($dbh_k_read, 'breedingmethod',
-                                               'BreedingMethodNote',
-                                               'BreedingMethodId',
-                                               $breedingmethod_id );
+  my $read_sql    =  'SELECT BreedingMethodNote, BreedingMethodAcronym, BreedingMethodSymbol ';
+     $read_sql   .=  'FROM breedingmethod WHERE BreedingMethodId=? ';
+
+  my ($r_df_val_err, $r_df_val_msg, $breed_df_val_data) = read_data($dbh_k_read, $read_sql, [$breedingmethod_id]);
+
+  if ($r_df_val_err) {
+
+    $self->logger->debug("Retrieve breedingmethod default values for optional fields failed: $r_df_val_msg");
+    $data_for_postrun_href->{'Error'}  = 1;
+    $data_for_postrun_href->{'Data'}   = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $breedingmethod_note      = undef;
+  my $breedingmethod_acronym   = undef;
+  my $breedingmethod_symbol    = undef;
+
+  my $nb_df_val_rec     =   scalar(@{$breed_df_val_data});
+
+  if ($nb_df_val_rec != 1)  {
+
+     $self->logger->debug("Retrieve breedingmethod default values - number of records unacceptable: $nb_df_val_rec");
+     $data_for_postrun_href->{'Error'} = 1;
+     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+     return $data_for_postrun_href;
+  }
+
+  $breedingmethod_note     =  $breed_df_val_data->[0]->{'BreedingMethodNote'};
+  $breedingmethod_acronym  =  $breed_df_val_data->[0]->{'BreedingMethodAcronym'};
+  $breedingmethod_symbol   =  $breed_df_val_data->[0]->{'BreedingMethodSymbol'};
 
   if (length($breedingmethod_note) == 0) {
 
     $breedingmethod_note = undef;
   }
 
-  my $breedingmethod_acronym = read_cell_value($dbh_k_read, 'breedingmethod',
-                                               'BreedingMethodAcronym',
-                                               'BreedingMethodId',
-                                               $breedingmethod_id );
-
   if (length($breedingmethod_acronym) == 0) {
 
     $breedingmethod_acronym = undef;
   }
 
-  my $breedingmethod_symbol  = read_cell_value($dbh_k_read, 'breedingmethod',
-                                               'BreedingMethodSymbol',
-                                               'BreedingMethodId',
-                                               $breedingmethod_id );
-
   if (length($breedingmethod_symbol) == 0) {
 
     $breedingmethod_symbol = undef;
   }
+
 
   if (defined $query->param('BreedingMethodAcronym')) {
 
@@ -10007,6 +10125,7 @@ sub update_breedingmethod_runmode {
       $breedingmethod_symbol = $query->param('BreedingMethodSymbol');
     }
   }
+
 
   my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength ";
   $sql   .= "FROM factor ";
@@ -10223,7 +10342,7 @@ sub get_breedingmethod_runmode {
 
 =pod get_breedingmethod_HELP_START
 {
-"OperationName" : "Get breeding method",
+"OperationName": "Get breeding method",
 "Description": "Get detailed information about breeding method specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -10311,7 +10430,7 @@ sub del_breedingmethod_runmode {
 
 =pod del_breedingmethod_gadmin_HELP_START
 {
-"OperationName" : "Delete breeding method",
+"OperationName": "Delete breeding method",
 "Description": "Delete breeding method specified by id. Breeding method can be deleted only if not attached to any lower level related record.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -10407,7 +10526,7 @@ sub import_pedigree_csv_runmode {
 
 =pod import_pedigree_csv_HELP_START
 {
-"OperationName" : "Import pedigree",
+"OperationName": "Import pedigree",
 "Description": "Import specimen pedigree information in bulk using csv file.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -10815,7 +10934,7 @@ sub export_specimen_runmode {
 
 =pod export_specimen_HELP_START
 {
-"OperationName" : "Export specimens",
+"OperationName": "Export specimens",
 "Description": "Export a list of specimens into a csv file",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -11182,7 +11301,7 @@ sub export_pedigree_runmode {
 
 =pod export_pedigree_HELP_START
 {
-"OperationName" : "Export pedigree",
+"OperationName": "Export pedigree",
 "Description": "Export specimen pedigree into csv file.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -11377,7 +11496,7 @@ sub add_pedigree_runmode {
 
 =pod add_pedigree_HELP_START
 {
-"OperationName" : "Add pedigree",
+"OperationName": "Add pedigree",
 "Description": "Add a new specimen record into pedigree tree.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -11569,7 +11688,7 @@ sub update_pedigree_runmode {
 
 =pod update_pedigree_gadmin_HELP_START
 {
-"OperationName" : "Update pedigree",
+"OperationName": "Update pedigree",
 "Description": "Update specimen pedigree record specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -11775,7 +11894,7 @@ sub del_pedigree_runmode {
 
 =pod del_pedigree_gadmin_HELP_START
 {
-"OperationName" : "Delete pedigree",
+"OperationName": "Delete pedigree",
 "Description": "Delete specimen pedigree specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -11843,7 +11962,7 @@ sub add_genpedigree_runmode {
 
 =pod add_genpedigree_HELP_START
 {
-"OperationName" : "Add pedigree for genotype",
+"OperationName": "Add pedigree for genotype",
 "Description": "Add a new pedigree record into genotype pedigree tree.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -12015,8 +12134,8 @@ sub list_gen_ancestor_runmode {
 
 =pod list_gen_ancestor_HELP_START
 {
-"OperationName" : "List genotype ancestors",
-"Description": "List all ancestors of the geneotype from pedigree tree.",
+"OperationName": "List genotype ancestors",
+"Description": "List all ancestors of the genotype from pedigree tree.",
 "AuthRequired": 1,
 "GroupRequired": 1,
 "GroupAdminRequired": 0,
@@ -12026,7 +12145,7 @@ sub list_gen_ancestor_runmode {
 "SuccessMessageJSON": "{'RecordMeta' : [{'TagName' : 'Ancestor'}],'Ancestor' : [{'ParentGenotypeId' : '2','NumberOfGenotypes' : null,'GenotypeId' : '1','GenParentType' : '59','GenPedigreeId' : '5','Level' : 0,'GenParentTypeName' : 'GenParentType - 8659523','ParentGenotypeName' : 'Geno_5317468'}]}",
 "ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
 "ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
-"HTTPParameter": [{"Required": 0, "Name": "Level", "Description": "The number of recursions to retrieve the parentage records from the database"}],
+"HTTPParameter": [{"Required": 0, "Name": "Level", "Description": "The number of recursions to retrieve the parentage records from the database"}, {"Required": 0, "Name": "OutputType", "Description": "Type of the structure of the genotype ancestor records that will be returned. The possible values are ALL and KEYANCESTOR. ALL is for returning all genotype ancestor records found by this recursive process. KEYANCESTOR is when DAL will separate the genotype pedigree records for genotypes that have been used as ancestors for more than once like being parents and grand parents from pedigree records of the genotypes that are used for as ancestors for only one time. ALL is the default value."}],
 "URLParameter": [{"ParameterName": "genoid", "Description": "Existing GenotypeId"}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
@@ -12072,6 +12191,16 @@ sub list_gen_ancestor_runmode {
     $stopping_level = $level + 0;
   }
 
+  my $structure_type = 'ALL';
+
+  if (defined $query->param('OutputType')) {
+
+    if ( uc($query->param('OutputType')) eq 'KEYANCESTOR' ) {
+
+      $structure_type = 'KEYANCESTOR';
+    }
+  }
+
   my $dbh = connect_kdb_read();
 
   if (!record_existence($dbh, 'genotype', 'GenotypeId', $genotype_id)) {
@@ -12105,9 +12234,13 @@ sub list_gen_ancestor_runmode {
   $top_level_sql   .= 'LEFT JOIN generaltype ON genpedigree.GenParentType = generaltype.TypeId ';
   $top_level_sql   .= 'WHERE genpedigree.GenotypeId=?';
 
+  # ------------ Second Optimisation Edit number #2 -------------------------------
+
+  my $frequency_href = {};
+
   my ($read_ancestor_err, $read_ancestor_msg,
       $finish_level, $ancestor_data) = recurse_read($dbh, $top_level_sql, [$genotype_id],
-                                                    'ParentGenotypeId', 0, $stopping_level);
+                                                    'ParentGenotypeId', 0, $stopping_level, $frequency_href);
 
   if ($read_ancestor_err) {
 
@@ -12122,10 +12255,72 @@ sub list_gen_ancestor_runmode {
 
   $dbh->disconnect();
 
-  $data_for_postrun_href->{'Error'}     = 0;
-  $data_for_postrun_href->{'Data'}      = {'Ancestor'   => $ancestor_data,
-                                           'RecordMeta' => [{'TagName' => 'Ancestor'}],
-  };
+  if ( uc($structure_type) eq 'KEYANCESTOR' ) {
+
+    my $uniq_ancestor_data = [];
+    my $key_ancestor_data  = [];
+
+    my $uniq_key_ancestor_href = {};
+
+    my $nb_rec = scalar(@{$ancestor_data});
+
+    for (my $i = 0; $i < $nb_rec; $i += 1) {
+
+      my $ancestor_rec = $ancestor_data->[$i];
+
+      my $child_id   = $ancestor_rec->{'GenotypeId'};
+      my $parent_id  = $ancestor_rec->{'ParentGenotypeId'};
+      my $type_id    = $ancestor_rec->{'GenParentType'};
+
+      if ( ! (defined $frequency_href->{$child_id}) ) {
+
+        push(@{$uniq_ancestor_data}, $ancestor_rec);
+        $self->logger->debug("Checking if this condition is true for CHILD: $child_id");
+      }
+      else {
+
+        my $count = $frequency_href->{$child_id};
+
+        $self->logger->debug("CHILD ID: $child_id - COUNT: $count");
+
+        # if my child has been used as a parent more than once,
+        # then i am very likely to be a grand parent more than once as well
+
+        if ($count > 1) {
+
+          if (! (defined $uniq_key_ancestor_href->{"${child_id}_${parent_id}_${type_id}"}) ) {
+
+            delete($ancestor_rec->{'Level'});
+            push(@{$key_ancestor_data}, $ancestor_rec);
+
+            $uniq_key_ancestor_href->{"${child_id}_${parent_id}_${type_id}"} = 1;
+          }
+        }
+        else {
+
+          push(@{$uniq_ancestor_data}, $ancestor_rec);
+        }
+      }
+    }
+
+    my @sorted_uniq_ancestor_data = sort { $a->{'Level'} <=> $b->{'Level'} } @{$uniq_ancestor_data};
+    my @sorted_key_ancestor_data  = sort { $a->{'GenotypeId'} <=> $b->{'GenotypeId'} } @{$key_ancestor_data};
+
+    $data_for_postrun_href->{'Error'}     = 0;
+    $data_for_postrun_href->{'Data'}      = {'Ancestor'    => \@sorted_uniq_ancestor_data,
+                                             'KeyAncestor' => \@sorted_key_ancestor_data,
+                                             'RecordMeta'  => [{'TagName' => 'Ancestor'}],
+                                            };
+
+    # ------------ Second Optimisation Edit number #2 -------------------------------
+  }
+  elsif ( uc($structure_type) eq 'ALL' ) {
+
+    $data_for_postrun_href->{'Error'}     = 0;
+    $data_for_postrun_href->{'Data'}      = {'Ancestor'    => $ancestor_data,
+                                             'RecordMeta'  => [{'TagName' => 'Ancestor'}],
+                                            };
+  }
 
   return $data_for_postrun_href;
 }
@@ -12134,8 +12329,8 @@ sub list_gen_descendant_runmode {
 
 =pod list_gen_descendant_HELP_START
 {
-"OperationName" : "List genotype descendants",
-"Description": "List all descendants of the geneotype from a pedigree tree.",
+"OperationName": "List genotype descendants",
+"Description": "List all descendants of the genotype from a pedigree tree.",
 "AuthRequired": 1,
 "GroupRequired": 1,
 "GroupAdminRequired": 0,
@@ -12252,7 +12447,7 @@ sub list_spec_ancestor_runmode {
 
 =pod list_spec_ancestor_HELP_START
 {
-"OperationName" : "List ancestors",
+"OperationName": "List ancestors",
 "Description": "List all ancestors of the specimen specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -12263,7 +12458,7 @@ sub list_spec_ancestor_runmode {
 "SuccessMessageJSON": "{'RecordMeta' : [{'TagName' : 'Ancestor'}],'Ancestor' : [{'ParentSpecimenId' : '11','NumberOfSpecimens' : null,'ParentType' : '7','SelectionReason' : null,'PedigreeId' : '6','Level' : 0,'ParentSpecimenName' : 'Import_specimen1_9161882','ParentTypeName' : 'Male-5673950','SpecimenId' : '10'}]}",
 "ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
 "ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
-"HTTPParameter": [{"Required": 0, "Name": "Level", "Description": "The number of recursions to retrieve the parentage records from the database"}],
+"HTTPParameter": [{"Required": 0, "Name": "Level", "Description": "The number of recursions to retrieve the parentage records from the database"}, {"Required": 0, "Name": "OutputType", "Description": "Type of the structure of the specimen ancestor records that will be returned. The possible values are ALL and KEYANCESTOR. ALL is for returning all specimen ancestor records found by this recursive process. KEYANCESTOR is when DAL will separate the specimen pedigree records for specimens that have been used as ancestors for more than once like being parents and grand parents from pedigree records of the specimens that are used for as ancestors for only one time. ALL is the default value."}],
 "URLParameter": [{"ParameterName": "id", "Description": "Existing SpecimenId"}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
@@ -12305,6 +12500,16 @@ sub list_spec_ancestor_runmode {
     }
 
     $stopping_level = $level + 0;
+  }
+
+  my $structure_type = 'ALL';
+
+  if (defined $query->param('OutputType')) {
+
+    if ( uc($query->param('OutputType')) eq 'KEYANCESTOR' ) {
+
+      $structure_type = 'KEYANCESTOR';
+    }
   }
 
   my $dbh = connect_kdb_read();
@@ -12355,9 +12560,11 @@ sub list_spec_ancestor_runmode {
   $top_level_sql   .= 'LEFT JOIN generaltype ON pedigree.ParentType = generaltype.TypeId ';
   $top_level_sql   .= 'WHERE pedigree.SpecimenId=?';
 
+  my $frequency_href = {};
+
   my ($read_ancestor_err, $read_ancestor_msg,
       $finish_level, $ancestor_data) = recurse_read($dbh, $top_level_sql, [$specimen_id],
-                                                    'ParentSpecimenId', 0, $stopping_level);
+                                                    'ParentSpecimenId', 0, $stopping_level, $frequency_href);
 
   if ($read_ancestor_err) {
 
@@ -12366,16 +12573,78 @@ sub list_spec_ancestor_runmode {
     my $err_msg = "Unexpected Error.";
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-    
+
     return $data_for_postrun_href;
   }
 
   $dbh->disconnect();
 
-  $data_for_postrun_href->{'Error'}     = 0;
-  $data_for_postrun_href->{'Data'}      = {'Ancestor'   => $ancestor_data,
-                                           'RecordMeta' => [{'TagName' => 'Ancestor'}],
-  };
+  if ( uc($structure_type) eq 'KEYANCESTOR' ) {
+
+    my $uniq_ancestor_data = [];
+    my $key_ancestor_data  = [];
+
+    my $uniq_key_ancestor_href = {};
+
+    my $nb_rec = scalar(@{$ancestor_data});
+
+    for (my $i = 0; $i < $nb_rec; $i += 1) {
+
+      my $ancestor_rec = $ancestor_data->[$i];
+
+      my $child_id   = $ancestor_rec->{'SpecimenId'};
+      my $parent_id  = $ancestor_rec->{'ParentSpecimenId'};
+      my $type_id    = $ancestor_rec->{'ParentType'};
+
+      if ( ! (defined $frequency_href->{$child_id}) ) {
+
+        push(@{$uniq_ancestor_data}, $ancestor_rec);
+        $self->logger->debug("Checking if this condition is true for CHILD: $child_id");
+      }
+      else {
+
+        my $count = $frequency_href->{$child_id};
+
+        $self->logger->debug("CHILD ID: $child_id - COUNT: $count");
+
+        # if my child has been used as a parent more than once,
+        # then i am very likely to be a grand parent more than once as well
+
+        if ($count > 1) {
+
+          if (! (defined $uniq_key_ancestor_href->{"${child_id}_${parent_id}_${type_id}"}) ) {
+
+            delete($ancestor_rec->{'Level'});
+            push(@{$key_ancestor_data}, $ancestor_rec);
+
+            $uniq_key_ancestor_href->{"${child_id}_${parent_id}_${type_id}"} = 1;
+          }
+        }
+        else {
+
+          push(@{$uniq_ancestor_data}, $ancestor_rec);
+        }
+      }
+    }
+
+    my @sorted_uniq_ancestor_data = sort { $a->{'Level'} <=> $b->{'Level'} } @{$uniq_ancestor_data};
+    my @sorted_key_ancestor_data  = sort { $a->{'SpecimenId'} <=> $b->{'SpecimenId'} } @{$key_ancestor_data};
+
+    $data_for_postrun_href->{'Error'}     = 0;
+    $data_for_postrun_href->{'Data'}      = {'Ancestor'    => \@sorted_uniq_ancestor_data,
+                                             'KeyAncestor' => \@sorted_key_ancestor_data,
+                                             'RecordMeta'  => [{'TagName' => 'Ancestor'}],
+                                            };
+
+    # ------------ Second Optimisation Edit number #2 -------------------------------
+  }
+  elsif ( uc($structure_type) eq 'ALL' ) {
+
+    $data_for_postrun_href->{'Error'}     = 0;
+    $data_for_postrun_href->{'Data'}      = {'Ancestor'   => $ancestor_data,
+                                             'RecordMeta' => [{'TagName' => 'Ancestor'}],
+                                            };
+  }
 
   return $data_for_postrun_href;
 }
@@ -12384,7 +12653,7 @@ sub list_spec_descendant_runmode {
 
 =pod list_spec_descendant_HELP_START
 {
-"OperationName" : "List descendants",
+"OperationName": "List descendants",
 "Description": "List all descendants of the specimen specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -12516,7 +12785,7 @@ sub list_pedigree_advanced_runmode {
 
 =pod list_pedigree_advanced_HELP_START
 {
-"OperationName" : "List pedigree",
+"OperationName": "List pedigree",
 "Description": "Returns list of pedigree records. This listing requires pagination definition.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -12770,7 +13039,7 @@ sub list_gen_pedigree_advanced_runmode {
 
 =pod list_gen_pedigree_advanced_HELP_START
 {
-"OperationName" : "List genotype pedigree",
+"OperationName": "List genotype pedigree",
 "Description": "Return list of genotype pedigree records. This listing requires pagination definition.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -13026,7 +13295,7 @@ sub add_keyword_to_specimen_runmode {
 
 =pod add_keyword_to_specimen_HELP_START
 {
-"OperationName" : "Attach keyword to specimen",
+"OperationName": "Attach keyword to specimen",
 "Description": "Add keyword to the specimen specified by.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -13226,7 +13495,7 @@ sub list_specimen_keyword_advanced_runmode {
 
 =pod list_specimen_keyword_advanced_HELP_START
 {
-"OperationName" : "List keywords for specimen",
+"OperationName": "List keywords for specimen",
 "Description": "List keywords associated for specimen specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -13574,7 +13843,7 @@ sub remove_specimen_keyword_runmode {
 
 =pod remove_specimen_keyword_HELP_START
 {
-"OperationName" : "Remove specimen keyword",
+"OperationName": "Remove specimen keyword",
 "Description": "Delete association between specimen and keyword specified by specimenkeyword id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -13684,7 +13953,7 @@ sub import_genpedigree_csv_runmode {
 
 =pod import_genpedigree_csv_HELP_START
 {
-"OperationName" : "Import genpedigree",
+"OperationName": "Import genpedigree",
 "Description": "Import genotype pedigree information in bulk using csv file.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -14062,7 +14331,7 @@ sub export_genpedigree_runmode {
 
 =pod export_genpedigree_HELP_START
 {
-"OperationName" : "Export genpedigree",
+"OperationName": "Export genpedigree",
 "Description": "Export genotype pedigree into csv file.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -14256,7 +14525,7 @@ sub update_genpedigree_runmode {
 
 =pod update_genpedigree_gadmin_HELP_START
 {
-"OperationName" : "Update genpedigree",
+"OperationName": "Update genpedigree",
 "Description": "Update genotype pedigree record specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -14452,7 +14721,7 @@ sub del_genpedigree_runmode {
 
 =pod del_genpedigree_gadmin_HELP_START
 {
-"OperationName" : "Delete genpedigree",
+"OperationName": "Delete genpedigree",
 "Description": "Delete genotype pedigree specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,

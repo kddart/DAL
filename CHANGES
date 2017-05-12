@@ -1,3 +1,63 @@
+Version 2.4.0
+Date: 12/05/2017
+
+Major:
+
+  * DAL cookies have domain value that the server extracts from the url.
+
+  * It supports token as well as cookies. For a session token to work, the login URL will return the session id and the verification random number directly in the output text in addition to cookie headers. The parameter names for the session token are KDDArT_DAL_SESSID for session id and KDDArT_RANDOM_NUMBER for the verification random number.
+
+  * One trait can be a memeber of many groups and a trait group can have many traits.
+
+  * It supports importing samplemeasurement in groups.
+
+  * It supports compulsary optimistic update on item.
+
+  * Its spports bulk update of items with compulsary optimic update feature.
+
+Minor:
+
+  * List samplemeasurement with pagination, field list, filtering and sorting.
+
+  * DAL can generate a multi-user unique number from MySQL autonumber for naming.
+
+  * It supports DATE_RANGE validation rule which requires a valid date string in yyyy-dd-mm format.
+
+  * It supports creating a new session from an existing active login session.
+
+Detailed lists of changes from version 2.3.2 to 2.4.0
+
+Trait group is now an independent table with new calls
+* 'add/traitgroup'
+* 'delete/traitgroup/_id'
+* 'get/traitgroup/_id'
+* 'list/traitgroup/_nperpage/page/_num'
+* 'traitgroup/_id/add/trait'
+* 'traitgroup/_id/remove/trait/_tid'
+* 'update/traitgroup/_id'
+
+Samplemeasure records can now be imported in a group which can be removed and reimported later. New calls
+* 'delete/smgroup/_id'
+* 'get/smgroup/_id'
+* 'trial/_id/import/smgroupdata/csv'
+* 'trial/_id/list/smgroup'
+* 'update/smgroup/_id'
+
+New call to list samplemeasurement
+* 'list/samplemeasurement/_nperpage/page/_num'
+
+New call to get a unique number from DAL
+* 'get/uniquenumber'
+
+New call to update analysis group
+* 'update/analysisgroup/_id'
+
+New call to update item in bulk
+* 'update/itembulk/json'
+
+New call to create a new session from an existing active login session
+* 'clone/session'
+
 Version 2.3.2
 Date: 23/09/2016
 

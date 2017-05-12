@@ -8,6 +8,7 @@
   <INPUT ParaName="Pedigree" Value="" />
   <INPUT ParaName="SelectionHistory" Value="" />
   <INPUT ParaName="FilialGeneration" Value="" />
+  <INPUT ParaName="SpecimenNote" Value="Comment about this specimen is empty" />
   <INPUT ParaName="genotypespecimen" Process="1" SrcFile="xml/add_data_no_vcol/genotype.xml" />
   <Match Attr="StatusCode" Value="200" />
   <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
@@ -17,6 +18,6 @@
   <Parent CaseFile="xml/add_data_no_vcol/case_00106_add_geno1_4_specimen.xml" Order="3" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00107_add_geno2_4_specimen.xml" Order="4" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00208_add_breeding_method.xml" Order="5" />
-  <ReturnId ParaName="SpecimenId" Value="108" />
-  <RunInfo Success="1" Time="1474353386" />
+  <ReturnId ParaName="SpecimenId" Value="26" />
+  
 </TestCase>

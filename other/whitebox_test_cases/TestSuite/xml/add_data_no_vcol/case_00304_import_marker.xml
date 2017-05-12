@@ -23,6 +23,6 @@
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00303_add_analysisgroup.xml" Force="1" Order="3" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00473_add_datasettype.xml" Order="4" />
-  <ReturnId ParaName="DataSetId" Value="10" />
-  <RunInfo Success="1" Time="1474346334" />
+  <ReturnId ParaName="DataSetId" Value="3" />
+  
 </TestCase>

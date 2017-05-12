@@ -1,8 +1,8 @@
--- generated on: Mon Sep 12 12:02:16 2016
+-- generated on: Fri May 12 15:24:37 2017
 -- input file: ER_dbmodel_Core.xml
 
 
--- Copyright (C) 2016 by Diversity Arrays Technology Pty Ltd
+-- Copyright (C) 2017 by Diversity Arrays Technology Pty Ltd
 --
 -- This program is free software: you can redistribute it and/or modify
 -- it under the terms of the GNU General Public License as published by
@@ -16,7 +16,7 @@
 
 
 -- model name: KDDart core ER diagram
--- model version: 2.3.2.86
+-- model version: 2.4.0.95
 
 -- table activitylog
 CREATE TABLE `activitylog` (
@@ -254,12 +254,14 @@ CREATE TABLE `samplemeasurement` (
   `TrialUnitId` INTEGER NOT NULL COMMENT 'trial unit id',
   `TraitId` INTEGER NOT NULL COMMENT 'id of the trait being measured',
   `OperatorId` INTEGER NOT NULL COMMENT 'user performing the measurement',
-  `MeasureDateTime` DATETIME NOT NULL COMMENT 'date / time of the measurement',
   `InstanceNumber` TINYINT NOT NULL DEFAULT '1' COMMENT 'next consecutive number of the measurement instance if all other values of primary key are the same',
   `SampleTypeId` INTEGER NOT NULL COMMENT 'sample type id',
-  `TrialUnitSpecimenId` INTEGER NULL COMMENT 'optional value of trial unit specimen link if measurement is at the level of sub-trialunit',
+  `SMGroupId` INTEGER NOT NULL DEFAULT '0' COMMENT 'sample measurement group the measurement if part of - if any',
+  `TrialUnitSpecimenId` INTEGER NOT NULL COMMENT 'optional value of trial unit specimen link if measurement is at the level of sub-trialunit',
+  `MeasureDateTime` DATETIME NOT NULL COMMENT 'date / time of the measurement',
   `TraitValue` VARCHAR(255) NOT NULL COMMENT 'measurement value',
-  PRIMARY KEY(`TrialUnitId`, `TraitId`, `OperatorId`, `MeasureDateTime`, `InstanceNumber`, `SampleTypeId`)
+  `StateReason` VARCHAR(30) NULL COMMENT 'optional value state e.g. reason for rejection',
+  PRIMARY KEY(`TrialUnitId`, `TraitId`, `OperatorId`, `InstanceNumber`, `SampleTypeId`, `SMGroupId`, `TrialUnitSpecimenId`)
 ) ENGINE=InnoDB COMMENT='Measurement of the sample from trial unit for a particular trait/variate, by the operator on certain date/time. Measurement can be done for sample type if it does not refer to the entire trial unit.';
 
 CREATE  INDEX `xsm_OperatorId` ON `samplemeasurement` (`OperatorId`);
@@ -273,6 +275,8 @@ CREATE  INDEX `xsm_TrialUnitId` ON `samplemeasurement` (`TrialUnitId`);
 CREATE  INDEX `xsm_SampleTypeId` ON `samplemeasurement` (`SampleTypeId`);
 
 CREATE  INDEX `xsm_TrialUnitSpecimenId` ON `samplemeasurement` (`TrialUnitSpecimenId`);
+
+CREATE  INDEX `xsm_SMGroupId` ON `samplemeasurement` (`SMGroupId`);
 
 ALTER TABLE `samplemeasurement` CONVERT TO CHARACTER SET utf8 COLLATE utf8_general_ci;
 
@@ -346,13 +350,14 @@ ALTER TABLE `systemuser` CONVERT TO CHARACTER SET utf8 COLLATE utf8_general_ci;
 -- table trait
 CREATE TABLE `trait` (
   `TraitId` INTEGER NOT NULL AUTO_INCREMENT COMMENT 'trait id',
-  `UnitId` INTEGER NOT NULL COMMENT '',
+  `UnitId` INTEGER NOT NULL COMMENT 'id of the unit trait will be measured in',
   `TraitGroupTypeId` INTEGER NULL COMMENT 'optional - class traitgroup - (e.g. all plant height related traits can be grouped in plantheight type',
   `TraitName` VARCHAR(32) NOT NULL COMMENT 'trait name',
   `TraitCaption` VARCHAR(64) NOT NULL COMMENT 'trait name (e.g. to display) shorter version or e.g. name without spaces',
   `TraitDescription` VARCHAR(255) NOT NULL COMMENT 'description about trait',
-  `TraitDataType` VARCHAR(20) NOT NULL COMMENT 'data type (e.g.  DATE, TEXT, CATEGORICAL, ELAPSED_DAYS, INTEGER, DECIMAL) possibly others, but some standarisation needed',
+  `TraitDataType` INTEGER NOT NULL COMMENT 'data type as per general type Class traitdatatype (e.g.  DATE, TEXT, CATEGORICAL, ELAPSED_DAYS, INTEGER, DECIMAL) possibly others',
   `TraitValueMaxLength` INTEGER(10) NOT NULL COMMENT 'max length of the value (e.g. 12)',
+  `TraitLevel` SET('trialunit','subtrialunit','notetrialunit') NOT NULL DEFAULT 'trialunit' COMMENT 'level at which trait is being used (scored), additional global distinction',
   `IsTraitUsedForAnalysis` TINYINT(1) NOT NULL COMMENT 'flag - can be used to streamline export, e.g export all that need analysis',
   `TraitValRule` VARCHAR(255) NOT NULL COMMENT 'validation rule for the value of the trait',
   `TraitValRuleErrMsg` VARCHAR(255) NOT NULL COMMENT 'error message to display, when validation rule criteria are not met',
@@ -379,6 +384,10 @@ CREATE  INDEX `xt_OwnGroupPerm` ON `trait` (`OwnGroupPerm`);
 CREATE  INDEX `xt_AccessGroupPerm` ON `trait` (`AccessGroupPerm`);
 
 CREATE  INDEX `xt_OtherPerm` ON `trait` (`OtherPerm`);
+
+CREATE  INDEX `xt_TraitDataType` ON `trait` (`TraitDataType`);
+
+CREATE  INDEX `xt_TraitLevel` ON `trait` (`TraitLevel`);
 
 ALTER TABLE `trait` CONVERT TO CHARACTER SET utf8 COLLATE utf8_general_ci;
 
@@ -597,6 +606,7 @@ CREATE TABLE `specimen` (
   `Pedigree` TEXT NULL COMMENT 'Could be generated Purdy string from male and female parent ID (or some other than Purdy standard)',
   `SelectionHistory` VARCHAR(254) NULL COMMENT 'Can be siblings clones etc, where genotype name is the same. pulses use this a lot',
   `FilialGeneration` INTEGER NULL COMMENT 'Level of specimens being selfed, required when full selection history is not available',
+  `SpecimenNote` TEXT NULL COMMENT 'Comments about specimen if applicable',
   `OwnGroupId` INTEGER NOT NULL COMMENT 'group id which owns the record',
   `AccessGroupId` INTEGER NOT NULL DEFAULT '0' COMMENT 'group id which can access the recrod (different than own group)',
   `OwnGroupPerm` TINYINT NOT NULL COMMENT 'permission for group owning the record',
@@ -805,6 +815,7 @@ CREATE TABLE `item` (
   `LastMeasuredUserId` INTEGER NULL COMMENT 'who last updated',
   `ItemOperation` SET('subsample','group') NULL COMMENT 'in case item is derived from other items by taking sample or grouping (mixing) this can be defined here. Item parentage is defined in itemparent table',
   `ItemNote` VARCHAR(254) NULL COMMENT 'some comments',
+  `LastUpdateTimeStamp` DATETIME NOT NULL COMMENT 'last update time',
   PRIMARY KEY(`ItemId`)
 ) ENGINE=InnoDB COMMENT='Items, such as seed bags, stored in the inventory. A generic term and may be used for as inventory for a variety of material. ';
 
@@ -957,7 +968,7 @@ ALTER TABLE `trialtrait` CONVERT TO CHARACTER SET utf8 COLLATE utf8_general_ci;
 -- table generaltype
 CREATE TABLE `generaltype` (
   `TypeId` INTEGER NOT NULL AUTO_INCREMENT COMMENT 'general type id',
-  `Class` SET('site','item','container','deviceregister','trial','trialevent','sample','specimengroup','specimengroupstatus','state','parent','itemparent','genotypespecimen','markerdataset','workflow','project','itemlog','plate','genmap','multimedia','tissue','genotypealias','genparent','genotypealiasstatus','traitgroup','unittype','trialgroup','breedingmethod') NOT NULL COMMENT 'class of type - possible values (site, item, container, deviceregister, trial, operation, sample, specimengroup, specimengroupstatus, state, parent, itemparent, genotypespecimen, markerdataset, workflow, project, itemlog, plate, genmap, multimedia, tissue, genotypealias, genparent, genotypealiasstatus, traitgroup, unittype, trialgroup, breedingmethod)',
+  `Class` SET('site','item','container','deviceregister','trial','trialevent','sample','specimengroup','specimengroupstatus','state','parent','itemparent','genotypespecimen','markerdataset','workflow','project','itemlog','plate','genmap','multimedia','tissue','genotypealias','genparent','genotypealiasstatus','traitgroup','unittype','trialgroup','breedingmethod','traitdatatype') NOT NULL COMMENT 'class of type - possible values (site, item, container, deviceregister, trial, operation, sample, specimengroup, specimengroupstatus, state, parent, itemparent, genotypespecimen, markerdataset, workflow, project, itemlog, plate, genmap, multimedia, tissue, genotypealias, genparent, genotypealiasstatus, traitgroup, unittype, trialgroup, breedingmethod, traitdatatype)',
   `TypeName` VARCHAR(100) NOT NULL COMMENT 'name of the type within notation',
   `TypeNote` VARCHAR(254) NULL COMMENT 'type description',
   `IsTypeActive` TINYINT(1) NOT NULL DEFAULT '1' COMMENT '0|1 flag to indicate if type is active (can be used)',
@@ -1289,10 +1300,13 @@ ALTER TABLE `trialdimension` CONVERT TO CHARACTER SET utf8 COLLATE utf8_general_
 CREATE TABLE `keywordgroup` (
   `KeywordGroupId` INTEGER NOT NULL AUTO_INCREMENT COMMENT 'id of the keyword group',
   `KeywordGroupName` VARCHAR(100) NOT NULL COMMENT 'unique name of the keyword group',
+  `OperatorId` INTEGER NULL COMMENT 'optional operator id - if defined than group may belong to this particular user',
   PRIMARY KEY(`KeywordGroupId`)
-) ENGINE=InnoDB COMMENT='Groups of keywords for easy search';
+) ENGINE=InnoDB COMMENT='Arbitrary groups of keywords for easy search or other purpose.';
 
-CREATE UNIQUE INDEX `kwg_KeywordGroupName` ON `keywordgroup` (`KeywordGroupName`);
+CREATE UNIQUE INDEX `kwg_KeywordGroupName` ON `keywordgroup` (`KeywordGroupName`, `OperatorId`);
+
+CREATE  INDEX `kwg_OperatorId` ON `keywordgroup` (`OperatorId`);
 
 ALTER TABLE `keywordgroup` CONVERT TO CHARACTER SET utf8 COLLATE utf8_general_ci;
 
@@ -1301,10 +1315,13 @@ CREATE TABLE `keyword` (
   `KeywordId` INTEGER NOT NULL AUTO_INCREMENT COMMENT 'keyword id',
   `KeywordName` VARCHAR(30) NOT NULL COMMENT 'unique keyword',
   `KeywordNote` VARCHAR(254) NULL COMMENT 'keyword description',
+  `OperatorId` INTEGER NULL COMMENT 'optional owner of the keyword',
   PRIMARY KEY(`KeywordId`)
 ) ENGINE=InnoDB COMMENT='System wide collection of keywords';
 
-CREATE UNIQUE INDEX `kw_KeywordName` ON `keyword` (`KeywordName`);
+CREATE UNIQUE INDEX `kw_KeywordNameOperator` ON `keyword` (`KeywordName`, `OperatorId`);
+
+CREATE  INDEX `kw_OperatorId` ON `keyword` (`OperatorId`);
 
 ALTER TABLE `keyword` CONVERT TO CHARACTER SET utf8 COLLATE utf8_general_ci;
 
@@ -1374,6 +1391,67 @@ CREATE  INDEX `xcr_femaleparentid` ON `crossing` (`FemaleParentId`);
 CREATE  INDEX `xcr_userid` ON `crossing` (`UserId`);
 
 ALTER TABLE `crossing` CONVERT TO CHARACTER SET utf8 COLLATE utf8_general_ci;
+
+-- table traitgroup
+CREATE TABLE `traitgroup` (
+  `TraitGroupId` INTEGER NOT NULL AUTO_INCREMENT COMMENT 'trait group id',
+  `TraitGroupName` VARCHAR(254) NOT NULL COMMENT 'name of the group',
+  `OperatorId` INTEGER NULL COMMENT 'optional operator id - if defined than group may belong to this particular user',
+  PRIMARY KEY(`TraitGroupId`)
+) ENGINE=InnoDB COMMENT='Group of traits. Can be used for various arbitrary purposes.';
+
+CREATE UNIQUE INDEX `trg_TraitGroupName` ON `traitgroup` (`TraitGroupName`, `OperatorId`);
+
+CREATE  INDEX `trg_OperatorId` ON `traitgroup` (`OperatorId`);
+
+ALTER TABLE `traitgroup` CONVERT TO CHARACTER SET utf8 COLLATE utf8_general_ci;
+
+-- table traitgroupentry
+CREATE TABLE `traitgroupentry` (
+  `TraitGroupEntryId` INTEGER NOT NULL AUTO_INCREMENT COMMENT 'trait group entry internal id',
+  `TraitId` INTEGER NOT NULL COMMENT 'trait id belonging to the group',
+  `TraitGroupId` INTEGER NOT NULL COMMENT 'trait group id',
+  PRIMARY KEY(`TraitGroupEntryId`)
+) ENGINE=InnoDB COMMENT='List of trait group members';
+
+CREATE  INDEX `tge_TraitId` ON `traitgroupentry` (`TraitId`);
+
+CREATE  INDEX `tge_TraitGroupId` ON `traitgroupentry` (`TraitGroupId`);
+
+ALTER TABLE `traitgroupentry` CONVERT TO CHARACTER SET utf8 COLLATE utf8_general_ci;
+
+-- table smgroup
+CREATE TABLE `smgroup` (
+  `SMGroupId` INTEGER NOT NULL AUTO_INCREMENT COMMENT 'internal group id',
+  `SMGroupName` VARCHAR(254) NOT NULL COMMENT 'group name - has to be unique',
+  `TrialId` INTEGER NOT NULL COMMENT 'trial id measurements belong to - this is a constrain that grouping measurements between trials is not possible',
+  `OperatorId` INTEGER NOT NULL COMMENT 'user - owner of the group',
+  `SMGroupStatus` VARCHAR(20) NULL COMMENT 'status of the group',
+  `SMGroupDateTime` DATETIME NOT NULL COMMENT 'date and time of the group - possibly creation time or last update',
+  `SMGroupNote` TEXT NULL COMMENT 'general comments for the group',
+  PRIMARY KEY(`SMGroupId`)
+) ENGINE=InnoDB COMMENT='Sample measurements for some portions of the trials may be grouped to distinct them from the same measurements, which were done before, but need to be retained or to have two sets which can be compared. It can also be used as means to keep several versions of the same dataset';
+
+CREATE UNIQUE INDEX `smg_SMGroupName` ON `smgroup` (`SMGroupName`);
+
+CREATE  INDEX `smg_TrialId` ON `smgroup` (`TrialId`);
+
+CREATE  INDEX `smg_OperatorId` ON `smgroup` (`OperatorId`);
+
+CREATE  INDEX `smg_SMGroupDateTime` ON `smgroup` (`SMGroupDateTime`);
+
+CREATE  INDEX `smg_SMGroupStatus` ON `smgroup` (`SMGroupStatus`);
+
+ALTER TABLE `smgroup` CONVERT TO CHARACTER SET utf8 COLLATE utf8_general_ci;
+
+-- table uniquenumber
+CREATE TABLE `uniquenumber` (
+  `UniqueNumberId` INTEGER NOT NULL AUTO_INCREMENT COMMENT 'sytem wide unique number',
+  PRIMARY KEY(`UniqueNumberId`)
+) ENGINE=InnoDB COMMENT='Just to assure that every number provided in REST interface is always truly system wide unique.';
+
+
+ALTER TABLE `uniquenumber` CONVERT TO CHARACTER SET utf8 COLLATE utf8_general_ci;
 
 
 ALTER TABLE `contactfactor` ADD FOREIGN KEY (`ContactId`)
@@ -1860,10 +1938,6 @@ ALTER TABLE `trialdimension` ADD FOREIGN KEY (`TrialId`)
   REFERENCES `trial` (`TrialId`) 
   ON DELETE NO ACTION ON UPDATE NO ACTION;
 
-ALTER TABLE `samplemeasurement` ADD FOREIGN KEY (`TrialUnitSpecimenId`)
-  REFERENCES `trialunitspecimen` (`TrialUnitSpecimenId`) 
-  ON DELETE NO ACTION ON UPDATE NO ACTION;
-
 ALTER TABLE `keywordgroupentry` ADD FOREIGN KEY (`KeywordGroupId`)
   REFERENCES `keywordgroup` (`KeywordGroupId`) 
   ON DELETE NO ACTION ON UPDATE NO ACTION;
@@ -1905,6 +1979,38 @@ ALTER TABLE `crossing` ADD FOREIGN KEY (`FemaleParentId`)
   ON DELETE NO ACTION ON UPDATE NO ACTION;
 
 ALTER TABLE `crossing` ADD FOREIGN KEY (`UserId`)
+  REFERENCES `systemuser` (`UserId`) 
+  ON DELETE NO ACTION ON UPDATE NO ACTION;
+
+ALTER TABLE `keywordgroup` ADD FOREIGN KEY (`OperatorId`)
+  REFERENCES `systemuser` (`UserId`) 
+  ON DELETE NO ACTION ON UPDATE NO ACTION;
+
+ALTER TABLE `traitgroupentry` ADD FOREIGN KEY (`TraitGroupId`)
+  REFERENCES `traitgroup` (`TraitGroupId`) 
+  ON DELETE NO ACTION ON UPDATE NO ACTION;
+
+ALTER TABLE `traitgroupentry` ADD FOREIGN KEY (`TraitId`)
+  REFERENCES `trait` (`TraitId`) 
+  ON DELETE NO ACTION ON UPDATE NO ACTION;
+
+ALTER TABLE `traitgroup` ADD FOREIGN KEY (`OperatorId`)
+  REFERENCES `systemuser` (`UserId`) 
+  ON DELETE NO ACTION ON UPDATE NO ACTION;
+
+ALTER TABLE `trait` ADD FOREIGN KEY (`TraitDataType`)
+  REFERENCES `generaltype` (`TypeId`) 
+  ON DELETE NO ACTION ON UPDATE NO ACTION;
+
+ALTER TABLE `keyword` ADD FOREIGN KEY (`OperatorId`)
+  REFERENCES `systemuser` (`UserId`) 
+  ON DELETE NO ACTION ON UPDATE NO ACTION;
+
+ALTER TABLE `smgroup` ADD FOREIGN KEY (`TrialId`)
+  REFERENCES `trial` (`TrialId`) 
+  ON DELETE NO ACTION ON UPDATE NO ACTION;
+
+ALTER TABLE `smgroup` ADD FOREIGN KEY (`OperatorId`)
   REFERENCES `systemuser` (`UserId`) 
   ON DELETE NO ACTION ON UPDATE NO ACTION;
 

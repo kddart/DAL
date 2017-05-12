@@ -1,7 +1,7 @@
 <dataConfig>
   <dataSource type="JdbcDataSource"
             driver="nl.cwi.monetdb.jdbc.MonetDriver"
-            url="jdbc:monetdb://192.168.9.17/kddart_marker_v2_3_1"
+            url="jdbc:monetdb://localhost/kddart_marker_v2_3_2"
             user="monetdb"
             password="monetdb" />
   <document>

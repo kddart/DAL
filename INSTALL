@@ -1,10 +1,10 @@
 Installation instructions
 
-The easiest way to get DAL working is to get a preconfigured virtual machine from DArT or use an ansible playbook deployment script in other/deploy_with_ansible.
+The easiest way to get DAL working is to get a preconfigured virtual machine from DArT.
 
 If you want to try on your own, the very general instructions are provided below. You have to be very familiar with Linux system administration, Apache configuration, Perl environment and MySQL, PostgreSQL database configurations. Installation described below has been tested on openSuSE installation (with Apache 2.2 - 2.4 will have some differences).
 
-Works on openSuSE Leap 42.1 and Centos 7
+Works on openSuSE 12.2 and 12.3
 
 Instructions are assuming that base folder for installation is '/srv/www/'
 

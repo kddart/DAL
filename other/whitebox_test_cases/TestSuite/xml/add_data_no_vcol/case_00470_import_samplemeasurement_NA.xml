@@ -15,5 +15,5 @@
   <Parent CaseFile="xml/add_data_no_vcol/case_00471_add_trait_boolex_with_NA.xml" Force="1" Order="4" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00201_add_sampletype.xml" Order="5" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00472_add_trialtrait_boolex_with_NA.xml" Force="1" Order="6" />
-  <RunInfo Success="1" Time="1474006836" />
+  
 </TestCase>

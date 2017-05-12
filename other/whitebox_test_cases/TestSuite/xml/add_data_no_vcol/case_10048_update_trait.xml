@@ -6,7 +6,8 @@
   <INPUT ParaName="TraitGroupTypeId" SrcValue="xml/add_data_no_vcol/case_00424_add_traitgroup_type.xml" />
   <INPUT ParaName="TraitCaption" Value="Automatic testing trait" />
   <INPUT ParaName="TraitDescription" Value="Trait used for automatic testing" />
-  <INPUT ParaName="TraitDataType" Value="INTEGER" />
+  <INPUT ParaName="TraitDataType" SrcValue="xml/add_data_no_vcol/case_00574_add_trait_data_type.xml" />
+  <INPUT ParaName="TraitLevel" Value="trialunit" />
   <INPUT ParaName="TraitValueMaxLength" Value="20" />
   <INPUT ParaName="UnitId" SrcValue="xml/add_data_no_vcol/case_00399_add_item_unit4update_trait.xml" />
   <INPUT ParaName="IsTraitUsedForAnalysis" Value="0" />
@@ -23,5 +24,6 @@
   <Parent CaseFile="xml/add_data_no_vcol/case_00438_add_trait_no_trait_group_type.xml" Order="3" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00399_add_item_unit4update_trait.xml" Order="4" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00424_add_traitgroup_type.xml" Force="1" Order="5" />
-  <RunInfo Success="1" Time="1474006811" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00574_add_trait_data_type.xml" Order="6" />
+  
 </TestCase>

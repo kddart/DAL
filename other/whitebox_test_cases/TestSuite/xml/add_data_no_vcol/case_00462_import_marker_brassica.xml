@@ -545,6 +545,6 @@
   <Parent CaseFile="xml/add_data_no_vcol/extract_tcase/case_00302_add_extract263.xml" Order="266" />
   <Parent CaseFile="xml/add_data_no_vcol/extract_tcase/case_00302_add_extract264.xml" Order="267" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00473_add_datasettype.xml" Order="268" />
-  <ReturnId ParaName="DataSetId" Value="8" />
-  <RunInfo Success="1" Time="1474007199" />
+  <ReturnId ParaName="DataSetId" Value="2" />
+  
 </TestCase>

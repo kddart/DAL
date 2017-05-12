@@ -106,26 +106,9 @@ sub delete {
 }
 
 sub clear {
+
     my $self = shift;
     $self->delete('write_token', 'checksum');
-
-    my $cgiapp = $self->authen->_cgiapp();
-    my $q = $cgiapp->query();
-
-    my $cookie_name = CGI::Session->name();
-    my $cgisession_cookie = $q->cookie(
-            -name      => "$cookie_name",
-            -values    => '',
-            -expires   => '-1d',
-        );
-
-    my $kddart_cookie = $q->cookie(
-            -name      => 'KDDArT_RANDOM_NUMBER',
-            -values    => '',
-            -expires   => '-1d',
-        );
-
-    $cgiapp->header_add(-cookie => [$cgisession_cookie, $kddart_cookie]);
 }
 
 #

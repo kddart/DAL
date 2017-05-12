@@ -192,6 +192,7 @@ sub setup {
     'remove_keyword_from_group_gadmin'    => 'remove_keyword_from_group_runmode',
     'del_keyword_group_gadmin'            => 'del_keyword_group_runmode',
     'update_group_gadmin'                 => 'update_group_runmode',
+    'get_unique_number'                   => 'get_unique_number_runmode',
    );
 
   my $logger = get_logger();
@@ -213,9 +214,13 @@ sub setup {
 
   $self->{logger} = $logger;
 
+  my $domain_name = $COOKIE_DOMAIN->{$ENV{DOCUMENT_ROOT}};
+  $self->logger->debug("COOKIE DOMAIN: $domain_name");
+
   $self->authen->config(LOGIN_URL => '');
   $self->session_config(
-          CGI_SESSION_OPTIONS => [ "driver:File", $self->query, {Directory=>$SESSION_STORAGE_PATH} ],
+          CGI_SESSION_OPTIONS => [ "driver:File", $self->query, {Directory => $SESSION_STORAGE_PATH} ],
+          SEND_COOKIE         => 0,
       );
 
   my $multimedia_href = {};
@@ -258,7 +263,7 @@ sub add_user_runmode {
 
 =pod add_user_gadmin_HELP_START
 {
-"OperationName" : "Add user",
+"OperationName": "Add user",
 "Description": "Add a new system user.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -379,7 +384,7 @@ sub update_user_runmode {
 
 =pod update_user_gadmin_HELP_START
 {
-"OperationName" : "Update user",
+"OperationName": "Update user",
 "Description": "Update existing system user.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -487,7 +492,7 @@ sub list_group_default_runmode {
 
 =pod list_group_HELP_START
 {
-"OperationName" : "List group(s)",
+"OperationName": "List group(s)",
 "Description": "Return list of groups, where currently logged in user is the member of.",
 "AuthRequired": 1,
 "GroupRequired": 0,
@@ -534,7 +539,7 @@ sub list_all_group_runmode {
 
 =pod list_all_group_HELP_START
 {
-"OperationName" : "List all groups",
+"OperationName": "List all groups",
 "Description": "Return a list of all user groups defined in the database.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -580,7 +585,7 @@ sub list_operation_runmode {
 
 =pod list_operation_HELP_START
 {
-"OperationName" : "List operations",
+"OperationName": "List operations",
 "Description": "Return a list of all available operations in the DAL API.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -616,7 +621,7 @@ sub get_session_expiry_runmode {
 
 =pod get_session_expiry_HELP_START
 {
-"OperationName" : "Get session expiry",
+"OperationName": "Get session expiry",
 "Description": "Get information when current DAL session expires.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -650,7 +655,7 @@ sub add_group_member_runmode {
 
 =pod add_group_member_gadmin_HELP_START
 {
-"OperationName" : "Add group member",
+"OperationName": "Add group member",
 "Description": "Add system user to a system group.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -1026,7 +1031,7 @@ sub add_group_runmode {
 
 =pod add_group_gadmin_HELP_START
 {
-"OperationName" : "Add group",
+"OperationName": "Add group",
 "Description": "Create a new system group in the database.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -1200,7 +1205,7 @@ sub list_user_runmode {
 
 =pod list_user_gadmin_HELP_START
 {
-"OperationName" : "List users in the current group",
+"OperationName": "List users in the current group",
 "Description": "Return list of system users currently present in the group of the login session.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -1231,7 +1236,7 @@ sub list_user_runmode {
     $where_clause = '';
   }
 
-  my $sql = 'SELECT systemuser.UserId, UserName, ContactId, UserType ';
+  my $sql = 'SELECT DISTINCT systemuser.UserId, UserName, ContactId, UserType ';
   $sql   .= 'FROM systemuser LEFT JOIN authorisedsystemgroup ';
   $sql   .= 'ON systemuser.UserId = authorisedsystemgroup.UserId ';
   $sql   .= $where_clause;
@@ -1261,7 +1266,7 @@ sub change_user_password_runmode {
 
 =pod change_user_password_HELP_START
 {
-"OperationName" : "Change password",
+"OperationName": "Change password",
 "Description": "Change current password into something new. Each user can change only his/her own password.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -1376,7 +1381,7 @@ sub remove_group_member_runmode {
 
 =pod remove_group_member_gadmin_HELP_START
 {
-"OperationName" : "Remove user from a group",
+"OperationName": "Remove user from a group",
 "Description": "Remove user from a group. User is no longer a member of this group at all.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -1482,7 +1487,7 @@ sub remove_owner_status_runmode {
 
 =pod remove_owner_status_gadmin_HELP_START
 {
-"OperationName" : "Remove owner status",
+"OperationName": "Remove owner status",
 "Description": "Remove ownership status from a user. User is no longer owner (admin) of the group. Group have to retain at least one owner, who can manage the group.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -1599,7 +1604,7 @@ sub change_permission_runmode {
 
 =pod change_permission_HELP_START
 {
-"OperationName" : "Change record permission",
+"OperationName": "Change record permission",
 "Description": "Change permission to the record id for the table. User doing the change needs to have appropriate permission to the record to make such a change. The HTTP parameters here are the new permission values.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -1795,7 +1800,7 @@ sub change_owner_runmode {
 
 =pod change_owner_HELP_START
 {
-"OperationName" : "Change owner",
+"OperationName": "Change owner",
 "Description": "Change the ownership of the record in the table. User doing the change needs to have appropriate permission to the record to make such a change. The HTTP parameters here are the new owner and access group IDs.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -2018,7 +2023,7 @@ sub get_permission_runmode {
 
 =pod get_permission_HELP_START
 {
-"OperationName" : "Get permission",
+"OperationName": "Get permission",
 "Description": "Return detailed information about permission in the table for a specified record id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -2217,7 +2222,7 @@ sub get_group_runmode {
 
 =pod get_group_gadmin_HELP_START
 {
-"OperationName" : "Get group",
+"OperationName": "Get group",
 "Description": "Return detailed information about a group specified by id including list of group members.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -2304,8 +2309,8 @@ sub get_user_runmode {
 
 =pod get_user_HELP_START
 {
-"OperationName" : "Get user",
-"Description": "Return detailed information aboutsystem user specified by id.",
+"OperationName": "Get user",
+"Description": "Return detailed information about system user specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
 "GroupAdminRequired": 0,
@@ -2386,7 +2391,7 @@ sub add_barcodeconf_runmode {
 
 =pod add_barcodeconf_gadmin_HELP_START
 {
-"OperationName" : "Add barcode configuration",
+"OperationName": "Add barcode configuration",
 "Description": "Add a new barcode configuration definition.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -2618,7 +2623,7 @@ sub list_barcodeconf_runmode {
 
 =pod list_barcodeconf_HELP_START
 {
-"OperationName" : "List barcode configuration",
+"OperationName": "List barcode configuration",
 "Description": "List all current entries of barcode configuration.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -2663,7 +2668,7 @@ sub get_barcodeconf_runmode {
 
 =pod get_barcodeconf_HELP_START
 {
-"OperationName" : "Get barcode configuration",
+"OperationName": "Get barcode configuration",
 "Description": "Get detailed information about barcode configuration for specified id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -2719,7 +2724,7 @@ sub add_multimedia_runmode {
 
 =pod add_multimedia_HELP_START
 {
-"OperationName" : "Add mulitmedia file",
+"OperationName": "Add multimedia file",
 "Description": "Attach multimedia file to the table and record in the table.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -3012,8 +3017,8 @@ sub list_multimedia_runmode {
 
 =pod list_multimedia_HELP_START
 {
-"OperationName" : "List multimedia files",
-"Description": "List mulitmedia files for the table and record in the table.",
+"OperationName": "List multimedia files",
+"Description": "List multimedia files for the table and record in the table.",
 "AuthRequired": 1,
 "GroupRequired": 1,
 "GroupAdminRequired": 0,
@@ -3128,8 +3133,8 @@ sub get_multimedia_runmode {
 
 =pod get_multimedia_HELP_START
 {
-"OperationName" : "Get multimedia file meta data",
-"Description": "Get metat data of a multimedia file specified by id.",
+"OperationName": "Get multimedia file meta data",
+"Description": "Get meta data of a multimedia file specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
 "GroupAdminRequired": 0,
@@ -3164,8 +3169,36 @@ sub get_multimedia_runmode {
     return $data_for_postrun_href;
   }
 
-  my $table_name = read_cell_value($dbh, 'multimedia', 'SystemTable', 'MultimediaId', $multimedia_id);
-  my $rec_id     = read_cell_value($dbh, 'multimedia', 'RecordId', 'MultimediaId', $multimedia_id);
+  my $read_media_sql   = 'SELECT SystemTable, RecordId ';
+     $read_media_sql  .= 'FROM multimedia WHERE MultimediaId=? ';
+
+  my ($r_df_val_err, $r_df_val_msg, $media_df_val_data) = read_data($dbh, $read_media_sql, [$multimedia_id]);
+
+  if ($r_df_val_err) {
+
+    $self->logger->debug("Retrieve multimedia default values for optional fields failed: $r_df_val_msg");
+    $data_for_postrun_href->{'Error'}  = 1;
+    $data_for_postrun_href->{'Data'}   = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $table_name   =   undef;
+  my $rec_id       =   undef;
+
+  my $nb_df_val_rec    =  scalar(@{$media_df_val_data});
+
+  if ($nb_df_val_rec != 1)  {
+  
+     $self->logger->debug("Retrieve multimedia default values - number of records unacceptable: $nb_df_val_rec");
+     $data_for_postrun_href->{'Error'} = 1;
+     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+     return $data_for_postrun_href;
+  }
+
+  $table_name   =   $media_df_val_data->[0]->{'SystemTable'};
+  $rec_id       =   $media_df_val_data->[0]->{'RecordId'};
 
   my $chk_rec_sql = $multimedia_setting_href->{$table_name}->{'ChkRecSql'};
 
@@ -3237,7 +3270,7 @@ sub update_multimedia_runmode {
 
 =pod update_multimedia_HELP_START
 {
-"OperationName" : "Update mulitmedia meta data",
+"OperationName": "Update multimedia meta data",
 "Description": "Update multimedia meta data specified by id",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -3286,9 +3319,39 @@ sub update_multimedia_runmode {
     return $data_for_postrun_href;
   }
 
-  my $table_name = read_cell_value($dbh_write, 'multimedia', 'SystemTable', 'MultimediaId', $multimedia_id);
-  my $rec_id     = read_cell_value($dbh_write, 'multimedia', 'RecordId', 'MultimediaId', $multimedia_id);
-  my $note       = read_cell_value($dbh_write, 'multimedia', 'MultimediaNote', 'MultimediaId', $multimedia_id);
+  my $read_mm_sql     =   'SELECT SystemTable, RecordId, MultimediaNote ';
+  $read_mm_sql       .=   'FROM multimedia WHERE MultimediaId=? ';
+
+  my ($r_df_val_err, $r_df_val_msg, $mm_df_val_data) = read_data($dbh_write, $read_mm_sql, [$multimedia_id]);
+
+  if ($r_df_val_err) {
+
+    $self->logger->debug("Retrieve multimedia default values for optional fields failed: $r_df_val_msg");
+    $data_for_postrun_href->{'Error'}  = 1;
+    $data_for_postrun_href->{'Data'}   = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $table_name     =  undef;
+  my $rec_id         =  undef;
+  my $note           =  undef;
+
+  my $nb_df_val_rec    =  scalar(@{$mm_df_val_data});
+
+  if ($nb_df_val_rec != 1)  {
+
+    $self->logger->debug("Retrieve multimedia default values - number of records unacceptable: $nb_df_val_rec");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $table_name      = $mm_df_val_data->[0]->{'SystemTable'};
+  $rec_id          = $mm_df_val_data->[0]->{'RecordId'};
+  $note            = $mm_df_val_data->[0]->{'MultimediaNote'};
+
 
   if (length($note) == 0) {
 
@@ -3300,6 +3363,16 @@ sub update_multimedia_runmode {
     if (length($query->param('MultimediaNote')) > 0) {
 
       $note = $query->param('MultimediaNote');
+    }
+  }
+
+  my $new_rec_id = $rec_id;
+
+  if (defined $query->param('RecordId')) {
+
+    if (length($query->param('RecordId')) > 0) {
+
+      $new_rec_id = $query->param('RecordId');
     }
   }
 
@@ -3318,12 +3391,41 @@ sub update_multimedia_runmode {
 
   my $chk_rec_sql = $multimedia_setting_href->{$table_name}->{'ChkRecSql'};
 
+  my ($read_err, $new_db_rec_id) = read_cell($dbh, $chk_rec_sql, [$new_rec_id]);
+
+  if ($read_err) {
+
+    my $err_msg = "Unexpected Error";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (length($new_db_rec_id) == 0) {
+
+    my $err_msg = "Record ($new_rec_id) in $table_name: not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
   if (defined $multimedia_setting_href->{$table_name}->{'ChkPermFunc'}) {
 
     my $chk_perm_func = $multimedia_setting_href->{$table_name}->{'ChkPermFunc'};
     if (!$chk_perm_func->($dbh, $rec_id, $READ_WRITE_PERM)) {
 
       my $err_msg = "Record ($rec_id) in $table_name: permission denied.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    if (!$chk_perm_func->($dbh, $new_rec_id, $READ_WRITE_PERM)) {
+
+      my $err_msg = "Record ($new_rec_id) in $table_name: permission denied.";
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
@@ -3343,12 +3445,13 @@ sub update_multimedia_runmode {
   }
 
   my $sql = 'UPDATE multimedia SET ';
+  $sql   .= 'RecordId=?, ';
   $sql   .= 'FileType=?, ';
   $sql   .= 'MultimediaNote=? ';
   $sql   .= 'WHERE MultimediaId=?';
 
   my $sth = $dbh_write->prepare($sql);
-  $sth->execute($file_type, $note, $multimedia_id);
+  $sth->execute($new_rec_id, $file_type, $note, $multimedia_id);
 
   if ($dbh_write->err()) {
 
@@ -3376,7 +3479,7 @@ sub del_multimedia_runmode {
 
 =pod del_multimedia_gadmin_HELP_START
 {
-"OperationName" : "Delete mulitmedia",
+"OperationName": "Delete multimedia",
 "Description": "Delete multimedia",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -3410,8 +3513,36 @@ sub del_multimedia_runmode {
     return $data_for_postrun_href;
   }
 
-  my $table_name = read_cell_value($dbh_write, 'multimedia', 'SystemTable', 'MultimediaId', $multimedia_id);
-  my $rec_id     = read_cell_value($dbh_write, 'multimedia', 'RecordId', 'MultimediaId', $multimedia_id);
+  my $read_media_sql   = 'SELECT SystemTable, RecordId ';
+     $read_media_sql  .= 'FROM multimedia WHERE MultimediaId=? ';
+
+  my ($r_df_val_err, $r_df_val_msg, $media_df_val_data) = read_data($dbh_write, $read_media_sql, [$multimedia_id]);
+
+  if ($r_df_val_err) {
+
+    $self->logger->debug("Retrieve multimedia default values for optional fields failed: $r_df_val_msg");
+    $data_for_postrun_href->{'Error'}  = 1;
+    $data_for_postrun_href->{'Data'}   = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $table_name   =   undef;
+  my $rec_id       =   undef;
+
+  my $nb_df_val_rec    =  scalar(@{$media_df_val_data});
+
+  if ($nb_df_val_rec != 1)  {
+  
+     $self->logger->debug("Retrieve multimedia default values - number of records unacceptable: $nb_df_val_rec");
+     $data_for_postrun_href->{'Error'} = 1;
+     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+     return $data_for_postrun_href;
+  }
+
+  $table_name   =   $media_df_val_data->[0]->{'SystemTable'};
+  $rec_id       =   $media_df_val_data->[0]->{'RecordId'};
 
   my $multimedia_setting_href = $self->{'multimedia'};
 
@@ -3500,7 +3631,7 @@ sub add_workflow_runmode {
 
 =pod add_workflow_gadmin_HELP_START
 {
-"OperationName" : "Add workflow",
+"OperationName": "Add workflow",
 "Description": "Add a new workflow into the system",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -3632,7 +3763,7 @@ sub update_workflow_runmode {
 
 =pod update_workflow_gadmin_HELP_START
 {
-"OperationName" : "Update workflow",
+"OperationName": "Update workflow",
 "Description": "Update workflow specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -3787,7 +3918,7 @@ sub del_workflow_runmode {
 
 =pod del_workflow_gadmin_HELP_START
 {
-"OperationName" : "Delete workflow",
+"OperationName": "Delete workflow",
 "Description": "Delete workflow if it is not used and it does not have any definition.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -4021,7 +4152,7 @@ sub list_workflow_runmode {
 
 =pod list_workflow_HELP_START
 {
-"OperationName" : "List workflow",
+"OperationName": "List workflow",
 "Description": "List all available workflow in the system dictionary.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -4068,7 +4199,7 @@ sub get_workflow_runmode {
 
 =pod get_workflow_HELP_START
 {
-"OperationName" : "Get workflow",
+"OperationName": "Get workflow",
 "Description": "Get detailed information about workflow specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -4131,7 +4262,7 @@ sub add_workflow_def_runmode {
 
 =pod add_workflow_def_gadmin_HELP_START
 {
-"OperationName" : "Add workflow definition",
+"OperationName": "Add workflow definition",
 "Description": "Add workflow definition.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -4139,7 +4270,7 @@ sub add_workflow_def_runmode {
 "SignatureRequired": 1,
 "AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
 "KDDArTModule": "main",
-"KDDArTTable": "workflow",
+"KDDArTTable": "workflowdef",
 "SkippedField": ["WorkflowId"],
 "SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><ReturnId Value='1' ParaName='WorkflowdefId' /><Info Message='Workflowdef (1) has been added successfully.' /></DATA>",
 "SuccessMessageJSON": "{'ReturnId' : [{'Value' : '2', 'ParaName' : 'WorkflowdefId'}], 'Info' : [{'Message' : 'Workflowdef (2) has been added successfully.'}]}",
@@ -4288,7 +4419,7 @@ sub update_workflow_def_runmode {
 
 =pod update_workflow_def_gadmin_HELP_START
 {
-"OperationName" : "Update workflow definition",
+"OperationName": "Update workflow definition",
 "Description": "Update workflow definition details specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -4338,9 +4469,39 @@ sub update_workflow_def_runmode {
 
   my $dbh_k_read = connect_kdb_read();
 
-  my $step_order = read_cell_value($dbh_k_read, 'workflowdef', 'StepOrder', 'WorkflowdefId', $workflow_def_id);
 
-  my $step_note  = read_cell_value($dbh_k_read, 'workflowdef', 'StepNote', 'WorkflowdefId', $workflow_def_id);
+  my $read_wfdef_sql   =  'SELECT StepOrder, StepNote, WorkflowId ';
+     $read_wfdef_sql  .=  'FROM workflowdef WHERE WorkflowdefId=? ';
+
+  my ($r_df_val_err, $r_df_val_msg, $wfdef_df_val_data) = read_data($dbh_k_read, $read_wfdef_sql, [$workflow_def_id]);
+
+  if ($r_df_val_err) {
+
+    $self->logger->debug("Retrieve workflowdef default values for optional fields failed: $r_df_val_msg");
+    $data_for_postrun_href->{'Error'}  = 1;
+    $data_for_postrun_href->{'Data'}   = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $step_order     =  undef;
+  my $step_note      =  undef;
+  my $workflow_id    =  undef;
+
+  my $nb_df_val_rec    =  scalar(@{$wfdef_df_val_data});
+
+  if ($nb_df_val_rec != 1)  {
+
+     $self->logger->debug("Retrieve workflowdef default values - number of records unacceptable: $nb_df_val_rec");
+     $data_for_postrun_href->{'Error'} = 1;
+     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+     return $data_for_postrun_href;
+  }
+
+  $step_order        =   $wfdef_df_val_data->[0]->{'StepOrder'};
+  $step_note         =   $wfdef_df_val_data->[0]->{'StepNote'};
+  $workflow_id       =   $wfdef_df_val_data->[0]->{'WorkflowId'};
 
   if (length($step_note) == 0) {
 
@@ -4363,16 +4524,6 @@ sub update_workflow_def_runmode {
     }
   }
 
-  if (!record_existence($dbh_k_read, 'workflowdef', 'WorkflowdefId', $workflow_def_id)) {
-
-    my $err_msg = "Workflowdef ($workflow_def_id): not found.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-    return $data_for_postrun_href;
-  }
-
-  my $workflow_id = read_cell_value($dbh_k_read, 'workflowdef', 'WorkflowId', 'WorkflowdefId', $workflow_def_id);
 
   my $sql = 'SELECT WorkflowdefId FROM workflowdef WHERE StepName=? AND WorkflowId=? AND WorkflowdefId<>?';
 
@@ -4546,7 +4697,7 @@ sub list_workflow_def_runmode {
 
 =pod list_workflow_def_HELP_START
 {
-"OperationName" : "List workflow definition",
+"OperationName": "List workflow definition",
 "Description": "List workflow definition for specified workflow id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -4604,7 +4755,7 @@ sub get_workflow_def_runmode {
 
 =pod get_workflow_def_HELP_START
 {
-"OperationName" : "Get workflow definition",
+"OperationName": "Get workflow definition",
 "Description": "Get detailed information about workflow definition specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -4663,7 +4814,7 @@ sub del_workflow_def_runmode {
 
 =pod del_workflow_def_gadmin_HELP_START
 {
-"OperationName" : "Delete workflow definition",
+"OperationName": "Delete workflow definition",
 "Description": "Delete workflow definition if it is not used.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -4741,7 +4892,7 @@ sub get_user_preference_runmode {
 
 =pod get_user_preference_HELP_START
 {
-"OperationName" : "Get User Preference",
+"OperationName": "Get User Preference",
 "Description": "Get user preference regarding, for example, field list, field description and so on.",
 "AuthRequired": 1,
 "GroupRequired": 0,
@@ -4831,7 +4982,7 @@ sub update_user_preference_runmode {
 
 =pod update_user_preference_HELP_START
 {
-"OperationName" : "Update User Preference",
+"OperationName": "Update User Preference",
 "Description": "Update user preference regarding, for example, field list, field description and so on.",
 "AuthRequired": 1,
 "GroupRequired": 0,
@@ -5152,7 +5303,7 @@ sub add_keyword_runmode {
 
 =pod add_keyword_gadmin_HELP_START
 {
-"OperationName" : "Add keyword",
+"OperationName": "Add keyword",
 "Description": "Add a new keyword into the system",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -5206,9 +5357,50 @@ sub add_keyword_runmode {
     }
   }
 
+  my $operator_id = undef;
+
   my $dbh_k_read = connect_kdb_read();
 
-  if (record_existence($dbh_k_read, 'keyword', 'KeywordName', $keyword_name)) {
+  my $user_id = $self->authen->user_id();
+
+  my $uniq_name_sql = 'SELECT KeywordId FROM keyword WHERE KeywordName=?';
+  my @uniq_name_arg = ($keyword_name);
+
+  if (defined $query->param('OperatorId')) {
+
+    if (length($query->param('OperatorId')) > 0) {
+
+      $operator_id = $query->param('OperatorId');
+
+      if ( ! record_existence($dbh_k_read, 'systemuser', 'UserId', $operator_id) ) {
+
+        my $err_msg = "Operator ($operator_id): not found.";
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'OperatorId' => $err_msg}]};
+
+        return $data_for_postrun_href;
+      }
+
+      $uniq_name_sql .= ' AND OperatorId=?';
+      push(@uniq_name_arg, $operator_id);
+    }
+  }
+
+  $uniq_name_sql .= ' LIMIT 1';
+
+  my ($uniq_name_err, $db_keyword_id) = read_cell($dbh_k_read, $uniq_name_sql, \@uniq_name_arg);
+
+  if ($uniq_name_err) {
+
+    $self->logger->debug("Read unique keyword name failed");
+    my $err_msg = "Unexpected Error.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'KeywordName' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (length($db_keyword_id) > 0) {
 
     my $err_msg = "KeywordName ($keyword_name): already exists.";
     $data_for_postrun_href->{'Error'} = 1;
@@ -5223,10 +5415,11 @@ sub add_keyword_runmode {
 
   my $sql = 'INSERT INTO keyword SET ';
   $sql   .= 'KeywordName=?, ';
-  $sql   .= 'KeywordNote=?';
+  $sql   .= 'KeywordNote=?, ';
+  $sql   .= 'OperatorId=?';
 
   my $sth = $dbh_k_write->prepare($sql);
-  $sth->execute( $keyword_name, $keyword_note );
+  $sth->execute( $keyword_name, $keyword_note, $operator_id );
 
   my $keyword_id = -1;
   if (!$dbh_k_write->err()) {
@@ -5261,7 +5454,7 @@ sub update_keyword_runmode {
 
 =pod update_keyword_gadmin_HELP_START
 {
-"OperationName" : "Update keyword",
+"OperationName": "Update keyword",
 "Description": "Update keyword specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -5309,9 +5502,49 @@ sub update_keyword_runmode {
 
   my $dbh_k_read = connect_kdb_read();
 
-  my $sql = 'SELECT KeywordId FROM keyword WHERE KeywordName=? AND KeywordId<>?';
+  if (!record_existence( $dbh_k_read, 'keyword', 'KeywordId', $keyword_id )) {
 
-  my ($r_kwd_err, $db_kwd_id) = read_cell($dbh_k_read, $sql, [$keyword_name, $keyword_id]);
+    my $err_msg = "Keyword ($keyword_id): not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $operator_id = read_cell_value($dbh_k_read, 'keyword', 'OperatorId', 'KeywordId', $keyword_id);
+
+  if (length($operator_id) == 0) {
+
+    $operator_id = 'NULL';
+  }
+
+  if (defined $query->param('OperatorId')) {
+
+    if (length($query->param('OperatorId')) > 0) {
+
+      $operator_id = $query->param('OperatorId');
+    }
+  }
+
+  my $sql = 'SELECT KeywordId FROM keyword WHERE KeywordName=? AND KeywordId<>?';
+  my $sql_arg_aref = [$keyword_name, $keyword_id];
+
+  if ("$operator_id" ne 'NULL') {
+
+    $sql .= ' AND OperatorId=?';
+    push(@{$sql_arg_aref}, $operator_id);
+
+    if ( ! record_existence($dbh_k_read, 'systemuser', 'UserId', $operator_id) ) {
+
+      my $err_msg = "Operator ($operator_id): not found.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'OperatorId' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  my ($r_kwd_err, $db_kwd_id) = read_cell($dbh_k_read, $sql, $sql_arg_aref);
 
   if ($r_kwd_err) {
 
@@ -5327,15 +5560,6 @@ sub update_keyword_runmode {
     my $err_msg = "KeywordName ($keyword_name) already exists.";
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'KeywordName' => $err_msg}]};
-
-    return $data_for_postrun_href;
-  }
-
-  if (!record_existence( $dbh_k_read, 'keyword', 'KeywordId', $keyword_id )) {
-
-    my $err_msg = "Keyword ($keyword_id): not found.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
     return $data_for_postrun_href;
   }
@@ -5361,7 +5585,8 @@ sub update_keyword_runmode {
 
   $sql    = "UPDATE keyword SET ";
   $sql   .= "KeywordName=?, ";
-  $sql   .= "KeywordNote=? ";
+  $sql   .= "KeywordNote=?, ";
+  $sql   .= "OperatorId=$operator_id ";
   $sql   .= "WHERE KeywordId=?";
 
   my $sth = $dbh_k_write->prepare($sql);
@@ -5472,7 +5697,7 @@ sub list_keyword_advanced_runmode {
 
 =pod list_keyword_advanced_HELP_START
 {
-"OperationName" : "List keyword(s)",
+"OperationName": "List keyword(s)",
 "Description": "Return a list of keywords currently present in the system.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -5596,8 +5821,24 @@ sub list_keyword_advanced_runmode {
     $final_field_list = $sel_field_list;
   }
 
+  my $sql_field_lookup = {};
+
+  for my $field_name (@{$final_field_list}) {
+
+    $sql_field_lookup->{$field_name} = 1;
+  }
+
+  my $other_join = '';
+
+  if ($sql_field_lookup->{'OperatorId'}) {
+
+    $other_join = ' LEFT JOIN systemuser ON keyword.OperatorId = systemuser.UserId ';
+    push(@{$final_field_list}, 'systemuser.UserName AS OperatorUserName');
+  }
+
   $sql  = 'SELECT ' . join(',', @{$final_field_list}) . ' ';
   $sql .= 'FROM keyword ';
+  $sql .= $other_join;
 
   my ( $filter_err, $filter_msg, $filter_phrase, $where_arg ) = parse_filtering('KeywordId',
                                                                                 'keyword',
@@ -5735,7 +5976,7 @@ sub get_keyword_runmode {
 
 =pod get_keyword_HELP_START
 {
-"OperationName" : "Get keyword",
+"OperationName": "Get keyword",
 "Description": "Get detailed information about keyword specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -5797,7 +6038,7 @@ sub del_keyword_runmode {
 
 =pod del_keyword_gadmin_HELP_START
 {
-"OperationName" : "Delete keyword",
+"OperationName": "Delete keyword",
 "Description": "Delete keyword if it is not used and it is not part of any grouping.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -5893,7 +6134,7 @@ sub add_keyword_group_runmode {
 
 =pod add_keyword_group_gadmin_HELP_START
 {
-"OperationName" : "Add keyword group",
+"OperationName": "Add keyword group",
 "Description": "Add a new keyword group.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -5943,7 +6184,48 @@ sub add_keyword_group_runmode {
 
   my $dbh_write = connect_kdb_write();
 
-  if (record_existence($dbh_write, 'keywordgroup', 'KeywordGroupName', $keyword_group_name)) {
+  my $operator_id = undef;
+
+  my $user_id = $self->authen->user_id();
+
+  my $uniq_name_sql = 'SELECT KeywordGroupId FROM keywordgroup WHERE KeywordGroupName=?';
+  my @uniq_name_arg = ($keyword_group_name);
+
+  if (defined $query->param('OperatorId')) {
+
+    if (length($query->param('OperatorId')) > 0) {
+
+      $operator_id = $query->param('OperatorId');
+
+      if ( ! record_existence($dbh_write, 'systemuser', 'UserId', $operator_id) ) {
+
+        my $err_msg = "Operator ($operator_id): not found.";
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'OperatorId' => $err_msg}]};
+
+        return $data_for_postrun_href;
+      }
+
+      $uniq_name_sql .= ' AND OperatorId=?';
+      push(@uniq_name_arg, $operator_id);
+    }
+  }
+
+  $uniq_name_sql .= ' LIMIT 1';
+
+  my ($uniq_name_err, $db_keyword_group_id) = read_cell($dbh_write, $uniq_name_sql, \@uniq_name_arg);
+
+  if ($uniq_name_err) {
+
+    $self->logger->debug("Read unique keyword group name failed");
+    my $err_msg = "Unexpected Error.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'KeywordName' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (length($db_keyword_group_id) > 0) {
 
     my $err_msg = "KeywordGroupName ($keyword_group_name): already exists.";
     $data_for_postrun_href->{'Error'} = 1;
@@ -6051,10 +6333,10 @@ sub add_keyword_group_runmode {
   }
 
   my $sql = 'INSERT INTO keywordgroup SET ';
-  $sql   .= 'KeywordGroupName=?';
+  $sql   .= 'KeywordGroupName=?, OperatorId=?';
 
   my $sth = $dbh_write->prepare($sql);
-  $sth->execute($keyword_group_name);
+  $sth->execute($keyword_group_name, $operator_id);
 
   if ($dbh_write->err()) {
 
@@ -6114,7 +6396,7 @@ sub update_keyword_group_runmode {
 
 =pod update_keyword_group_gadmin_HELP_START
 {
-"OperationName" : "Update keyword group",
+"OperationName": "Update keyword group",
 "Description": "Update information about keyword group specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -6173,23 +6455,62 @@ sub update_keyword_group_runmode {
 
   my $keyword_group_name         = $query->param('KeywordGroupName');
 
-  my $chk_spec_grp_name_sql = 'SELECT KeywordGroupId FROM keywordgroup ';
-  $chk_spec_grp_name_sql   .= 'WHERE KeywordGroupId <> ? AND KeywordGroupName = ?';
+  my $operator_id = read_cell_value($dbh_write, 'keywordgroup', 'OperatorId',
+                                    'KeywordGroupId', $keyword_grp_id);
 
-  my ($r_chk_spec_grp_name_err, $duplicate_spec_grp_id) = read_cell($dbh_write, $chk_spec_grp_name_sql,
-                                                                    [$keyword_grp_id, $keyword_group_name]);
+  if (length($operator_id) == 0) {
 
-  if (length($duplicate_spec_grp_id) > 0) {
+    $operator_id = 'NULL';
+  }
 
-    my $err_msg = "KeywordGroupName ($keyword_group_name) already exists.";
+  if (defined $query->param('OperatorId')) {
+
+    if (length($query->param('OperatorId')) > 0) {
+
+      $operator_id = $query->param('OperatorId');
+    }
+  }
+
+  my $sql = 'SELECT KeywordGroupId FROM keywordgroup WHERE KeywordGroupName=? AND KeywordGroupId<>?';
+  my $sql_arg_aref = [$keyword_group_name, $keyword_grp_id];
+
+  if ("$operator_id" ne 'NULL') {
+
+    $sql .= ' AND OperatorId=?';
+    push(@{$sql_arg_aref}, $operator_id);
+
+    if ( ! record_existence($dbh_write, 'systemuser', 'UserId', $operator_id) ) {
+
+      my $err_msg = "Operator ($operator_id): not found.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'OperatorId' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  my ($r_kwd_grp_err, $db_kwd_grp_id) = read_cell($dbh_write, $sql, $sql_arg_aref);
+
+  if ($r_kwd_grp_err) {
+
+    my $err_msg = "Unexpected Error.";
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
     return $data_for_postrun_href;
   }
 
-  my $sql = 'UPDATE keywordgroup SET ';
-  $sql   .= 'KeywordGroupName=? ';
+  if (length($db_kwd_grp_id) > 0) {
+
+    my $err_msg = "KeywordGroupName ($keyword_group_name) already exists.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'KeywordGroupName' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $sql = "UPDATE keywordgroup SET ";
+  $sql   .= "KeywordGroupName=?, OperatorId=$operator_id ";
   $sql   .= 'WHERE KeywordGroupId=?';
 
   my $sth = $dbh_write->prepare($sql);
@@ -6268,7 +6589,7 @@ sub list_keyword_group_runmode {
 
 =pod list_keyword_group_advanced_HELP_START
 {
-"OperationName" : "List keyword group(s)",
+"OperationName": "List keyword group(s)",
 "Description": "Return a list of keyword groups currently present in the system.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -6392,8 +6713,24 @@ sub list_keyword_group_runmode {
     $final_field_list = $sel_field_list;
   }
 
+  my $sql_field_lookup = {};
+
+  for my $field_name (@{$final_field_list}) {
+
+    $sql_field_lookup->{$field_name} = 1;
+  }
+
+  my $other_join = '';
+
+  if ($sql_field_lookup->{'OperatorId'}) {
+
+    $other_join = ' LEFT JOIN systemuser ON keywordgroup.OperatorId = systemuser.UserId ';
+    push(@{$final_field_list}, 'systemuser.UserName AS OperatorUserName');
+  }
+
   $sql  = 'SELECT ' . join(',', @{$final_field_list}) . ' ';
   $sql .= 'FROM keywordgroup ';
+  $sql .= $other_join;
 
   my ( $filter_err, $filter_msg, $filter_phrase, $where_arg ) = parse_filtering('KeywordGroupId',
                                                                                 'keywordgroup',
@@ -6531,7 +6868,7 @@ sub get_keyword_group_runmode {
 
 =pod get_keyword_group_HELP_START
 {
-"OperationName" : "Get keyword group",
+"OperationName": "Get keyword group",
 "Description": "Get detailed information about keyword group specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -6593,7 +6930,7 @@ sub add_keyword2group_bulk_runmode {
 
 =pod add_keyword2group_bulk_gadmin_HELP_START
 {
-"OperationName" : "Add keyword to a group",
+"OperationName": "Add keyword to a group",
 "Description": "Add a keyword to a keywordgroup.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -6861,7 +7198,7 @@ sub list_keyword_in_group_runmode {
 
 =pod list_keyword_in_group_HELP_START
 {
-"OperationName" : "List keyword(s) in the specified group",
+"OperationName": "List keyword(s) in the specified group",
 "Description": "Listing keywords in the group specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -6926,8 +7263,8 @@ sub remove_keyword_from_group_runmode {
 
 =pod remove_keyword_from_group_gadmin_HELP_START
 {
-"OperationName" : "Remove keyword from group",
-"Description": "Remove specified keyword from keywordgrou specified by idp",
+"OperationName": "Remove keyword from group",
+"Description": "Remove specified keyword from keywordgroup specified by ids",
 "AuthRequired": 1,
 "GroupRequired": 1,
 "GroupAdminRequired": 1,
@@ -7008,8 +7345,8 @@ sub del_keyword_group_runmode {
 
 =pod del_keyword_group_gadmin_HELP_START
 {
-"OperationName" : "Delete keyword group",
-"Description": "Delete keyword group if it does not have any memeber keyword.",
+"OperationName": "Delete keyword group",
+"Description": "Delete keyword group if it does not have any member keyword.",
 "AuthRequired": 1,
 "GroupRequired": 1,
 "GroupAdminRequired": 1,
@@ -7084,7 +7421,7 @@ sub update_group_runmode {
 
 =pod update_group_gadmin_HELP_START
 {
-"OperationName" : "Update group",
+"OperationName": "Update group",
 "Description": "Update existing system group.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -7191,6 +7528,63 @@ sub update_group_runmode {
 
   $data_for_postrun_href->{'Error'}     = 0;
   $data_for_postrun_href->{'Data'}      = {'Info'      => $info_msg_aref};
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub get_unique_number_runmode {
+
+=pod get_unique_number_HELP_START
+{
+"OperationName": "Get Unique Number",
+"Description": "Ask DAL to give a KDDart unique number that can be used in naming convention",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><StatInfo ServerElapsedTime='0.039' Unit='second'/><ReturnId ParaName='UniqueNumberId' Value='12'/><Info Message='Unique number is generated successfully.'/></DATA>",
+"SuccessMessageJSON": "{'ReturnId' : [{'ParaName' : 'UniqueNumberId','Value' : '13'}],'StatInfo' : [{'ServerElapsedTime' : '0.027','Unit' : 'second'}],'Info' : [{'Message' : 'Unique number is generated successfully.'}]}",
+"ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
+"ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.'}]}"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self = shift;
+
+  my $data_for_postrun_href = {};
+
+  my $dbh_write = connect_kdb_write();
+
+  my $sql = 'INSERT INTO uniquenumber SET ';
+  $sql   .= 'UniqueNumberId=0';
+
+  my $sth = $dbh_write->prepare($sql);
+  $sth->execute();
+
+  if ($dbh_write->err()) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sth->finish();
+
+  my $unique_number = $dbh_write->last_insert_id(undef, undef, 'uniquenumber', 'UniqueNumberId');
+
+  $dbh_write->disconnect();
+
+  my $info_msg_aref  = [{'Message' => "Unique number is generated successfully."}];
+  my $return_id_aref = [{'Value' => "$unique_number", 'ParaName' => 'UniqueNumberId'}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'      => $info_msg_aref,
+                                           'ReturnId'  => $return_id_aref,
+  };
   $data_for_postrun_href->{'ExtraData'} = 0;
 
   return $data_for_postrun_href;

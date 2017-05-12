@@ -48,7 +48,7 @@ our @EXPORT   = qw($DTD_PATH $RPOSTGRES_UP_FILE $GIS_BUFFER_DISTANCE
                    $CGI_INDEX_SCRIPT $LINK_PERM $READ_PERM $WRITE_PERM
                    $READ_LINK_PERM $READ_WRITE_PERM $ALL_PERM $VALID_CTYPE
                    $GIS_ENFORCE_GEO_WITHIN $TMP_DATA_PATH $SESSION_STORAGE_PATH
-                   $TIMEZONE $ACCEPT_HEADER_LOOKUP
+                   $TIMEZONE $ACCEPT_HEADER_LOOKUP $COOKIE_DOMAIN
                    $DAL_VERSION $DAL_ABOUT $DAL_COPYRIGHT $NB_RECORD_BULK_INSERT
                    $UNIT_POSITION_SPLITTER $M2M_RELATION
                    $GENO_SPEC_ONE2ONE $GENO_SPEC_ONE2MANY $GENO_SPEC_MANY2MANY
@@ -87,7 +87,10 @@ our @EXPORT   = qw($DTD_PATH $RPOSTGRES_UP_FILE $GIS_BUFFER_DISTANCE
                    filter_csv_aref parse_marker_sorting get_sorting_function check_static_field
                    get_next_value_for check_bool_href check_email_href check_value_href load_config read_cookies
                    record_existence_bulk get_solr_cores get_solr_fields get_solr_entities
+                   validate_trait_db_bulk
                  );
+
+our $COOKIE_DOMAIN            = {};
 
 our $DSN_KDB_READ             = {};
 
@@ -166,8 +169,8 @@ our $CONFIG_LOADED          = 0;
 
 our $VALID_CTYPE            = {'xml' => 1, 'json' => 1, 'geojson' => 1};
 
-our $DAL_VERSION            = '2.3.2';
-our $DAL_COPYRIGHT          = 'Copyright (c) 2015, Diversity Arrays Technology, All rights reserved.';
+our $DAL_VERSION            = '2.4.0';
+our $DAL_COPYRIGHT          = 'Copyright (c) 2017, Diversity Arrays Technology, All rights reserved.';
 our $DAL_ABOUT              = 'Data Access Layer';
 
 our $GENO_SPEC_ONE2ONE      = '1-TO-1';
@@ -678,14 +681,26 @@ sub arrayref2xml {
   for my $row (@{$data}) {
 
     my %attributes;
-    for my $fieldname (keys(%{$row})) {
 
-      my $value = $row->{$fieldname};
-      $value =~ tr/\000-\037/ /;
-      $attributes{$fieldname} = $value;
+    if (ref $row eq 'HASH') {
+
+      for my $fieldname (keys(%{$row})) {
+
+        my $value = $row->{$fieldname};
+        $value =~ tr/\000-\037/ /;
+        $attributes{$fieldname} = $value;
+      }
     }
+    else {
+
+      if (ref $row ne 'ARRAY') {
+
+        $attributes{'FieldValue'} = $row;
+      }
+    }
+
     $writer->emptyTag($tag_name, %attributes);
-  } 
+  }
   $writer->endTag($root_tag);
   $writer->end();
   return $xml;
@@ -732,16 +747,27 @@ sub make_xml_tag {
     my $nested = 0;
     my %attributes;
     my @nested_field;
-    for my $fieldname (keys(%{$row})) {
 
-      if (ref $row->{$fieldname} eq 'ARRAY') {
+    if (ref $row eq 'HASH') {
 
-        $nested = 1;
-        push(@nested_field, $fieldname);
+      for my $fieldname (keys(%{$row})) {
+
+        if (ref $row->{$fieldname} eq 'ARRAY') {
+
+          $nested = 1;
+          push(@nested_field, $fieldname);
+        }
+        else {
+
+          $attributes{$fieldname} = $row->{$fieldname};
+        }
       }
-      else {
+    }
+    else {
 
-        $attributes{$fieldname} = $row->{$fieldname};
+      if (ref $row ne 'ARRAY') {
+
+        $attributes{'FieldValue'} = $row;
       }
     }
 
@@ -3924,6 +3950,14 @@ sub validate_trait_db {
         }
       }
     }
+    elsif ( (uc($validation_rule_prefix) eq 'DATE_RANGE') ) {
+
+      if ($trait_value !~ /^\d{4}\-\d{2}\-\d{2}( \d{2}\:\d{2}\:\d{2})?$/) {
+
+        $err     = 1;
+        $err_msg = 'Invalid date';
+      }
+    }
     elsif ( (uc($validation_rule_prefix) eq 'RANGE')   ||
             (uc($validation_rule_prefix) eq 'LERANGE') ||
             (uc($validation_rule_prefix) eq 'RERANGE') ||
@@ -4074,6 +4108,11 @@ sub is_correct_validation_rule {
         $correct = 0;
         $msg     = 'Invalid choice expression containing [].';
       }
+    }
+    elsif ( (uc($validation_rule_prefix) eq 'DATE_RANGE') ) {
+
+      # No need to validate further
+      $correct = 1;
     }
     elsif ( (uc($validation_rule_prefix) eq 'RANGE')   ||
             (uc($validation_rule_prefix) eq 'LERANGE') ||
@@ -4697,6 +4736,15 @@ sub WKT2geoJSON {
 
     $geom->{type} = "Point";
     $wkt =~ s/POINT//og;
+    $wkt =~ s/\)/\]/og;
+    $wkt =~ s/\(/\[/og;
+    $wkt =~ s/(-?\d+(?:\.\d+)?)\s(-?\d+(?:\.\d+)?)/ $1, $2/og;
+    $geom->{'coordinates'} = eval($wkt);
+  }
+  elsif ($wkt =~ /^MULTIPOINT/) {
+
+    $geom->{type} = "MultiPoint";
+    $wkt =~ s/MULTIPOINT//og;
     $wkt =~ s/\)/\]/og;
     $wkt =~ s/\(/\[/og;
     $wkt =~ s/(-?\d+(?:\.\d+)?)\s(-?\d+(?:\.\d+)?)/ $1, $2/og;
@@ -5606,11 +5654,11 @@ sub recurse_read {
   my $current_level    = $_[4];
   my $stopping_level   = $_[5];
 
-  my $global_id_href = {};
+  my $global_frequency_id_href = {};
 
   if (defined $_[6]) {
 
-    $global_id_href = $_[6];
+    $global_frequency_id_href = $_[6];
   }
 
   my $err          = 0;
@@ -5637,9 +5685,21 @@ sub recurse_read {
 
     for my $read_data_rec (@{$read_data_aref}) {
 
+      my $id = $read_data_rec->{$seeking_id_field};
       $read_data_rec->{'Level'} = $current_level;
 
+      warn("ID: $id - LEVEL: $current_level");
+
       push(@{$data}, $read_data_rec);
+
+      if (! (defined $global_frequency_id_href->{$id}) ) {
+
+        $global_frequency_id_href->{$id} = 1;
+      }
+      else {
+
+        $global_frequency_id_href->{$id} += 1;
+      }
     }
 
     return ($err, $msg, $finish_level, $data);
@@ -5653,13 +5713,18 @@ sub recurse_read {
 
     $read_data_rec->{'Level'} = $current_level;
 
+    warn("ID: $id - LEVEL: $current_level");
+
     push(@{$data}, $read_data_rec);
+    $next_level_id_dict{$id} = 1;
 
-    if (! (defined $global_id_href->{$id}) ) {
+    if (! (defined $global_frequency_id_href->{$id}) ) {
 
-      $global_id_href->{$id} = 1;
+      $global_frequency_id_href->{$id} = 1;
+    }
+    else {
 
-      $next_level_id_dict{$id} = 1;
+      $global_frequency_id_href->{$id} += 1;
     }
   }
 
@@ -5667,7 +5732,7 @@ sub recurse_read {
 
     my ($nlevel_err, $nlevel_msg, $nlevel_fl, $nlevel_data) = recurse_read($dbh, $sql, [$next_level_id],
                                                                            $seeking_id_field, $current_level+1,
-                                                                           $stopping_level, $global_id_href);
+                                                                           $stopping_level, $global_frequency_id_href);
 
     if ($nlevel_err) {
 
@@ -7294,6 +7359,301 @@ sub get_solr_entities {
   }
 
   return (0, '', $entity_name2query_href);
+}
+
+sub validate_trait_db_bulk {
+
+  my $dbh                = $_[0];
+  my $trait_id2val_href  = $_[1];
+
+  my @trait_id_list = keys(%{$trait_id2val_href});
+
+  my $err          = 0;
+  my $err_msg      = '';
+  my $err_trait_id = -1;
+  my $err_val_idx  = -1;
+
+  if (scalar(@trait_id_list) == 0) {
+
+    $err = 1;
+    $err_msg = 'No trait';
+
+    return ($err, $err_msg, $err_trait_id, $err_val_idx);
+  }
+
+  my $sql = '';
+  $sql   .= 'SELECT TraitId, TraitValRule, TraitValRuleErrMsg ';
+  $sql   .= 'FROM trait ';
+  $sql   .= 'WHERE TraitId IN (' . join(',', @trait_id_list) . ')';
+
+  my ($r_trait_err, $r_trait_msg, $validation_data) = read_data($dbh, $sql, []);
+
+  if ($r_trait_err) {
+
+    $err = 1;
+    $err_msg = 'Read trait validation rule failed: ' . $r_trait_msg;
+
+    return ($err, $err_msg, $err_trait_id, $err_val_idx);
+  }
+
+  if (scalar(@{$validation_data}) != scalar(@trait_id_list)) {
+
+    $err = 1;
+    $err_msg = 'Some validation rules are missing';
+
+    return ($err, $err_msg, $err_trait_id, $err_val_idx);
+  }
+
+  my $trait_id2validation_href = {};
+
+  foreach my $valid_rec (@{$validation_data}) {
+
+    my $trait_id = $valid_rec->{'TraitId'};
+    my $val_rule = $valid_rec->{'TraitValRule'};
+    my $val_msg  = $valid_rec->{'TraitValRuleErrMsg'};
+
+    $trait_id2validation_href->{$trait_id} = [$val_rule, $val_msg];
+  }
+
+  # should it '[^<>=]=' => '=='
+  my $operator_lookup = { 'AND'    => '&&',
+                          'OR'     => '||',
+                          '[^<>]=' => '==',
+  };
+
+  foreach my $trait_id (@trait_id_list) {
+
+    my $validation_rule     = $trait_id2validation_href->{$trait_id}->[0];
+    my $validation_err_msg  = $trait_id2validation_href->{$trait_id}->[1];
+
+    my $value_aref      = $trait_id2val_href->{$trait_id};
+
+    for (my $i = 0; $i < scalar(@{$value_aref}); $i++) {
+
+      my $trait_value = $value_aref->[$i];
+
+      if ($validation_rule =~ /(\w+)\((.*)\)/) {
+
+        my $validation_rule_prefix = $1;
+        my $validation_rule_body   = $2;
+
+        if (uc($validation_rule_prefix) eq 'REGEX') {
+
+          if (!($trait_value =~ /$validation_rule_body/)) {
+
+            $err          = 1;
+            $err_msg      = $validation_err_msg;
+            $err_trait_id = $trait_id;
+            $err_val_idx  = $i;
+          }
+        }
+        elsif (uc($validation_rule_prefix) eq 'BOOLEX') {
+
+          if ($validation_rule_body !~ /x/) {
+
+            $err           = 1;
+            $err_msg       = 'No variable x in boolean expression.';
+            $err_trait_id  = $trait_id;
+            $err_val_idx   = $i;
+          }
+          elsif ( ($validation_rule_body =~ /\&/) ||
+                  ($validation_rule_body =~ /\|/) ) {
+
+            $err           = 1;
+            $err_msg       = 'Contain forbidden characters';
+            $err_trait_id  = $trait_id;
+            $err_val_idx   = $i;
+          }
+          elsif ( $validation_rule_body =~ /\d+\.?\d*\s*,/) {
+
+            $err           = 1;
+            $err_msg       = 'Contain a comma - invalid boolean expression';
+            $err_trait_id  = $trait_id;
+            $err_val_idx   = $i;
+          }
+          else {
+
+            if ($trait_value =~ /^[-+]?\d+\.?\d*$/) {
+
+              $validation_rule_body =~ s/x/ $trait_value /ig;
+            }
+            else {
+
+              $validation_rule_body =~ s/x/ '$trait_value' /ig;
+            }
+
+            for my $operator (keys(%{$operator_lookup})) {
+
+              my $perl_operator = $operator_lookup->{$operator};
+              $validation_rule_body =~ s/$operator/$perl_operator/ig;
+            }
+
+            my $test_condition;
+
+            eval(q{$test_condition = } . qq{($validation_rule_body) ? 1 : 0;});
+
+            if($@) {
+
+              $err           = 1;
+              $err_msg       = "Invalid boolean trait value validation expression ($validation_rule_body).";
+              $err_trait_id  = $trait_id;
+              $err_val_idx   = $i;
+            }
+            else {
+
+              if ($test_condition == 0) {
+
+                $err          = 1;
+                $err_msg      = $validation_err_msg;
+                $err_trait_id = $trait_id;
+                $err_val_idx  = $i;
+              }
+              else {
+
+                $err          = 0;
+                $err_msg      = '';
+                $err_trait_id = -1;
+                $err_val_idx  = -1;
+              }
+            }
+          }
+        }
+        elsif (uc($validation_rule_prefix) eq 'CHOICE') {
+
+          if ($validation_rule_body =~ /^\[.*\]$/) {
+
+            $err          = 1;
+            $err_msg      = 'Invalid choice expression containing [].';
+            $err_trait_id = $trait_id;
+            $err_val_idx  = $i;
+          }
+          else {
+
+            my @choice_list = split(/\|/, $validation_rule_body);
+
+            $err          = 1;
+            $err_msg      = $validation_err_msg;
+            $err_trait_id = $trait_id;
+            $err_val_idx  = $i;
+
+            foreach my $choice (@choice_list) {
+
+              if (lc("$choice") eq lc("$trait_value")) {
+
+                $err          = 0;
+                $err_msg      = '';
+                $err_trait_id = -1;
+                $err_val_idx  = -1;
+                last;
+              }
+            }
+          }
+        }
+        elsif ( (uc($validation_rule_prefix) eq 'DATE_RANGE') ) {
+
+          if ($trait_value !~ /^\d{4}\-\d{2}\-\d{2}( \d{2}\:\d{2}\:\d{2})?$/) {
+
+            $err     = 1;
+            $err_msg = 'Invalid date';
+          }
+        }
+        elsif ( (uc($validation_rule_prefix) eq 'RANGE')   ||
+                (uc($validation_rule_prefix) eq 'LERANGE') ||
+                (uc($validation_rule_prefix) eq 'RERANGE') ||
+                (uc($validation_rule_prefix) eq 'BERANGE') ) {
+
+          if ($validation_rule_body !~ /^[-+]?\d+\.?\d*\s*\.\.\s*[-+]?\d+\.?\d*$/) {
+
+            $err          = 1;
+            $err_msg      = 'Invalid range expression';
+            $err_trait_id = $trait_id;
+            $err_val_idx  = $i;
+          }
+          else {
+
+            $err          = 1;
+            $err_msg      = $validation_err_msg;
+            $err_trait_id = $trait_id;
+            $err_val_idx  = $i;
+
+            if ($trait_value =~ /^[-+]?\d+\.?\d*$/) {
+
+              my ($left_val, $right_val) = split(/\s*\.\.\s*/, $validation_rule_body);
+
+              if (uc($validation_rule_prefix) eq 'RANGE') {
+
+                if ($trait_value >= $left_val && $trait_value <= $right_val) {
+
+                  $err          = 0;
+                  $err_msg      = '';
+                  $err_trait_id = -1;
+                  $err_val_idx  = -1;
+                }
+              }
+              elsif (uc($validation_rule_prefix) eq 'LERANGE') {
+
+                if ($trait_value > $left_val && $trait_value <= $right_val) {
+
+                  $err          = 0;
+                  $err_msg      = '';
+                  $err_trait_id = -1;
+                  $err_val_idx  = -1;
+                }
+              }
+              elsif (uc($validation_rule_prefix) eq 'RERANGE') {
+
+                if ($trait_value >= $left_val && $trait_value < $right_val) {
+
+                  $err          = 0;
+                  $err_msg      = '';
+                  $err_trait_id = -1;
+                  $err_val_idx  = -1;
+                }
+              }
+              elsif (uc($validation_rule_prefix) eq 'BERANGE') {
+
+                if ($trait_value > $left_val && $trait_value < $right_val) {
+
+                  $err          = 0;
+                  $err_msg      = '';
+                  $err_trait_id = -1;
+                  $err_val_idx  = -1;
+                }
+              }
+            }
+            else {
+
+              $err          = 1;
+              $err_msg      = "Trait value ($trait_value) not a valid number";
+              $err_trait_id = $trait_id;
+              $err_val_idx  = $i;
+            }
+          }
+        }
+        else {
+
+          $err          = 1;
+          $err_msg      = 'Unknown trait value validation rule.';
+          $err_trait_id = $trait_id;
+          $err_val_idx  = $i;
+        }
+      }
+      else {
+
+        $err          = 1;
+        $err_msg      = "Unknown validation rule.";
+        $err_trait_id = $trait_id;
+        $err_val_idx  = $i;
+      }
+
+      if ($err) {
+
+        return ($err, $err_msg, $err_trait_id, $err_val_idx);
+      }
+    }
+  }
+
+  return ($err, $err_msg, $err_trait_id, $err_val_idx);
 }
 
 1;

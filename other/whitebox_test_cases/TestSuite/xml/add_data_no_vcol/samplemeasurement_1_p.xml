@@ -2,18 +2,18 @@
   <ROW>
     <InstanceNumber Value="5" />
     <MeasurementDateTime Value="2011-01-15 14:28:37" />
-    <SampleTypeId Value="343" />
-    <TraitId Value="30" />
+    <SampleTypeId Value="25" />
+    <TraitId Value="1" />
     <TraitValue Value="11" />
-    <TrialUnitId Value="33" />
+    <TrialUnitId Value="7" />
   </ROW>
   <ROW>
     <InstanceNumber Value="6" />
     <MeasurementDateTime Value="2011-01-15 14:28:37" />
-    <SampleTypeId Value="343" />
-    <TraitId Value="30" />
+    <SampleTypeId Value="25" />
+    <TraitId Value="1" />
     <TraitValue Value="40" />
-    <TrialUnitId Value="33" />
-    <TrialUnitSpecimenId Value="143" />
+    <TrialUnitId Value="7" />
+    <TrialUnitSpecimenId Value="30" />
   </ROW>
 </DATA>

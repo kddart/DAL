@@ -24,6 +24,6 @@
   <Parent CaseFile="xml/add_data_no_vcol/case_00117_add_specimen4.xml" Order="7" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00119_add_treatment.xml" Force="1" Order="9" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00485_add_trial_dimension.xml" Force="1" Order="10" />
-  <ReturnId ParaName="TrialUnitId" Value="36" />
-  <RunInfo Success="1" Time="1474353385" />
+  <ReturnId ParaName="TrialUnitId" Value="9" />
+  
 </TestCase>

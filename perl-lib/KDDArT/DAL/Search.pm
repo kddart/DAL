@@ -74,9 +74,13 @@ sub setup {
 
   $self->{logger} = $logger;
 
+  my $domain_name = $COOKIE_DOMAIN->{$ENV{DOCUMENT_ROOT}};
+  $self->logger->debug("COOKIE DOMAIN: $domain_name");
+
   $self->authen->config(LOGIN_URL => '');
   $self->session_config(
-          CGI_SESSION_OPTIONS => [ "driver:File", $self->query, {Directory=>$SESSION_STORAGE_PATH} ],
+          CGI_SESSION_OPTIONS => [ "driver:File", $self->query, {Directory => $SESSION_STORAGE_PATH} ],
+          SEND_COOKIE         => 0,
       );
 }
 
@@ -84,7 +88,7 @@ sub search_solr_runmode {
 
 =pod search_solr_HELP_START
 {
-"OperationName" : "Search KDDart databases",
+"OperationName": "Search KDDart databases",
 "Description": "An interface to search KDDart databases via Solr enterprise search engine",
 "AuthRequired": 1,
 "GroupRequired": 0,
@@ -125,6 +129,13 @@ sub search_solr_runmode {
 
   my $solr_query_txt   = $query->param('Query');
   my $sorting          = $query->param('Sorting');
+  my $field_list       = '';
+
+  if (defined $query->param('FieldList')) {
+
+    $field_list = $query->param('FieldList');
+    $field_list .= ' entity_name';
+  }
 
   if (length($solr_query_txt) == 0) {
 
@@ -168,6 +179,7 @@ sub search_solr_runmode {
   my $solr_start = ($page - 1) * $nb_per_page;
 
   my $results = $solr->select(q => $solr_query_txt,
+                              fl => $field_list,
                               sort => $sorting,
                               rows => $nb_per_page,
                               start => $solr_start
@@ -264,8 +276,8 @@ sub list_solr_core_runmode {
 
 =pod list_solr_core_HELP_START
 {
-"OperationName" : "List available cores in Solr",
-"Description": "An interface to list all avaiblable Solr cores that DAL can use for the search",
+"OperationName": "List available cores in Solr",
+"Description": "An interface to list all available Solr cores that DAL can use for the search",
 "AuthRequired": 1,
 "GroupRequired": 0,
 "GroupAdminRequired": 0,
@@ -316,8 +328,8 @@ sub list_solr_entity_runmode {
 
 =pod list_solr_entity_HELP_START
 {
-"OperationName" : "List available entities in a Solr core",
-"Description": "An interface to list all avaiblable entities in the specified Solr core",
+"OperationName": "List available entities in a Solr core",
+"Description": "An interface to list all available entities in the specified Solr core",
 "AuthRequired": 1,
 "GroupRequired": 0,
 "GroupAdminRequired": 0,

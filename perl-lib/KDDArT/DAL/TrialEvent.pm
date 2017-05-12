@@ -75,8 +75,14 @@ sub setup {
   $logger->level($DEBUG);
   $self->{logger} = $logger;
 
-  $self->authen->config( LOGIN_URL => '' );
-  $self->session_config( CGI_SESSION_OPTIONS => [ "driver:File", $self->query, { Directory => $SESSION_STORAGE_PATH } ], );
+  my $domain_name = $COOKIE_DOMAIN->{$ENV{DOCUMENT_ROOT}};
+  $self->logger->debug("COOKIE DOMAIN: $domain_name");
+
+  $self->authen->config(LOGIN_URL => '');
+  $self->session_config(
+          CGI_SESSION_OPTIONS => [ "driver:File", $self->query, {Directory => $SESSION_STORAGE_PATH} ],
+          SEND_COOKIE         => 0,
+      );
 
   $self->run_modes(
     'add_trialevent'           => 'add_trialevent_runmode',
@@ -184,7 +190,7 @@ sub list_trialevent_runmode {
 
 =pod list_trialevent_HELP_START
 {
-"OperationName" : "List trial events for trial",
+"OperationName": "List trial events for trial",
 "Description": "List trial events for a trial specified by trial id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -308,7 +314,7 @@ sub get_trialevent_runmode {
 
 =pod get_trialevent_HELP_START
 {
-"OperationName" : "Get trial event",
+"OperationName": "Get trial event",
 "Description": "Get detailed information for a trial event specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -416,7 +422,7 @@ sub del_trialevent_runmode {
 
 =pod del_trialevent_gadmin_HELP_START
 {
-"OperationName" : "Delete trial event",
+"OperationName": "Delete trial event",
 "Description": "Delete trial event specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -501,7 +507,7 @@ sub add_trialevent_runmode {
 
 =pod add_trialevent_HELP_START
 {
-"OperationName" : "Add trial event",
+"OperationName": "Add trial event",
 "Description": "Define a new trial event for a trial specified by trial id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -715,7 +721,7 @@ sub update_trialevent_runmode {
 
 =pod update_trialevent_HELP_START
 {
-"OperationName" : "Update trial event",
+"OperationName": "Update trial event",
 "Description": "Update trial event specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,

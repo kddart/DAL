@@ -89,18 +89,22 @@ sub setup {
         );
 
     my $layout = Log::Log4perl::Layout::PatternLayout->new("[%d] [%H] [%X{client_ip}] [%p] [%F{1}:%L] [%M] [%m]%n");
-    
+
     $app->layout($layout);
-    
+
     $logger->add_appender($app);
   }
   $logger->level($DEBUG);
 
   $self->{logger} = $logger;
 
+  my $domain_name = $COOKIE_DOMAIN->{$ENV{DOCUMENT_ROOT}};
+  $self->logger->debug("COOKIE DOMAIN: $domain_name");
+
   $self->authen->config(LOGIN_URL => '');
   $self->session_config(
-          CGI_SESSION_OPTIONS => [ "driver:File", $self->query, {Directory=>$SESSION_STORAGE_PATH} ],
+          CGI_SESSION_OPTIONS => [ "driver:File", $self->query, {Directory => $SESSION_STORAGE_PATH} ],
+          SEND_COOKIE         => 0,
       );
 }
 
@@ -108,7 +112,7 @@ sub list_factor_table_runmode {
 
 =pod list_factor_table_HELP_START
 {
-"OperationName" : "List factor columns",
+"OperationName": "List factor columns",
 "Description": "Return the list of factor (virtual) column types defined in the system. Each listed entity can be extended, so additional information not present in the base data model can be stored.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -330,7 +334,7 @@ sub list_field_runmode {
 
 =pod list_field_HELP_START
 {
-"OperationName" : "List fields for a table",
+"OperationName": "List fields for a table",
 "Description": "Return detailed list of fields for a table with data definitions and requirements.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -672,7 +676,7 @@ sub update_vcolumn_runmode {
 
 =pod update_vcolumn_gadmin_HELP_START
 {
-"OperationName" : "Update virtual column",
+"OperationName": "Update virtual column",
 "Description": "Update definition of virtual column specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -723,14 +727,49 @@ sub update_vcolumn_runmode {
 
   my $vcol_name = $query->param('FactorName');
 
-  my $vcol_caption = read_cell_value($dbh_write, 'factor', 'FactorCaption', 'FactorId', $vcol_id);
+  my $read_vcol_sql   =  'SELECT FactorCaption, FactorDescription, FactorUnit, FactorValidRule, FactorValidRuleErrMsg ';
+     $read_vcol_sql  .=  'FROM factor WHERE FactorId=? ';
+
+  my ($r_df_val_err, $r_df_val_msg, $vcol_df_val_data) = read_data($dbh_write, $read_vcol_sql, [$vcol_id]);
+
+  if ($r_df_val_err) {
+
+    $self->logger->debug("Retrieve vcolumn default values for optional fields failed: $r_df_val_msg");
+    $data_for_postrun_href->{'Error'}  = 1;
+    $data_for_postrun_href->{'Data'}   = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $vcol_caption              =  undef;
+  my $vcol_desc                 =  undef;
+  my $vcol_unit                 =  undef;
+  my $vcol_validation_rule      =  undef;
+  my $vcol_validation_err_msg   =  undef;
+
+  my $nb_df_val_rec    =  scalar(@{$vcol_df_val_data});
+
+  if ($nb_df_val_rec != 1)  {
+
+     $self->logger->debug("Retrieve vcol default values - number of records unacceptable: $nb_df_val_rec");
+     $data_for_postrun_href->{'Error'} = 1;
+     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+     return $data_for_postrun_href;
+  }
+
+  $vcol_caption                  =  $vcol_df_val_data->[0]->{'FactorCaption'};
+  $vcol_desc                     =  $vcol_df_val_data->[0]->{'FactorDescription'};
+  $vcol_unit                     =  $vcol_df_val_data->[0]->{'FactorUnit'};
+  $vcol_validation_rule          =  $vcol_df_val_data->[0]->{'FactorValidRule'};
+  $vcol_validation_err_msg       =  $vcol_df_val_data->[0]->{'FactorValidRuleErrMsg'};
+
 
   if (defined $query->param('FactorCaption')) {
 
     $vcol_caption = $query->param('FactorCaption');
   }
 
-  my $vcol_desc = read_cell_value($dbh_write, 'factor', 'FactorDescription', 'FactorId', $vcol_id);
 
   if (defined $query->param('FactorDescription')) {
 
@@ -741,7 +780,6 @@ sub update_vcolumn_runmode {
   my $vcol_nullable     = $query->param('CanFactorHaveNull');
   my $vcol_maxlen       = $query->param('FactorValueMaxLength');
 
-  my $vcol_unit = read_cell_value($dbh_write, 'factor', 'FactorUnit', 'FactorId', $vcol_id);
 
   if (defined $query->param('FactorUnit')) {
 
@@ -753,7 +791,6 @@ sub update_vcolumn_runmode {
 
   my $vcol_public       = $query->param('Public');
 
-  my $vcol_validation_rule = read_cell_value($dbh_write, 'factor', 'FactorValidRule', 'FactorId', $vcol_id);
 
   if (defined $query->param('FactorValidRule')) {
     
@@ -763,7 +800,6 @@ sub update_vcolumn_runmode {
     }
   }
 
-  my $vcol_validation_err_msg = read_cell_value($dbh_write, 'factor', 'FactorValidRuleErrMsg', 'FactorId', $vcol_id);
 
   if (defined $query->param('FactorValidRuleErrMsg')) {
 
@@ -1036,7 +1072,7 @@ sub get_vcolumn_runmode {
 
 =pod get_vcolumn_HELP_START
 {
-"OperationName" : "Get virtual column",
+"OperationName": "Get virtual column",
 "Description": "Return detailed information about a virtual column definition specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -1119,7 +1155,7 @@ sub add_vcolumn_runmode {
 
 =pod add_vcolumn_gadmin_HELP_START
 {
-"OperationName" : "Add virtual column",
+"OperationName": "Add virtual column",
 "Description": "Add a new virtual column to one of the factor tables.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -1338,8 +1374,8 @@ sub get_dtd_runmode {
 
 =pod get_dtd_HELP_START
 {
-"OperationName" : "Get DTD",
-"Description": "Get Document Type Definition for the table. This interface returns the content of the DTD file of the requrested table if the DTD is present.",
+"OperationName": "Get DTD",
+"Description": "Get Document Type Definition for the table. This interface returns the content of the DTD file of the requested table if the DTD is present.",
 "AuthRequired": 1,
 "GroupRequired": 1,
 "GroupAdminRequired": 0,
@@ -1388,7 +1424,7 @@ sub add_general_type_runmode {
 
 =pod add_general_type_gadmin_HELP_START
 {
-"OperationName" : "Add type",
+"OperationName": "Add type",
 "Description": "Add a new entry into type dictionary for a class.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -1480,26 +1516,27 @@ sub add_general_type_runmode {
                        'trialevent'           => 1,
                        'sample'               => 1,
                        'specimengroup'        => 1,
+                       'specimengroupstatus'  => 1,
                        'state'                => 1,
                        'parent'               => 1,
                        'itemparent'           => 1,
-                       'plate'                => 1,
-                       'tissue'               => 1,
+                       'genotypespecimen'     => 1,
                        'markerdataset'        => 1,
                        'workflow'             => 1,
                        'project'              => 1,
                        'itemlog'              => 1,
+                       'plate'                => 1,
                        'genmap'               => 1,
                        'multimedia'           => 1,
+                       'tissue'               => 1,
                        'genotypealias'        => 1,
                        'genparent'            => 1,
                        'genotypealiasstatus'  => 1,
-                       'genotypespecimen'     => 1,
                        'traitgroup'           => 1,
                        'unittype'             => 1,
                        'trialgroup'           => 1,
                        'breedingmethod'       => 1,
-                       'specimengroupstatus'  => 1,
+                       'traitdatatype'        => 1,
   };
 
   if (!($class_lookup->{$class})) {
@@ -1677,7 +1714,9 @@ sub list_general_type {
                                  'unittype'            => [{'TableName' => 'itemunit', 'FieldName' => 'UnitTypeId'}],
                                  'breedingmethod'      => [{'TableName' => 'breedingmethod', 'FieldName' => 'BreedingMethodTypeId'}],
                                  'trialgroup'          => [{'TableName' => 'trialgroup', 'FieldName' => 'TrialGroupType'}],
-                                 'specimengroupstatus' => [{'TableName' => 'specimengroup', 'FieldName' => 'SpecimenGroupStatus'}]
+                                 'specimengroupstatus' => [{'TableName' => 'specimengroup', 'FieldName' => 'SpecimenGroupStatus'}],
+                                 'traitgroup'          => [{'TableName' => 'trait', 'FieldName' => 'TraitGroupTypeId'}],
+                                 'traitdatatype'       => [{'TableName' => 'trait', 'FieldName' => 'TraitDataType'}]
   };
 
   my $marker_class_lookup = {'markerdataset'     => 1,
@@ -1781,7 +1820,7 @@ sub list_general_type_runmode {
 
 =pod list_general_type_HELP_START
 {
-"OperationName" : "List types",
+"OperationName": "List types",
 "Description": "List dictionary of types for a class and status.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -1792,7 +1831,8 @@ sub list_general_type_runmode {
 "SuccessMessageJSON": "{'VCol' : [], 'RecordMeta' : [{'TagName' : 'GeneralType'}], 'GeneralType' : [{'IsTypeActive' : '0', 'TypeId' : '225', 'TypeName' : 'Farm', 'Class' : 'site', 'update' : 'update/type/site/225', 'TypeNote' : ''},{'IsTypeActive' : '1', 'TypeId' : '224', 'TypeName' : 'Research Station', 'Class' : 'site', 'update' : 'update/type/site/224', 'TypeNote' : ''}]}",
 "ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Class (contact) not supported.' /></DATA>"}],
 "ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Class (contact) not supported.'}]}"}],
-"URLParameter": [{"ParameterName": "class", "Description": "Value from a predefined list of values for classification of the type. This list of values is site, item, container, deviceregister, trial, trialevent, sample, specimengroup, state, parent, itemparent, genotypespecimen, dataset, workflow, project, itemlog, plate, genmap, multimedia, tissue, genotypealias, genparent, genotypealiasstatus, traitgroup, unittype and trialgroup."}, {"ParameterName": "status", "Description": "Status filtering value which can be 'active', 'inactive' or 'all'."}],
+"URLParameter": [{"ParameterName": "class", "Description": "Value from a predefined list of values for classification of the type. This list of values is site, item, container, deviceregister, trial, trialevent, sample, specimengroup, state, parent, itemparent, genotypespecimen, dataset, workflow, project, itemlog, plate, genmap, multimedia, tissue, genotypealias, genparent, genotypealiasstatus, traitgroup, unittype, trialgroup, traitgroup and traitdatatype."}, {"ParameterName": "status", "Description": "Status filtering value which can be 'active', 'inactive' or 'all'."}],
+"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database field name, a filtering operator and the filtering value."}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
@@ -1830,27 +1870,28 @@ sub list_general_type_runmode {
                        'trialevent'           => 1,
                        'sample'               => 1,
                        'specimengroup'        => 1,
+                       'specimengroupstatus'  => 1,
                        'state'                => 1,
                        'parent'               => 1,
                        'itemparent'           => 1,
-                       'plate'                => 1,
-                       'tissue'               => 1,
+                       'genotypespecimen'     => 1,
                        'markerdataset'        => 1,
                        'workflow'             => 1,
                        'project'              => 1,
                        'itemlog'              => 1,
+                       'plate'                => 1,
                        'genmap'               => 1,
                        'multimedia'           => 1,
+                       'tissue'               => 1,
                        'genotypealias'        => 1,
                        'genparent'            => 1,
                        'genotypealiasstatus'  => 1,
-                       'genotypespecimen'     => 1,
                        'traitgroup'           => 1,
                        'unittype'             => 1,
                        'trialgroup'           => 1,
                        'breedingmethod'       => 1,
-                       'specimengroupstatus'  => 1,
-                       'any'                  => 1,
+                       'traitdatatype'        => 1,
+                       'any'                  => 1
   };
 
   if (!($class_lookup->{$class})) {
@@ -1931,7 +1972,7 @@ sub get_general_type_runmode {
 
 =pod get_general_type_HELP_START
 {
-"OperationName" : "Get type",
+"OperationName": "Get type",
 "Description": "Get detailed type definition for a class and specified id in the class.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -2004,7 +2045,7 @@ sub update_general_type_runmode {
 
 =pod update_general_type_gadmin_HELP_START
 {
-"OperationName" : "Update type",
+"OperationName": "Update type",
 "Description": "Update type definition for a class and specified id within the class.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -2057,11 +2098,41 @@ sub update_general_type_runmode {
 
   my $dbh_k_read = connect_kdb_read();
 
-  my $type_note        = read_cell_value($dbh_k_read, 'generaltype', 'TypeNote', 'TypeId', $type_id);
-  my $is_active        = read_cell_value($dbh_k_read, 'generaltype', 'IsTypeActive', 'TypeId', $type_id);
+  my $read_general_type_sql    =   'SELECT TypeNote, IsTypeActive, IsFixed, TypeName ';
+     $read_general_type_sql   .=   'FROM generaltype WHERE TypeId=? ';
 
-  my $db_is_fixed      = read_cell_value($dbh_k_read, 'generaltype', 'IsFixed', 'TypeId', $type_id);
-  my $db_type_name     = read_cell_value($dbh_k_read, 'generaltype', 'TypeName', 'TypeId', $type_id);
+  my ($r_df_val_err, $r_df_val_msg, $general_df_val_data) = read_data($dbh_k_read, $read_general_type_sql, [$type_id]);
+
+  if ($r_df_val_err) {
+
+    $self->logger->debug("Retrieve general type default values for optional fields failed: $r_df_val_msg");
+    $data_for_postrun_href->{'Error'}  = 1;
+    $data_for_postrun_href->{'Data'}   = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $type_note          = undef;
+  my $is_active          = undef;
+  my $db_is_fixed        = undef;
+  my $db_type_name       = undef;
+
+  my $nb_df_val_rec    =  scalar(@{$general_df_val_data});
+
+  if ($nb_df_val_rec != 1)  {
+
+     $self->logger->debug("Retrieve general type default values - number of records unacceptable: $nb_df_val_rec");
+     $data_for_postrun_href->{'Error'} = 1;
+     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+     return $data_for_postrun_href;
+  }
+
+  $type_note          =  $general_df_val_data->[0]->{'TypeNote'};
+  $is_active          =  $general_df_val_data->[0]->{'IsTypeActive'};
+  $db_is_fixed        =  $general_df_val_data->[0]->{'IsFixed'};
+  $db_type_name       =  $general_df_val_data->[0]->{'TypeName'};
+
 
   if (defined $query->param('IsTypeActive')) {
 
@@ -2289,7 +2360,7 @@ sub del_general_type_runmode {
 
 =pod del_general_type_gadmin_HELP_START
 {
-"OperationName" : "Delete type",
+"OperationName": "Delete type",
 "Description": "Delete type definition for a class and specified id within the class. Type can be deleted only if not attached to any lower level related record.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -2433,7 +2504,7 @@ sub count_groupby_runmode {
 
 =pod count_groupby_HELP_START
 {
-"OperationName" : "Count records with GROUP BY",
+"OperationName": "Count records with GROUP BY",
 "Description": "Count records in the specified table based on the submitted group by fields. It supports pagination, filtering and sorting",
 "AuthRequired": 1,
 "GroupRequired": 1,

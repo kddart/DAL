@@ -229,9 +229,13 @@ sub setup {
 
   $self->{logger} = $logger;
 
+  my $domain_name = $COOKIE_DOMAIN->{$ENV{DOCUMENT_ROOT}};
+  $self->logger->debug("COOKIE DOMAIN: $domain_name");
+
   $self->authen->config(LOGIN_URL => '');
   $self->session_config(
-          CGI_SESSION_OPTIONS => [ "driver:File", $self->query, {Directory=>$SESSION_STORAGE_PATH} ],
+          CGI_SESSION_OPTIONS => [ "driver:File", $self->query, {Directory => $SESSION_STORAGE_PATH} ],
+          SEND_COOKIE         => 0,
       );
 }
 
@@ -239,7 +243,7 @@ sub add_site_runmode {
 
 =pod add_site_gadmin_HELP_START
 {
-"OperationName" : "Add site",
+"OperationName": "Add site",
 "Description": "Add a new site (breeding station, farm) to the system.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -544,7 +548,7 @@ sub add_designtype_runmode {
 
 =pod add_designtype_gadmin_HELP_START
 {
-"OperationName" : "Add design type",
+"OperationName": "Add design type",
 "Description": "Add a new trial design type to the system.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -671,7 +675,7 @@ sub add_trial_runmode {
 
 =pod add_trial_HELP_START
 {
-"OperationName" : "Add trial",
+"OperationName": "Add trial",
 "Description": "Add a new trial (e.g. field or nursery experiment) into the system.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -1188,7 +1192,7 @@ sub add_trial_unit_runmode {
 
 =pod add_trial_unit_HELP_START
 {
-"OperationName" : "Add trial unit to the trial",
+"OperationName": "Add trial unit to the trial",
 "Description": "Add a new trial unit to the trial specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -1719,7 +1723,7 @@ sub add_trial_unit_bulk_runmode {
 
 =pod add_trial_unit_bulk_HELP_START
 {
-"OperationName" : "Add trial units to the trial",
+"OperationName": "Add trial units to the trial",
 "Description": "Add trial units in bulk to the trial specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -2742,7 +2746,7 @@ sub get_site_full_runmode {
 
 =pod get_site_HELP_START
 {
-"OperationName" : "Get site",
+"OperationName": "Get site",
 "Description": "Get detailed information about the site specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -2777,7 +2781,7 @@ sub get_site_full_runmode {
 
   my $field_list = ['site.*', 'generaltype.TypeName AS SiteTypeName', 'VCol*', 'LCol*',
                     "concat(contact.ContactFirstName, concat(' ', contact.ContactLastName)) As CurrentSiteManagerName"];
-  
+
   my $other_join = ' LEFT JOIN generaltype ON site.SiteTypeId = generaltype.TypeId ';
   $other_join   .= ' LEFT JOIN contact ON site.CurrentSiteManagerId = contact.ContactId ';
 
@@ -2827,7 +2831,7 @@ sub update_site_runmode {
 
 =pod update_site_gadmin_HELP_START
 {
-"OperationName" : "Update site",
+"OperationName": "Update site",
 "Description": "Update information about the site using specified id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -2875,7 +2879,7 @@ sub update_site_runmode {
   my $dbh_k_read = connect_kdb_read();
 
   my $site_exist = record_existence($dbh_k_read, 'site', 'SiteId', $site_id);
-  
+
   if (!$site_exist) {
 
     my $err_msg = "Site ($site_id) not found.";
@@ -2890,7 +2894,37 @@ sub update_site_runmode {
   my $site_acronym       = $query->param('SiteAcronym');
   my $cur_manager_id     = $query->param('CurrentSiteManagerId');
 
-  my $site_sdate         = read_cell_value($dbh_k_read, 'site', 'SiteStartDate', 'SiteId', $site_id);
+  my $read_site_sql      =  'SELECT SiteStartDate, SiteEndDate ';
+     $read_site_sql     .=  'FROM site WHERE SiteId=? ';
+
+  my ($r_df_val_err, $r_df_val_msg, $site_df_val_data) = read_data($dbh_k_read, $read_site_sql, [$site_id]);
+
+  if ($r_df_val_err) {
+
+    $self->logger->debug("Retrieve site default values for optional fields failed: $r_df_val_msg");
+    $data_for_postrun_href->{'Error'}  = 1;
+    $data_for_postrun_href->{'Data'}   = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $site_sdate    =  undef;
+  my $site_edate    =  undef;
+
+  my $nb_df_val_rec    =  scalar(@{$site_df_val_data});
+
+  if ($nb_df_val_rec != 1)  {
+
+     $self->logger->debug("Retrieve site default values - number of records unacceptable: $nb_df_val_rec");
+     $data_for_postrun_href->{'Error'} = 1;
+     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+     return $data_for_postrun_href;
+  }
+
+  $site_sdate    =   $site_df_val_data->[0]->{'SiteStartDate'};
+  $site_edate    =   $site_df_val_data->[0]->{'SiteEndDate'};
+
 
   if (defined $query->param('SiteStartDate')) {
 
@@ -2920,7 +2954,6 @@ sub update_site_runmode {
     $site_sdate = undef;
   }
 
-  my $site_edate         = read_cell_value($dbh_k_read, 'site', 'SiteEndDate', 'SiteId', $site_id);
 
   if (defined $query->param('SiteEndDate')) {
 
@@ -3064,9 +3097,9 @@ sub update_site_runmode {
 
           my $factor_sth = $dbh_k_write->prepare($sql);
           $factor_sth->execute($factor_value, $site_id, $vcol_id);
-      
+
           if ($dbh_k_write->err()) {
-        
+
             $data_for_postrun_href->{'Error'} = 1;
             $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
@@ -3082,9 +3115,9 @@ sub update_site_runmode {
           $sql .= 'FactorValue=?';
           my $factor_sth = $dbh_k_write->prepare($sql);
           $factor_sth->execute($site_id, $vcol_id, $factor_value);
-          
+
           if ($dbh_k_write->err()) {
-        
+
             $data_for_postrun_href->{'Error'} = 1;
             $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
@@ -3102,9 +3135,9 @@ sub update_site_runmode {
 
           my $factor_sth = $dbh_k_write->prepare($sql);
           $factor_sth->execute($site_id, $vcol_id);
-      
+
           if ($dbh_k_write->err()) {
-        
+
             $data_for_postrun_href->{'Error'} = 1;
             $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
@@ -3131,7 +3164,7 @@ sub update_site_geography_runmode {
 
 =pod update_site_geography_gadmin_HELP_START
 {
-"OperationName" : "Update site location",
+"OperationName": "Update site location",
 "Description": "Update site's geographical location.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -3356,7 +3389,7 @@ sub list_designtype_runmode {
 
 =pod list_designtype_HELP_START
 {
-"OperationName" : "List design types",
+"OperationName": "List design types",
 "Description": "List all available trial design types in the system. This listing does not require pagination information.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -3403,7 +3436,7 @@ sub get_designtype_runmode {
 
 =pod get_designtype_HELP_START
 {
-"OperationName" : "Get design type",
+"OperationName": "Get design type",
 "Description": "Get detailed information about trial design type specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -3466,7 +3499,7 @@ sub update_designtype_runmode {
 
 =pod update_designtype_gadmin_HELP_START
 {
-"OperationName" : "Update design type",
+"OperationName": "Update design type",
 "Description": "Update definition of the trial design type.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -3546,37 +3579,64 @@ sub update_designtype_runmode {
 
     return $data_for_postrun_href;
   }
+ 
+  my $read_sql     =  'SELECT DesignSoftware, DesignTemplateFile, DesignGenotypeFormat, DesignFactorAliasPrefix ';
+     $read_sql    .=  'FROM designtype ';
+     $read_sql    .=  'WHERE DesignTypeId=? ';
 
-  my $design_software  = read_cell_value($dbh, 'designtype', 'DesignSoftware', 'DesignTypeId', $designtype_id);
+  my ($r_df_val_err, $r_df_val_msg, $design_df_val_data) = read_data($dbh, $read_sql, [$designtype_id]);
+
+  if ($r_df_val_err) {
+
+    $self->logger->debug("Retrieve designtype default values for optional fields failed: $r_df_val_msg");
+    $data_for_postrun_href->{'Error'}  = 1;
+    $data_for_postrun_href->{'Data'}   = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $design_software            =  undef;
+  my $design_template_file       =  undef;
+  my $design_geno_format         =  undef;
+  my $design_factor_alias_prefix =  undef;
+
+  my $nb_df_val_rec      =  scalar(@{$design_df_val_data});
+
+  if ($nb_df_val_rec != 1)  {
+
+     $self->logger->debug("Retrieve designtype default values - number of records unacceptable: $nb_df_val_rec");
+     $data_for_postrun_href->{'Error'} = 1;
+     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+     return $data_for_postrun_href;
+  }
+
+  $design_software            =  $design_df_val_data->[0]->{'DesignSoftware'};
+  $design_template_file       =  $design_df_val_data->[0]->{'DesignTemplateFile'};
+  $design_geno_format         =  $design_df_val_data->[0]->{'DesignGenotypeFormat'};
+  $design_factor_alias_prefix =  $design_df_val_data->[0]->{'DesignFactorAliasPrefix'};
 
   if (defined $query->param('DesignSoftware')) {
 
-    $design_software = $query->param('DesignSoftware');
+     $design_software = $query->param('DesignSoftware');
   }
-
-  my $design_template_file = read_cell_value($dbh, 'designtype', 'DesignTemplateFile',
-                                             'DesignTypeId', $designtype_id);
 
   if (defined $query->param('DesignTemplateFile')) {
 
-    $design_template_file = $query->param('DesignTemplateFile');
+     $design_template_file = $query->param('DesignTemplateFile');
   }
-
-  my $design_geno_format = read_cell_value($dbh, 'designtype', 'DesignGenotypeFormat',
-                                           'DesignTypeId', $designtype_id);
 
   if (defined $query->param('DesignGenotypeFormat')) {
 
-    $design_geno_format = $query->param('DesignGenotypeFormat');
+     $design_geno_format = $query->param('DesignGenotypeFormat');
   }
 
-  my $design_factor_alias_prefix = read_cell_value($dbh, 'designtype', 'DesignFactorAliasPrefix',
-                                                   'DesignTypeId', $designtype_id);
 
   if (defined $query->param('DesignFactorAliasPrefix')) {
 
-    $design_factor_alias_prefix = $query->param('DesignFactorAliasPrefix');
+     $design_factor_alias_prefix = $query->param('DesignFactorAliasPrefix');
   }
+
 
   $dbh->disconnect();
 
@@ -4181,7 +4241,7 @@ sub list_trial_advanced_runmode {
 
 =pod list_trial_advanced_HELP_START
 {
-"OperationName" : "List trials",
+"OperationName": "List trials",
 "Description": "List trials available in the system. This listing requires pagination information.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -4560,9 +4620,9 @@ sub list_trial_advanced_runmode {
     $self->logger->debug("SQL Row count time: $rcount_time");
 
     if ($pg_id_err == 1) {
-    
+
       $self->logger->debug($pg_id_msg);
-    
+
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
@@ -4570,7 +4630,7 @@ sub list_trial_advanced_runmode {
     }
 
     if ($pg_id_err == 2) {
-      
+
       $page = 0;
     }
 
@@ -4582,7 +4642,7 @@ sub list_trial_advanced_runmode {
 
     $paged_limit_clause = $limit_clause;
   }
-  
+
   $dbh->disconnect();
 
   my ($sort_err, $sort_msg, $sort_sql) = parse_sorting($sorting, $sql_field_list);
@@ -4644,7 +4704,7 @@ sub get_trial_runmode {
 
 =pod get_trial_HELP_START
 {
-"OperationName" : "Get trial",
+"OperationName": "Get trial",
 "Description": "Get detailed information about a trial specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -4754,7 +4814,7 @@ sub update_trial_runmode {
 
 =pod update_trial_HELP_START
 {
-"OperationName" : "Update trial",
+"OperationName": "Update trial",
 "Description": "Update information about a trial specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -4816,7 +4876,49 @@ sub update_trial_runmode {
 
   my $dbh_k_read = connect_kdb_read();
 
-  my $project_id = read_cell_value($dbh_k_read, 'trial', 'ProjectId', 'TrialId', $trial_id);
+  my $read_tr_sql     =  'SELECT ProjectId, CurrentWorkflowId, TrialEndDate, TrialNote ';
+     $read_tr_sql    .=  'FROM trial WHERE TrialId=? ';
+
+
+  my ($r_df_val_err, $r_df_val_msg, $trial_df_val_data) = read_data($dbh_k_read, $read_tr_sql, [$trial_id]);
+
+  if ($r_df_val_err) {
+
+    $self->logger->debug("Retrieve trial default values for optional fields failed: $r_df_val_msg");
+    $data_for_postrun_href->{'Error'}  = 1;
+    $data_for_postrun_href->{'Data'}   = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $project_id     =  undef;
+  my $workflow_id    =  undef;
+  my $trial_edate    =  undef;
+  my $trial_note     =  undef;
+
+  my $nb_df_val_rec    =  scalar(@{$trial_df_val_data});
+
+  if ($nb_df_val_rec != 1)  {
+
+     $self->logger->debug("Retrieve trial default values - number of records unacceptable: $nb_df_val_rec");
+     $data_for_postrun_href->{'Error'} = 1;
+     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+     return $data_for_postrun_href;
+  }
+
+  $project_id     =  $trial_df_val_data->[0]->{'ProjectId'};
+  $workflow_id    =  $trial_df_val_data->[0]->{'CurrentWorkflowId'};
+  $trial_edate    =  $trial_df_val_data->[0]->{'TrialEndDate'};
+  $trial_note     =  $trial_df_val_data->[0]->{'TrialNote'};
+
+  # Unknown end DateTime value from database 0000-00-00 00:00:00 which should be reset to empty string, undef,
+  # and then null in the db
+
+  if ($trial_edate eq '0000-00-00 00:00:00') {
+
+    $trial_edate = undef;
+  }
 
   if (defined $query->param('ProjectId')) {
 
@@ -4846,8 +4948,6 @@ sub update_trial_runmode {
     $project_id = undef;
   }
 
-  my $workflow_id = read_cell_value($dbh_k_read, 'trial', 'CurrentWorkflowId', 'TrialId', $trial_id);
-
   if (length($workflow_id) == 0) {
 
     $workflow_id = undef;
@@ -4860,8 +4960,6 @@ sub update_trial_runmode {
       $workflow_id = $query->param('CurrentWorkflowId');
     }
   }
-
-  my $trial_edate = read_cell_value($dbh_k_read, 'trial', 'TrialEndDate', 'TrialId', $trial_id);
 
   if (defined $query->param('TrialEndDate')) {
 
@@ -4878,8 +4976,6 @@ sub update_trial_runmode {
 
     $trial_edate = undef;
   }
-
-  my $trial_note = read_cell_value($dbh_k_read, 'trial', 'TrialNote', 'TrialId', $trial_id);
 
   if (defined $query->param('TrialNote')) {
 
@@ -5022,7 +5118,7 @@ sub update_trial_runmode {
   if (length($trial_location) > 0) {
 
     my ($is_wkt_err, $wkt_err_href) = is_valid_wkt_href($dbh_gis_read, {'triallocation' => $trial_location},
-                                                        ['POLYGON', 'MULTIPOLYGON']);
+                                                        ['POLYGON', 'MULTIPOLYGON', 'POINT']);
 
     if ($is_wkt_err) {
 
@@ -5241,15 +5337,38 @@ sub update_trial_runmode {
 
     if (!record_existence($dbh_gis_write, 'trialloc', 'trialid', $trial_id)) {
 
-      $trialloc_sql  = 'INSERT INTO trialloc (trialid, triallocation) ';
-      $trialloc_sql .= 'VALUES (?, ST_Multi(ST_GeomFromText(?, -1)))';
+      if ($trial_location =~ /^POINT/i) {
+
+        my $st_buffer_val = $POINT2POLYGON_BUFFER4TRIAL->{$ENV{DOCUMENT_ROOT}};
+
+        $trialloc_sql  = "INSERT INTO trialloc (trialid, triallocation) ";
+        $trialloc_sql .= "VALUES (?, ST_Multi(ST_Buffer(ST_GeomFromText(?, -1), $st_buffer_val, 1)))";
+      }
+      else {
+
+        $trialloc_sql  = 'INSERT INTO trialloc (trialid, triallocation) ';
+        $trialloc_sql .= 'VALUES (?, ST_Multi(ST_GeomFromText(?, -1)))';
+      }
+
       @sql_arg = ($trial_id, $trial_location);
     }
     else {
 
-      $trialloc_sql  = 'UPDATE trialloc SET ';
-      $trialloc_sql .= 'triallocation = ST_Multi(ST_GeomFromText(?, -1)) ';
-      $trialloc_sql .= 'WHERE trialid=?';
+      if ($trial_location =~ /^POINT/i) {
+
+        my $st_buffer_val = $POINT2POLYGON_BUFFER4TRIAL->{$ENV{DOCUMENT_ROOT}};
+
+        $trialloc_sql  = 'UPDATE trialloc SET ';
+        $trialloc_sql .= 'triallocation = ST_Multi(ST_Buffer(ST_GeomFromText(?, -1), $st_buffer_val, 1)) ';
+        $trialloc_sql .= 'WHERE trialid=?';
+      }
+      else {
+
+        $trialloc_sql  = 'UPDATE trialloc SET ';
+        $trialloc_sql .= 'triallocation = ST_Multi(ST_GeomFromText(?, -1)) ';
+        $trialloc_sql .= 'WHERE trialid=?';
+      }
+
       @sql_arg = ($trial_location, $trial_id);
     }
 
@@ -5287,7 +5406,7 @@ sub update_trial_geography_runmode {
 
 =pod update_trial_geography_HELP_START
 {
-"OperationName" : "Update trial location",
+"OperationName": "Update trial location",
 "Description": "Update trial's geographical position.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -5414,6 +5533,7 @@ sub update_trial_geography_runmode {
       $does_actual_update = 1;
     }
   }
+
 
   my $postgres_trial_id = read_cell_value($dbh_gis_write, 'trialloc', 'trialid', 'trialid', $trial_id);
 
@@ -5731,7 +5851,7 @@ sub get_trial_unit_runmode {
 
 =pod get_trial_unit_HELP_START
 {
-"OperationName" : "Get trial unit",
+"OperationName": "Get trial unit",
 "Description": "Get detailed information about trial unit specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -5806,7 +5926,12 @@ sub get_trial_unit_runmode {
     return $data_for_postrun_href;
   }
 
-  $data_for_postrun_href->{'Error'} = 0;
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'geojson'}   = 1;
+  $data_for_postrun_href->{'GJSonInfo'} = {'GeometryField' => 'trialunitlocation',
+                                           'FeatureName'   => 'Specimen[0] [ name: Specimen->SpecimenName ]',
+                                           'FeatureId'     => 'TrialUnitId',
+  };
   $data_for_postrun_href->{'Data'}  = {'TrialUnit'  => $trial_unit_data,
                                        'RecordMeta' => [{'TagName' => 'TrialUnit'}],
   };
@@ -5818,7 +5943,7 @@ sub update_trial_unit_runmode {
 
 =pod update_trial_unit_HELP_START
 {
-"OperationName" : "Update trial unit",
+"OperationName": "Update trial unit",
 "Description": "Update trial unit specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -5864,7 +5989,48 @@ sub update_trial_unit_runmode {
   # Finish generic required static field checking
 
   my $dbh_k_write = connect_kdb_write();
-  my $trial_id = read_cell_value($dbh_k_write, 'trialunit', 'TrialId', 'TrialUnitId', $trial_unit_id);
+
+  my $read_tr_u_sql    =   'SELECT TrialId, SourceTrialUnitId, SampleSupplierId, TrialUnitNote, TrialUnitBarcode, TreatmentId ';
+     $read_tr_u_sql   .=   'FROM trialunit WHERE TrialUnitId=? ';
+
+  my ($r_df_val_err, $r_df_val_msg, $trial_u_df_val_data) = read_data($dbh_k_write, $read_tr_u_sql, [$trial_unit_id]);
+
+  if ($r_df_val_err) {
+
+    $self->logger->debug("Retrieve trialunit default values for optional fields failed: $r_df_val_msg");
+    $data_for_postrun_href->{'Error'}  = 1;
+    $data_for_postrun_href->{'Data'}   = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $trial_id            =  undef;
+  my $src_trial_unit_id   =  undef;
+  my $sample_supplier_id  =  undef;
+  my $trial_unit_comment  =  undef;
+  my $barcode             =  undef;
+  my $treatment_id        =  undef;
+
+
+  my $nb_df_val_rec    =  scalar(@{$trial_u_df_val_data});
+ 
+  if ($nb_df_val_rec != 1)  {
+
+     $self->logger->debug("Retrieve trialunit default values - number of records unacceptable: $nb_df_val_rec");
+     $data_for_postrun_href->{'Error'} = 1;
+     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+     return $data_for_postrun_href;
+  }
+
+
+  $trial_id            =  $trial_u_df_val_data->[0]->{'TrialId'};
+  $src_trial_unit_id   =  $trial_u_df_val_data->[0]->{'SourceTrialUnitId'};
+  $sample_supplier_id  =  $trial_u_df_val_data->[0]->{'SampleSupplierId'};
+  $trial_unit_comment  =  $trial_u_df_val_data->[0]->{'TrialUnitNote'};
+  $barcode             =  $trial_u_df_val_data->[0]->{'TrialUnitBarcode'};
+  $treatment_id        =  $trial_u_df_val_data->[0]->{'TreatmentId'};
+
 
   if (length($trial_id) == 0) {
 
@@ -5879,8 +6045,8 @@ sub update_trial_unit_runmode {
   my $gadmin_status = $self->authen->gadmin_status();
   my $perm_str = permission_phrase($group_id, 0, $gadmin_status, 'trial');
   my $sql      = "SELECT $perm_str AS UltimatePermission ";
-  $sql        .= 'FROM trial ';
-  $sql        .= 'WHERE TrialId=?';
+     $sql     .= 'FROM trial ';
+     $sql     .= 'WHERE TrialId=?';
 
   my ($read_err, $permission) = read_cell($dbh_k_write, $sql, [$trial_id]);
 
@@ -5895,8 +6061,6 @@ sub update_trial_unit_runmode {
 
   my $replicate_number    = $query->param('ReplicateNumber');
 
-  my $src_trial_unit_id   = read_cell_value($dbh_k_write, 'trialunit', 'SourceTrialUnitId',
-                                            'TrialUnitId', $trial_unit_id);
 
   if (length($src_trial_unit_id) == 0) {
 
@@ -5911,9 +6075,6 @@ sub update_trial_unit_runmode {
     }
   }
 
-  my $sample_supplier_id  = read_cell_value($dbh_k_write, 'trialunit', 'SampleSupplierId',
-                                            'TrialUnitId', $trial_unit_id);
-
   if (defined $query->param('SampleSupplierId')) {
 
     if (length($query->param('SampleSupplierId')) > 0) {
@@ -5922,16 +6083,11 @@ sub update_trial_unit_runmode {
     }
   }
 
-  my $trial_unit_comment  = read_cell_value($dbh_k_write, 'trialunit', 'TrialUnitNote',
-                                            'TrialUnitId', $trial_unit_id);
-
   if (defined $query->param('TrialUnitNote')) {
 
-    $trial_unit_comment = $query->param('TrialUnitNote');
+     $trial_unit_comment = $query->param('TrialUnitNote');
   }
 
-  my $barcode = read_cell_value($dbh_k_write, 'trialunit', 'TrialUnitBarcode',
-                                'TrialUnitId', $trial_unit_id);
 
   if (length($barcode) == 0) {
 
@@ -5946,8 +6102,6 @@ sub update_trial_unit_runmode {
     }
   }
 
-  my $treatment_id = read_cell_value($dbh_k_write, 'trialunit', 'TreatmentId',
-                                     'TrialUnitId', $trial_unit_id);;
 
   if (length($treatment_id) == 0) {
 
@@ -5961,6 +6115,7 @@ sub update_trial_unit_runmode {
       $treatment_id = $query->param('TreatmentId');
     }
   }
+
 
   if (defined $treatment_id) {
 
@@ -6151,7 +6306,7 @@ sub update_trial_unit_geography_runmode {
 
 =pod update_trial_unit_geography_HELP_START
 {
-"OperationName" : "Update trial unit location",
+"OperationName": "Update trial unit location",
 "Description": "Updates trial unit's geographical position.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -6177,6 +6332,7 @@ sub update_trial_unit_geography_runmode {
   my $dbh_k_read = connect_kdb_read();
 
   my $trial_id = read_cell_value($dbh_k_read, 'trialunit', 'TrialId', 'TrialUnitId', $trial_unit_id);
+
 
   if (length($trial_id) == 0) {
 
@@ -6326,7 +6482,7 @@ sub list_trial_unit_specimen {
         $self->logger->debug("Check id existence error: $chk_id_msg");
         $err = 1;
         $msg = $chk_id_msg;
-        
+
         return ($err, $msg, []);
       }
     }
@@ -6362,7 +6518,7 @@ sub add_trial_unit_specimen_runmode {
 
 =pod add_trial_unit_specimen_HELP_START
 {
-"OperationName" : "Add specimen to trial unit",
+"OperationName": "Add specimen to trial unit",
 "Description": "Associate a new specimen with a trial unit specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -6632,7 +6788,7 @@ sub remove_trial_unit_specimen_runmode {
 
 =pod remove_trial_unit_specimen_HELP_START
 {
-"OperationName" : "Remove trial unit specimen",
+"OperationName": "Remove trial unit specimen",
 "Description": "Delete association between trial unit and specimen specified by trialunitsepcimen id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -6729,7 +6885,7 @@ sub update_trial_unit_specimen_runmode {
 
 =pod update_trial_unit_specimen_HELP_START
 {
-"OperationName" : "Update trial unit specimen",
+"OperationName": "Update trial unit specimen",
 "Description": "Update information about association between trial unit and specimen specified by trialunitsepcimen id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -6776,8 +6932,51 @@ sub update_trial_unit_specimen_runmode {
 
   $dbh_read = connect_kdb_read();
 
-  my $trial_unit_id = read_cell_value($dbh_read, 'trialunitspecimen', 'TrialUnitId',
-                                      'TrialUnitSpecimenId', $tunit_specimen_id);
+  my $read_tru_sp_sql   = 'SELECT trialunitspecimen.TrialUnitId, trialunit.TrialId, SpecimenId, ItemId, ';
+  $read_tru_sp_sql     .= 'PlantDate, HarvestDate, HasDied, Notes ';
+  $read_tru_sp_sql     .= 'FROM trialunitspecimen LEFT JOIN trialunit ';
+  $read_tru_sp_sql     .= 'ON trialunitspecimen.TrialUnitId = trialunit.TrialUnitId ';
+  $read_tru_sp_sql     .= 'WHERE TrialUnitSpecimenId=? ';
+
+  my ($r_df_val_err, $r_df_val_msg, $trail_usp_df_val_data) = read_data($dbh_read, $read_tru_sp_sql, [$tunit_specimen_id]);
+
+  if ($r_df_val_err) {
+
+    $self->logger->debug("Retrieve trialunitspecimen default values for optional fields failed: $r_df_val_msg");
+    $data_for_postrun_href->{'Error'}  = 1;
+    $data_for_postrun_href->{'Data'}   = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $trial_unit_id      =  undef;
+  my $specimen_id        =  undef;
+  my $item_id            =  undef;
+  my $planted_date       =  undef;
+  my $harvested_date     =  undef;
+  my $has_died           =  undef;
+  my $notes              =  undef;
+  my $trial_id           =  undef;
+
+  my $nb_df_val_rec    =  scalar(@{$trail_usp_df_val_data});
+
+  if ($nb_df_val_rec != 1)  {
+
+     $self->logger->debug("Retrieve trialunitspecimen default values - number of records unacceptable: $nb_df_val_rec");
+     $data_for_postrun_href->{'Error'} = 1;
+     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+     return $data_for_postrun_href;
+  }
+
+  $trial_unit_id      =  $trail_usp_df_val_data->[0]->{'TrialUnitId'};
+  $specimen_id        =  $trail_usp_df_val_data->[0]->{'SpecimenId'};
+  $item_id            =  $trail_usp_df_val_data->[0]->{'ItemId'};
+  $planted_date       =  $trail_usp_df_val_data->[0]->{'PlantDate'};
+  $harvested_date     =  $trail_usp_df_val_data->[0]->{'HarvesDate'};
+  $has_died           =  $trail_usp_df_val_data->[0]->{'HasDied'};
+  $notes              =  $trail_usp_df_val_data->[0]->{'Notes'};
+  $trial_id           =  $trail_usp_df_val_data->[0]->{'TrialId'};
 
   if (length($trial_unit_id) == 0) {
 
@@ -6788,7 +6987,6 @@ sub update_trial_unit_specimen_runmode {
     return $data_for_postrun_href;
   }
 
-  my $trial_id = read_cell_value($dbh_read, 'trialunit', 'TrialId', 'TrialUnitId', $trial_unit_id);
 
   my $group_id = $self->authen->group_id();
   my $gadmin_status = $self->authen->gadmin_status();
@@ -6810,29 +7008,26 @@ sub update_trial_unit_specimen_runmode {
 
   my $data_submitted = 0;
 
-  my $specimen_id = read_cell_value($dbh_read, 'trialunitspecimen', 'SpecimenId',
-                                    'TrialUnitSpecimenId', $tunit_specimen_id);
-
   if (defined $query->param('SpecimenId')) {
 
-    if (length($query->param('SpecimenId')) > 0) {
+      if (length($query->param('SpecimenId')) > 0) {
+ 
+          $specimen_id = $query->param('SpecimenId');
 
-      $specimen_id = $query->param('SpecimenId');
+          $sql = 'SELECT GenotypeId FROM genotypespecimen WHERE SpecimenId=?';
+          my $sth = $dbh_read->prepare($sql);
+          $sth->execute($specimen_id);
+          my $genotype_id_href = $sth->fetchall_hashref('GenotypeId');
+          $sth->finish();
 
-      $sql = 'SELECT GenotypeId FROM genotypespecimen WHERE SpecimenId=?';
-      my $sth = $dbh_read->prepare($sql);
-      $sth->execute($specimen_id);
-      my $genotype_id_href = $sth->fetchall_hashref('GenotypeId');
-      $sth->finish();
+          my @geno_id = keys(%{$genotype_id_href});
+          if (scalar(@geno_id) == 0) {
 
-      my @geno_id = keys(%{$genotype_id_href});
-      if (scalar(@geno_id) == 0) {
+          my $err_msg = "SpecimenId ($specimen_id) not found.";
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'SpecimenId' => $err_msg}]};
 
-        my $err_msg = "SpecimenId ($specimen_id) not found.";
-        $data_for_postrun_href->{'Error'} = 1;
-        $data_for_postrun_href->{'Data'}  = {'Error' => [{'SpecimenId' => $err_msg}]};
-
-        return $data_for_postrun_href;
+          return $data_for_postrun_href;
       }
 
       my ($is_geno_ok, $trouble_geno_id_aref) = check_permission($dbh_read, 'genotype', 'GenotypeId',
@@ -6853,64 +7048,61 @@ sub update_trial_unit_specimen_runmode {
       }
 
       $data_submitted = 1;
-    }
+      }
+
   }
 
-  my $item_id = read_cell_value($dbh_read, 'trialunitspecimen', 'ItemId',
-                                'TrialUnitSpecimenId', $tunit_specimen_id);
-
   $self->logger->debug("ItemId: $item_id");
-
+ 
   if (length($item_id) == 0) {
 
     $item_id = undef;
   }
 
+
   if (defined $query->param('ItemId')) {
 
-    if (length($query->param('ItemId')) > 0) {
+     if (length($query->param('ItemId')) > 0) {
 
-      $item_id = $query->param('ItemId');
+        $item_id = $query->param('ItemId');
 
-      if ($item_id ne '0') {
+        if ($item_id ne '0') {
 
-        if (!record_existence($dbh_read, 'item', 'ItemId', $item_id)) {
+            if (!record_existence($dbh_read, 'item', 'ItemId', $item_id)) {
 
-          my $err_msg = "ItemId ($item_id) not found.";
-          $data_for_postrun_href->{'Error'} = 1;
-          $data_for_postrun_href->{'Data'}  = {'Error' => [{'ItemId' => $err_msg}]};
+             my $err_msg = "ItemId ($item_id) not found.";
+             $data_for_postrun_href->{'Error'} = 1;
+             $data_for_postrun_href->{'Data'}  = {'Error' => [{'ItemId' => $err_msg}]};
 
-          return $data_for_postrun_href;
+             return $data_for_postrun_href;
         }
 
         $data_submitted = 1;
-      }
-    }
+         }
+     }
   }
-
-  my $planted_date = read_cell_value($dbh_read, 'trialunitspecimen',
-                                     'PlantDate', 'TrialUnitSpecimenId', $tunit_specimen_id);
 
   if (defined $query->param('PlantDate')) {
 
-    if (length($query->param('PlantDate')) > 0) {
+     if (length($query->param('PlantDate')) > 0) {
+  
+        $planted_date = $query->param('PlantDate');
 
-      $planted_date = $query->param('PlantDate');
-      my ($pdate_err, $pdate_msg) = check_dt_value( {'PlantDate' => $planted_date} );
+        my ($pdate_err, $pdate_msg) = check_dt_value( {'PlantDate' => $planted_date} );
 
-      if ($pdate_err) {
+        if ($pdate_err) {
 
-        my $err_msg = "$pdate_msg not date/time.";
-        $data_for_postrun_href->{'Error'} = 1;
-        $data_for_postrun_href->{'Data'}  = {'Error' => [{'PlateDate' => $err_msg}]};
+            my $err_msg = "$pdate_msg not date/time.";
+            $data_for_postrun_href->{'Error'} = 1;
+            $data_for_postrun_href->{'Data'}  = {'Error' => [{'PlateDate' => $err_msg}]};
 
-        return $data_for_postrun_href;
-      }
+            return $data_for_postrun_href;
+        }
 
       $data_submitted = 1;
-    }
+     }
   }
-
+ 
   # Unknown planted DateTime value from database 0000-00-00 00:00:00 which should be reset to undef,
   # and then null in the db
 
@@ -6924,27 +7116,25 @@ sub update_trial_unit_specimen_runmode {
     $planted_date = undef;
   }
 
-  my $harvested_date = read_cell_value($dbh_read, 'trialunitspecimen',
-                                       'HarvestDate', 'TrialUnitSpecimenId', $tunit_specimen_id);
-
   if (defined $query->param('HarvestDate')) {
 
-    if (length($query->param('HarvestDate')) > 0) {
+     if (length($query->param('HarvestDate')) > 0) {
 
-      $harvested_date = $query->param('HarvestDate');
-      my ($hdate_err, $hdate_msg) = check_dt_value( {'HarvestDate' => $harvested_date} );
+        $harvested_date = $query->param('HarvestDate');
+ 
+        my ($hdate_err, $hdate_msg) = check_dt_value( {'HarvestDate' => $harvested_date} );
 
-      if ($hdate_err) {
+        if ($hdate_err) {
 
-        my $err_msg = "$hdate_msg not date/time.";
-        $data_for_postrun_href->{'Error'} = 1;
-        $data_for_postrun_href->{'Data'}  = {'Error' => [{'HarvestDate' => $err_msg}]};
+           my $err_msg = "$hdate_msg not date/time.";
+           $data_for_postrun_href->{'Error'} = 1;
+           $data_for_postrun_href->{'Data'}  = {'Error' => [{'HarvestDate' => $err_msg}]};
 
-        return $data_for_postrun_href;
-      }
+           return $data_for_postrun_href;
+        }
 
       $data_submitted = 1;
-    }
+      } 
   }
 
   # Unknown harvested DateTime value from database 0000-00-00 00:00:00 which should be reset to undef,
@@ -6960,14 +7150,13 @@ sub update_trial_unit_specimen_runmode {
     $harvested_date = undef;
   }
 
-  my $has_died = read_cell_value($dbh_read, 'trialunitspecimen',
-                                 'HasDied', 'TrialUnitSpecimenId', $tunit_specimen_id);
 
   if (defined $query->param('HasDied')) {
 
     if (length($query->param('HasDied')) > 0) {
 
-      $has_died = $query->param('HasDied');
+  
+      $has_died = $query->param('HasDied'); 
       if (!($has_died =~ /[0|1]/)) {
 
         my $err_msg = "HasDied not a binary value.";
@@ -6986,14 +7175,12 @@ sub update_trial_unit_specimen_runmode {
     $has_died = undef;
   }
 
-  my $notes = read_cell_value($dbh_read, 'trialunitspecimen',
-                              'Notes', 'TrialUnitSpecimenId', $tunit_specimen_id);
-
   if (defined $query->param('Notes')) {
 
     $notes = $query->param('Notes');
     $data_submitted = 1;
   }
+
 
   $dbh_read->disconnect();
 
@@ -7044,7 +7231,7 @@ sub list_site_advanced_runmode {
 
 =pod list_site_advanced_HELP_START
 {
-"OperationName" : "List sites",
+"OperationName": "List sites",
 "Description": "List all the available sites in the system. This listing requires pagination information.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -7349,9 +7536,9 @@ sub list_site_advanced_runmode {
     $self->logger->debug("SQL Count time: $rcount_time");
 
     if ($pg_id_err == 1) {
-    
+
       $self->logger->debug($pg_id_msg);
-    
+
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
@@ -7432,7 +7619,7 @@ sub list_trial_unit_advanced_runmode {
 
 =pod list_trial_unit_advanced_HELP_START
 {
-"OperationName" : "List trial units",
+"OperationName": "List trial units",
 "Description": "List trial units (e.g. plots). This listing does require pagination information.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -7834,8 +8021,8 @@ sub list_trial_unit_specimen_advanced_runmode {
 
 =pod list_trial_unit_specimen_advanced_HELP_START
 {
-"OperationName" : "List trial unit specimen",
-"Description": "List the whole association of specimenes with trial units. This listing requires pagination information. Use filtering criteria to return subset of interest.",
+"OperationName": "List trial unit specimen",
+"Description": "List the whole association of specimens with trial units. This listing requires pagination information. Use filtering criteria to return subset of interest.",
 "AuthRequired": 1,
 "GroupRequired": 1,
 "GroupAdminRequired": 0,
@@ -8184,7 +8371,7 @@ sub add_trial_trait_runmode {
 
 =pod add_trial_trait_HELP_START
 {
-"OperationName" : "Add trait to trial",
+"OperationName": "Add trait to trial",
 "Description": "Attach a trait to the trial definition specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -8464,8 +8651,8 @@ sub list_trial_trait_runmode {
 
 =pod list_trial_trait_HELP_START
 {
-"OperationName" : "List traits for trial",
-"Description": "List all the triats attached to the trial specified by id.",
+"OperationName": "List traits for trial",
+"Description": "List all the traits attached to the trial specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
 "GroupAdminRequired": 0,
@@ -8557,7 +8744,7 @@ sub get_trial_trait_runmode {
 
 =pod get_trial_trait_HELP_START
 {
-"OperationName" : "Get trial trait",
+"OperationName": "Get trial trait",
 "Description": "Get detailed information about trial and trait association specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -8645,7 +8832,7 @@ sub list_unitposition_field_runmode {
 
 =pod list_unitposition_field_HELP_START
 {
-"OperationName" : "List unit position fields",
+"OperationName": "List unit position fields",
 "Description": "List all available unit position field types currently stored in unit position dictionary.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -8724,7 +8911,7 @@ sub update_trial_trait_runmode {
 
 =pod update_trial_trait_HELP_START
 {
-"OperationName" : "Update trial trait",
+"OperationName": "Update trial trait",
 "Description": "Update trial and trait association for specified id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -8771,8 +8958,38 @@ sub update_trial_trait_runmode {
   }
 
   my $dbh_read = connect_kdb_read();
+ 
+  my $read_trial_trait_sql   =   'SELECT TrialId, UnitId ';
+     $read_trial_trait_sql  .=   'FROM trialtrait WHERE TrialTraitId=? ';
 
-  my $trial_id = read_cell_value($dbh_read, 'trialtrait', 'TrialId', 'TrialTraitId', $trial_trait_id);
+  my ($r_df_val_err, $r_df_val_msg, $trialtrait_df_val_data) = read_data($dbh_read, $read_trial_trait_sql, [$trial_trait_id]);
+
+  if ($r_df_val_err) {
+
+    $self->logger->debug("Retrieve trialtrait default values for optional fields failed: $r_df_val_msg");
+    $data_for_postrun_href->{'Error'}  = 1;
+    $data_for_postrun_href->{'Data'}   = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $trial_id      = undef;
+  my $unit_id       = undef;
+
+  my $nb_df_val_rec    =  scalar(@{$trialtrait_df_val_data});
+
+  if ($nb_df_val_rec != 1)  {
+
+     $self->logger->debug("Retrieve trialtrait default values - number of records unacceptable: $nb_df_val_rec");
+     $data_for_postrun_href->{'Error'} = 1;
+     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+     return $data_for_postrun_href;
+  }
+
+  $trial_id   =  $trialtrait_df_val_data->[0]->{'TrialId'};
+  $unit_id    =  $trialtrait_df_val_data->[0]->{'UnitId'};
+
 
   if ( length($trial_id) == 0 ) {
 
@@ -8783,7 +9000,6 @@ sub update_trial_trait_runmode {
     return $data_for_postrun_href;
   }
 
-  my $unit_id = read_cell_value($dbh_read, 'trialtrait', 'UnitId', 'TrialTraitId', $trial_trait_id);
 
   if (length($unit_id) == 0) {
 
@@ -8853,7 +9069,7 @@ sub remove_trial_trait_runmode {
 
 =pod remove_trial_trait_HELP_START
 {
-"OperationName" : "Delete trait for trial",
+"OperationName": "Delete trait for trial",
 "Description": "Delete trait from being associated with the trial. If data for this trait already exists in the trial, this association can not be removed.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -8969,7 +9185,7 @@ sub del_designtype_runmode {
 
 =pod del_designtype_gadmin_HELP_START
 {
-"OperationName" : "Delete design type",
+"OperationName": "Delete design type",
 "Description": "Delete trial design type specified by id. Design type can be deleted only if not attached to any lower level related record.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -9048,7 +9264,7 @@ sub del_site_runmode {
 
 =pod del_site_gadmin_HELP_START
 {
-"OperationName" : "Delete site",
+"OperationName": "Delete site",
 "Description": "Delete site specified by id. Site can be deleted only if not attached to any lower level related record.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -9161,7 +9377,7 @@ sub del_trial_runmode {
 
 =pod del_trial_gadmin_HELP_START
 {
-"OperationName" : "Delete trial",
+"OperationName": "Delete trial",
 "Description": "Delete trial for a specified id. Trial can be deleted only if not attached to any lower level related record.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -9319,7 +9535,7 @@ sub del_trial_unit_runmode {
 
 =pod del_trial_unit_gadmin_HELP_START
 {
-"OperationName" : "Delete trial unit",
+"OperationName": "Delete trial unit",
 "Description": "Delete trial unit from the trial specified by id. If data for this trial unit already exists, than trial unit can not be deleted.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -9449,7 +9665,7 @@ sub add_project_runmode {
 
 =pod add_project_gadmin_HELP_START
 {
-"OperationName" : "Add project",
+"OperationName": "Add project",
 "Description": "Add a new project to the system.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -9526,11 +9742,22 @@ sub add_project_runmode {
     }
   }
 
-  my $project_note = '';
+  my $project_note   = undef;
+  my $project_status = undef;
 
   if (defined $query->param('ProjectNote')) {
+    if (length($query->param('ProjectNote')) > 0) {
 
-    $project_note = $query->param('ProjectNote');
+     $project_note = $query->param('ProjectNote');
+
+    }
+  }
+ 
+  if (defined $query->param('ProjectStatus')) {
+    if (length($query->param('ProjectStatus')) > 0) {
+ 
+     $project_status = $query->param('ProjectStatus');
+    }
   }
 
   my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength ";
@@ -9612,6 +9839,7 @@ sub add_project_runmode {
 
   $sql  = 'INSERT INTO project SET ';
   $sql .= 'ProjectName=?, ';
+  $sql .= 'ProjectStatus=?, ';
   $sql .= 'TypeId=?, ';
   $sql .= 'ProjectManagerId=?, ';
   $sql .= 'ProjectStartDate=?, ';
@@ -9619,7 +9847,7 @@ sub add_project_runmode {
   $sql .= 'ProjectNote=?';
 
   my $sth = $dbh_k_write->prepare($sql);
-  $sth->execute($project_name, $projecttype_id, $cur_manager_id,
+  $sth->execute($project_name, $project_status, $projecttype_id, $cur_manager_id,
                 $project_sdate, $project_edate, $project_note);
 
   my $project_id = -1;
@@ -9680,7 +9908,7 @@ sub update_project_runmode {
 
 =pod update_project_gadmin_HELP_START
 {
-"OperationName" : "Update project",
+"OperationName": "Update project",
 "Description": "Update information about a project specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -9754,7 +9982,41 @@ sub update_project_runmode {
     return $data_for_postrun_href;
   }
 
-  my $project_sdate         = read_cell_value($dbh_k_read, 'project', 'ProjectStartDate', 'ProjectId', $project_id);
+  my $read_proj_sql    =  'SELECT ProjectStartDate, ProjectEndDate, ProjectStatus, ProjectNote ';
+     $read_proj_sql   .=  'FROM project WHERE ProjectId=? ';
+
+  my ($r_df_val_err, $r_df_val_msg, $proj_df_val_data) = read_data($dbh_k_read, $read_proj_sql, [$project_id]);
+
+  if ($r_df_val_err) {
+
+    $self->logger->debug("Retrieve project default values for optional fields failed: $r_df_val_msg");
+    $data_for_postrun_href->{'Error'}  = 1;
+    $data_for_postrun_href->{'Data'}   = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+ 
+  my $project_sdate    = undef;
+  my $project_edate    = undef;
+  my $project_status   = undef;
+  my $project_note     = undef;
+
+  my $nb_df_val_rec    =  scalar(@{$proj_df_val_data});
+
+  if ($nb_df_val_rec != 1)  {
+
+     $self->logger->debug("Retrieve project default values - number of records unacceptable: $nb_df_val_rec");
+     $data_for_postrun_href->{'Error'} = 1;
+     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+     return $data_for_postrun_href;
+  }
+
+  $project_sdate      =  $proj_df_val_data->[0]->{'ProjectStart'};
+  $project_edate      =  $proj_df_val_data->[0]->{'ProjectEndDate'};
+  $project_status     =  $proj_df_val_data->[0]->{'ProjectStatus'};
+  $project_note       =  $proj_df_val_data->[0]->{'ProjectNote'};
+
 
   if (defined $query->param('ProjectStartDate')) {
 
@@ -9786,7 +10048,6 @@ sub update_project_runmode {
     $project_sdate = undef;
   }
 
-  my $project_edate         = read_cell_value($dbh_k_read, 'project', 'ProjectEndDate', 'ProjectId', $project_id);
 
   if (defined $query->param('ProjectEndDate')) {
 
@@ -9818,11 +10079,20 @@ sub update_project_runmode {
     $project_edate = undef;
   }
 
-  my $project_note = read_cell_value($dbh_k_read, 'project', 'ProjectNote', 'ProjectId', $project_id);
 
   if (defined $query->param('ProjectNote')) {
+    if (length($query->param('ProjectNote')) > 0) {
 
-    $project_note = $query->param('ProjectNote');
+       $project_note = $query->param('ProjectNote');
+
+    }
+  }
+
+  if (defined $query->param('ProjectStatus')) {
+    if (length($query->param('ProjectStatus')) > 0) {
+
+       $project_status = $query->param('ProjectStatus');
+    }
   }
 
   my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength ";
@@ -9898,12 +10168,13 @@ sub update_project_runmode {
   $sql .= 'ProjectManagerId=?, ';
   $sql .= 'ProjectStartDate=?, ';
   $sql .= 'ProjectEndDate=?, ';
+  $sql .= 'ProjectStatus=?, ';
   $sql .= 'ProjectNote=? ';
   $sql .= 'WHERE ProjectId=?';
 
   my $sth = $dbh_k_write->prepare($sql);
   $sth->execute($project_name, $projecttype_id, $cur_manager_id,
-                $project_sdate, $project_edate, $project_note, $project_id);
+                $project_sdate, $project_edate, $project_status, $project_note, $project_id);
 
   if ($dbh_k_write->err()) {
 
@@ -10124,7 +10395,7 @@ sub list_project_advanced_runmode {
 
 =pod list_project_advanced_HELP_START
 {
-"OperationName" : "List projects",
+"OperationName": "List projects",
 "Description": "List available projects. This listing requires pagination information.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -10478,7 +10749,7 @@ sub get_project_runmode {
 
 =pod get_project_HELP_START
 {
-"OperationName" : "Get project",
+"OperationName": "Get project",
 "Description": "Get detailed information about the project specified by project id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -10563,7 +10834,7 @@ sub del_project_runmode {
 
 =pod del_project_gadmin_HELP_START
 {
-"OperationName" : "Delete project",
+"OperationName": "Delete project",
 "Description": "Delete project from the system specified by id. Project can be deleted only if not attached to any lower level related record.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -10659,7 +10930,7 @@ sub get_trial_unit_specimen_runmode {
 
 =pod get_trial_unit_specimen_HELP_START
 {
-"OperationName" : "Get trial unit specimen",
+"OperationName": "Get trial unit specimen",
 "Description": "Get detailed information about association between trial unit and specimen specified by trialunitspecimen id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -10756,7 +11027,7 @@ sub add_trial_dimension_runmode {
 
 =pod add_trial_dimension_HELP_START
 {
-"OperationName" : "Add dimension to trial",
+"OperationName": "Add dimension to trial",
 "Description": "Attach a dimension to the trial definition specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -10908,7 +11179,7 @@ sub update_trial_dimension_runmode {
 
 =pod update_trial_dimension_HELP_START
 {
-"OperationName" : "Update trial dimension",
+"OperationName": "Update trial dimension",
 "Description": "Update trial dimension association for specified trial id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -11043,7 +11314,7 @@ sub del_trial_dimension_runmode {
 
 =pod del_trial_dimension_gadmin_HELP_START
 {
-"OperationName" : "Delete trial dimension",
+"OperationName": "Delete trial dimension",
 "Description": "Delete trial dimension for specified trial dimension id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -11247,7 +11518,7 @@ sub list_trial_dimension_runmode {
 
 =pod list_trial_dimension_HELP_START
 {
-"OperationName" : "List dimension for trial",
+"OperationName": "List dimension for trial",
 "Description": "List all the dimension attached to the trial specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -11340,7 +11611,7 @@ sub get_trial_dimension_runmode {
 
 =pod get_trial_dimension_HELP_START
 {
-"OperationName" : "Get trial dimension",
+"OperationName": "Get trial dimension",
 "Description": "Get detailed information about trial and dimension association specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -11428,7 +11699,7 @@ sub add_trial_workflow_runmode {
 
 =pod add_trial_workflow_HELP_START
 {
-"OperationName" : "Add trial workflow step",
+"OperationName": "Add trial workflow step",
 "Description": "Record the detailed workflow step.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -11669,7 +11940,7 @@ sub update_trial_workflow_runmode {
 
 =pod update_trial_workflow_HELP_START
 {
-"OperationName" : "Update trial workflow",
+"OperationName": "Update trial workflow",
 "Description": "Update the detailed workflow step.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -11723,7 +11994,45 @@ sub update_trial_workflow_runmode {
 
   my $dbh_k_write = connect_kdb_write();
 
-  my $trial_id = read_cell_value($dbh_k_write, 'trialworkflow', 'TrialId', 'TrialWorkflowId', $trial_wf_id);
+  my $read_trial_wf_sql   =   'SELECT TrialId, CompleteBy, Completed, ReminderAt, ReminderTo, Note ';
+     $read_trial_wf_sql  .=   'FROM trialworkflow WHERE TrialWorkflowId=? ';
+
+  my ($r_df_val_err, $r_df_val_msg, $trial_wf_df_val_data) = read_data($dbh_k_write, $read_trial_wf_sql, [$trial_wf_id]);
+
+  if ($r_df_val_err) {
+
+    $self->logger->debug("Retrieve trialworkflow default values for optional fields failed: $r_df_val_msg");
+    $data_for_postrun_href->{'Error'}  = 1;
+    $data_for_postrun_href->{'Data'}   = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $trial_id      = undef;
+  my $complete_by   = undef;
+  my $completed     = undef;
+  my $reminder_at   = undef;
+  my $reminder_to   = undef;
+  my $note          = undef;
+
+  my $nb_df_val_rec    =  scalar(@{$trial_wf_df_val_data});
+
+  if ($nb_df_val_rec != 1)  {
+
+     $self->logger->debug("Retrieve trialworkflow default values - number of records unacceptable: $nb_df_val_rec");
+     $data_for_postrun_href->{'Error'} = 1;
+     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+     return $data_for_postrun_href;
+  }
+
+  $trial_id        = $trial_wf_df_val_data->[0]->{'TrialId'};
+  $complete_by     = $trial_wf_df_val_data->[0]->{'CompleteBy'};
+  $completed       = $trial_wf_df_val_data->[0]->{'Completed'};
+  $reminder_at     = $trial_wf_df_val_data->[0]->{'ReminderAt'};
+  $reminder_to     = $trial_wf_df_val_data->[0]->{'ReminderTo'};
+  $note            = $trial_wf_df_val_data->[0]->{'Note'};
+
 
   if (length($trial_id) == 0) {
 
@@ -11749,30 +12058,24 @@ sub update_trial_workflow_runmode {
     return $data_for_postrun_href;
   }
 
-  my $complete_by = read_cell_value($dbh_k_write, 'trialworkflow', 'CompleteBy', 'TrialWorkflowId', $trial_wf_id);
 
   if (length($complete_by) == 0) {
 
     $complete_by = undef;
   }
 
-  my $completed   = read_cell_value($dbh_k_write, 'trialworkflow', 'Completed', 'TrialWorkflowId', $trial_wf_id);
-
-  my $reminder_at = read_cell_value($dbh_k_write, 'trialworkflow', 'ReminderAt', 'TrialWorkflowId', $trial_wf_id);
 
   if (length($reminder_at) == 0) {
 
     $reminder_at = undef;
   }
 
-  my $reminder_to = read_cell_value($dbh_k_write, 'trialworkflow', 'ReminderTo', 'TrialWorkflowId', $trial_wf_id);
 
   if (length($reminder_to) == 0) {
 
     $reminder_to = undef;
   }
 
-  my $note        = read_cell_value($dbh_k_write, 'trialworkflow', 'Note', 'TrialWorkflowId', $trial_wf_id);
 
   if (length($note) == 0) {
 
@@ -11965,7 +12268,7 @@ sub list_trial_workflow_runmode {
 
 =pod list_trial_workflow_HELP_START
 {
-"OperationName" : "List trial workflow",
+"OperationName": "List trial workflow",
 "Description": "List recorded workflow steps for a trial specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -12056,7 +12359,7 @@ sub get_trial_workflow_runmode {
 
 =pod get_trial_workflow_HELP_START
 {
-"OperationName" : "Get trial workflow",
+"OperationName": "Get trial workflow",
 "Description": "Get recorded trial workflow details specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -12149,7 +12452,7 @@ sub del_trial_workflow_runmode {
 
 =pod del_trial_workflow_gadmin_HELP_START
 {
-"OperationName" : "Delete trial workflow",
+"OperationName": "Delete trial workflow",
 "Description": "Delete trial workflow for specified trial workflow id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -12245,7 +12548,7 @@ sub add_trialgroup_runmode {
 
 =pod add_trialgroup_HELP_START
 {
-"OperationName" : "Group existing trials together",
+"OperationName": "Group existing trials together",
 "Description": "Group existing trials together. This grouping could be multi environment trials.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -12398,7 +12701,7 @@ sub add_trialgroup_runmode {
     return $data_for_postrun_href;
   }
 
-  my $entry_xml_file              = $self->authen->get_upload_file();
+  my $entry_xml_file           = $self->authen->get_upload_file();
   my $trialgroupentry_dtd_file = $self->get_trialgroupentry_dtd_file();
 
   $self->logger->debug("Trialgroupentry DTD: $trialgroupentry_dtd_file");
@@ -12459,6 +12762,30 @@ sub add_trialgroup_runmode {
     }
 
     push(@{$trial_id_aref}, $trial_id);
+  }
+
+  my ($trial_err, $trial_msg,
+      $unfound_trial_aref, $found_trial_aref) = record_existence_bulk($dbh_k_read, 'trial',
+                                                                      'TrialId', $trial_id_aref);
+
+  if ($trial_err) {
+
+    $self->logger->debug("Check recorod existence bulk failed: $trial_msg");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (scalar(@{$unfound_trial_aref}) > 0) {
+
+    my $unfound_trial_csv = join(',', @{$unfound_trial_aref});
+
+    my $err_msg = "Trial ($unfound_trial_csv): not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
   }
 
   my $group_id      = $self->authen->group_id();
@@ -12578,8 +12905,8 @@ sub update_trialgroup_runmode {
 
 =pod update_trialgroup_HELP_START
 {
-"OperationName" : "Update trial group meta information",
-"Description": "Update detaled information of trialgroup grouping",
+"OperationName": "Update trial group meta information",
+"Description": "Update detailed information of trial grouping",
 "AuthRequired": 1,
 "GroupRequired": 1,
 "GroupAdminRequired": 0,
@@ -12636,24 +12963,94 @@ sub update_trialgroup_runmode {
     return $data_for_postrun_href;
   }
 
+  my $trial_id_sql = 'SELECT TrialId FROM trialgroupentry WHERE TrialGroupId=?';
+
+  my ($r_t_id_err, $r_t_id_msg, $trial_id_data) = read_data($dbh_k_read, $trial_id_sql, [$t_grp_id]);
+
+  if ($r_t_id_err) {
+
+    $self->logger->debug("Retrieve trial id failed: $r_t_id_msg");
+    $data_for_postrun_href->{'Error'}  = 1;
+    $data_for_postrun_href->{'Data'}   = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $trial_id_aref = [];
+
+  for my $trial_rec (@{$trial_id_data}) {
+
+    push(@{$trial_id_aref}, $trial_rec->{'TrialId'});
+  }
+
+  my $group_id      = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  my ($is_trial_ok, $trouble_trial_id_aref) = check_permission($dbh_k_read, 'trial', 'TrialId',
+                                                               $trial_id_aref, $group_id, $gadmin_status,
+                                                               $READ_WRITE_PERM);
+
+  if (!$is_trial_ok) {
+
+    my $trouble_trial_id = $trouble_trial_id_aref->[0];
+
+    my $err_msg = "Permission denied: Group ($group_id) and Trial ($trouble_trial_id).";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
   my $t_grp_name = $query->param('TrialGroupName');
   my $t_grp_type = $query->param('TrialGroupType');
 
-  my $t_grp_start = read_cell_value($dbh_k_read, 'trialgroup', 'TrialGroupStart', 'TrialGroupId', $t_grp_id);
+  my $read_t_grp_sql  =  'SELECT TrialGroupStart, TrialGroupEnd, TrialGroupNote, TrialGroupOwner ';
+  $read_t_grp_sql    .=  'FROM trialgroup WHERE TrialGroupId=? ';
+
+  my ($r_df_val_err, $r_df_val_msg, $t_grp_df_val_data) = read_data($dbh_k_read, $read_t_grp_sql, [$t_grp_id]);
+
+  if ($r_df_val_err) {
+
+    $self->logger->debug("Retrieve trialgroup default values for optional fields failed: $r_df_val_msg");
+    $data_for_postrun_href->{'Error'}  = 1;
+    $data_for_postrun_href->{'Data'}   = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $t_grp_start       =  undef;
+  my $t_grp_end         =  undef;
+  my $t_grp_note        =  undef;
+  my $t_grp_owner       =  undef;
+
+  my $nb_df_val_rec     =  scalar(@{$t_grp_df_val_data});
+
+  if ($nb_df_val_rec != 1)  {
+
+     $self->logger->debug("Retrieve trialgroup default values - number of records unacceptable: $nb_df_val_rec");
+     $data_for_postrun_href->{'Error'} = 1;
+     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+     return $data_for_postrun_href;
+  }
+
+  $t_grp_start       =   $t_grp_df_val_data->[0]->{'TrialGroupStart'};
+  $t_grp_end         =   $t_grp_df_val_data->[0]->{'TrialGroupEnd'};
+  $t_grp_note        =   $t_grp_df_val_data->[0]->{'TrialGroupNote'};
+  $t_grp_owner       =   $t_grp_df_val_data->[0]->{'TrialGroupOwner'};
+
 
   if (length($t_grp_start) == 0) {
 
     $t_grp_start = undef;
   }
 
-  my $t_grp_end   = read_cell_value($dbh_k_read, 'trialgroup', 'TrialGroupEnd', 'TrialGroupId', $t_grp_id);
 
   if (length($t_grp_end) == 0) {
 
     $t_grp_end = undef;
   }
 
-  my $t_grp_note  = read_cell_value($dbh_k_read, 'trialgroup', 'TrialGroupNote', 'TrialGroupId', $t_grp_id);
 
   if (length($t_grp_note) == 0) {
 
@@ -12771,8 +13168,6 @@ sub update_trialgroup_runmode {
   }
 
   my $user_id = $self->authen->user_id();
-
-  my $t_grp_owner = read_cell_value($dbh_k_read, 'trialgroup', 'TrialGroupOwner', 'TrialGroupId', $t_grp_id);
 
   if ("$t_grp_owner" ne "$user_id") {
 
@@ -13026,7 +13421,7 @@ sub list_trialgroup_advanced_runmode {
 
 =pod list_trialgroup_advanced_HELP_START
 {
-"OperationName" : "List trialgroup",
+"OperationName": "List trialgroup",
 "Description": "Return list of trialgroups. This listing requires pagination definition.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -13173,13 +13568,14 @@ sub list_trialgroup_advanced_runmode {
 
   if ($field_lookup->{'TrialGroupType'} == 1) {
 
-    $other_join = ' LEFT JOIN generaltype ON trialgroup.TrialGroupType = generaltype.TypeId ';
+    $other_join .= ' LEFT JOIN generaltype ON trialgroup.TrialGroupType = generaltype.TypeId ';
     push(@{$final_field_list}, q| generaltype.TypeName AS TrialGroupTypeName |);
   }
 
-  if ( !(defined $field_lookup->{'TrialGroupOwner'}) ) {
+  if ($field_lookup->{'TrialGroupOwner'} == 1 ) {
 
-    push(@{$final_field_list}, 'TrialGroupOwner');
+    $other_join .= ' LEFT JOIN systemuser ON trialgroup.TrialGroupOwner = systemuser.UserId ';
+    push(@{$final_field_list}, ' systemuser.UserName AS TrialGroupOwnerUserName ');
   }
 
   ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_sql($dbh, $final_field_list, 'trialgroup',
@@ -13194,17 +13590,12 @@ sub list_trialgroup_advanced_runmode {
     return $data_for_postrun_href;
   }
 
-  my $field_name2table_name  = {};
-  my $validation_func_lookup = {};
-
   $self->logger->debug("Filtering CSV: $filtering_csv");
 
   my ($filter_err, $filter_msg, $filter_phrase, $where_arg) = parse_filtering('TrialGroupId',
                                                                               'trialgroup',
                                                                               $filtering_csv,
-                                                                              $final_field_list,
-                                                                              $validation_func_lookup,
-                                                                              $field_name2table_name);
+                                                                              $final_field_list);
 
   $self->logger->debug("Filter phrase: $filter_phrase");
 
@@ -13322,7 +13713,7 @@ sub list_trialgroup_advanced_runmode {
                                            'VCol'            => $vcol_list,
                                            'Pagination'      => $pagination_aref,
                                            'RecordMeta'      => [{'TagName' => 'TrialGroup'}],
-  };
+                                          };
 
   return $data_for_postrun_href;
 }
@@ -13331,7 +13722,7 @@ sub get_trialgroup_runmode {
 
 =pod get_trialgroup_HELP_START
 {
-"OperationName" : "Get trialgroup",
+"OperationName": "Get trialgroup",
 "Description": "Return detailed information about trialgroup specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -13408,11 +13799,11 @@ sub del_trialgroup_runmode {
 
 =pod del_trialgroup_HELP_START
 {
-"OperationName" : "Delete trialgroup",
+"OperationName": "Delete trialgroup",
 "Description": "Delete trialgroup grouping specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
-"GroupAdminRequired": 1,
+"GroupAdminRequired": 0,
 "SignatureRequired": 1,
 "AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
 "SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='TrialGroup (5) has been deleted successfully.' /></DATA>",
@@ -13425,7 +13816,7 @@ sub del_trialgroup_runmode {
 =cut
 
   my $self               = shift;
-  my $t_grp_id             = $self->param('id');
+  my $t_grp_id           = $self->param('id');
 
   my $data_for_postrun_href = {};
 
@@ -13495,7 +13886,7 @@ sub add_trial2trialgroup_runmode {
 
 =pod add_trial2trialgroup_HELP_START
 {
-"OperationName" : "Add more trials to a trial group",
+"OperationName": "Add more trials to a trial group",
 "Description": "Add more trials into a trial group specified by id",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -13682,7 +14073,7 @@ sub add_trial2trialgroup_runmode {
 
   $sql .= join(',', @sql_val_list);
 
-  $self->logger->debug("MultiLoc entry SQL: $sql");
+  $self->logger->debug("SQL: $sql");
 
   my $sth = $dbh_k_write->prepare($sql);
   $sth->execute();
@@ -13711,7 +14102,7 @@ sub remove_trial_from_trialgroup_runmode {
 
 =pod remove_trial_from_trialgroup_HELP_START
 {
-"OperationName" : "Remove trial from trialgroup",
+"OperationName": "Remove trial from trialgroup",
 "Description": "Remove trial specified by id from trialgroup specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -13812,7 +14203,7 @@ sub import_trialunitkeyword_csv_runmode {
 
 =pod import_trialunitkeyword_csv_HELP_START
 {
-"OperationName" : "Import trialunit keyword",
+"OperationName": "Import trialunit keyword",
 "Description": "Import keyword for trialunit(s) from a csv file.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -14109,7 +14500,7 @@ sub list_trialunit_keyword_advanced_runmode {
 
 =pod list_trialunit_keyword_advanced_HELP_START
 {
-"OperationName" : "List trial unit keyword",
+"OperationName": "List trial unit keyword",
 "Description": "List the whole association of keywords with trial units. This listing will require pagination if it is called without trialunit id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -14459,7 +14850,7 @@ sub add_trial_unit_keyword_runmode {
 
 =pod add_trial_unit_keyword_HELP_START
 {
-"OperationName" : "Add keyword to trial unit",
+"OperationName": "Add keyword to trial unit",
 "Description": "Associate a new keyword with a trial unit specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -14602,7 +14993,7 @@ sub remove_trial_unit_keyword_runmode {
 
 =pod remove_trial_unit_keyword_HELP_START
 {
-"OperationName" : "Remove trial unit keyword",
+"OperationName": "Remove trial unit keyword",
 "Description": "Delete association between trial unit and keyword specified by trialunitkeyword id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -14690,7 +15081,7 @@ sub import_crossing_csv_runmode {
 
 =pod import_crossing_csv_HELP_START
 {
-"OperationName" : "Import crossing records",
+"OperationName": "Import crossing records",
 "Description": "Import crossings from a csv file formatted as a sparse matrix of crossing data at the trial unit level.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -14704,7 +15095,7 @@ sub import_crossing_csv_runmode {
 "RequiredUpload": 1,
 "UploadFileFormat": "CSV",
 "UploadFileParameterName": "uploadfile",
-"HTTPParameter": [{"Name": "TrialId", "Description": "Column number starting from 0 in the CSV upload file for TrialId column", "Requried": 1}, {"Name": "BreedingMethodId", "Description": "Column number starting from 0 in the CSV upload file for BreedingMethodId column", "Requried": 1}, {"Name": "MaleParentId", "Description": "Column number starting from 0 for TrialUnitSpecimenId male parent column", "Requried": 1}, {"Name": "FemaleParentId", "Description": "Column number starting from zero for TrialUnitSpecimenId female parent column", "Requried": 1}, {"Name": "CrossingDateTime", "Description": "Column number starting from 0 for crossing date/time column", "Requried": 0}, {"Name": "UserId", "Description": "Column number starting from 0 for UserId column", "Requried": 0}, {"Name": "CrossingNote", "Description": "Column number starting from 0 for CrossingNote column", "Requried": 0}],
+"HTTPParameter": [{"Name": "TrialId", "Description": "Column number starting from 0 in the CSV upload file for TrialId column", "Required": 1}, {"Name": "BreedingMethodId", "Description": "Column number starting from 0 in the CSV upload file for BreedingMethodId column", "Required": 1}, {"Name": "MaleParentId", "Description": "Column number starting from 0 for TrialUnitSpecimenId male parent column", "Required": 1}, {"Name": "FemaleParentId", "Description": "Column number starting from zero for TrialUnitSpecimenId female parent column", "Required": 1}, {"Name": "CrossingDateTime", "Description": "Column number starting from 0 for crossing date/time column", "Required": 0}, {"Name": "UserId", "Description": "Column number starting from 0 for UserId column", "Required": 0}, {"Name": "CrossingNote", "Description": "Column number starting from 0 for CrossingNote column", "Required": 0}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
@@ -15167,7 +15558,7 @@ sub list_crossing_advanced_runmode {
 
 =pod list_crossing_advanced_HELP_START
 {
-"OperationName" : "List trial crossings",
+"OperationName": "List trial crossings",
 "Description": "List trial crossings.",
 "AuthRequired": 1,
 "GroupRequired": 1,

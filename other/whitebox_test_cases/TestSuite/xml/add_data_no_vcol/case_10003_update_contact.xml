@@ -11,10 +11,11 @@
   <INPUT ParaName="ContactTelephone" Value="+61261227335" />
   <INPUT ParaName="ContactMobile" Value="04 12345678" />
   <INPUT ParaName="ContactEMail" Value="admin@kddart.example.com" />
+  <INPUT ParaName="contactlocation" Value="MULTIPOINT((135.644531965262 -24.90437), (149.1057021617679 -35.317184619919445))" />
   <Match Attr="StatusCode" Value="200" />
   <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
   <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
-  <Parent CaseFile="xml/add_data_no_vcol/case_00101_add_org.xml" Order="3" />
-  <RunInfo Success="1" Time="1474006731" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00102_add_con.xml" Order="3" />
+  
 </TestCase>

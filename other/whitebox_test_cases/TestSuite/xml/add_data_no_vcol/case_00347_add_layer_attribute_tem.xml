@@ -13,6 +13,6 @@
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00345_add_layer.xml" Order="3" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00225_add_item_unit.xml" Order="4" />
-  <ReturnId ParaName="id" Value="62" colname="temperature_68674142362" />
-  <RunInfo Success="1" Time="1474006954" />
+  <ReturnId ParaName="id" Value="11" colname="temperature_46561540281" />
+  
 </TestCase>

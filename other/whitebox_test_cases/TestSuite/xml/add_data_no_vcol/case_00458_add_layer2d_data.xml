@@ -14,5 +14,5 @@
   <Parent CaseFile="xml/add_data_no_vcol/case_00450_add_layer2d_attribute_tem.xml" Force="1" Order="4" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00460_add_layer2d_attribute_hum.xml" Force="1" Order="5" />
   <ReturnId ParaName="id" Value="1" />
-  <RunInfo Success="1" Time="1474006947" />
+  
 </TestCase>

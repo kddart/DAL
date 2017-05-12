@@ -8,7 +8,7 @@
 # Purpose   : This is part of the testing framework for the Data Access Layer.
 #             This script is for removing records added in kddart_dal_test.pl.
 #
-#
+#             NOT WORKING ANY MORE - this is due to the use of memory storage instead of disk.
 
 use warnings;
 use strict;

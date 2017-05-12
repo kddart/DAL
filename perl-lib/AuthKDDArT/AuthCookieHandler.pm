@@ -13,6 +13,15 @@ use Apache2::RequestIO;
 use Apache2::RequestUtil;
 use CGI::Session;
 use Digest::HMAC_SHA1 qw(hmac_sha1 hmac_sha1_hex);
+use Apache2::Const qw(:common M_GET HTTP_FORBIDDEN HTTP_MOVED_TEMPORARILY HTTP_OK);
+use Apache::AuthCookie::Util qw(is_blank);
+use Apache2::AuthCookie::Params;
+use Apache2::Log;
+use Apache2::Access;
+use Apache2::Response;
+use Apache2::Util;
+use APR::Table;
+
 use vars qw($VERSION @ISA);
 
 sub authen_cred ($$\@) {
@@ -26,25 +35,14 @@ sub authen_cred ($$\@) {
   return $session_token;
 }
 
-sub authen_ses_key ($$$) {
+sub authenticate {
 
-  my ($self, $r, $cookie) = @_;
-  my $user = '';
+  my ($auth_type, $r) = @_;
 
-  $cookie = ($r->headers_in->get("Cookie") || "");
+  my $debug = $r->dir_config("AuthCookieDebug") || 0;
 
-  my $sess_id_cookie_name = $self->cookie_name($r);
-
-  my $session_id = read_cookie($cookie, $sess_id_cookie_name);
-
-  $r->log_error("FILEAUTH: SessionId: $session_id");
-  $r->log_error("FILEAUTH: Cookie: $cookie");
-
-  my $filename     = $r->filename();
-  my $uri          = $r->uri();
-  my $unparsed_uri = $r->unparsed_uri();
-
-  my $document_root = $r->document_root();
+  $r->server->log_error("authenticate() entry - Overriding the default authenticate method") if ($debug >= 3);
+  $r->server->log_error("auth_type " . $auth_type) if ($debug >= 3);
 
   my $args_txt     = $r->args();
 
@@ -54,6 +52,165 @@ sub authen_ses_key ($$$) {
 
     $args_txt_print = $args_txt;
   }
+
+  $r->log_error("authenticate args: $args_txt_print");
+
+  my $session_id = '';
+
+  if (defined $args_txt) {
+
+    if (length($args_txt) > 0) {
+
+      my @args_pair_list = split(/\&/, $args_txt);
+
+      foreach my $args_pair (@args_pair_list) {
+
+        my ($arg_name, $arg_val) = split(/=/, $args_pair);
+
+        if (uc($arg_name) eq 'KDDART_DAL_SESSID') {
+
+          $session_id = $arg_val;
+        }
+      }
+    }
+  }
+
+  $r->log_error("session id: $session_id");
+
+  if (my $prev = ($r->prev || $r->main)) {
+
+    # we are in a subrequest or internal redirect.  Just copy user from the
+    # previous or main request if its is present
+    if (defined $prev->user) {
+
+      $r->server->log_error('authenticate() is in a subrequest or internal redirect.') if $debug >= 3;
+      $r->user( $prev->user );
+      return OK;
+    }
+  }
+
+  if ($debug >= 3) {
+
+    $r->server->log_error("r=$r authtype=". $r->auth_type);
+  }
+
+  if ($r->auth_type ne $auth_type) {
+
+    # This location requires authentication because we are being called,
+    # but we don't handle this AuthType.
+    $r->server->log_error("AuthType mismatch: $auth_type =/= ".$r->auth_type) if $debug >= 3;
+    return DECLINED;
+  }
+
+  # Ok, the AuthType is $auth_type which we handle, what's the authentication
+  # realm's name?
+  my $auth_name = $r->auth_name;
+  $r->server->log_error("auth_name $auth_name") if $debug >= 2;
+
+  unless ($auth_name) {
+
+    $r->server->log_error("AuthName not set, AuthType=$auth_type", $r->uri);
+    return SERVER_ERROR;
+  }
+
+  # Get the Cookie header. If there is a session key for this realm, strip
+  # off everything but the value of the cookie.
+
+  my $ses_key_cookie = $session_id || $auth_type->key($r);
+
+  $r->server->log_error("ses_key_cookie: $ses_key_cookie");
+
+  $r->server->log_error("ses_key_cookie " . $ses_key_cookie) if $debug >= 1;
+  $r->server->log_error("uri " . $r->uri) if $debug >= 2;
+
+  if ($ses_key_cookie) {
+
+    my ($auth_user, @args) = $auth_type->authen_ses_key($r, $ses_key_cookie);
+
+    if (!is_blank($auth_user) and scalar @args == 0) {
+
+      # We have a valid session key, so we return with an OK value.
+      # Tell the rest of Apache what the authentication method and
+      # user is.
+
+      $r->ap_auth_type($auth_type);
+      $r->user($auth_user);
+      $r->server->log_error("user authenticated as $auth_user")
+        if $debug >= 1;
+
+      return OK;
+    }
+    elsif (scalar @args > 0 and $auth_type->can('custom_errors')) {
+
+      return $auth_type->custom_errors($r, $auth_user, @args);
+    }
+    else {
+
+      # There was a session key set, but it's invalid for some reason. So,
+      # remove it from the client now so when the credential data is posted
+      # we act just like it's a new session starting.
+
+      #$auth_type->remove_cookie($r);
+      #$r->subprocess_env('AuthCookieReason', 'bad_cookie');
+
+      $r->server->log_error("Bad session");
+    }
+  }
+  else {
+
+    $r->subprocess_env('AuthCookieReason', 'no_cookie');
+  }
+
+  # This request is not authenticated, but tried to get a protected
+  # document.  Send client the authen form.
+  return $auth_type->login_form($r);
+}
+
+sub authen_ses_key ($$$) {
+
+  my ($self, $r, $session_id) = @_;
+  my $user = '';
+
+  my $args_txt     = $r->args();
+
+  my $args_txt_print = '';
+
+  if (defined $args_txt) {
+
+    $args_txt_print = $args_txt;
+  }
+
+  my $cookie = ($r->headers_in->get("Cookie") || "");
+
+  my $sign_key_cookie_name = 'KDDArT_RANDOM_NUMBER';
+  my $sign_key_aref        = read_cookies($cookie, $sign_key_cookie_name);
+
+  if (defined $args_txt) {
+
+    if (length($args_txt) > 0) {
+
+      my @args_pair_list = split(/\&/, $args_txt);
+
+      foreach my $args_pair (@args_pair_list) {
+
+        my ($arg_name, $arg_val) = split(/=/, $args_pair);
+
+        if (uc($arg_name) eq 'KDDART_RANDOM_NUMBER') {
+
+          $sign_key_aref = [$arg_val];
+        }
+      }
+    }
+  }
+
+  $r->log_error("FILEAUTH: SessionId: $session_id");
+  $r->log_error("FILEAUTH: Cookie: $cookie");
+
+  my $filename     = $r->filename();
+  my $uri          = $r->uri();
+  my $unparsed_uri = $r->unparsed_uri();
+
+  my $document_root = $r->document_root();
 
   $r->log_error("FILEAUTH: DOCUMENT_ROOT: $document_root");
   $r->log_error("FILEAUTH: uri: $uri - unparsed_uri: $unparsed_uri - filename: $filename - args: $args_txt_print");
@@ -90,9 +247,6 @@ sub authen_ses_key ($$$) {
       $group_id            = $session->param('GROUP_ID');
       $user_id             = $session->param('USER_ID');
       $gadmin_status       = $session->param('GADMIN_STATUS');
-
-      my $sign_key_cookie_name = 'KDDArT_RANDOM_NUMBER';
-      my $sign_key_aref        = read_cookies($cookie, $sign_key_cookie_name);
 
       foreach my $sign_key (@{$sign_key_aref}) {
 
@@ -304,29 +458,31 @@ sub check_file_permission {
         if (length($args_txt) > 0) {
 
           my @args_pair_list = split(/\&/, $args_txt);
-          my $first_arg_pair = $args_pair_list[0];
 
-          my ($arg_name, $arg_val) = split(/=/, $first_arg_pair);
+          foreach my $args_pair (@args_pair_list) {
 
-          if (lc($arg_name) eq 'saveas') {
+            my ($arg_name, $arg_val) = split(/=/, $args_pair);
 
-            if ($arg_val eq '1') {
+            if (lc($arg_name) eq 'saveas') {
 
-              my $org_name = read_cell_value($dbh_k, 'multimedia', 'OrigFileName', 'HashFileName', $hash_filename);
+              if ($arg_val eq '1') {
 
-              if (length($org_name) == 0) {
+                my $org_name = read_cell_value($dbh_k, 'multimedia', 'OrigFileName', 'HashFileName', $hash_filename);
 
-                $saveas_orig_name = $hash_filename;
-              }
-              else {
-
-                if (lc($org_name) eq 'uploadfile') {
+                if (length($org_name) == 0) {
 
                   $saveas_orig_name = $hash_filename;
                 }
                 else {
 
-                  $saveas_orig_name = $org_name;
+                  if (lc($org_name) eq 'uploadfile') {
+
+                    $saveas_orig_name = $hash_filename;
+                  }
+                  else {
+
+                    $saveas_orig_name = $org_name;
+                  }
                 }
               }
             }

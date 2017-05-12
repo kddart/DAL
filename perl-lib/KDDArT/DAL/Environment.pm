@@ -163,9 +163,13 @@ sub setup {
 
   $self->{logger} = $logger;
 
+  my $domain_name = $COOKIE_DOMAIN->{$ENV{DOCUMENT_ROOT}};
+  $self->logger->debug("COOKIE DOMAIN: $domain_name");
+
   $self->authen->config(LOGIN_URL => '');
   $self->session_config(
-          CGI_SESSION_OPTIONS => [ "driver:File", $self->query, {Directory=>$SESSION_STORAGE_PATH} ],
+          CGI_SESSION_OPTIONS => [ "driver:File", $self->query, {Directory => $SESSION_STORAGE_PATH} ],
+          SEND_COOKIE         => 0,
       );
 
   $XML::Checker::FAIL = sub { $self->xml_parse_failed(@_); };
@@ -175,7 +179,7 @@ sub add_layer_n_attrib_runmode {
 
 =pod add_layer_n_attrib_HELP_START
 {
-"OperationName" : "Add layer with attributes",
+"OperationName": "Add layer with attributes",
 "Description": "Add a new layer with definition of attribute(s). It is extended version of add/layer call. This method does not import or creates any geo-referenced data.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -612,7 +616,7 @@ sub add_layer_runmode {
 
 =pod add_layer_HELP_START
 {
-"OperationName" : "Add layer",
+"OperationName": "Add layer",
 "Description": "Create a new GIS layer definition in the system. This method does not import or creates any geo-referenced data.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -924,7 +928,7 @@ sub register_device_runmode {
 
 =pod register_device_gadmin_HELP_START
 {
-"OperationName" : "Add device registration",
+"OperationName": "Add device registration",
 "Description": "Register a new device in the system. Device can be any measuring instrument or sensor later used to obtain some data.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -1060,7 +1064,7 @@ sub update_device_registration_runmode {
 
 =pod update_device_registration_gadmin_HELP_START
 {
-"OperationName" : "Update device",
+"OperationName": "Update device",
 "Description": "Update information about registered device specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -1124,9 +1128,39 @@ sub update_device_registration_runmode {
     return $data_for_postrun_href;
   }
 
-  my $note = read_cell_value($dbh_write, 'deviceregister', 'DeviceNote', 'DeviceRegisterId', $reg_id);
-  my $lng  = read_cell_value($dbh_write, 'deviceregister', 'Longitude', 'DeviceRegisterId', $reg_id);
-  my $lat  = read_cell_value($dbh_write, 'deviceregister', 'Latitude', 'DeviceRegisterId', $reg_id);
+  my $read_device_sql     =  'SELECT DeviceNote, Longitude, Latitude ';
+     $read_device_sql    .=  'FROM deviceregister WHERE DeviceRegisterId=? ';
+
+  my ($r_df_val_err, $r_df_val_msg, $device_df_val_data) = read_data($dbh_write, $read_device_sql, [$reg_id]);
+
+
+  if ($r_df_val_err) {
+
+    $self->logger->debug("Retrieve device default values for optional fields failed: $r_df_val_msg");
+    $data_for_postrun_href->{'Error'}  = 1;
+    $data_for_postrun_href->{'Data'}   = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $note      =   undef;
+  my $lng       =   undef;
+  my $lat       =   undef;
+
+  my $nb_df_val_rec    =  scalar(@{$device_df_val_data});
+
+  if ($nb_df_val_rec != 1)  {
+
+     $self->logger->debug("Retrieve device default values - number of records unacceptable: $nb_df_val_rec");
+     $data_for_postrun_href->{'Error'} = 1;
+     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+     return $data_for_postrun_href;
+  }
+
+  $note     =  $device_df_val_data->[0]->{'DeviceNote'};
+  $lng      =  $device_df_val_data->[0]->{'Longitude'};
+  $lat      =  $device_df_val_data->[0]->{'Latitude'};
 
   if (defined $query->param('DeviceNote')) {
 
@@ -1176,7 +1210,7 @@ sub map_device_param_runmode {
 
 =pod map_device_param_gadmin_HELP_START
 {
-"OperationName" : "Map device parameter",
+"OperationName": "Map device parameter",
 "Description": "Map device or sensor to particular attribute defined for a GIS layer. Device can be mapped to one or more attributes and/or layers indicating where the data are coming from.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -1371,7 +1405,7 @@ sub update_device_param_mapping_runmode {
 
 =pod update_device_param_mapping_gadmin_HELP_START
 {
-"OperationName" : "Update parameter mapping",
+"OperationName": "Update parameter mapping",
 "Description": "Update parameter mapping to the GIS attribute and the specified device id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -1474,7 +1508,37 @@ sub update_device_param_mapping_runmode {
     return $data_for_postrun_href;
   }
 
-  my $layertype = read_cell_value($dbh_gis_write, 'layer', 'layertype', 'id', $layer_id);
+  my $read_dv_p_m_sql     =   'SELECT layertype, geometrytype ';
+     $read_dv_p_m_sql    .=   'FROM layer WHERE id=? ';
+
+  my ($r_df_val_err, $r_df_val_msg, $dv_p_m_df_val_data) = read_data($dbh_gis_write, $read_dv_p_m_sql, [$layer_id]);
+
+  if ($r_df_val_err) {
+
+    $self->logger->debug("Retrieve device param mapping default values for optional fields failed: $r_df_val_msg");
+    $data_for_postrun_href->{'Error'}  = 1;
+    $data_for_postrun_href->{'Data'}   = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $layertype          =   undef;
+  my $geometry_type      =   undef;
+
+  my $nb_df_val_rec    =  scalar(@{$dv_p_m_df_val_data});
+
+  if ($nb_df_val_rec != 1)  {
+
+     $self->logger->debug("Retrieve device param mapping default values - number of records unacceptable: $nb_df_val_rec");
+     $data_for_postrun_href->{'Error'} = 1;
+     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+     return $data_for_postrun_href;
+  }
+
+  $layertype          =   $dv_p_m_df_val_data->[0]->{'layertype'};
+  $geometry_type      =   $dv_p_m_df_val_data->[0]->{'geometrytype'};
+
 
   if (uc($layertype) eq '2D') {
 
@@ -1486,7 +1550,6 @@ sub update_device_param_mapping_runmode {
     return $data_for_postrun_href;
   }
 
-  my $geometry_type = read_cell_value($dbh_gis_write, 'layer', 'geometrytype', 'id', $layer_id);
 
   if (length($geometry_type) > 0) {
 
@@ -1563,7 +1626,7 @@ sub log_environment_data_bulk_runmode {
 
 =pod log_environment_data_HELP_START
 {
-"OperationName" : "Log environment data",
+"OperationName": "Log environment data",
 "Description": "Insert a log entity into GIS layer. Mostly used as a log of spatio-temporal information where geo-location can already be known, but new entry is next record in time.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -2121,7 +2184,7 @@ sub list_layer_full_runmode {
 
 =pod list_layer_full_HELP_START
 {
-"OperationName" : "List layers",
+"OperationName": "List layers",
 "Description": "Return list of GIS layers defined in the system.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -2193,7 +2256,7 @@ sub get_layer_runmode {
 
 =pod get_layer_HELP_START
 {
-"OperationName" : "Get layer",
+"OperationName": "Get layer",
 "Description": "Return detailed information about GIS layer in the system specified by layer id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -2330,7 +2393,7 @@ sub list_parameter_mapping_full_runmode {
 
 =pod list_parameter_mapping_full_HELP_START
 {
-"OperationName" : "List mapped parameters",
+"OperationName": "List mapped parameters",
 "Description": "Return current list of parameter mappings between GIS attributes and devices.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -2389,7 +2452,7 @@ sub get_parameter_mapping_runmode {
 
 =pod get_parameter_mapping_HELP_START
 {
-"OperationName" : "Get mapped parameter",
+"OperationName": "Get mapped parameter",
 "Description": "Return detailed information for mapped parameter to the GIS attribute and the specified device id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -2611,7 +2674,7 @@ sub list_dev_registration_full_runmode {
 
 =pod list_dev_registration_full_HELP_START
 {
-"OperationName" : "List devices",
+"OperationName": "List devices",
 "Description": "Return a list of registered devices.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -2711,7 +2774,7 @@ sub list_layer_attribute_runmode {
 
 =pod list_layer_attribute_HELP_START
 {
-"OperationName" : "List attributes",
+"OperationName": "List attributes",
 "Description": "Return a list of all attributes for all available GIS layers.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -2770,7 +2833,7 @@ sub add_layer_attribute_runmode {
 
 =pod add_layer_attribute_HELP_START
 {
-"OperationName" : "Add attribute to the layer",
+"OperationName": "Add attribute to the layer",
 "Description": "Add a new attribute to the GIS layer",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -2975,7 +3038,7 @@ sub add_layer_attribute_bulk_runmode {
 
 =pod add_layer_attribute_bulk_HELP_START
 {
-"OperationName" : "Add layer attributes",
+"OperationName": "Add layer attributes",
 "Description": "Add a new set of attributes to a GIS layer specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -3217,7 +3280,7 @@ sub export_layer_data_shape_runmode {
 
 =pod export_layer_data_shape_HELP_START
 {
-"OperationName" : "Export GIS data",
+"OperationName": "Export GIS data",
 "Description": "Export GIS dataset in either shape or csv format for the layer specified by id. CSV format contains description of geometric object using WKT (Well Known Text) notation.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -3228,7 +3291,7 @@ sub export_layer_data_shape_runmode {
 "SuccessMessageJSON": "{'OutputFile' : [{'shp' : 'http://kddart-d.diversityarrays.com/data/admin/export_1_6_1_4_3_7_2_5__68fe6e93f44f5120d599477caef61d6a.shp','csv' : 'http://kddart-d.diversityarrays.com/data/admin/export_1_6_1_4_3_7_2_5__68fe6e93f44f5120d599477caef61d6a.csv','dbf' : 'http://kddart-d.diversityarrays.com/data/admin/export_1_6_1_4_3_7_2_5__68fe6e93f44f5120d599477caef61d6a.dbf','shx' : 'http://kddart-d.diversityarrays.com/data/admin/export_1_6_1_4_3_7_2_5__68fe6e93f44f5120d599477caef61d6a.shx'}]}",
 "ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
 "ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
-"HTTPParameter": [{"Required": 0, "Name": "AttributeIdCSV", "Description": "Comma separted value of wanted layer attribute id list"}, {"Required": 0, "Name": "TimeFrom", "Description": "The startting time of wanted layer data. It is inclusive."}, {"Required": 0, "Name": "TimeTo", "Description": "The ending time of wanted layer data. It is inclusive"}, {"Required": 0, "Name": "AOITopLeftLong", "Description": "Area of Interest longitude. Area of Interest parameters define a rectangular geographic area where wanted data were recorded. If data over an area of interest is wanted, all four parameter must be provided."}, {"Required": 0, "Name": "AOITopLeftLat", "Description": "Area of Interest latitude"}, {"Required": 0, "Name": "AOIBottomRightLong", "Description": "Area of Interest bottom right longitude"}, {"Required": 0, "Name": "AOIBottomRightLat", "Description": "Area of Interest bottom right latitude"}],
+"HTTPParameter": [{"Required": 0, "Name": "AttributeIdCSV", "Description": "Comma separated value of wanted layer attribute id list"}, {"Required": 0, "Name": "TimeFrom", "Description": "The starting time of wanted layer data. It is inclusive."}, {"Required": 0, "Name": "TimeTo", "Description": "The ending time of wanted layer data. It is inclusive"}, {"Required": 0, "Name": "AOITopLeftLong", "Description": "Area of Interest longitude. Area of Interest parameters define a rectangular geographic area where wanted data were recorded. If data over an area of interest is wanted, all four parameter must be provided."}, {"Required": 0, "Name": "AOITopLeftLat", "Description": "Area of Interest latitude"}, {"Required": 0, "Name": "AOIBottomRightLong", "Description": "Area of Interest bottom right longitude"}, {"Required": 0, "Name": "AOIBottomRightLat", "Description": "Area of Interest bottom right latitude"}],
 "URLParameter": [{"ParameterName": "id", "Description": "Existing LayerId."}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
@@ -3621,7 +3684,7 @@ sub import_layer_data_csv_bulk_runmode {
 
 =pod import_layer_data_csv_HELP_START
 {
-"OperationName" : "Import GIS data",
+"OperationName": "Import GIS data",
 "Description": "Import GIS dataset from csv file into a layer specified by id. Geometry objects have to be described in WKT (Well Known Text) notation.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -4021,7 +4084,7 @@ sub del_device_registration_runmode {
 
 =pod del_device_registration_gadmin_HELP_START
 {
-"OperationName" : "Delete device",
+"OperationName": "Delete device",
 "Description": "Delete device from the system specified by id. Device can only be deleted if it is not attached to lower level records in the database.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -4116,7 +4179,7 @@ sub update_layer_runmode {
 
 =pod update_layer_HELP_START
 {
-"OperationName" : "Update layer",
+"OperationName": "Update layer",
 "Description": "Update GIS layer definition",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -4199,7 +4262,48 @@ sub update_layer_runmode {
     return $data_for_postrun_href;
   }
 
-  my $parent_layer              = read_cell_value($dbh_write, 'layer', 'parent', 'id', $layer_id);
+  my $read_layer_sql    =    'SELECT parent, layermetadata, srid, alias, ';
+     $read_layer_sql   .=    'description, layertype, geometrytype ';
+     $read_layer_sql   .=    'FROM layer WHERE id=? ';
+
+  my ($r_df_val_err, $r_df_val_msg, $layer_df_val_data) = read_data($dbh_write, $read_layer_sql, [$layer_id]);
+
+  if ($r_df_val_err) {
+
+    $self->logger->debug("Retrieve layer default values for optional fields failed: $r_df_val_msg");
+    $data_for_postrun_href->{'Error'}  = 1;
+    $data_for_postrun_href->{'Data'}   = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $parent_layer         =   undef;
+  my $layer_mdata          =   undef;
+  my $layer_srid           =   undef;
+  my $layer_alias          =   undef;
+  my $layer_description    =   undef;
+  my $db_layer_type        =   undef;
+  my $db_geometry_type     =   undef;
+
+  my $nb_df_val_rec    =  scalar(@{$layer_df_val_data});
+
+  if ($nb_df_val_rec != 1)  {
+
+     $self->logger->debug("Retrieve layer default values - number of records unacceptable: $nb_df_val_rec");
+     $data_for_postrun_href->{'Error'} = 1;
+     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+     return $data_for_postrun_href;
+  }
+
+  $parent_layer         =   $layer_df_val_data->[0]->{'parent'};
+  $layer_mdata          =   $layer_df_val_data->[0]->{'layermetadata'};
+  $layer_srid           =   $layer_df_val_data->[0]->{'srid'};
+  $layer_alias          =   $layer_df_val_data->[0]->{'alias'};
+  $layer_description    =   $layer_df_val_data->[0]->{'description'};
+  $db_layer_type        =   $layer_df_val_data->[0]->{'layertype'};
+  $db_geometry_type     =   $layer_df_val_data->[0]->{'geometrytype'};
+
 
   if (length($parent_layer) == 0) {
 
@@ -4216,7 +4320,6 @@ sub update_layer_runmode {
 
   my $layer_name                = $query->param('name');
 
-  my $layer_mdata               = read_cell_value($dbh_write, 'layer', 'layermetadata', 'id', $layer_id);
 
   if (length($layer_mdata) == 0) {
 
@@ -4233,7 +4336,6 @@ sub update_layer_runmode {
 
   my $is_editable               = $query->param('iseditable');
 
-  my $layer_srid                = read_cell_value($dbh_write, 'layer', 'srid', 'id', $layer_id);
 
   if (length($layer_srid) == 0) {
 
@@ -4261,8 +4363,6 @@ sub update_layer_runmode {
     }
   }
 
-  my $layer_alias            = read_cell_value($dbh_write, 'layer', 'alias', 'id', $layer_id);
-  my $layer_description      = read_cell_value($dbh_write, 'layer', 'description', 'id', $layer_id);
 
   if ( length($query->param('alias')) > 0 ) { $layer_alias = $query->param('alias'); }
 
@@ -4320,7 +4420,6 @@ sub update_layer_runmode {
     }
   }
 
-  my $db_layer_type = read_cell_value($dbh_write, 'layer', 'layertype', 'id', $layer_id);
 
   my $chk_data_sql = '';
 
@@ -4368,7 +4467,6 @@ sub update_layer_runmode {
     }
   }
 
-  my $db_geometry_type = read_cell_value($dbh_write, 'layer', 'geometrytype', 'id', $layer_id);
 
   my $ACCEPTABLE_GEOM_TYPE = { 'POINT'              => 1,
                                'LINESTRING'         => 1,
@@ -5092,7 +5190,7 @@ sub update_layer_attribute_runmode {
 
 =pod update_layer_attribute_HELP_START
 {
-"OperationName" : "Update layer attribute",
+"OperationName": "Update layer attribute",
 "Description": "Update the definition of layer attribute",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -5144,7 +5242,41 @@ sub update_layer_attribute_runmode {
 
   # Finish generic required static field checking
 
-  my $layer_id = read_cell_value($dbh_write, 'layerattrib', 'layer', 'id', $layer_attrib_id);
+  my $read_layer_attrib_sql   =   'SELECT layer, validation, coltype, colname ';
+     $read_layer_attrib_sql  .=   'FROM layerattrib WHERE id=? ';
+
+  my ($r_df_val_err, $r_df_val_msg, $layer_attrib_df_val_data) = read_data($dbh_write, $read_layer_attrib_sql, [$layer_attrib_id]);
+
+  if ($r_df_val_err) {
+
+    $self->logger->debug("Retrieve layer attribute default values for optional fields failed: $r_df_val_msg");
+    $data_for_postrun_href->{'Error'}  = 1;
+    $data_for_postrun_href->{'Data'}   = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $layer_id       =   undef;
+  my $validation     =   undef;
+  my $db_coltype     =   undef;
+  my $db_colname     =   undef;
+
+  my $nb_df_val_rec    =  scalar(@{$layer_attrib_df_val_data});
+
+  if ($nb_df_val_rec != 1)  {
+
+     $self->logger->debug("Retrieve layer attribute default values - number of records unacceptable: $nb_df_val_rec");
+     $data_for_postrun_href->{'Error'} = 1;
+     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+     return $data_for_postrun_href;
+  }
+
+  $layer_id       =   $layer_attrib_df_val_data->[0]->{'layer'};;
+  $validation     =   $layer_attrib_df_val_data->[0]->{'validation'};
+  $db_coltype     =   $layer_attrib_df_val_data->[0]->{'coltype'};
+  $db_colname     =   $layer_attrib_df_val_data->[0]->{'colname'};
+
 
   if (length($layer_id) == 0) {
 
@@ -5180,7 +5312,6 @@ sub update_layer_attribute_runmode {
 
   $colname = lc($colname);
 
-  my $validation = read_cell_value($dbh_write, 'layerattrib', 'validation', 'id', $layer_attrib_id);
 
   if (defined $query->param('validation')) {
 
@@ -5275,8 +5406,6 @@ sub update_layer_attribute_runmode {
     return $data_for_postrun_href;
   }
 
-  my $db_coltype = read_cell_value($dbh_write, 'layerattrib', 'coltype', 'id', $layer_attrib_id);
-
   if (lc($coltype) ne lc($db_coltype)) {
 
     if ($nb_record > 0) {
@@ -5290,7 +5419,6 @@ sub update_layer_attribute_runmode {
     }
   }
 
-  my $db_colname = read_cell_value($dbh_write, 'layerattrib', 'colname', 'id', $layer_attrib_id);
 
   if (lc($colname) ne lc($db_colname)) {
 
@@ -5378,7 +5506,7 @@ sub del_layer_runmode {
 
 =pod del_layer_gadmin_HELP_START
 {
-"OperationName" : "Delete layer",
+"OperationName": "Delete layer",
 "Description": "Delete layer definition and its data",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -5550,7 +5678,7 @@ sub del_layer_attribute_runmode {
 
 =pod del_layer_attribute_gadmin_HELP_START
 {
-"OperationName" : "Delete layer attribute",
+"OperationName": "Delete layer attribute",
 "Description": "Delete the definition of layer attribute and its data",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -5866,8 +5994,8 @@ sub add_layer2d_data_runmode {
 
 =pod add_layer2d_data_HELP_START
 {
-"OperationName" : "Add data to layer 2D",
-"Description": "",
+"OperationName": "Add data to 2D layer",
+"Description": "Add data to a 2D layer table",
 "AuthRequired": 1,
 "GroupRequired": 1,
 "GroupAdminRequired": 0,
@@ -6076,8 +6204,8 @@ sub update_layer2d_data_runmode {
 
 =pod update_layer2d_data_HELP_START
 {
-"OperationName" : "Update a record in 2D layer",
-"Description": "",
+"OperationName": "Update a record in 2D layer",
+"Description": "Update a record in 2D layer table",
 "AuthRequired": 1,
 "GroupRequired": 1,
 "GroupAdminRequired": 0,
@@ -6101,7 +6229,37 @@ sub update_layer2d_data_runmode {
 
   my $dbh_write = connect_gis_write();
 
-  my $layertype = read_cell_value($dbh_write, 'layer', 'layertype', 'id', $layer_id);
+  my $read_layer2d_sql   =  'SELECT layertype, geometrytype ';
+     $read_layer2d_sql  .=  'FROM layer WHERE id=? ';
+
+  my ($r_df_val_err, $r_df_val_msg, $layer2d_df_val_data) = read_data($dbh_write, $read_layer2d_sql, [$layer_id]);
+
+  if ($r_df_val_err) {
+
+    $self->logger->debug("Retrieve layer2d default values for optional fields failed: $r_df_val_msg");
+    $data_for_postrun_href->{'Error'}  = 1;
+    $data_for_postrun_href->{'Data'}   = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $layertype     =   undef;
+  my $geometry_type =   undef;
+
+  my $nb_df_val_rec    =  scalar(@{$layer2d_df_val_data});
+
+  if ($nb_df_val_rec != 1)  {
+
+     $self->logger->debug("Retrieve layer2d default values - number of records unacceptable: $nb_df_val_rec");
+     $data_for_postrun_href->{'Error'} = 1;
+     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+     return $data_for_postrun_href;
+  }
+
+  $layertype      =  $layer2d_df_val_data->[0]->{'layertype'}; 
+  $geometry_type  =  $layer2d_df_val_data->[0]->{'geometrytype'};
+
 
   if (length($layertype) == 0) {
 
@@ -6161,7 +6319,6 @@ sub update_layer2d_data_runmode {
     return $data_for_postrun_href;
   }
 
-  my $geometry_type = read_cell_value($dbh_write, 'layer', 'geometrytype', 'id', $layer_id);
 
   my ($is_wkt_err, $wkt_err_href) = is_valid_wkt_href($dbh_write, {'geometry' => $geometry}, uc($geometry_type));
 
@@ -6289,8 +6446,8 @@ sub list_layer2d_data_runmode {
 
 =pod list_layer2d_data_advanced_HELP_START
 {
-"OperationName" : "List records in 2D layer",
-"Description": "",
+"OperationName": "List records in 2D layer",
+"Description": "Listing records from 2D layer table",
 "AuthRequired": 1,
 "GroupRequired": 1,
 "GroupAdminRequired": 0,
@@ -6578,7 +6735,7 @@ sub get_layer2d_data_runmode {
 
 =pod get_layer2d_data_HELP_START
 {
-"OperationName" : "Get a record in 2D layer",
+"OperationName": "Get a record in 2D layer",
 "Description": "",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -6716,7 +6873,7 @@ sub del_layer2d_data_runmode {
 
 =pod del_layer2d_data_gadmin_HELP_START
 {
-"OperationName" : "Delete a record in 2D layer",
+"OperationName": "Delete a record in 2D layer",
 "Description": "",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -6819,7 +6976,7 @@ sub list_layer_data_advanced_runmode {
 
 =pod list_layer_data_advanced_HELP_START
 {
-"OperationName" : "List records in layer",
+"OperationName": "List records in layer",
 "Description": "",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -7073,7 +7230,7 @@ sub add_layer_data_runmode {
 
 =pod add_layer_data_HELP_START
 {
-"OperationName" : "Add data to layer",
+"OperationName": "Add data to layer",
 "Description": "Add data into layer from a JSON string or blob",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -7422,7 +7579,7 @@ sub update_layer_data_runmode {
 
 =pod update_layer_data_gadmin_HELP_START
 {
-"OperationName" : "Update layer data",
+"OperationName": "Update layer data",
 "Description": "Update layer data from a JSON string or blob. The record must exist or DAL will return an error.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -7447,7 +7604,37 @@ sub update_layer_data_runmode {
 
   my $dbh_write = connect_gis_write();
 
-  my $layertype = read_cell_value($dbh_write, 'layer', 'layertype', 'id', $layer_id);
+  my $read_layer2d_sql   =  'SELECT layertype, geometrytype ';
+     $read_layer2d_sql  .=  'FROM layer WHERE id=? ';
+
+  my ($r_df_val_err, $r_df_val_msg, $layer2d_df_val_data) = read_data($dbh_write, $read_layer2d_sql, [$layer_id]);
+
+  if ($r_df_val_err) {
+
+    $self->logger->debug("Retrieve layer2d default values for optional fields failed: $r_df_val_msg");
+    $data_for_postrun_href->{'Error'}  = 1;
+    $data_for_postrun_href->{'Data'}   = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $layertype     =   undef;
+  my $geometry_type =   undef;
+
+  my $nb_df_val_rec    =  scalar(@{$layer2d_df_val_data});
+
+  if ($nb_df_val_rec != 1)  {
+
+     $self->logger->debug("Retrieve layer2d default values - number of records unacceptable: $nb_df_val_rec");
+     $data_for_postrun_href->{'Error'} = 1;
+     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+     return $data_for_postrun_href;
+  }
+
+  $layertype      =  $layer2d_df_val_data->[0]->{'layertype'};
+  $geometry_type  =  $layer2d_df_val_data->[0]->{'geometrytype'};
+
 
   if (length($layertype) == 0) {
 
@@ -7580,8 +7767,6 @@ sub update_layer_data_runmode {
 
     return $data_for_postrun_href;
   }
-
-  my $geometry_type = read_cell_value($dbh_write, 'layer', 'geometrytype', 'id', $layer_id);
 
   my $data_aref = $data_obj->{'DATA'};
 
@@ -7759,8 +7944,8 @@ sub del_layer_data_runmode {
 
 =pod del_layer_data_gadmin_HELP_START
 {
-"OperationName" : "Delete layer data",
-"Description": "Delete data from layer for a particular attribute, for an exact geometry position and from a starting datetime to an ending dattetime.",
+"OperationName": "Delete layer data",
+"Description": "Delete data from layer for a particular attribute, for an exact geometry position and from a starting datetime to an ending datetime.",
 "AuthRequired": 1,
 "GroupRequired": 1,
 "GroupAdminRequired": 0,

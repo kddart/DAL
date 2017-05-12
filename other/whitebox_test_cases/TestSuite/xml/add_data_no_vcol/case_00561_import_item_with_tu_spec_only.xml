@@ -15,5 +15,5 @@
   <Parent CaseFile="xml/add_data_no_vcol/case_00308_add_item_type.xml" Order="5" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00552_trialunit_add_spec4crossing.xml" Order="6" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00553_trialunit_add_spec4crossing.xml" Order="7" />
-  <RunInfo Success="1" Time="1473398198" />
+  
 </TestCase>

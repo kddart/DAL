@@ -87,8 +87,14 @@ sub setup {
   $logger->level($DEBUG);
   $self->{logger} = $logger;
 
-  $self->authen->config( LOGIN_URL => '' );
-  $self->session_config( CGI_SESSION_OPTIONS => [ "driver:File", $self->query, { Directory => $SESSION_STORAGE_PATH } ], );
+  my $domain_name = $COOKIE_DOMAIN->{$ENV{DOCUMENT_ROOT}};
+  $self->logger->debug("COOKIE DOMAIN: $domain_name");
+
+  $self->authen->config(LOGIN_URL => '');
+  $self->session_config(
+          CGI_SESSION_OPTIONS => [ "driver:File", $self->query, {Directory => $SESSION_STORAGE_PATH} ],
+          SEND_COOKIE         => 0,
+      );
 
   $self->run_modes(
     'export_marker_dart'                              => 'export_marker_dart_runmode',
@@ -112,7 +118,7 @@ sub import_markerdata_dart_runmode {
 
 =pod import_markerdata_dart_HELP_START
 {
-"OperationName" : "Import marker dataset",
+"OperationName": "Import marker dataset",
 "Description": "Import scoring marker dataset from a CSV file.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -1051,7 +1057,7 @@ sub export_marker_dart_runmode {
 
 =pod export_marker_dart_HELP_START
 {
-"OperationName" : "Export marker dataset",
+"OperationName": "Export marker dataset",
 "Description": "Export analysis group marker dataset in a CSV form",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -1231,8 +1237,36 @@ sub export_marker_dart_runmode {
 
   my $dbh_k_read = connect_kdb_read();
 
-  my $mrk_name_fieldname = read_cell_value($dbh_m_read, 'dataset', 'MarkerNameFieldName', 'DataSetId', $dataset_id);
-  my $seq_fieldname      = read_cell_value($dbh_m_read, 'dataset', 'MarkerSequenceFieldName', 'DataSetId', $dataset_id);
+  my $read_dataset_sql   = 'SELECT "MarkerNameFieldName", "MarkerSequenceFieldName" ';
+     $read_dataset_sql  .= 'FROM dataset WHERE "DataSetId"=? ';
+
+  my ($r_df_val_err, $r_df_val_msg, $dataset_df_val_data) = read_data($dbh_m_read, $read_dataset_sql, [$dataset_id]);
+
+  if ($r_df_val_err) {
+
+    $self->logger->debug("Retrieve dataset default values for optional fields failed: $r_df_val_msg");
+    $data_for_postrun_href->{'Error'}  = 1;
+    $data_for_postrun_href->{'Data'}   = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $mrk_name_fieldname    = undef;
+  my $seq_fieldname         = undef;
+
+  my $nb_df_val_rec    =  scalar(@{$dataset_df_val_data});
+
+  if ($nb_df_val_rec != 1)  {
+
+     $self->logger->debug("Retrieve dataset default values - number of records unacceptable: $nb_df_val_rec");
+     $data_for_postrun_href->{'Error'} = 1;
+     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+     return $data_for_postrun_href;
+  }
+
+  $mrk_name_fieldname    = $dataset_df_val_data->[0]->{'MarkerNameFieldName'};
+  $seq_fieldname         = $dataset_df_val_data->[0]->{'MarkerSequenceFieldName'}; 
 
   my @filterable_fieldlist = ($mrk_name_fieldname, $seq_fieldname);
 
@@ -1835,7 +1869,7 @@ sub list_marker_meta_field_runmode {
 
 =pod list_marker_meta_field_HELP_START
 {
-"OperationName" : "List metadata fields",
+"OperationName": "List metadata fields",
 "Description": "List metadata fields of marker table for analysis group specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -1993,7 +2027,7 @@ sub list_marker_runmode {
 
 =pod list_marker_HELP_START
 {
-"OperationName" : "List markers",
+"OperationName": "List markers",
 "Description": "List marker information from an analysis group dataset.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -2354,7 +2388,7 @@ sub get_marker_runmode {
 
 =pod get_marker_HELP_START
 {
-"OperationName" : "Get marker information",
+"OperationName": "Get marker information",
 "Description": "Get an individual marker information",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -2501,7 +2535,7 @@ sub list_marker_data_runmode {
 
 =pod list_marker_data_HELP_START
 {
-"OperationName" : "List marker data",
+"OperationName": "List marker data",
 "Description": "List analysis group dataset marker data with pagination limiting the number of markers and blocksination limiting the number of samples/extracts.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -2668,8 +2702,36 @@ sub list_marker_data_runmode {
 
   my $dataset_id = $dataset_id_aref->[0];
 
-  my $mrk_name_fieldname = read_cell_value($dbh_m, 'dataset', 'MarkerNameFieldName', 'DataSetId', $dataset_id);
-  my $seq_fieldname      = read_cell_value($dbh_m, 'dataset', 'MarkerSequenceFieldName', 'DataSetId', $dataset_id);
+  my $read_dataset_sql   = 'SELECT "MarkerNameFieldName", "MarkerSequenceFieldName" ';
+     $read_dataset_sql  .= 'FROM dataset WHERE "DataSetId"=? ';
+
+  my ($r_df_val_err, $r_df_val_msg, $dataset_df_val_data) = read_data($dbh_m, $read_dataset_sql, [$dataset_id]);
+
+  if ($r_df_val_err) {
+
+    $self->logger->debug("Retrieve dataset default values for optional fields failed: $r_df_val_msg");
+    $data_for_postrun_href->{'Error'}  = 1;
+    $data_for_postrun_href->{'Data'}   = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $mrk_name_fieldname =  undef;
+  my $seq_fieldname      =  undef;
+
+  my $nb_df_val_rec    =  scalar(@{$dataset_df_val_data});
+
+  if ($nb_df_val_rec != 1)  {
+
+     $self->logger->debug("Retrieve dataset default values - number of records unacceptable: $nb_df_val_rec");
+     $data_for_postrun_href->{'Error'} = 1;
+     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+     return $data_for_postrun_href;
+  }
+
+  $mrk_name_fieldname =  $dataset_df_val_data->[0]->{'MarkerNameFieldName'};
+  $seq_fieldname      =  $dataset_df_val_data->[0]->{'MarkerSequenceFieldName'};
 
   my @filterable_fieldlist = ($mrk_name_fieldname, $seq_fieldname);
 
@@ -3130,7 +3192,7 @@ sub add_markermap_runmode {
 
 =pod add_markermap_gadmin_HELP_START
 {
-"OperationName" : "Add Marker Map",
+"OperationName": "Add Marker Map",
 "Description": "Create marker map definition",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -3287,7 +3349,7 @@ sub update_markermap_runmode {
 
 =pod update_markermap_gadmin_HELP_START
 {
-"OperationName" : "Update Marker Map",
+"OperationName": "Update Marker Map",
 "Description": "Update marker map definition",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -3346,7 +3408,43 @@ sub update_markermap_runmode {
     return $data_for_postrun_href;
   }
 
-  my $db_operator_id = read_cell_value($dbh_m_write, 'markermap', 'OperatorId', 'MarkerMapId', $marker_map_id);
+  my $read_markermap_sql    =  'SELECT "OperatorId", "ModelRef", "MapDescription", "MapSoftware", "MapParameters" ';
+     $read_markermap_sql    .= 'FROM markermap WHERE "MarkerMapId"=? ';
+
+  my ($r_df_val_err, $r_df_val_msg, $markermap_df_val_data) = read_data($dbh_m_write, $read_markermap_sql, [$marker_map_id]);
+
+  if ($r_df_val_err) {
+
+    $self->logger->debug("Retrieve markermap default values for optional fields failed: $r_df_val_msg");
+    $data_for_postrun_href->{'Error'}  = 1;
+    $data_for_postrun_href->{'Data'}   = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $db_operator_id     =   undef;
+  my $model_ref          =   undef;
+  my $map_desc           =   undef;
+  my $map_soft           =   undef;
+  my $map_params         =   undef;
+
+  my $nb_df_val_rec    =  scalar(@{$markermap_df_val_data});
+
+  if ($nb_df_val_rec != 1)  {
+
+     $self->logger->debug("Retrieve markermap default values - number of records unacceptable: $nb_df_val_rec");
+     $data_for_postrun_href->{'Error'} = 1;
+     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+  
+     return $data_for_postrun_href;
+  }
+
+  $db_operator_id     =   $markermap_df_val_data->[0]->{'OperatorId'};
+  $model_ref          =   $markermap_df_val_data->[0]->{'ModelRef'};
+  $map_desc           =   $markermap_df_val_data->[0]->{'MapDescription'};
+  $map_soft           =   $markermap_df_val_data->[0]->{'MapSoftware'};
+  $map_params         =   $markermap_df_val_data->[0]->{'MapParameters'};
+
 
   my $user_id = $self->authen->user_id();
 
@@ -3359,10 +3457,6 @@ sub update_markermap_runmode {
     return $data_for_postrun_href;
   }
 
-  my $model_ref   = read_cell_value($dbh_m_write, 'markermap', 'ModelRef', 'MarkerMapId', $marker_map_id);
-  my $map_desc    = read_cell_value($dbh_m_write, 'markermap', 'MapDescription', 'MarkerMapId', $marker_map_id);
-  my $map_soft    = read_cell_value($dbh_m_write, 'markermap', 'MapSoftware', 'MarkerMapId', $marker_map_id);
-  my $map_params  = read_cell_value($dbh_m_write, 'markermap', 'MapParameters', 'MarkerMapId', $marker_map_id);
 
   if (defined $query->param('ModelRef')) {
 
@@ -3580,7 +3674,7 @@ sub list_markermap_runmode {
 
 =pod list_markermap_HELP_START
 {
-"OperationName" : "List marker maps",
+"OperationName": "List marker maps",
 "Description": "List marker map position",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -3624,7 +3718,7 @@ sub get_markermap_runmode {
 
 =pod get_markermap_HELP_START
 {
-"OperationName" : "Get Marker Map",
+"OperationName": "Get Marker Map",
 "Description": "Get marker map definition",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -3682,8 +3776,8 @@ sub import_markermap_position_runmode {
 
 =pod import_markermap_position_gadmin_HELP_START
 {
-"OperationName" : "Import marker map position",
-"Description": "Import marker map postions from a csv file",
+"OperationName": "Import marker map position",
+"Description": "Import marker map positions from a csv file",
 "AuthRequired": 1,
 "GroupRequired": 1,
 "GroupAdminRequired": 1,
@@ -4123,7 +4217,7 @@ sub list_markermap_position_advanced_runmode {
 
 =pod list_markermap_position_advanced_HELP_START
 {
-"OperationName" : "List Marker Map position",
+"OperationName": "List Marker Map position",
 "Description": "List marker map positions in pagination with filtering and sorting ability",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -4338,7 +4432,7 @@ sub list_extract_marker_data_advanced_runmode {
 
 =pod list_extract_marker_data_HELP_START
 {
-"OperationName" : "List marker data for extract",
+"OperationName": "List marker data for extract",
 "Description": "List marker data  for extract across all datasets that the user has read permission.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -5158,7 +5252,7 @@ sub append_markerdata_csv_runmode {
 
 =pod append_markerdata_csv_HELP_START
 {
-"OperationName" : "Append markerdata into an existing dataset",
+"OperationName": "Append markerdata into an existing dataset",
 "Description": "Append markerdata into an existing dataset from a CSV file. If more than 10 of the top 100 lines in the upload CSV already exist, it will stop and return an error without appending the data into the dataset",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -5200,7 +5294,36 @@ sub append_markerdata_csv_runmode {
 
   my $dbh_m_read = connect_mdb_read();
 
-  my $anal_id = read_cell_value($dbh_m_read, 'dataset', 'AnalysisGroupId', 'DataSetId', $dataset_id);
+  my $read_dataset_sql   = 'SELECT "AnalysisGroupId", "MarkerNameFieldName" ';
+     $read_dataset_sql  .= 'FROM dataset WHERE "DataSetId"=? ';
+
+  my ($r_df_val_err, $r_df_val_msg, $dataset_df_val_data) = read_data($dbh_m_read, $read_dataset_sql, [$dataset_id]);
+
+  if ($r_df_val_err) {
+
+    $self->logger->debug("Retrieve dataset default values for optional fields failed: $r_df_val_msg");
+    $data_for_postrun_href->{'Error'}  = 1;
+    $data_for_postrun_href->{'Data'}   = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $anal_id                   =   undef;
+  my $ds_mrk_name_fieldname     =   undef;
+
+  my $nb_df_val_rec    =  scalar(@{$dataset_df_val_data});
+
+  if ($nb_df_val_rec != 1)  {
+
+     $self->logger->debug("Retrieve dataset default values - number of records unacceptable: $nb_df_val_rec");
+     $data_for_postrun_href->{'Error'} = 1;
+     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+     return $data_for_postrun_href;
+  }
+
+  $anal_id                   =   $dataset_df_val_data->[0]->{'AnalysisGroupId'};
+  $ds_mrk_name_fieldname     =   $dataset_df_val_data->[0]->{'MarkerNameFieldName'};
 
   if (length($anal_id) == 0) {
 
@@ -5466,8 +5589,6 @@ sub append_markerdata_csv_runmode {
   }
 
   my $uniq_mrk_name_csv = join(',', keys(%{$uniq_mrk_name_href}));
-
-  my $ds_mrk_name_fieldname = read_cell_value($dbh_m_write, 'dataset', 'MarkerNameFieldName', 'DataSetId', $dataset_id);
 
   $sql  = qq|SELECT COUNT(*) FROM "$markerdata_tablename" |;
   $sql .= qq|WHERE "$ds_mrk_name_fieldname" IN ($uniq_mrk_name_csv)|;

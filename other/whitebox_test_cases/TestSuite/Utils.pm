@@ -16,23 +16,29 @@ use Digest::MD5 qw(md5 md5_hex md5_base64);
 use XML::XSLT;
 use JSON::XS;
 use Cwd;
+use Data::Dumper;
 
 our @ISA      = qw(Exporter);
 our @EXPORT   = qw(get_write_token switch_group standard_request add_record
                    logout run_test_case add_record_upload claim_grp_ownership
                    dal_base_url make_dal_url login is_add_case who_has_no_dependent
                    is_the_same delete_test_record read_file make_random_number
+                   $STORAGE
                   );
 
-my $dal_base_url_file = 'dal_base_url.conf';
+my $dal_base_url_file     = 'dal_base_url.conf';
 
-our $SESSION_TIME_SECOND  = 600;
+# This variable is no longer relevant since the test data is saved in memory
+# instead of hard disk so data from previous session is irrelevant.
+our $SESSION_TIME_SECOND  = 600000000000000;
 
 our $ACCEPT_HEADER_LOOKUP = {'JSON' => 'application/json',
                              'XML'  => 'text/xml',
                            };
 
 our $HTTP_TIME_OUT        = 6000;
+
+our $STORAGE              = {};
 
 sub make_dal_url {
 
@@ -57,7 +63,9 @@ sub get_write_token {
 
   if ($_[0]) { $path2cfg = $_[0]; }
 
-  my $filename = 'write_token';
+  my $process_id = $$;
+
+  my $filename = "write_token_${process_id}";
 
   open(WT_FHANDLE, "< ${path2cfg}/$filename") || die "Can't read write token file.";
   my $line = <WT_FHANDLE>;
@@ -91,13 +99,15 @@ sub login {
 
   my $browser  = LWP::UserAgent->new();
 
+  my $process_id = $$;
+
   if (defined $ACCEPT_HEADER_LOOKUP->{$output_format}) {
 
     $browser->default_header('Accept' => $ACCEPT_HEADER_LOOKUP->{$output_format});
   }
 
   my $cookie_jar = HTTP::Cookies->new(
-    file => './lwp_cookies.dat',
+    file => "./lwp_cookies_${process_id}.dat",
     autosave => 1,
     );
 
@@ -159,7 +169,7 @@ sub login {
     chomp($write_token);
     $logger->debug("Write token: $write_token");
 
-    open(WT_FHANDLE, ">./write_token") or die "Can't save write token to file.";
+    open(WT_FHANDLE, ">./write_token_${process_id}") or die "Can't save write token to file.";
     print WT_FHANDLE $write_token;
     close(WT_FHANDLE);
 
@@ -191,6 +201,8 @@ sub is_match {
   my $match_aref    = $_[2];
   my $logger        = $_[3];
 
+  my $process_id = $$;
+
   my $err = 0;
   my $attr_csv = '';
   for my $match_info (@{$match_aref}) {
@@ -204,7 +216,17 @@ sub is_match {
     elsif (defined $match_info->{'VirAttr'}) {
 
       my $vir_attr_case_file = $match_info->{'VirAttr'};
-      my $vir_attr_ref = XMLin($vir_attr_case_file, ForceArray => 1);
+
+      my $vir_attr_ref = undef;
+
+      if (defined $STORAGE->{"${vir_attr_case_file}_${process_id}"}) {
+
+        $vir_attr_ref = $STORAGE->{"${vir_attr_case_file}_${process_id}"};
+      }
+      else {
+
+        die "No STORAGE data for ${vir_attr_case_file}_${process_id}";
+      }
 
       if (defined $vir_attr_ref->{'FactorName'}->[0]->{'Value'}) {
 
@@ -316,7 +338,7 @@ sub is_match {
 
           my $csv_file_full  = $data_ref->{$tag_name}->[0]->{$attr_name};
           my @file_url_block = split('/', $csv_file_full);
-          my $csv_filename   = $file_url_block[-1];
+          my $csv_filename   = $file_url_block[-1] . '_' . "$process_id";
 
           $logger->debug("Downloaded CSV file URL: $csv_file_full");
 
@@ -324,8 +346,7 @@ sub is_match {
           $browser->timeout($HTTP_TIME_OUT);
 
           my $cookie_jar = HTTP::Cookies->new(
-            file => './lwp_cookies.dat',
-            autosave => 1,
+            file => "./lwp_cookies_${process_id}.dat",
             );
 
           $browser->cookie_jar($cookie_jar);
@@ -502,6 +523,8 @@ sub get_case_parameter {
 
   my $input_aref = $tcase_data_ref->{'INPUT'};
 
+  my $process_id = $$;
+
   my $parameter = {};
 
   my $start_time;
@@ -527,7 +550,16 @@ sub get_case_parameter {
         if (defined $input_href->{'SrcName'}) {
 
           my $src_name_case_file = $input_href->{'SrcName'};
-          my $src_name_case_data_ref = XMLin($src_name_case_file, ForceArray => 1);
+          my $src_name_case_data_ref = undef;
+
+          if (defined $STORAGE->{"${src_name_case_file}_${process_id}"}) {
+
+            $src_name_case_data_ref = $STORAGE->{"${src_name_case_file}_${process_id}"};
+          }
+          else {
+
+            die "No STORAGE data for ${src_name_case_file}_${process_id}";
+          }
 
           if (defined $input_href->{'SrcNameAttribute'}) {
 
@@ -592,15 +624,38 @@ sub get_case_parameter {
         }
         else {
 
-          $src_case_data_ref = XMLin($src_case_file, ForceArray => 1);
+          if (defined $STORAGE->{"${src_case_file}_${process_id}"}) {
+
+            $src_case_data_ref = $STORAGE->{"${src_case_file}_${process_id}"};
+          }
+          else {
+
+            # This is for static file like permission and group file
+            if ($src_case_file !~ /case_\d+_\w+\.xml$/) {
+
+              $src_case_data_ref = XMLin($src_case_file, ForceArray => 1);
+            }
+            else {
+
+              die "No STORAGE for ${src_case_file}_${process_id} - Case: $case_file";
+            }
+          }
+
           $src_case_data_lookup_href->{$src_case_file} = $src_case_data_ref;
         }
 
-        if (defined $src_case_data_ref->{'ReturnId'}->[0]->{'Value'}) {
+        my $src_tag = 'ReturnId';
 
-          $para_val = $src_case_data_ref->{'ReturnId'}->[0]->{'Value'};
+        if (defined $input_href->{'SrcTag'}) {
+
+          $src_tag = $input_href->{'SrcTag'};
         }
-        elsif (defined $src_case_data_ref->{'ReturnId'}->[0]->{'IdFile'}) {
+
+        if (defined $src_case_data_ref->{"$src_tag"}->[0]->{'Value'}) {
+
+          $para_val = $src_case_data_ref->{"$src_tag"}->[0]->{'Value'};
+        }
+        elsif (defined $src_case_data_ref->{"$src_tag"}->[0]->{'IdFile'}) {
 
           if ( ! ((defined $input_href->{'Idx'}) && (defined $input_href->{'Attr'})) ) {
 
@@ -608,8 +663,8 @@ sub get_case_parameter {
             die "$case_file: $para_name source value 'Idx' and 'Attr' missing.";
           }
 
-          my $file_format     = $src_case_data_ref->{'ReturnId'}->[0]->{'FileFormat'};
-          my $id_file         = $src_case_data_ref->{'ReturnId'}->[0]->{'IdFile'};
+          my $file_format     = $src_case_data_ref->{"$src_tag"}->[0]->{'FileFormat'};
+          my $id_file         = $src_case_data_ref->{"$src_tag"}->[0]->{'IdFile'};
           my $id_data         = undef;
 
           my $record_idx = $input_href->{'Idx'};
@@ -645,7 +700,7 @@ sub get_case_parameter {
 
           my $lookup_start_time = [gettimeofday()];
 
-          $para_val = $id_data->{'ReturnId'}->[$record_idx]->{$val_attr};
+          $para_val = $id_data->{"$src_tag"}->[$record_idx]->{$val_attr};
 
           my $lookup_elapsed_time = tv_interval($lookup_start_time);
 
@@ -655,6 +710,91 @@ sub get_case_parameter {
 
           $logger->debug("$case_file: $para_name source case $src_case_file value not found");
           die "$case_file: $para_name source case $src_case_file value not found";
+        }
+
+        if ( (defined $input_href->{'FinalValURL'}) && (defined $input_href->{'FinalValRetrievalStep'}) ) {
+
+          my $derived_url = $input_href->{'FinalValURL'};
+          $derived_url =~ s/:\w+\/?/${para_val}/;
+
+           if ($derived_url !~ /http\:\/\//i) {
+
+             $derived_url = make_dal_url($derived_url);
+           }
+
+          $logger->debug("Final value URL: $derived_url");
+
+          my $derived_req_param_href = {'URL' => $derived_url};
+
+          my ($final_val_err, $final_val_msg,
+              $dummy_return_id, $final_val_ret_data) = standard_request($derived_req_param_href,
+                                                                        'XML', [], $logger);
+
+          if ($final_val_err) {
+
+            $logger->debug("$case_file: get the final value from the source case failed: $final_val_msg");
+            die "$case_file: get the final value from the source case failed: $final_val_msg";
+          }
+
+          my $retrieval_step = $input_href->{'FinalValRetrievalStep'};
+
+          my @retrieval_step_list = split(/,/, $retrieval_step);
+
+          my $step_data = $final_val_ret_data;
+
+          my $nb_step = scalar(@retrieval_step_list);
+
+          for (my $s = 0; $s < $nb_step; $s++) {
+
+            my $step = $retrieval_step_list[$s];
+
+            if ( defined $step_data->{$step} ) {
+
+              my $step_dtype = ref($step_data->{$step});
+
+              $logger->debug("$case_file: data type for step ($step): $step_dtype");
+
+              if ( length($step_dtype) == 0 ) {
+
+                if ($s == ($nb_step-1)) {
+
+                  $para_val = $step_data->{$step};
+                  $logger->debug("$case_file: final param val from final val URL: $derived_url : $para_val");
+                }
+                else {
+
+                  $logger->debug("$case_file: get the final value - data for non-last step($step) is scalar.");
+                  die "$case_file: get the final value - data for non-last step($step) is scalar.";
+                }
+              }
+              else {
+
+                if ( $step_dtype eq 'ARRAY' ) {
+
+                  if ($s < ($nb_step-1)) {
+
+                    my $tmp_data = $step_data->{$step}->[0];
+                    $step_data = $tmp_data;
+                  }
+                  else {
+
+                    $logger->debug("$case_file: get the final value - data from last $step is an array.");
+                    die "$case_file: get the final value - data from last $step is an array.";
+                  }
+                }
+                else {
+
+                  $logger->debug("$case_file: get the final value - unknown data type from $step");
+                  die "$case_file: get the final value - unknown data type from $step";
+                }
+              }
+            }
+            else {
+
+              $logger->debug("$case_file: get the final value - cannot find $step tag");
+              die "$case_file: get the final value - cannot find $step tag";
+            }
+          }
         }
       }
 
@@ -679,7 +819,16 @@ sub get_case_parameter {
               if (defined $src_file_rec->{'SrcValue'}) {
 
                 my $src_val_file = $src_file_rec->{'SrcValue'};
-                my $src_val_ref = XMLin($src_val_file, ForceArray => 1);
+                my $src_val_ref  = undef;
+
+                if (defined $STORAGE->{"${src_val_file}_${process_id}"}) {
+
+                  $src_val_ref = $STORAGE->{"${src_val_file}_${process_id}"};
+                }
+                else {
+
+                  die "No STORAGE for ${src_val_file}_${process_id}";
+                }
 
                 my $target_para_name = '';
 
@@ -716,7 +865,16 @@ sub get_case_parameter {
                   if (defined $next_l_rec->{'SrcValue'}) {
 
                     my $next_l_src_val_file = $next_l_rec->{'SrcValue'};
-                    my $next_l_src_val_ref  = XMLin($next_l_src_val_file, ForceArray => 1);
+                    my $next_l_src_val_ref  = undef;
+
+                    if (defined $STORAGE->{"${next_l_src_val_file}_${process_id}"}) {
+
+                      $next_l_src_val_ref = $STORAGE->{"${next_l_src_val_file}_${process_id}"};
+                    }
+                    else {
+
+                      die "No STORAGE for ${next_l_src_val_file}_${process_id}";
+                    }
 
                     my $next_l_target_para_name = '';
 
@@ -854,7 +1012,16 @@ sub get_case_parameter {
                   my $src_value_file = $level2_ref->{'SrcValue'};
 
                   #print "Level2 key: $level2_key | source value file: $src_value_file\n";
-                  my $src_value_ref = XMLin($src_value_file, ForceArray => 1);
+                  my $src_value_ref = undef;
+
+                  if (defined $STORAGE->{"${src_value_file}_${process_id}"}) {
+
+                    $src_value_ref = $STORAGE->{"${src_value_file}_${process_id}"};
+                  }
+                  else {
+
+                    die "No STORAGE for ${src_value_file}_${process_id} - Case: $case_file";
+                  }
 
                   if (!(defined $level2_ref->{'ParaName'})) {
 
@@ -867,13 +1034,38 @@ sub get_case_parameter {
                   delete($level2_ref->{'ParaName'});
                   delete($level2_ref->{'SrcValue'});
                 }
+
+                if (defined $level2_ref->{'Random'}) {
+
+                  my $prefix = '';
+
+                  if (defined $level2_ref->{'PrefixVal'}) {
+
+                    $prefix = $level2_ref->{'PrefixVal'};
+                    delete($level2_ref->{'PrefixVal'});
+                  }
+
+                  my $rand_val_size = 11;
+
+                  if (defined $level2_ref->{'Size'}) {
+
+                    $rand_val_size = $level2_ref->{'Size'} - length($prefix);
+                    delete($level2_ref->{'Size'});
+                  }
+
+                  my $rand_str = random_regex('\d' x $rand_val_size);
+                  my $target_para_name = $level2_ref->{'ParaName'};
+                  $level2_ref->{$target_para_name} = $rand_str;
+                  delete($level2_ref->{'ParaName'});
+                  delete($level2_ref->{'Random'});
+                }
               }
             }
           }
         }
 
         my $p_src_xml_file = $src_xml_file;
-        $p_src_xml_file =~ s/\.xml/_p\.xml/;
+        $p_src_xml_file    =~ s/\.xml/_p_${process_id}\.xml/;
 
         #print "Prcessed source xml file: $p_src_xml_file\n";
 
@@ -936,6 +1128,8 @@ sub standard_request {
 
   my $url        = $parameter->{'URL'};
 
+  my $process_id = $$;
+
   while($url =~ /:(\w+)\/?/ ) {
 
     my $para_name = $1;
@@ -952,8 +1146,7 @@ sub standard_request {
   }
 
   my $cookie_jar = HTTP::Cookies->new(
-    file => './lwp_cookies.dat',
-    autosave => 1,
+    file => "./lwp_cookies_${process_id}.dat",
     );
 
   $browser->cookie_jar($cookie_jar);
@@ -997,21 +1190,80 @@ sub logout {
   my $match         = $_[2];
   my $logger        = $_[3];
 
-  my $login_case_file = $parameter->{'LoginCase'};
+  my $url        = $parameter->{'URL'};
 
-  if (-w $login_case_file) {
+  my $process_id = $$;
 
-    my $login_case_ref = XMLin($login_case_file, ForceArray => 1);
-    $login_case_ref->{'RunInfo'}->[0]->{'Time'} = "0";
-    XMLout($login_case_ref, OutputFile => $login_case_file, RootName => 'TestCase');
-  }
-  else {
+  my $browser  = LWP::UserAgent->new();
+  $browser->timeout($HTTP_TIME_OUT);
 
-    $logger->debug("$login_case_file not found and not writable.");
-    return (1, 'LoginCase');
+  if (defined $ACCEPT_HEADER_LOOKUP->{$output_format}) {
+
+    $browser->default_header('Accept' => $ACCEPT_HEADER_LOOKUP->{$output_format});
   }
 
-  return standard_request($parameter, $output_format, $match, $logger)
+  my $cookie_jar = HTTP::Cookies->new(
+    file => "./lwp_cookies_${process_id}.dat",
+    autosave => 1,
+    );
+
+  $browser->cookie_jar($cookie_jar);
+
+  my $req = POST($url, $parameter);
+
+  my $response     = $browser->request($req);
+  my $msg_content  = $response->content();
+  my $header_href  = $response->headers();
+
+  $logger->debug("Content: " . $msg_content);
+  $logger->debug("Response code: " . $response->code());
+
+  foreach my $header_key (keys(%{$header_href})) {
+
+    my $header_val = $header_href->{$header_key};
+    $logger->debug("Header val data type: " . ref($header_val));
+
+    if (ref $header_val eq 'HASH') {
+
+      $logger->debug("Header : $header_key");
+      foreach my $sub_header_key (keys(%{$header_val})) {
+
+        my $sub_header_val = $header_val->{$sub_header_key};
+        $logger->debug("Sub header key: $sub_header_key - $sub_header_val");
+      }
+    }
+    elsif (ref $header_val eq 'ARRAY') {
+
+      $logger->debug("Header : $header_key - " . join(',', @{$header_val}));
+    }
+    else {
+
+      $logger->debug("Header : $header_key - $header_val");
+    }
+  }
+
+  my $return_data    = {};
+
+  if ($response->code() == 200) {
+
+    if (uc($output_format) eq 'XML') {
+
+      $return_data = XMLin($msg_content, ForceArray => 1);
+    }
+    elsif (uc($output_format) eq 'JSON') {
+
+      $return_data = decode_json($msg_content);
+    }
+  }
+
+  my @is_match_return = is_match($response, $output_format, $match, $logger);
+
+  if ($is_match_return[0] == 1) {
+
+    print "$msg_content\n";
+  }
+
+  return (@is_match_return, undef, $return_data);
 }
 
 sub add_record_upload {
@@ -1022,6 +1274,8 @@ sub add_record_upload {
   my $logger        = $_[3];
 
   my $url        = $parameter->{'URL'};
+
+  my $process_id = $$;
 
   while($url =~ /:(\w+)\/?/ ) {
 
@@ -1039,8 +1293,7 @@ sub add_record_upload {
   }
 
   my $cookie_jar = HTTP::Cookies->new(
-    file => './lwp_cookies.dat',
-    autosave => 1,
+    file => "./lwp_cookies_${process_id}.dat",
     );
 
   $browser->cookie_jar($cookie_jar);
@@ -1101,7 +1354,7 @@ sub add_record_upload {
 
         my $file_name = $file_path_split[-1];
 
-        my $new_file_name = 'newfile_' . random_regex('\d\d\d\d\d\d\d') . '_' . $file_name;
+        my $new_file_name = 'newfile_' . random_regex('\d\d\d\d\d\d\d') . '_' . $file_name . '_' . $process_id;
 
         my $last_path_element = scalar(@file_path_split) - 2;
 
@@ -1297,7 +1550,7 @@ sub add_record_upload {
       $logger->debug("Return ID file URL: $return_id_file_url");
 
       my @file_url_block = split('/', $return_id_file_url);
-      my $filename = $file_url_block[-1];
+      my $filename = $file_url_block[-1] . '_' . $process_id;
 
       $logger->debug("ID filename: $filename");
 
@@ -1342,6 +1595,8 @@ sub add_record {
 
   my $url        = $parameter->{'URL'};
 
+  my $process_id = $$;
+
   while($url =~ /:(\w+)\/?/ ) {
 
     my $para_name = $1;
@@ -1357,8 +1612,7 @@ sub add_record {
   }
 
   my $cookie_jar = HTTP::Cookies->new(
-    file => './lwp_cookies.dat',
-    autosave => 1,
+    file => "./lwp_cookies_${process_id}.dat",
     );
 
   $browser->cookie_jar($cookie_jar);
@@ -1438,11 +1692,14 @@ sub add_record {
 
 sub run_test_case {
 
-  my $case_file = $_[0];
-  my $force     = $_[1];
-  my $logger    = $_[2];
+  my $case_file      = $_[0];
+  my $force          = $_[1];
+  my $logger         = $_[2];
+  my $time_stat_href = $_[3];
 
   $logger->debug(" $case_file: run test");
+
+  my $process_id = $$;
 
   if ( !(-r $case_file) ) {
 
@@ -1452,6 +1709,11 @@ sub run_test_case {
   my $start_time = [gettimeofday()];
 
   my $tcase_data_ref = XMLin($case_file, ForceArray => 1);
+
+  if (defined $STORAGE->{"${case_file}_${process_id}"}) {
+
+    $tcase_data_ref = $STORAGE->{"${case_file}_${process_id}"};
+  }
 
   if (defined $tcase_data_ref->{'CaseInfo'}->[0]->{'Description'}) {
 
@@ -1500,7 +1762,7 @@ sub run_test_case {
       $case_force = $parent->{'Force'};
     }
 
-    run_test_case($case_file, $case_force, $logger);
+    run_test_case($case_file, $case_force, $logger, $time_stat_href);
   }
 
   my $parameter = get_case_parameter($tcase_data_ref, $logger, $case_file);
@@ -1572,9 +1834,16 @@ sub run_test_case {
 
             $return_id_href->{'ParaName'} = $capture_field_name;
 
-            if (defined $return_data->{$ret_tag_name}->[0]->{$capture_field_name}) {
+            my $cap_idx = 0;
 
-              $return_id_href->{'Value'}    = $return_data->{$ret_tag_name}->[0]->{$capture_field_name};
+            if (defined $tcase_data_ref->{'CaseInfo'}->[0]->{'CaptureIndex'}) {
+
+              $cap_idx = $tcase_data_ref->{'CaseInfo'}->[0]->{'CaptureIndex'};
+            }
+
+            if (defined $return_data->{$ret_tag_name}->[$cap_idx]->{$capture_field_name}) {
+
+              $return_id_href->{'Value'}    = $return_data->{$ret_tag_name}->[$cap_idx]->{$capture_field_name};
               $tcase_data_ref->{'ReturnId'} = [$return_id_href];
             }
             else {
@@ -1589,6 +1858,11 @@ sub run_test_case {
         }
       }
     }
+  }
+
+  if (defined $return_data->{'ReturnOther'}) {
+
+    $tcase_data_ref->{'ReturnOther'} = $return_data->{'ReturnOther'};
   }
 
   my $case_type = $tcase_data_ref->{'CaseInfo'}->[0]->{'Type'};
@@ -1609,7 +1883,8 @@ sub run_test_case {
     $tcase_data_ref->{'RunInfo'} = [{'Success' => 0, 'Time' => 0}];
   }
 
-  XMLout($tcase_data_ref, OutputFile => $case_file, RootName => 'TestCase');
+  $logger->debug("${case_file}_${process_id} : " . Dumper($tcase_data_ref));
+  $STORAGE->{"${case_file}_${process_id}"} = $tcase_data_ref;
 
   if ($case_type eq 'BLOCKING') {
 
@@ -1621,8 +1896,28 @@ sub run_test_case {
   }
 
   my $elapsed_time = tv_interval($start_time);
+  my $dal_time = undef;
 
-  $logger->debug("Run time: $elapsed_time (seconds)");
+  if (defined $return_data->{'StatInfo'}->[0]->{'ServerElapsedTime'}) {
+
+    $dal_time = $return_data->{'StatInfo'}->[0]->{'ServerElapsedTime'};
+  }
+
+  $logger->debug("Run time: $elapsed_time (seconds) - DAL time: $dal_time");
+
+  if (defined $dal_time) {
+
+    if (defined $time_stat_href->{$case_file}) {
+
+      push(@{$time_stat_href->{$case_file}}, [$process_id, $elapsed_time, $dal_time]);
+    }
+    else {
+
+      $time_stat_href->{$case_file} = [[$process_id, $elapsed_time, $dal_time]];
+    }
+  }
+
+  print "PID: $process_id - $case_file - Test time: $elapsed_time - DAL time: $dal_time\n";
 
   return $case_err;
 }
@@ -1639,6 +1934,8 @@ sub claim_grp_ownership {
   my $plain_pass = $parameter->{'GroupPassword'};
   my $url        = $parameter->{'URL'};
 
+  my $process_id = $$;
+
   my $browser  = LWP::UserAgent->new();
 
   if (defined $ACCEPT_HEADER_LOOKUP->{$output_format}) {
@@ -1647,8 +1944,7 @@ sub claim_grp_ownership {
   }
 
   my $cookie_jar = HTTP::Cookies->new(
-    file => './lwp_cookies.dat',
-    autosave => 1,
+    file => "./lwp_cookies_${process_id}.dat",
     );
 
   $browser->cookie_jar($cookie_jar);
@@ -1742,9 +2038,16 @@ sub is_add_case {
 
   my $case_file = $_[0];
 
+  my $process_id = $$;
+
   my $status = 0;
 
   my $tcase_data_ref = XMLin($case_file, ForceArray => 1);
+
+  if (defined $STORAGE->{"${case_file}_${process_id}"}) {
+
+    $tcase_data_ref = $STORAGE->{"${case_file}_${process_id}"};
+  }
 
   if ( (defined $tcase_data_ref->{'Delete'}) && (defined $tcase_data_ref->{'ReturnId'}) ) {
 
@@ -1909,9 +2212,10 @@ sub delete_test_record {
 
   my $browser  = LWP::UserAgent->new();
 
+  my $process_id = $$;
+
   my $cookie_jar = HTTP::Cookies->new(
-    file => './lwp_cookies.dat',
-    autosave => 1,
+    file => "./lwp_cookies_${process_id}.dat",
     );
 
   $browser->cookie_jar($cookie_jar);

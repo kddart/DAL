@@ -2,10 +2,11 @@
   <CaseInfo CustomMethod="add_record" Description="Add a trait" TargetURL="add/trait" Type="BLOCKING" />
   <Delete TargetURL="delete/trait/:TraitId" />
   <INPUT ParaName="TraitName" PrefixVal="Trait_" Random="1" />
+  <INPUT ParaName="TraitLevel" Value="trialunit" />
   <INPUT ParaName="TraitGroupTypeId" SrcValue="xml/add_data_no_vcol/case_00424_add_traitgroup_type.xml" />
   <INPUT ParaName="TraitCaption" Value="Automatic testing trait" />
   <INPUT ParaName="TraitDescription" Value="Trait used for automatic testing" />
-  <INPUT ParaName="TraitDataType" Value="INTEGER" />
+  <INPUT ParaName="TraitDataType" SrcValue="xml/add_data_no_vcol/case_00574_add_trait_data_type.xml" />
   <INPUT ParaName="TraitValueMaxLength" Value="20" />
   <INPUT ParaName="UnitId" SrcValue="xml/add_data_no_vcol/case_00397_add_item_unit4add_trait.xml" />
   <INPUT ParaName="IsTraitUsedForAnalysis" Value="0" />
@@ -22,6 +23,7 @@
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00397_add_item_unit4add_trait.xml" Order="3" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00424_add_traitgroup_type.xml" Order="4" />
-  <ReturnId ParaName="TraitId" Value="31" />
-  <RunInfo Success="1" Time="1474006804" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00574_add_trait_data_type.xml" Order="5" />
+  <ReturnId ParaName="TraitId" Value="2" />
+  
 </TestCase>

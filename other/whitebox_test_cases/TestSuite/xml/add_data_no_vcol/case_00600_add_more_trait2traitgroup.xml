@@ -1,0 +1,14 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record_upload" Description="Add More Traits to TraitGroup" TargetURL="traitgroup/:TraitGroupId/add/trait" Type="BLOCKING" />
+  <Delete TargetURL="delete/traitgroup/:TraitGroupId" />
+  <INPUT ParaName="TraitGroupId" SrcValue="xml/add_data_no_vcol/case_00595_add_traitgroup.xml" />
+  <INPUT ParaName="traitgroupentry" Process="1" SrcFile="xml/add_data_no_vcol/traitgroupentry_more.xml" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00595_add_traitgroup.xml" Force="1" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00439_add_trait_wth_choice_valid.xml" Order="4" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00442_add_trait_with_berange_valid.xml" Order="5" />
+  
+</TestCase>

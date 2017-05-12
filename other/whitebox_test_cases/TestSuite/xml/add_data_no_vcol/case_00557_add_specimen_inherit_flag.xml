@@ -18,5 +18,5 @@
   <Parent CaseFile="xml/add_data_no_vcol/case_00107_add_geno2_4_specimen.xml" Order="4" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00208_add_breeding_method.xml" Order="5" />
   <ReturnId ParaName="SpecimenId" Value="7247830" />
-  <RunInfo Success="1" Time="1473145491" />
+  
 </TestCase>

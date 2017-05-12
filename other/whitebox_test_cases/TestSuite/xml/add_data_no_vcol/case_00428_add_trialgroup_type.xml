@@ -8,6 +8,6 @@
   <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
   <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
-  <ReturnId ParaName="TypeId" Value="472" />
-  <RunInfo Success="1" Time="1474344084" />
+  <ReturnId ParaName="TypeId" Value="77" />
+  
 </TestCase>

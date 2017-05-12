@@ -1,0 +1,17 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record_upload" Description="Add Analysisgroup" TargetURL="add/analysisgroup" Type="BLOCKING" />
+  <Delete TargetURL="delete/analysisgroup/:AnalysisGroupId" />
+  <INPUT ParaName="AnalysisGroupName" PrefixVal="Analsysigroup_" Random="1" />
+  <INPUT ParaName="AnalysisGroupDescription" Value="Testing" />
+  <INPUT ParaName="AccessGroupId" Value="0" />
+  <INPUT ParaName="OwnGroupPerm" Value="7" />
+  <INPUT ParaName="AccessGroupPerm" Value="5" />
+  <INPUT ParaName="OtherPerm" Value="0" />
+  <INPUT ParaName="extract" SrcFile="xml/add_data_no_vcol/brassica_extract_manual.xml" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Match Attr="ParaName" Tag="ReturnId" Value="AnalysisGroupId" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  
+</TestCase>

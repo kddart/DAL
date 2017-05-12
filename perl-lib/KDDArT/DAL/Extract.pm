@@ -52,6 +52,7 @@ sub setup {
                                            'update_extract_gadmin',
                                            'del_extract_gadmin',
                                            'add_analysisgroup',
+                                           'update_analysisgroup',
                                            'add_plate_n_extract_gadmin',
                                            'import_plate_n_extract_gadmin',
       );
@@ -92,6 +93,7 @@ sub setup {
     'update_extract_gadmin'         => 'update_extract_runmode',
     'get_extract'                   => 'get_extract_runmode',
     'add_analysisgroup'             => 'add_analysisgroup_runmode',
+    'update_analysisgroup'          => 'update_analysisgroup_runmode',
     'list_analysisgroup_advanced'   => 'list_analysisgroup_advanced_runmode',
     'get_analysisgroup'             => 'get_analysisgroup_runmode',
     'add_plate_n_extract_gadmin'    => 'add_plate_n_extract_runmode',
@@ -119,9 +121,13 @@ sub setup {
   $logger->level($DEBUG);
   $self->{logger} = $logger;
 
+  my $domain_name = $COOKIE_DOMAIN->{$ENV{DOCUMENT_ROOT}};
+  $self->logger->debug("COOKIE DOMAIN: $domain_name");
+
   $self->authen->config(LOGIN_URL => '');
   $self->session_config(
-          CGI_SESSION_OPTIONS => [ "driver:File", $self->query, {Directory=>$SESSION_STORAGE_PATH} ],
+          CGI_SESSION_OPTIONS => [ "driver:File", $self->query, {Directory => $SESSION_STORAGE_PATH} ],
+          SEND_COOKIE         => 0,
       );
 }
 
@@ -129,7 +135,7 @@ sub list_plate_advanced_runmode {
 
 =pod list_plate_advanced_HELP_START
 {
-"OperationName" : "List plates",
+"OperationName": "List plates",
 "Description": "List DNA extract plates. This listing requires pagination information.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -610,7 +616,7 @@ sub del_plate_runmode {
 
 =pod del_plate_gadmin_HELP_START
 {
-"OperationName" : "Delete plate",
+"OperationName": "Delete plate",
 "Description": "Delete DNA plate for a specified plate id. Plate can be deleted only if not attached to any lower level related record.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -708,7 +714,7 @@ sub update_plate_runmode {
 
 =pod update_plate_gadmin_HELP_START
 {
-"OperationName" : "Update plate",
+"OperationName": "Update plate",
 "Description": "Update DNA plate information specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -774,7 +780,44 @@ sub update_plate_runmode {
   my $PlateName        = $query->param('PlateName');
   my $OperatorId       = $query->param('OperatorId');
 
-  my $PlateType = read_cell_value($dbh_m_read, 'plate', 'PlateType', 'PlateId', $plate_id);
+  my $read_p_sql       =  'SELECT "PlateType", "PlateDescription", "StorageId", "PlateWells", "PlateStatus" ';
+     $read_p_sql      .=  'FROM plate WHERE "PlateId"=? ';
+
+
+  my ($r_df_val_err, $r_df_val_msg, $p_df_val_data) = read_data($dbh_m_read, $read_p_sql, [$plate_id]);
+
+  if ($r_df_val_err) {
+
+    $self->logger->debug("Retrieve plate default values for optional fields failed: $r_df_val_msg");
+    $data_for_postrun_href->{'Error'}  = 1;
+    $data_for_postrun_href->{'Data'}   = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $PlateType           =  undef;
+  my $PlateDescription    =  undef;
+  my $StorageId           =  undef;
+  my $PlateWells          =  undef;
+  my $PlateStatus         =  undef;
+
+  my $nb_df_val_rec    =  scalar(@{$p_df_val_data});
+
+  if ($nb_df_val_rec != 1)  {
+
+     $self->logger->debug("Retrieve plate default values - number of records unacceptable: $nb_df_val_rec");
+     $data_for_postrun_href->{'Error'} = 1;
+     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+     return $data_for_postrun_href;
+  }
+
+  $PlateType             =   $p_df_val_data->[0]->{'PlateType'};
+  $PlateDescription      =   $p_df_val_data->[0]->{'PlateDescription'};
+  $StorageId             =   $p_df_val_data->[0]->{'StorageId'};
+  $PlateWells            =   $p_df_val_data->[0]->{'PlateWells'};
+  $PlateStatus           =   $p_df_val_data->[0]->{'PlateStatus'};
+
 
   if (defined($query->param('PlateType'))) {
 
@@ -789,14 +832,12 @@ sub update_plate_runmode {
     $PlateType = '0';
   }
 
-  my $PlateDescription = read_cell_value($dbh_m_read, 'plate', 'PlateDescription', 'PlateId', $plate_id);
 
   if (defined($query->param('PlateDescription'))) {
 
     $PlateDescription = $query->param('PlateDescription');
   }
 
-  my $StorageId = read_cell_value($dbh_m_read, 'plate', 'StorageId', 'PlateId', $plate_id);
 
   if (defined($query->param('StorageId'))) {
 
@@ -811,7 +852,6 @@ sub update_plate_runmode {
     $StorageId = '0';
   }
 
-  my $PlateWells = read_cell_value($dbh_m_read, 'plate', 'PlateWells', 'PlateId', $plate_id);
 
   if (defined($query->param('PlateWells'))) {
 
@@ -821,7 +861,6 @@ sub update_plate_runmode {
     }
   }
 
-  my $PlateStatus = read_cell_value($dbh_m_read, 'plate', 'PlateStatus', 'PlateId', $plate_id);
 
   if (defined($query->param('PlateStatus'))) {
 
@@ -1057,7 +1096,7 @@ sub get_plate_runmode {
 
 =pod get_plate_HELP_START
 {
-"OperationName" : "Get plate",
+"OperationName": "Get plate",
 "Description": "Get detailed information about the DNA plate specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -1376,7 +1415,7 @@ sub list_extract_advanced_runmode {
 
 =pod list_extract_advanced_HELP_START
 {
-"OperationName" : "List extracts",
+"OperationName": "List extracts",
 "Description": "List DNA extracts available in the system. Use filtering to retrieve desired subset or list current list of extracts attached to analysis group.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -1852,7 +1891,7 @@ sub add_extract_runmode {
 
 =pod add_extract_gadmin_HELP_START
 {
-"OperationName" : "Add extract",
+"OperationName": "Add extract",
 "Description": "Add a new DNA extract into the system.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -2355,7 +2394,7 @@ sub del_extract_runmode {
 
 =pod del_extract_gadmin_HELP_START
 {
-"OperationName" : "Delete extract",
+"OperationName": "Delete extract",
 "Description": "Delete DNA extract specified by id. Extract can be deleted only if not attached to any lower level related record.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -2452,7 +2491,7 @@ sub update_extract_runmode {
 
 =pod update_extract_gadmin_HELP_START
 {
-"OperationName" : "Update extract",
+"OperationName": "Update extract",
 "Description": "Update DNA extract specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -2513,7 +2552,52 @@ sub update_extract_runmode {
     return $data_for_postrun_href;
   }
 
-  my $ItemGroupId = read_cell_value($dbh_m_read, 'extract', 'ItemGroupId', 'ExtractId', $ExtractId);
+  my $read_extract_sql    =  'SELECT "ItemGroupId", "ParentExtractId", "PlateId", "GenotypeId", "Tissue", ';
+     $read_extract_sql   .=  '"WellRow", "WellCol", "Quality", "Status" ';
+     $read_extract_sql   .=  'FROM "extract" WHERE "ExtractId"=? ';
+
+  my ($r_df_val_err, $r_df_val_msg, $extract_df_val_data) = read_data($dbh_m_read, $read_extract_sql, [$ExtractId]);
+
+  if ($r_df_val_err) {
+
+    $self->logger->debug("Retrieve extract default values for optional fields failed: $r_df_val_msg");
+    $data_for_postrun_href->{'Error'}  = 1;
+    $data_for_postrun_href->{'Data'}   = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $ItemGroupId           =  undef;
+  my $ParentExtractId       =  undef;
+  my $PlateId               =  undef;
+  my $GenotypeId            =  undef;
+  my $Tissue                =  undef;
+  my $WellRow               =  undef;
+  my $WellCol               =  undef;
+  my $Quality               =  undef;
+  my $Status                =  undef;
+
+  my $nb_df_val_rec    =  scalar(@{$extract_df_val_data});
+
+  if ($nb_df_val_rec != 1)  {
+
+     $self->logger->debug("Retrieve extract default values - number of records unacceptable: $nb_df_val_rec");
+     $data_for_postrun_href->{'Error'} = 1;
+     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+     return $data_for_postrun_href;
+  }
+
+  $ItemGroupId           =  $extract_df_val_data->[0]->{'ItemGroupId'};
+  $ParentExtractId       =  $extract_df_val_data->[0]->{'ParentExtractId'};
+  $PlateId               =  $extract_df_val_data->[0]->{'PlateId'};
+  $GenotypeId            =  $extract_df_val_data->[0]->{'GenotypeId'};
+  $Tissue                =  $extract_df_val_data->[0]->{'Tissue'};
+  $WellRow               =  $extract_df_val_data->[0]->{'WellRow'};
+  $WellCol               =  $extract_df_val_data->[0]->{'WellCol'};
+  $Quality               =  $extract_df_val_data->[0]->{'Quality'};
+  $Status                =  $extract_df_val_data->[0]->{'Status'};
+
 
   if (defined $query->param('ItemGroupId')) {
 
@@ -2528,7 +2612,6 @@ sub update_extract_runmode {
     $ItemGroupId = undef;
   }
 
-  my $ParentExtractId = read_cell_value($dbh_m_read, 'extract', 'ParentExtractId', 'ExtractId', $ExtractId);
 
   if (defined($query->param('ParentExtractId'))) {
 
@@ -2543,7 +2626,6 @@ sub update_extract_runmode {
     $ParentExtractId = undef;
   }
 
-  my $PlateId = read_cell_value($dbh_m_read, 'extract', 'PlateId', 'ExtractId', $ExtractId);
 
   if (defined($query->param('PlateId'))) {
 
@@ -2558,7 +2640,6 @@ sub update_extract_runmode {
     $PlateId = undef;
   }
 
-  my $GenotypeId = read_cell_value($dbh_m_read, 'extract', 'GenotypeId', 'ExtractId', $ExtractId);
 
   if (defined($query->param('GenotypeId'))) {
 
@@ -2573,7 +2654,6 @@ sub update_extract_runmode {
     $GenotypeId = undef;
   }
 
-  my $Tissue = read_cell_value($dbh_m_read, 'extract', 'Tissue', 'ExtractId', $ExtractId);
 
   if (defined($query->param('Tissue'))) {
 
@@ -2588,28 +2668,24 @@ sub update_extract_runmode {
     $Tissue = undef;
   }
 
-  my $WellRow = read_cell_value($dbh_m_read, 'extract', 'WellRow', 'ExtractId', $ExtractId);
 
   if (defined($query->param('WellRow'))) {
 
     $WellRow = $query->param('WellRow');
   }
 
-  my $WellCol = read_cell_value($dbh_m_read, 'extract', 'WellCol', 'ExtractId', $ExtractId);
 
   if (defined($query->param('WellCol'))) {
 
     $WellCol = $query->param('WellCol');
   }
 
-  my $Quality = read_cell_value($dbh_m_read, 'extract', 'Quality', 'ExtractId', $ExtractId);
 
   if (defined($query->param('Quality'))) {
 
     $Quality = $query->param('Quality');
   }
 
-  my $Status = read_cell_value($dbh_m_read, 'extract', 'Status', 'ExtractId', $ExtractId);
 
   if (defined($query->param('Status'))) {
 
@@ -3026,7 +3102,7 @@ sub get_extract_runmode {
 
 =pod get_extract_HELP_START
 {
-"OperationName" : "Get extract",
+"OperationName": "Get extract",
 "Description": "Get detailed information about DNA extract specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -3292,7 +3368,7 @@ sub list_analysisgroup_advanced_runmode {
 
 =pod list_analysisgroup_advanced_HELP_START
 {
-"OperationName" : "List analysis groups",
+"OperationName": "List analysis groups",
 "Description": "List analysis groups defined in the system. This listing requires pagination information.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -3636,7 +3712,7 @@ sub get_analysisgroup_runmode {
 
 =pod get_analysisgroup_HELP_START
 {
-"OperationName" : "Get analysis group",
+"OperationName": "Get analysis group",
 "Description": "Get detailed information about the analysis group specified by id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -3731,7 +3807,7 @@ sub add_analysisgroup_runmode {
 
 =pod add_analysisgroup_HELP_START
 {
-"OperationName" : "Add analysis group",
+"OperationName": "Add analysis group",
 "Description": "Add a new analysis group definition. This groups DNA extracts which will undergo genotyping experiment together.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -4343,11 +4419,316 @@ sub add_analysisgroup_runmode {
   return $data_for_postrun_href;
 }
 
+sub update_analysisgroup_runmode {
+
+=pod update_analysisgroup_HELP_START
+{
+"OperationName": "Update analysis group",
+"Description": "Update analysis group definition. This groups DNA extracts which will undergo genotyping experiment together.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"KDDArTModule": "marker",
+"KDDArTTable": "analysisgroup",
+"KDDArTFactorTable": "analysisgroupfactor",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><ReturnId ParaName='AnalysisGroupId' Value='55' /><Info Message='AnalysisGroup (55) has been updated successfully.' /></DATA>",
+"SuccessMessageJSON": "{'ReturnId' : [{'Value' : '55','ParaName' : 'AnalysisGroupId'}], 'StatInfo' : [{'ServerElapsedTime' : '0.086','Unit' : 'second'}],'Info' : [{'Message' : 'AnalysisGroup (55) has been updated successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error MarkerStateType='MarkerStateType (252) not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'MarkerStateType' : 'MarkerStateType (252) not found.'}]}"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+  my $self            = shift;
+  my $AnalysisGroupId = $self->param('id');
+  my $query           = $self->query();
+
+  my $data_for_postrun_href    =  {};
+
+   # Generic required static field checking
+
+  my $dbh_read = connect_mdb_read();
+
+  my $skip_field = {'OwnGroupId'      => 1,
+                    'AccessGroupId'   => 1,
+                    'OwnGroupPerm'    => 1,
+                    'AccessGroupPerm' => 1,
+                    'OtherPerm'       => 1,
+                   };
+
+  my $field_name_translation = {};
+
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'analysisgroup', $skip_field,
+                                                                                $field_name_translation,
+                                                                               );
+  if ($chk_sfield_err) {
+
+     $self->logger->debug($chk_sfield_msg);
+
+     return $for_postrun_href;
+  }
+
+  $dbh_read->disconnect();
+  # Finish generic required static field checking
+
+  my $AnalysisGroupName         = $query->param('AnalysisGroupName');
+  my $AccessGroupId             = $query->param('AccessGroupId');
+
+  my $dbh_k_read = connect_kdb_read();
+  my $dbh_m_read = connect_mdb_read();
+
+  my $read_anagroup_sql   =  'SELECT "AnalysisGroupDescription", "ContactId" ';
+     $read_anagroup_sql  .=  'FROM "analysisgroup" ';
+     $read_anagroup_sql  .=  'WHERE "AnalysisGroupId"=? ';
+
+  my ($r_df_val_err, $r_df_val_msg, $anagroup_df_val_data) = read_data($dbh_m_read, $read_anagroup_sql, [$AnalysisGroupId]);
+
+  if ($r_df_val_err) {
+
+    $self->logger->debug("Retrieve analysisgroup default values for optional fields failed: $r_df_val_msg");
+    $data_for_postrun_href->{'Error'}  = 1;
+    $data_for_postrun_href->{'Data'}   = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $AnalysisGroupDescription = undef;
+  my $ContactId                = undef;
+
+  my $nb_df_val_rec    =  scalar(@{$anagroup_df_val_data});
+
+  if ($nb_df_val_rec != 1)  {
+
+     $self->logger->debug("Retrieve analysisgroup default values - number of records unacceptable: $nb_df_val_rec");
+     $data_for_postrun_href->{'Error'} = 1;
+     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+     return $data_for_postrun_href;
+  }
+
+  $AnalysisGroupDescription  = $anagroup_df_val_data->[0]->{'AnalysisGroupDescription'};
+  $ContactId                 = $anagroup_df_val_data->[0]->{'ContactId'};
+
+  if (defined($query->param('AnalysisGroupDescription'))) {
+
+    $AnalysisGroupDescription = $query->param('AnalysisGroupDescription');
+  }
+
+  if (defined($query->param('ContactId'))) {
+
+    if (length($query->param('ContactId')) > 0) {
+
+      $ContactId = $query->param('ContactId');
+    }
+  }
+
+  $self->logger->debug('Adding Analysis Group');
+
+  my $sql    = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength ";
+     $sql   .= "FROM factor ";
+     $sql   .= "WHERE TableNameOfFactor='analysisgroupfactor'";
+
+  my $vcol_data = $dbh_k_read->selectall_hashref($sql, 'FactorId');
+
+  my $vcol_param_data = {};
+  my $vcol_len_info   = {};
+  my $vcol_param_data_maxlen = {};
+  for my $vcol_id (keys(%{$vcol_data})) {
+
+    my $vcol_param_name = "VCol_${vcol_id}";
+    my $vcol_value      = $query->param($vcol_param_name);
+    if ($vcol_data->{$vcol_id}->{'CanFactorHaveNull'} != 1) {
+
+      $vcol_param_data->{$vcol_param_name} = $vcol_value;
+    }
+
+    $vcol_len_info->{$vcol_param_name} = $vcol_data->{$vcol_id}->{'FactorValueMaxLength'};
+    $vcol_param_data_maxlen->{$vcol_param_name} = $vcol_value;
+  }
+
+  my ($vcol_missing_err, $vcol_missing_href) = check_missing_href( $vcol_param_data );
+
+  if ($vcol_missing_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$vcol_missing_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  my ($vcol_maxlen_err, $vcol_maxlen_href) = check_maxlen_href($vcol_param_data_maxlen, $vcol_len_info);
+
+  if ($vcol_maxlen_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$vcol_maxlen_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $chk_start_time = [gettimeofday()];
+
+  $self->logger->debug("Checking AnalysisGroupName: $AnalysisGroupName");
+
+  my $chk_elapsed = tv_interval($chk_start_time);
+
+  $self->logger->debug("Check analysisgroup name time: $chk_elapsed seconds");
+
+  #check that supplied access group exists
+  my $access_grp_existence = record_existence($dbh_k_read, 'systemgroup', 'SystemGroupId', $AccessGroupId);
+
+  if (!$access_grp_existence) {
+
+     my $err_msg = "AccessGroup ($AccessGroupId) does not exist.";
+
+     $data_for_postrun_href->{'Error'} = 1;
+     $data_for_postrun_href->{'Data'}  = {'Error' => [{'AccessGroupId' => $err_msg}]};
+
+     return $data_for_postrun_href;
+  }
+
+  if ($ContactId ne '0') {
+
+    if (!record_existence($dbh_k_read, 'contact', 'ContactId', $ContactId)) {
+
+      my $err_msg = "Contact ($ContactId) not found.";
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'ContactId' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+   }
+
+  $dbh_k_read->disconnect();
+  $dbh_m_read->disconnect();
+
+  my $dbh_m_write = connect_mdb_write();
+
+  #update main table
+  $sql    = 'UPDATE "analysisgroup" SET ';
+  $sql   .= '"AnalysisGroupName"=?, ';
+  $sql   .= '"AnalysisGroupDescription"=?, ';
+  $sql   .= '"ContactId"=? ';
+  $sql   .= 'WHERE "AnalysisGroupId"=? ';
+
+  my $sth = $dbh_m_write->prepare($sql);
+     $sth->execute(
+                $AnalysisGroupName,
+                $AnalysisGroupDescription,
+                $ContactId,
+                $AnalysisGroupId
+     );
+
+  if ($dbh_m_write->err()) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sth->finish();
+  
+  #update factor table
+  for my $vcol_id (keys(%{$vcol_data})) {
+
+    my $factor_value = $query->param('VCol_' . $vcol_id);
+
+    $sql    =    'SELECT Count(*) ';
+    $sql   .=    'FROM "analysisgroupfactor" ';
+    $sql   .=    'WHERE "AnalysisGroupId"=? AND "FactorId"=? ';
+
+    my ($read_err, $count)   = read_cell($dbh_m_write, $sql, [$AnalysisGroupId, $vcol_id]);
+
+    if (length($factor_value) > 0) {
+
+       if ($count > 0)  {
+       $sql     =   'UPDATE "analysisgroupfactor" SET ';
+       $sql    .=   '"FactorValue"=? ';
+       $sql    .=   'WHERE "AnalysisGroupId"=? AND "FactorId"=? ';
+
+       my $factor_sth = $dbh_m_write->prepare($sql);
+          $factor_sth->execute($factor_value, $AnalysisGroupId, $vcol_id);
+
+        if ($dbh_m_write->err()) {
+
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+          return $data_for_postrun_href;
+        }
+
+        $factor_sth->finish();
+     }
+     else {
+
+         $sql   =  'INSERT INTO "analysisgroupfactor"(';
+         $sql  .=  '"AnalysisGroupId", ';
+         $sql  .=  '"FactorId", ';
+         $sql  .=  '"FactorValue") ';
+         $sql  .=  'VALUES(?, ?, ?)';
+
+         my $factor_sth  =  $dbh_m_write->prepare($sql);
+            $factor_sth->execute($AnalysisGroupId, $vcol_id, $factor_value);
+
+         if ($dbh_m_write->err()) {
+
+            $data_for_postrun_href->{'Error'}  = 1;
+            $data_for_postrun_href->{'Data'}   = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+            return $data_for_postrun_href;
+         }
+
+          $factor_sth->finish();
+     }
+   }
+
+   else {
+
+     if ($count > 0)  {
+
+        $sql   =  'DELETE FROM "analysisgroup" ';
+        $sql  .=  'WHERE "AnalysisGroupId"=? AND "FactorId"=? ';
+
+        my $factor_sth = $dbh_m_write->prepare($sql);
+            $factor_sth->execute($AnalysisGroupId, $vcol_id);
+
+        if ($dbh_m_write->err()) {
+
+          $self->logger->debug("Delete analysisgroupfactor failed");
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+          return $data_for_postrun_href;
+        }
+        $factor_sth->finish();
+     }
+    }
+  }
+
+  $dbh_m_write->disconnect();
+
+  my $info_msg_aref = [{'Message' => "AnalysisGroup ($AnalysisGroupId) has been updated successfully."}];
+  my $return_id_aref = [{'Value' => "$AnalysisGroupId", 'ParaName' => 'AnalysisGroupId'}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info' => $info_msg_aref,
+                                           'ReturnId' => $return_id_aref,
+  };
+
+  $data_for_postrun_href->{'ExtractData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
 sub add_plate_n_extract_runmode {
 
 =pod add_plate_n_extract_gadmin_HELP_START
 {
-"OperationName" : "Add plate with extracts",
+"OperationName": "Add plate with extracts",
 "Description": "Add DNA plate and extracts together. Allows to define entire plate and contents in one call.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -5192,7 +5573,7 @@ sub add_plate_runmode {
 
 =pod add_plate_gadmin_HELP_START
 {
-"OperationName" : "Add plate",
+"OperationName": "Add plate",
 "Description": "Add plate definition to the system for grouping DNA extracts",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -5655,7 +6036,7 @@ sub list_dataset_runmode {
 
 =pod list_dataset_HELP_START
 {
-"OperationName" : "List datasets",
+"OperationName": "List datasets",
 "Description": "List datasets for a specified analysis group",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -5806,7 +6187,7 @@ sub import_plate_n_extract_runmode {
 
 =pod import_plate_n_extract_gadmin_HELP_START
 {
-"OperationName" : "Import plates and extracts at the same time",
+"OperationName": "Import plates and extracts at the same time",
 "Description": "Import DNA plates and extracts together. Allows to define entire plate and contents in one call.",
 "AuthRequired": 1,
 "GroupRequired": 1,

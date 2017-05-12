@@ -1,8 +1,8 @@
--- generated on: Mon Sep 12 12:02:15 2016
+-- generated on: Fri May 12 15:24:37 2017
 -- input file: ER_dbmodel_Marker.xml
 
 
--- Copyright (C) 2016 by Diversity Arrays Technology Pty Ltd
+-- Copyright (C) 2017 by Diversity Arrays Technology Pty Ltd
 --
 -- This program is free software: you can redistribute it and/or modify
 -- it under the terms of the GNU General Public License as published by
@@ -16,7 +16,7 @@
 
 
 -- model name: Marker ER diagram
--- model version: 2.3.2.86
+-- model version: 2.4.0.95
 
 -- table analysisgroup
 CREATE TABLE "analysisgroup" (
@@ -298,19 +298,7 @@ ALTER TABLE "markeralias" ADD FOREIGN KEY ("AnalysisGroupMarkerId")
   REFERENCES "analysisgroupmarker" ("AnalysisGroupMarkerId") 
   ON DELETE NO ACTION ON UPDATE NO ACTION;
 
-ALTER TABLE "extract" ADD FOREIGN KEY ("ParentExtractId")
-  REFERENCES "extract" ("ExtractId") 
-  ON DELETE NO ACTION ON UPDATE NO ACTION;
-
 ALTER TABLE "markermapgroup" ADD FOREIGN KEY ("ChildMapId")
-  REFERENCES "markermap" ("MarkerMapId") 
-  ON DELETE NO ACTION ON UPDATE NO ACTION;
-
-ALTER TABLE "markermapgroup" ADD FOREIGN KEY ("ParentMapId")
-  REFERENCES "markermap" ("MarkerMapId") 
-  ON DELETE NO ACTION ON UPDATE NO ACTION;
-
-ALTER TABLE "markermapposition" ADD FOREIGN KEY ("MarkerMapId")
   REFERENCES "markermap" ("MarkerMapId") 
   ON DELETE NO ACTION ON UPDATE NO ACTION;
 
@@ -328,18 +316,6 @@ ALTER TABLE "datasetmarkermeta" ADD FOREIGN KEY ("DataSetId")
 
 ALTER TABLE "datasetextract" ADD FOREIGN KEY ("DataSetId")
   REFERENCES "dataset" ("DataSetId") 
-  ON DELETE NO ACTION ON UPDATE NO ACTION;
-
-ALTER TABLE "datasetextract" ADD FOREIGN KEY ("AnalGroupExtractId")
-  REFERENCES "analgroupextract" ("AnalGroupExtractId") 
-  ON DELETE NO ACTION ON UPDATE NO ACTION;
-
-ALTER TABLE "dataset" ADD FOREIGN KEY ("ParentDataSetId")
-  REFERENCES "dataset" ("DataSetId") 
-  ON DELETE NO ACTION ON UPDATE NO ACTION;
-
-ALTER TABLE "markermapposition" ADD FOREIGN KEY ("AnalysisGroupMarkerId")
-  REFERENCES "analysisgroupmarker" ("AnalysisGroupMarkerId") 
   ON DELETE NO ACTION ON UPDATE NO ACTION;
 
 -- field comments

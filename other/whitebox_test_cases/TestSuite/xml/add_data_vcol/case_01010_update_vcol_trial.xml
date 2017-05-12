@@ -1,7 +1,7 @@
 <TestCase>
   <CaseInfo CustomMethod="add_record" Description="Add a virtual column to trial" TargetURL="factortable/trialfactor/add/vcolumn" Type="BLOCKING" />
   <FactorName Value="TrialExtraCol_4977592" />
-  <INPUT ParaName="FactorId" SrcValue="case_01004_add_vcol_trial.xml" />
+  <INPUT ParaName="FactorId" SrcValue="xml/add_data_vcol/case_01004_add_vcol_trial.xml" />
   <INPUT ParaName="FactorName" PrefixVal="TrialExtraCol_" Random="1" />
   <INPUT ParaName="FactorCaption" PrefixVal="TrialExtraCol_" Random="1" />
   <INPUT ParaName="FactorDescription" Value="Extra Column" />

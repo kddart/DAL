@@ -13,5 +13,5 @@
   <Parent CaseFile="xml/add_data_no_vcol/case_00345_add_layer.xml" Force="1" Order="3" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00348_add_layer_attribute_hum.xml" Force="1" Order="4" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00371_register_device_fix.xml" Force="1" Order="4" />
-  <RunInfo Success="1" Time="1474006983" />
+  
 </TestCase>

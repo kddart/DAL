@@ -13,7 +13,7 @@
 #
 
 - hosts: kddartserver
-  gather_facts: no
+  gather_facts: yes
 
   vars_prompt:
     - name: "local_tar_gz_file"
@@ -46,6 +46,13 @@
     monetdbpass: monetdb
     postgrespass: '{{ dbpass }}'
     dal_address_name: kddart.example.com
+    solr_workspace: /root/tmp_install_solr
+    solr_config_file: /etc/default/solr.in.sh
+    solr_install_dir: /opt
+    solr_home: /var/solr
+    solr_version: "6.2.1"
+    mysql_jdbc_jar: mysql-connector-java-*-bin.jar
+    monetdb_jdbc_jar: monetdb-jdbc-*.jar
 
   tasks:
 
@@ -59,7 +66,7 @@
       shell: >
         if [ -d {{ local_dir }} ]; then 
         cd {{ local_dir }};
-        tar -zxvf {{ src_file }} --strip 1;
+        tar --no-same-owner -zxvf {{ src_file }} --strip 1;
         fi;
 
     - include: ./kddart_dal_v2_3_2_server_deployment_centos7.yml

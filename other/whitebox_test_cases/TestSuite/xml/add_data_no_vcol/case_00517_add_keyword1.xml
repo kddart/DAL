@@ -7,6 +7,6 @@
   <Match Attr="ParaName" Tag="ReturnId" Value="KeywordId" />
   <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
-  <ReturnId ParaName="KeywordId" Value="40" />
-  <RunInfo Success="1" Time="1474007412" />
+  <ReturnId ParaName="KeywordId" Value="7" />
+  
 </TestCase>

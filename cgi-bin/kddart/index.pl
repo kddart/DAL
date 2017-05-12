@@ -8,9 +8,9 @@
 # Author    : Puthick Hok
 # Created   : 02/06/2010
 # Modified  :
-# Purpose   : 
-#          
-#          
+# Purpose   :
+#
+#
 
 use strict;
 use warnings;
@@ -47,6 +47,9 @@ CGI::Application::Dispatch->dispatch(
 
     'logout'                                            => { app => 'KDDArT::DAL::Authentication',
                                                              rm  => 'logout' },
+
+    'clone/session'                                     => { app => 'KDDArT::DAL::Authentication',
+                                                             rm  => 'clone' },
 
     'get/login/status'                                  => { app => 'KDDArT::DAL::Authentication',
                                                              rm  => 'get_login_status' },
@@ -514,6 +517,27 @@ CGI::Application::Dispatch->dispatch(
     'trial/:id/list/trait'                              => { app => 'KDDArT::DAL::Trial',
                                                              rm  => 'list_trial_trait' },
 
+    'add/traitgroup'                                    => { app => 'KDDArT::DAL::Trait',
+                                                             rm  => 'add_traitgroup' },
+
+    'update/traitgroup/:id'                             => { app => 'KDDArT::DAL::Trait',
+                                                             rm  => 'update_traitgroup' },
+
+    'list/traitgroup/:nperpage/page/:num'               => { app => 'KDDArT::DAL::Trait',
+                                                             rm  => 'list_traitgroup_advanced' },
+
+    'get/traitgroup/:id'                                => { app => 'KDDArT::DAL::Trait',
+                                                             rm  => 'get_traitgroup' },
+
+    'traitgroup/:id/add/trait'                          => { app => 'KDDArT::DAL::Trait',
+                                                             rm  => 'add_trait2traitgroup' },
+
+    'traitgroup/:id/remove/trait/:tid'                  => { app => 'KDDArT::DAL::Trait',
+                                                             rm  => 'remove_trait_from_traitgroup' },
+
+    'delete/traitgroup/:id'                             => { app => 'KDDArT::DAL::Trait',
+                                                             rm  => 'del_traitgroup' },
+
     'trial/:id/list/dimension'                          => { app => 'KDDArT::DAL::Trial',
                                                              rm  => 'list_trial_dimension' },
 
@@ -679,6 +703,24 @@ CGI::Application::Dispatch->dispatch(
     'export/samplemeasurement/csv'                      => { app => 'KDDArT::DAL::Trait',
                                                              rm  => 'export_samplemeasurement_csv' },
 
+    'trial/:id/import/smgroupdata/csv'                  => { app => 'KDDArT::DAL::Trait',
+                                                             rm  => 'import_smgroup_data_csv' },
+
+    'trial/:id/list/smgroup'                            => { app => 'KDDArT::DAL::Trait',
+                                                             rm  => 'list_smgroup' },
+
+    'get/smgroup/:id'                                   => { app => 'KDDArT::DAL::Trait',
+                                                             rm  => 'get_smgroup' },
+
+    'update/smgroup/:id'                                => { app => 'KDDArT::DAL::Trait',
+                                                             rm  => 'update_smgroup' },
+
+    'delete/smgroup/:id'                                => { app => 'KDDArT::DAL::Trait',
+                                                             rm  => 'del_smgroup' },
+
+    'list/samplemeasurement/:nperpage/page/:num'        => { app => 'KDDArT::DAL::Trait',
+                                                             rm  => 'list_samplemeasurement_advanced' },
+
     'add/plate'                                         => { app => 'KDDArT::DAL::Extract',
                                                              rm  => 'add_plate_gadmin' },
 
@@ -687,6 +729,9 @@ CGI::Application::Dispatch->dispatch(
 
     'import/plate/n/extract/xml'                        => { app => 'KDDArT::DAL::Extract',
                                                              rm  => 'import_plate_n_extract_gadmin' },
+
+    'update/analysisgroup/:id'                          => { app => 'KDDArT::DAL::Extract',
+                                                             rm  => 'update_analysisgroup' },
 
     'add/analysisgroup'                                 => { app => 'KDDArT::DAL::Extract',
                                                              rm  => 'add_analysisgroup' },
@@ -870,6 +915,9 @@ CGI::Application::Dispatch->dispatch(
 
     'update/item/:id'                                   => { app => 'KDDArT::DAL::Inventory',
                                                              rm  => 'update_item_gadmin' },
+
+    'update/itembulk/json'                              => { app => 'KDDArT::DAL::Inventory',
+                                                             rm  => 'update_item_bulk_gadmin' },
 
     'delete/item/:id'                                   => { app => 'KDDArT::DAL::Inventory',
                                                              rm  => 'del_item_gadmin' },
@@ -1098,6 +1146,9 @@ CGI::Application::Dispatch->dispatch(
 
     'solrcore/:core/list/entity'                        => { app => 'KDDArT::DAL::Search',
                                                              rm  => 'list_solr_entity' },
+
+    'get/uniquenumber'                                  => { app => 'KDDArT::DAL::System',
+                                                             rm  => 'get_unique_number' },
 
   ],
 );

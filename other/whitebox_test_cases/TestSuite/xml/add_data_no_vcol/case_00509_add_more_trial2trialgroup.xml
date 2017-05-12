@@ -10,5 +10,5 @@
   <Parent CaseFile="xml/add_data_no_vcol/case_00505_add_trialgroup.xml" Force="1" Order="3" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00507_add_trial4trialgroup2.xml" Order="4" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00508_add_trial4trialgroup3.xml" Order="5" />
-  <RunInfo Success="1" Time="1474007434" />
+  
 </TestCase>

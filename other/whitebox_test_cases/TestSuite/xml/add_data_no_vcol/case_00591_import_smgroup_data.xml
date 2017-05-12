@@ -1,0 +1,28 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record_upload" Description="Import SMGroup data" TargetURL="trial/:TrialId/import/smgroupdata/csv" Type="BLOCKING" OutputFormat="JSON" />
+  <INPUT ParaName="TrialId" SrcValue="xml/add_data_no_vcol/case_00007_add_trial.xml" />
+  <INPUT ParaName="SMGroupName" PrefixVal="SMG_" Random="1" />
+  <INPUT ParaName="SMGroupStatus" Value="TEST" />
+  <INPUT ParaName="SMGroupNote" Value="Testing" />
+  <INPUT ParaName="TrialUnitIdCol" Value="0" />
+  <INPUT ParaName="SampleTypeIdCol" Value="1" />
+  <INPUT ParaName="TraitIdCol" Value="2" />
+  <INPUT ParaName="MeasureDateTimeCol" Value="3" />
+  <INPUT ParaName="InstanceNumberCol" Value="4" />
+  <INPUT ParaName="TraitValueCol" Value="5" />
+  <INPUT ParaName="StateReasonCol" Value="6" />
+  <INPUT ParaName="TrialUnitSpecimenIdCol" Value="7" />
+  <INPUT SrcXML="xml/add_data_no_vcol/samplemeasurement_1.xml" Transform="1" XSL="xml/add_data_no_vcol/samplemeasurement_1.xsl" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Match Attr="ParaName" Tag="ReturnId" Value="SMGroupId" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00358_add_trialunit.xml" Force="1" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00525_get_trial_unit_spec_id.xml" Force="1" Order="4" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00590_get_trial_unit_spec_id_2.xml" Force="1" Order="5" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00359_add_trait.xml" Order="6" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00201_add_sampletype.xml" Order="7" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00467_add_trialtrait4import_samplemeasurement.xml" Force="1" Order="8" />
+  
+</TestCase>
