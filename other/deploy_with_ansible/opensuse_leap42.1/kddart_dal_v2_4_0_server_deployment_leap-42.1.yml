@@ -4,7 +4,7 @@
 #
 # Author: Puthick Hok
 # Date: 08/08/2016
-# Usage: ansible-playbook kddart_dal_v2_4_server_deployment_leap-42.1.yml
+# Usage: ansible-playbook kddart_dal_v2_4_0_server_deployment_leap-42.1.yml
 # Description: By running the usage command, ansible will install and configure DAL
 #              according the instructions in kddart_server_deployment_centos7.yml.
 #              This script needs to be run by root.
@@ -30,9 +30,9 @@
       private: no
 
   vars:
-    src_file:  /root/KDDArT-DAL-v2.4.tar.gz
-    dal_version: v2.4
-    dal_db_version: v2_4
+    src_file:  /root/KDDArT-DAL-v2.4.0.tar.gz
+    dal_version: v2.4.0
+    dal_db_version: v2_4_0
     local_dir: /root/KDDArT-DAL-{{ dal_version }}
     apache_base_dir: /srv/www
     local_src_dir: /usr/local
