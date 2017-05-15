@@ -227,13 +227,17 @@
   shell: >
     if [ ! -e /root/.my.cnf ]; then echo "[client]" > /root/.my.cnf && echo "user=root" >> /root/.my.cnf && echo "password=`grep 'temporary password' /var/log/mysqld.log | gawk '{print $NF}'`" >> /root/.my.cnf && echo "ALTER USER 'root'@'localhost' IDENTIFIED BY '{{ mysqlrootpass }}'" | mysql -u root mysql --connect-expired-password; fi;
 
-- name: Disable sql_mode
+- name: Disable sql_mode for Centos
   shell: >
     echo "set global sql_mode='NO_ENGINE_SUBSTITUTION'" | mysql -u root --password="{{ mysqlrootpass }}";
-    [[ ! `grep 'sql-mode' /etc/my.cnf` ]] || sed -i 's|sql-mode=.*|sql-mode="NO_ENGINE_SUBSTITUTION"|' /etc/my.cnf;
+    if [ `grep 'sql-mode' /etc/my.cnf` ]; then
+    sed -i 's|sql-mode=.*|sql-mode="NO_ENGINE_SUBSTITUTION"|' /etc/my.cnf;
+    else
+    echo "sql_mode='NO_ENGINE_SUBSTITUTION'" >> /etc/my.cnf;
+    fi;
   when: ansible_distribution == 'CentOS'
 
-- name: Disable sql_mode
+- name: Disable sql_mode for Scientific Linux
   shell: >
     echo "sql_mode='NO_ENGINE_SUBSTITUTION'" >> /etc/my.cnf;
   when: ansible_distribution == 'Scientific'
