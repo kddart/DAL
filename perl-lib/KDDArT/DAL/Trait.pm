@@ -4811,7 +4811,17 @@ sub import_datakapture_data_csv_runmode {
 
     if (defined($trialunit_lookup->{$dk_file_unitposition_txt})) {
 
+      $self->logger->debug("Found trial unit");
       $db_trial_unit = $trialunit_lookup->{$dk_file_unitposition_txt};
+    }
+    else {
+
+      $self->logger->debug("Cannot find trial unit from: $dk_file_unitposition_txt");
+      my $err_msg = "Unexpected Error.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
     }
 
     my $db_replicate_number = $db_trial_unit->{'ReplicateNumber'};
@@ -5262,14 +5272,14 @@ sub insert_samplemeasurement_data {
 
         $effective_user_id = $operator_id;
       }
-
-      $uniq_tunit_href->{$trialunit_id} = 1;
-      push(@{$tunit_val_aref}, $trialunit_id);
-      push(@{$tunit_idx_aref}, $row_counter);
-
-      push(@{$tu_trait_id_val_aref}, [$trialunit_id, $trait_id]);
-      push(@{$tu_trait_id_idx_aref}, $row_counter);
     }
+
+    $uniq_tunit_href->{$trialunit_id} = 1;
+    push(@{$tunit_val_aref}, $trialunit_id);
+    push(@{$tunit_idx_aref}, $row_counter);
+
+    push(@{$tu_trait_id_val_aref}, [$trialunit_id, $trait_id]);
+    push(@{$tu_trait_id_idx_aref}, $row_counter);
 
     if (length($data_row->{'OperatorId'}) > 0) {
 
