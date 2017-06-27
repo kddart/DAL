@@ -1,10 +1,35 @@
 <dataConfig>
-  <dataSource type="JdbcDataSource"
+  <dataSource name="monetdb-ds" type="JdbcDataSource"
             driver="nl.cwi.monetdb.jdbc.MonetDriver"
-            url="jdbc:monetdb://localhost/kddart_marker_v2_3_2"
+            url="jdbc:monetdb://localhost/kddart_marker_v2_4_0"
             user="monetdb"
             password="monetdb" />
+
+  <dataSource name="mysql-ds" type="JdbcDataSource"
+            driver="com.mysql.jdbc.Driver"
+            url="jdbc:mysql://localhost:3306/kddart_v2_4_0"
+            user="kddart_dal"
+            password="yourSecurePassword" />
+
   <document>
-    <entity name="marker_info" query='select &apos;marker_info&apos; as "entity_name", "AnalysisGroupMarkerId" as "SolrId", "DataSetId", "MarkerName", "MarkerSequence", "MarkerDescription", "MarkerExtRef" from "analysisgroupmarker";' />
+
+    <entity dataSource="monetdb-ds" name="marker_info" query='select &apos;marker_info&apos; as "entity_name", concat(&apos;MRKINFO&apos;, "AnalysisGroupMarkerId") as "SolrId", "DataSetId", "MarkerName", "MarkerSequence", "MarkerDescription", "MarkerExtRef" from "analysisgroupmarker";' />
+
+    <entity dataSource="monetdb-ds" name="ext_analgrp" query='select &apos;ext_analgrp&apos; as "entity_name", concat(&apos;EXTANALGRP&apos;, "extract"."ExtractId") as "SolrId", "extract"."ExtractId", "GenotypeId", "ItemGroupId", "dataset"."AnalysisGroupId", "dataset"."DataSetId" from "extract" left join "analgroupextract" on "extract"."ExtractId" = "analgroupextract"."ExtractId" left join "datasetextract" on "analgroupextract"."AnalGroupExtractId" = "datasetextract"."AnalGroupExtractId" left join "dataset" on "datasetextract"."DataSetId" = "dataset"."DataSetId" where ISNULL("dataset"."DataSetId") = False;' >
+
+       <field column="GenotypeId" name="GenotypeId" />
+       <field column="ItemGroupId" name="ItemGroupId" />
+
+       <entity dataSource="mysql-ds" name="ext_trial_sub" query="select TrialId as GenotypeTrialList, trialunit.TrialUnitId as GenotypeTrialUnitList, TrialUnitSpecimenId as GenotypeTrialUnitSpecimenList from trialunit left join trialunitspecimen on trialunit.TrialUnitId=trialunitspecimen.TrialUnitId left join genotypespecimen on trialunitspecimen.SpecimenId=genotypespecimen.SpecimenId where GenotypeId='${ext_analgrp.GenotypeId}';">
+       </entity>
+
+       <entity dataSource="mysql-ds" name="trialunit_itm_grp" query="select TrialId as ItemGroupTrialList, trialunit.TrialUnitId as ItemGroupTrialUnitList, trialunitspecimen.TrialUnitSpecimenId as ItemGroupTrialUnitSpecimenList from trialunit left join trialunitspecimen on trialunit.TrialUnitId = trialunitspecimen.TrialUnitId left join item on trialunitspecimen.TrialUnitSpecimenId = item.TrialUnitSpecimenId left join itemgroupentry on item.ItemId=itemgroupentry.ItemId where ItemGroupId = '${ext_analgrp.ItemGroupId}';" >
+       </entity>
+
+       <entity dataSource="mysql-ds" name="geno_itm_grp" query="select item.SpecimenId as ItemGroupSpecimenList, GenotypeId as ItemGroupGenotypeList from itemgroupentry left join item on itemgroupentry.ItemId=item.ItemId left join specimen on item.SpecimenId = specimen.SpecimenId left join genotypespecimen on specimen.SpecimenId = genotypespecimen.SpecimenId where ItemGroupId = '${ext_analgrp.ItemGroupId}';" >
+       </entity>
+
+    </entity>
+
   </document>
 </dataConfig>

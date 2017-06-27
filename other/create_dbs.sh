@@ -122,7 +122,7 @@ EOF
 
 if [ $# -lt 7 ]
 then
-    echo -e "Usage: $0 <1 for no password | other value for passowrd prompt> <postgres dbname> <postgres sql> <main module dbname> <main module mysql sql> <marker dbname> <marker mysql sql> [1 (force drop db if exists)]"
+    echo -e "Usage: $0 <2 for inline password | 1 for no password at all | 0 for passowrd prompt> <postgres dbname> <postgres sql> <main module dbname> <main module mysql sql> <marker dbname> <marker mysql sql> [1 (force drop db if exists)]"
     exit 1
 fi
 
@@ -147,7 +147,7 @@ fi
 MYSQL_PASS_ARG=''
 MONET_PASS='monetdb'
 
-if [[ $NO_PASS -ne 1 ]]
+if [[ $NO_PASS -eq 0 ]]
 then
 
     stty -echo
@@ -171,6 +171,9 @@ then
 
     MONET_PASS=$MDB_PASS
     MYSQL_PASS_ARG="--password=$MYSQL_PASS"
+elif [[ $NO_PASS -eq 2 ]]
+then
+    MYSQL_PASS_ARG="--password=$DB_PASS"
 fi
 
 POSTGRES_DB_EXIST=`psql -h $DB_HOST -l -U $PG_UNAME | gawk '{print $1}' | grep "^$PG_DBNAME\$"`

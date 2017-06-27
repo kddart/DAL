@@ -225,7 +225,7 @@
 
 - name: Enable root login to mysql using temporary password and change the MySQL root password
   shell: >
-    if [ ! -e /root/.my.cnf ]; then echo "[client]" > /root/.my.cnf && echo "user=root" >> /root/.my.cnf && echo "password=`grep 'temporary password' /var/log/mysqld.log | gawk '{print $NF}'`" >> /root/.my.cnf && echo "ALTER USER 'root'@'localhost' IDENTIFIED BY '{{ mysqlrootpass }}'" | mysql -u root mysql --connect-expired-password; fi;
+    if [ ! -e /root/.my.cnf ]; then echo "[client]" > /root/.my.cnf && echo "user=root" >> /root/.my.cnf && echo "password=`grep 'temporary password' /var/log/mysqld.log | gawk '{print $NF}'`" >> /root/.my.cnf && echo "ALTER USER 'root'@'localhost' IDENTIFIED BY '{{ mysqlrootpass }}'" | mysql -u root --password=`grep 'temporary password' /var/log/mysqld.log | gawk '{print $NF}'` --connect-expired-password; fi;
 
 - name: Disable sql_mode for Centos
   shell: >
@@ -248,13 +248,13 @@
     sed -i "s|set -e|#set -e|" {{ local_dir }}/other/create_dbs.sh;
 
 - name: Create KDDart Databases
-  shell: "{{ local_dir }}/other/create_dbs.sh 1 kddart_gis_enviro_{{ dal_db_version }} {{ local_dir }}/other/db_files/kddart_gis_enviro_dal_{{ dal_version }}_postgis2.sql kddart_{{ dal_db_version }} {{ local_dir }}/other/db_files/kddart_dal_{{ dal_version }}.sql kddart_marker_{{ dal_db_version }} {{ local_dir }}/other/db_files/kddart_marker_dal_{{ dal_version }}.sql 1 > /root/create_dbs.log 2>&1"
+  shell: "{{ local_dir }}/other/create_dbs.sh 2 kddart_gis_enviro_{{ dal_db_version }} {{ local_dir }}/other/db_files/kddart_gis_enviro_dal_{{ dal_version }}_postgis2.sql kddart_{{ dal_db_version }} {{ local_dir }}/other/db_files/kddart_dal_{{ dal_version }}.sql kddart_marker_{{ dal_db_version }} {{ local_dir }}/other/db_files/kddart_marker_dal_{{ dal_version }}.sql 1 > /root/create_dbs.log 2>&1"
 
 - name: Save create dbs command for manual run to fix monetdb problem
-  shell: echo "{{ local_dir }}/other/create_dbs.sh 1 kddart_gis_enviro_{{ dal_db_version }} {{ local_dir }}/other/db_files/kddart_gis_enviro_dal_{{ dal_version }}_postgis2.sql kddart_{{ dal_db_version }} {{ local_dir }}/other/db_files/kddart_dal_{{ dal_version }}.sql kddart_marker_{{ dal_db_version }} {{ local_dir }}/other/db_files/kddart_marker_dal_{{ dal_version }}.sql 1 > /root/create_dbs.log 2>&1" > {{ local_dir }}/other/run_create_dbs.sh; chmod 755 {{ local_dir }}/other/run_create_dbs.sh;
+  shell: echo "{{ local_dir }}/other/create_dbs.sh 2 kddart_gis_enviro_{{ dal_db_version }} {{ local_dir }}/other/db_files/kddart_gis_enviro_dal_{{ dal_version }}_postgis2.sql kddart_{{ dal_db_version }} {{ local_dir }}/other/db_files/kddart_dal_{{ dal_version }}.sql kddart_marker_{{ dal_db_version }} {{ local_dir }}/other/db_files/kddart_marker_dal_{{ dal_version }}.sql 1 > /root/create_dbs.log 2>&1" > {{ local_dir }}/other/run_create_dbs.sh; chmod 755 {{ local_dir }}/other/run_create_dbs.sh;
 
 - name: Save create dbs command for demo databases
-  shell: echo "{{ local_dir }}/other/create_dbs.sh 1 kddart_gis_enviro_{{ dal_db_version }} {{ local_dir }}/other/db_files/demo/kddart_gis_enviro_demo_{{ dal_db_version }}.sql kddart_{{ dal_db_version }} {{ local_dir }}/other/db_files/demo/kddart_demo_{{ dal_db_version }}.sql kddart_marker_{{ dal_db_version }} {{ local_dir }}/other/db_files/demo/kddart_marker_demo_{{ dal_db_version }}.sql 1 > /root/create_demo_dbs.log 2>&1" > {{ local_dir }}/other/run_create_demo_dbs.sh; chmod 755 {{ local_dir }}/other/run_create_demo_dbs.sh;
+  shell: echo "{{ local_dir }}/other/create_dbs.sh 2 kddart_gis_enviro_{{ dal_db_version }} {{ local_dir }}/other/db_files/demo/kddart_gis_enviro_demo_{{ dal_db_version }}.sql kddart_{{ dal_db_version }} {{ local_dir }}/other/db_files/demo/kddart_demo_{{ dal_db_version }}.sql kddart_marker_{{ dal_db_version }} {{ local_dir }}/other/db_files/demo/kddart_marker_demo_{{ dal_db_version }}.sql 1 > /root/create_demo_dbs.log 2>&1" > {{ local_dir }}/other/run_create_demo_dbs.sh; chmod 755 {{ local_dir }}/other/run_create_demo_dbs.sh;
 
 - name: Remove MySQL root password .my.cnf
   shell: >
@@ -300,7 +300,6 @@
     cp -rp {{ local_dir}}/perl-lib/* {{ apache_base_dir }}/perl-lib;
     cp {{local_dir}}/other/kddart_dal.cfg {{ apache_base_dir }}/secure;
     cp {{local_dir}}/cgi-bin/kddart/* {{ apache_base_dir }}/cgi-bin/kddart;
-    mv {{ apache_base_dir }}/vhosts/{{ dal_address_name }}/data/admin/.htaccess {{ apache_base_dir }}/vhosts/{{ dal_address_name }}/data/admin/.htaccess_stopped;
 
 - name: Change /srv/www to {{ apache_base_dir }}
   shell: sed -i "s|/srv/www|{{ apache_base_dir }}|" {{ apache_base_dir }}/secure/kddart_dal.cfg

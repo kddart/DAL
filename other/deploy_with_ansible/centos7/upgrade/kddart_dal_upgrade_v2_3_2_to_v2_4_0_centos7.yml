@@ -1,0 +1,77 @@
+#
+# DAL Deployment script for CentOS 7
+# Copyright (c) 2017, Diversity Arrays Technology, All rights reserved.
+#
+# Author: Puthick Hok
+# Date: 23/06/2017
+# Description: Supporting ansible playbook script
+#
+
+- name: Adjust create_dbs.sh update the password
+  become: yes
+  shell: >
+    sed -i "s|DB_PASS='yourSecurePassword'|DB_PASS='{{ mysqlrootpass }}'|g" {{ local_dir }}/other/create_dbs.sh;
+
+- name: Copy Perl packages
+  become: yes
+  shell: >
+    export VHOST_DIR=`sed -e '1,/DSN_KDB_READ/d' -e '/DSN_KDB_WRITE/,$d' {{ apache_base_dir }}/secure/kddart_dal.cfg | grep 'DBI:mysql:database' | gawk 'BEGIN{FS="="}{print $1}END{}'`;
+    cp -rp {{ local_dir }}/vhosts/kddart.example.com/* $VHOST_DIR;
+    cp -rp {{ local_dir}}/perl-lib/* {{ apache_base_dir }}/perl-lib;
+    cp {{local_dir}}/cgi-bin/kddart/* {{ apache_base_dir }}/cgi-bin/kddart;
+
+- name: Backup databases
+  become: yes
+  shell: >
+    mkdir -p {{ backup_dir }};
+    cd {{ backup_dir }};
+    mysqldump -u root --password={{ mysqlrootpass }} kddart_{{ old_dal_db_version }} > {{ backup_dir }}/kddart_{{ old_dal_db_version }}-`date +"%Y%m%d"`.sql;
+    pg_dump -U postgres -d kddart_gis_enviro_{{ old_dal_db_version }} > {{ backup_dir }}/kddart_gis_enviro_{{ old_dal_db_version }}-`date +"%Y%m%d"`.sql;
+    export export DOTMONETDBFILE="./.monetdbuser";
+    echo -e "user=monetdb\npassword=monetdb\nlanguage=sql" > ./.monetdbuser;
+    msqldump -d kddart_marker_{{ old_dal_db_version }} > {{ backup_dir }}/kddart_marker_{{ old_dal_db_version }}-`date +"%Y%m%d"`.sql;
+
+- name: Recreating databases from backup file into a new version for upgrade
+  become: yes
+  shell: >
+    {{ local_dir }}/other/create_dbs.sh 2 kddart_gis_enviro_{{ dal_db_version }} {{ backup_dir }}/kddart_gis_enviro_{{ old_dal_db_version }}-`date +"%Y%m%d"`.sql kddart_{{ dal_db_version }} {{ backup_dir }}/kddart_{{ old_dal_db_version }}-`date +"%Y%m%d"`.sql kddart_marker_{{ dal_db_version }} {{ backup_dir }}/kddart_marker_{{ old_dal_db_version }}-`date +"%Y%m%d"`.sql 1 > /root/recreate_dbs.log 2>&1;
+
+- name: Upgrade KDDart core database structure
+  become: yes
+  shell: >
+    mysql -u root --password={{ mysqlrootpass }} kddart_{{ dal_db_version }} < {{ local_dir }}/other/db_files/upgrade_{{ old_dal_db_version }}_to_{{ dal_db_version }}.sql > /root/upgrade_core.log 2>&1;
+
+- name: Save commands that recreate and upgrade databases
+  become: yes
+  shell: >
+    echo "{{ local_dir }}/other/create_dbs.sh 2 kddart_gis_enviro_{{ dal_db_version }} {{ backup_dir }}/kddart_gis_enviro_{{ old_dal_db_version }}-`date +"%Y%m%d"`.sql kddart_{{ dal_db_version }} {{ backup_dir }}/kddart_{{ old_dal_db_version }}-`date +"%Y%m%d"`.sql kddart_marker_{{ dal_db_version }} {{ backup_dir }}/kddart_marker_{{ old_dal_db_version }}-`date +"%Y%m%d"`.sql 1 > /root/recreate_dbs.log 2>&1;" > {{ local_dir }}/other/run_upgrade_dbs.sh;
+    echo "mysql -u root --password={{ mysqlrootpass }} kddart_{{ dal_db_version }} < {{ local_dir }}/other/db_files/upgrade_{{ old_dal_db_version }}_to_{{ dal_db_version }}.sql > /root/upgrade_core.log 2>&1;" >> {{ local_dir }}/other/run_upgrade_dbs.sh;
+    chmod 755 {{ local_dir }}/other/run_upgrade_dbs.sh;
+
+- name: Change DAL config file for new version
+  become: yes
+  shell: >
+    sed -i "s|{{ old_dal_db_version }}|{{ dal_db_version }}|g" {{ apache_base_dir }}/secure/kddart_dal.cfg;
+
+- name: Change Solr config files
+  become: yes
+  shell: >
+    sed -i "s|{{ old_dal_db_version }}|{{ dal_db_version }}|g" {{ solr_home }}/data/db/conf/db-data-config.xml;
+    sed -i "s|{{ old_dal_db_version }}|{{ dal_db_version }}|g" {{ solr_home }}/data/monetdb/conf/monetdb-data-config.xml;
+
+- name: Restart mysql
+  become: yes
+  shell: systemctl restart mysqld
+
+- name: Restart postgresql
+  become: yes
+  shell: systemctl restart postgresql-9.5
+
+- name: Restart apache
+  become: yes
+  shell: systemctl restart httpd
+
+
+- name: Restart solr
+  become: yes
+  shell: /etc/init.d/solr restart

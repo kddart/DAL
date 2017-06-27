@@ -3821,6 +3821,10 @@ sub add_analysisgroup_runmode {
 "SuccessMessageJSON": "{'ReturnId' : [{'Value' : '3','ParaName' : 'AnalysisGroupId'}],'Info' : [{'Message' : 'AnalysisGroup (3) has been added successfully.'}]}",
 "ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error MarkerStateType='MarkerStateType (252) not found.' /></DATA>"}],
 "ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'MarkerStateType' : 'MarkerStateType (252) not found.'}]}"}],
+"RequiredUpload": 1,
+"UploadFileFormat": "XML",
+"UploadFileParameterName": "uploadfile",
+"DTDFileNameForUploadXML": "analysisgroup.dtd",
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut

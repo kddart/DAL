@@ -186,7 +186,7 @@
       shell: >
         if [ ! -e /usr/local/bin/monetdbd ]; then
         cd {{local_src_dir}};
-        curl -L https://www.monetdb.org/downloads/sources/Oct2014-SP2/MonetDB-11.19.9.tar.xz | tar Jx;
+        curl -L https://www.monetdb.org/downloads/sources/archive/MonetDB-11.19.9.tar.bz2 | tar jx;
         cd {{local_src_dir}}/MonetDB-11.19.9;
         {{local_src_dir}}/MonetDB-11.19.9/configure --disable-jdbc;
         make;
@@ -317,6 +317,18 @@
     - name: Make apache2 start on reboot
       shell: systemctl enable apache2
 
+    - name: Create JAVA Home environment variable
+      shell: "[[ `grep 'export JAVA_HOME' /etc/bash.bashrc` ]] || echo 'export JAVA_HOME=/usr/lib64/jvm/java-1.8.0-openjdk-1.8.0/jre' >> /etc/bash.bashrc"
+
+    - name: Run export for JAVA Home for this session
+      shell: export JAVA_HOME=/usr/lib64/jvm/java-1.8.0-openjdk-1.8.0/jre
+
+    - name: Create Java Classpath environment variable
+      shell: "[[ `grep 'export CLASSPATH' /etc/bash.bashrc` ]] || echo 'export CLASSPATH=$JAVA_HOME/lib' >> /etc/bash.bashrc"
+
+    - name: Run export for Java Classpath for this session
+      shell: export CLASSPATH=$JAVA_HOME/lib
+
     - name: Create Solr working directory
       file: path={{ solr_workspace }} state=directory
 
@@ -409,18 +421,6 @@
         - db
         - monetdb
         - dal
-
-    - name: Create JAVA Home environment variable
-      shell: "[[ `grep 'export JAVA_HOME' /etc/bash.bashrc` ]] || echo 'export JAVA_HOME=/usr/lib64/jvm/java-1.8.0-openjdk-1.8.0/jre' >> /etc/bash.bashrc"
-
-    - name: Run export for JAVA Home for this session
-      shell: export JAVA_HOME=/usr/lib64/jvm/java-1.8.0-openjdk-1.8.0/jre
-
-    - name: Create Java Classpath environment variable
-      shell: "[[ `grep 'export CLASSPATH' /etc/bash.bashrc` ]] || echo 'export CLASSPATH=$JAVA_HOME/lib' >> /etc/bash.bashrc"
-
-    - name: Run export for Java Classpath for this session
-      shell: export CLASSPATH=$JAVA_HOME/lib
 
     - name: Restart solr
       shell: /etc/init.d/solr restart

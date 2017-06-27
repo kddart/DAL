@@ -1,3 +1,16 @@
+Version 2.4.1
+Date: 26/06/2017
+Description: this version is a purely bug fix version to version 2.4.0.
+
+
+Minor:
+
+  * Help for add/analysisgroup has been updated to include a reference to DTD file for XML file that must contain extract ids.
+
+  * A bug regarding import trial data from a csv template (internal bug number 3739) is fixed.
+
+  * Upgrade from version 2.3.2 to version 2.4.0 is available.
+
 Version 2.4.0
 Date: 12/05/2017
 
