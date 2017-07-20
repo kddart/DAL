@@ -25,9 +25,9 @@
       private: yes
 
   vars:
-    src_file: /root/KDDArT-DAL-v2.4.0.tar.gz
     dal_version: v2.4.0
     dal_db_version: v2_4_0
+    src_file: /root/KDDArT-DAL-{{ dal_version }}.tar.gz
     old_dal_db_version: v2_3_2
     local_dir: /root/KDDArT-DAL-{{ dal_version }}
     backup_dir: /root/dal_upgrade_db_backup

@@ -17,6 +17,7 @@ DB_UNAME='kddart_dal'
 DB_HOST='localhost'
 # set your own postgres password as configured on your server
 DB_PASS='yourSecurePassword'
+INLINE_MYSQL_PASS='yourRootPassword'
 
 usage() { echo "Usage: $0 [-x <mysql kddart_dal password>] <other args>" 1>&2; exit 1; }
 
@@ -173,7 +174,7 @@ then
     MYSQL_PASS_ARG="--password=$MYSQL_PASS"
 elif [[ $NO_PASS -eq 2 ]]
 then
-    MYSQL_PASS_ARG="--password=$DB_PASS"
+    MYSQL_PASS_ARG="--password=$INLINE_MYSQL_PASS"
 fi
 
 POSTGRES_DB_EXIST=`psql -h $DB_HOST -l -U $PG_UNAME | gawk '{print $1}' | grep "^$PG_DBNAME\$"`

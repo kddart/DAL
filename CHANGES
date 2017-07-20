@@ -1,3 +1,16 @@
+Version 2.4.2
+Date: 18/07/2017
+
+Minor:
+
+  + Fix upgrade script so that it works in setup where mysql root password is different from kddart_dal password.
+
+  + Fix upgrade script so that it copies all DTD files from vhosts directory.
+
+Minor:
+
+  + Fix help for listing specimen group which no longer returns the specimens in the group.
+
 Version 2.4.1
 Date: 26/06/2017
 Description: this version is a purely bug fix version to version 2.4.0.

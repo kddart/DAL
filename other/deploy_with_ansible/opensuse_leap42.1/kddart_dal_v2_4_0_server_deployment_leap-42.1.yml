@@ -63,12 +63,20 @@
         - bison
         - gcc
         - perl
+        - curl
         - apache2
         - apache2-mod_perl-2.0.9
         - perl-App-cpanminus
         - mysql-community-server
         - mysql-devel
         - perl-DBD-Pg
+        - perl-DBD-mysql
+        - perl-Archive-Zip
+        - perl-Net-SSLeay
+        - perl-IO-Socket-SSL
+        - perl-XML-DOM
+        - perl-XML-Parser
+        - perl-XML-LibXML
         - postgresql94
         - postgresql94-server
         - postgresql-init
@@ -81,6 +89,10 @@
         - libxml2
         - libxml2-devel
         - java-1_8_0-openjdk
+        - libopenssl-devel
+        - pcre-devel
+        - libxml2-devel
+        - acl
 
     - name: Remove nagios-www (its apache config is not Apache 2.4 ready)
       zypper: pkg=nagios-www state=absent
@@ -111,7 +123,6 @@
       with_items:
         - Parse::PMFile
         - DBI
-        - DBD::mysql
         - DBD::SQLite
         - Geo::Coder::Google
         - Text::CSV
@@ -135,13 +146,11 @@
         - Log::Log4perl
         - Net::OAuth2::Client
         - Net::OAuth2::AccessToken
-        - Net::SSLeay
-        - IO::Socket::SSL
         - Mozilla::CA
         - Tree::R
         - JSON::XS
         - Hash::Merge
-        - XML::DOM
+        - XML::Simple
         - XML::Writer
         - XML::Parser::PerlSAX
         - File::Lockfile
@@ -186,7 +195,7 @@
       shell: >
         if [ ! -e /usr/local/bin/monetdbd ]; then
         cd {{local_src_dir}};
-        curl -L https://www.monetdb.org/downloads/sources/archive/MonetDB-11.19.9.tar.bz2 | tar jx;
+        curl --insecure -L https://www.monetdb.org/downloads/sources/archive/MonetDB-11.19.9.tar.bz2 | tar jx;
         cd {{local_src_dir}}/MonetDB-11.19.9;
         {{local_src_dir}}/MonetDB-11.19.9/configure --disable-jdbc;
         make;
@@ -304,6 +313,12 @@
         [[ `pidof /usr/local/bin/monetdbd` -gt 1 ]] && /usr/local/bin/monetdbd stop /var/lib/monetdb/dbfarm;
         sleep 30s;
         /usr/local/bin/monetdbd start /var/lib/monetdb/dbfarm;
+
+    - name: Make MonetDB start by default at boot time
+      shell: >
+        [[ `grep '/usr/local/bin/monetdbd start' /etc/rc.d/after.local` ]] || echo "/usr/local/bin/monetdbd start /var/lib/monetdb/dbfarm" >> /etc/rc.d/after.local;
+        chmod u+x /etc/rc.d/after.local;
+        systemctl enable local;
 
     - name: Restart apache
       shell: systemctl restart apache2

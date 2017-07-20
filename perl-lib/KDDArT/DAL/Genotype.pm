@@ -4626,7 +4626,7 @@ sub list_genotype_trait {
   if ($extra_attr_yes) {
 
     for my $row (@{$geno_trait_data}) {
-      
+
       if (($geno_perm & $READ_WRITE_PERM) == $READ_WRITE_PERM) {
 
         my $geno_trait_id  = $row->{'GenotypeTraitId'};
@@ -4989,7 +4989,7 @@ sub remove_genotype_trait_runmode {
 
     return $data_for_postrun_href;
   }
-  
+
   my $trait_exist = record_existence($dbh_read, 'trait', 'TraitId', $trait_id);
 
   if (!$trait_exist) {
@@ -5456,7 +5456,12 @@ sub list_specimen_group {
   my $extra_attr_yes    = $_[1];
   my $sql               = $_[2];
   my $where_para_aref   = $_[3];
-  my $extra_param       = $_[4];
+  my $extra_param       = 0;
+
+  if (defined $_[4]) {
+
+    $extra_param = $_[4];
+  }
 
   my $err = 0;
   my $msg = '';
@@ -5464,7 +5469,6 @@ sub list_specimen_group {
   my $data_aref = [];
 
   my $dbh = connect_kdb_read();
-  my $specimen_aref  = [];
 
   ($err, $msg, $data_aref) = read_data($dbh, $sql, $where_para_aref);
 
@@ -5484,6 +5488,7 @@ sub list_specimen_group {
 
   my $group_lookup      = {};
   my $spec_lookup       = {};
+  my $spec_count_lookup = {};
 
   if ($extra_attr_yes) {
 
@@ -5511,37 +5516,50 @@ sub list_specimen_group {
       $group_lookup = $dbh->selectall_hashref($group_sql, 'SystemGroupId');
     }
 
-    if ( $extra_param eq 0 ) {
+    if ( $extra_param ) {
 
-      my $specimen_sql = 'SELECT SpecimenGroupId, specimengroupentry.SpecimenId, ';
-      $specimen_sql   .= 'specimengroupentry.SpecimenNote, specimen.SpecimenName FROM specimengroupentry ';
-      $specimen_sql   .= 'LEFT JOIN specimen ON specimengroupentry.SpecimenId = specimen.SpecimenId ';
-      $specimen_sql   .= 'WHERE SpecimenGroupId IN (' . join(',', @{$spec_grp_id_aref}) . ')';
+      if (scalar(@{$spec_grp_id_aref}) > 0) {
 
-      my ($read_err, $read_msg, $specimen_id_aref) = read_data($dbh, $specimen_sql, []);
+        my $specimen_sql = 'SELECT SpecimenGroupId, specimengroupentry.SpecimenId, ';
+        $specimen_sql   .= 'specimengroupentry.SpecimenNote, specimen.SpecimenName FROM specimengroupentry ';
+        $specimen_sql   .= 'LEFT JOIN specimen ON specimengroupentry.SpecimenId = specimen.SpecimenId ';
+        $specimen_sql   .= 'WHERE SpecimenGroupId IN (' . join(',', @{$spec_grp_id_aref}) . ')';
 
-      if ($read_err) {
+        my ($read_err, $read_msg, $specimen_id_aref) = read_data($dbh, $specimen_sql, []);
 
-        return ($read_err, $read_msg, []);
-      }
+        if ($read_err) {
 
-      for my $spec_row (@{$specimen_id_aref}) {
-
-        my $spec_grp_id = $spec_row->{'SpecimenGroupId'};
-
-        if (defined $spec_lookup->{$spec_grp_id}) {
-
-          my $spec_aref = $spec_lookup->{$spec_grp_id};
-          delete($spec_row->{'SpecimenGroupId'});
-          push(@{$spec_aref}, $spec_row);
-          $spec_lookup->{$spec_grp_id} = $spec_aref;
+          return ($read_err, $read_msg, []);
         }
-        else {
 
-          delete($spec_row->{'SpecimenGroupId'});
-          $spec_lookup->{$spec_grp_id} = [$spec_row];
+        for my $spec_row (@{$specimen_id_aref}) {
+
+          my $spec_grp_id = $spec_row->{'SpecimenGroupId'};
+
+          if (defined $spec_lookup->{$spec_grp_id}) {
+
+            my $spec_aref = $spec_lookup->{$spec_grp_id};
+            delete($spec_row->{'SpecimenGroupId'});
+            push(@{$spec_aref}, $spec_row);
+            $spec_lookup->{$spec_grp_id} = $spec_aref;
+          }
+          else {
+
+            delete($spec_row->{'SpecimenGroupId'});
+            $spec_lookup->{$spec_grp_id} = [$spec_row];
+          }
         }
       }
+    }
+
+    if (scalar(@{$spec_grp_id_aref}) > 0) {
+
+      my $count_spec_sql   = "SELECT SpecimenGroupId, COUNT(*) AS NumOfSpecimens ";
+      $count_spec_sql     .= "FROM specimengroupentry ";
+      $count_spec_sql     .= 'WHERE SpecimenGroupId IN (' . join(',', @{$spec_grp_id_aref}) . ')';
+
+      $self->logger->debug("COUNT SPECIMEN: $count_spec_sql");
+      $spec_count_lookup = $dbh->selectall_hashref($count_spec_sql, 'SpecimenGroupId');
     }
   }
 
@@ -5566,42 +5584,40 @@ sub list_specimen_group {
     my $oth_perm     = $specimen_group_row->{'OtherPerm'};
     my $ulti_perm    = $specimen_group_row->{'UltimatePerm'};
 
-    if ( $extra_param eq 1 ) {
-       my $count_sql_specimen      =  "SELECT COUNT(*) FROM specimengroupentry ";
-          $count_sql_specimen     .=  "LEFT JOIN specimen ON specimengroupentry.SpecimenId = specimen.SpecimenId ";
-          $count_sql_specimen     .=  "WHERE SpecimenGroupId='$specimen_group_id' ";
-
-       my $count_specimen  =    $dbh->prepare($count_sql_specimen);        #$dbh->selectrow_array($count_sql_specimen);
-          $count_specimen  -> execute();
-          $count_specimen  -> bind_col(1, \$specimen_aref);
-          $count_specimen  -> fetch();
-          $count_specimen  -> finish();
-
-       if (length($specimen_aref) == 0) {
-
-          return ($err, $msg, []);
-       }
-    }
-
     if ($extra_attr_yes) {
 
-      if (defined $spec_lookup->{$specimen_group_id}) {
+      if ($extra_param) {
 
-        my $specimen_id_aref = $spec_lookup->{$specimen_group_id};
+        if (defined $spec_lookup->{$specimen_group_id}) {
 
-        for my $specimen_info (@{$specimen_id_aref}) {
+          my $specimen_aref  = [];
 
-          my $specimen_id = $specimen_info->{'SpecimenId'};
+          my $specimen_id_aref = $spec_lookup->{$specimen_group_id};
 
-          if ( ($ulti_perm & $READ_WRITE_PERM) == $READ_WRITE_PERM ) {
+          for my $specimen_info (@{$specimen_id_aref}) {
 
-            $specimen_info->{'removeSpecimen'} = "specimengroup/${specimen_group_id}/remove/specimen/$specimen_id";
+            my $specimen_id = $specimen_info->{'SpecimenId'};
+
+            if ( ($ulti_perm & $READ_WRITE_PERM) == $READ_WRITE_PERM ) {
+
+              $specimen_info->{'removeSpecimen'} = "specimengroup/${specimen_group_id}/remove/specimen/$specimen_id";
+            }
+
+            push(@{$specimen_aref}, $specimen_info);
           }
 
-          push(@{$specimen_aref}, $specimen_info);
+          $specimen_group_row->{'Specimen'} = $specimen_aref;
         }
-      } 
-      $specimen_group_row->{'Specimen'} = $specimen_aref;
+      }
+
+      if (defined $spec_count_lookup->{$specimen_group_id}->{'NumOfSpecimens'}) {
+
+        $specimen_group_row->{'NumOfSpecimens'} = $spec_count_lookup->{$specimen_group_id}->{'NumOfSpecimens'};
+      }
+      else {
+
+        $specimen_group_row->{'NumOfSpecimens'} = 0;
+      }
 
       $specimen_group_row->{'OwnGroupName'}          = $group_lookup->{$own_grp_id}->{'SystemGroupName'};
       $specimen_group_row->{'AccessGroupName'}       = $group_lookup->{$acc_grp_id}->{'SystemGroupName'};
@@ -5627,6 +5643,7 @@ sub list_specimen_group {
         }
       }
     }
+
     push(@extra_attr_specimen_group_data, $specimen_group_row);
   }
 
@@ -5646,8 +5663,8 @@ sub list_specimen_group_advanced_runmode {
 "GroupAdminRequired": 0,
 "SignatureRequired": 0,
 "AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "FILTERING"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Pagination NumOfRecords='7' NumOfPages='7' Page='1' NumPerPage='1' /><SpecimenGroup SpecimenGroupId='8' SpecimenGroupTypeName='SpecimenGroupType - 7080186' delete='delete/specimengroup/8' SpecimenGroupNote='' addSpecimen='specimengroup/8/add/specimen' SpecimenGroupTypeId='85' update='update/specimengroup/8' SpecimenGroupName='SpecimenGroup_9446508'><Specimen removeSpecimen='specimengroup/8/remove/specimen/450' SpecimenNote='TrialOrigin (KB1)' SpecimenId='450' /><Specimen removeSpecimen='specimengroup/8/remove/specimen/451' SpecimenNote='' SpecimenId='451' /></SpecimenGroup><RecordMeta TagName='SpecimenGroup' /></DATA>",
-"SuccessMessageJSON": "{'Pagination' : [{'NumOfRecords' : '7','NumOfPages' : 7,'NumPerPage' : '1','Page' : '1'}],'SpecimenGroup' : [{'SpecimenGroupId' : '8','SpecimenGroupNote' : '','SpecimenGroupTypeId' : '85','SpecimenGroupName' : 'SpecimenGroup_9446508','Specimen' : [{'removeSpecimen' : 'specimengroup/8/remove/specimen/450','SpecimenNote' : 'TrialOrigin (KB1)','SpecimenId' : '450'},{'removeSpecimen' : 'specimengroup/8/remove/specimen/451','SpecimenNote' : null,'SpecimenId' : '451'}],'SpecimenGroupTypeName' : 'SpecimenGroupType - 7080186','delete' : 'delete/specimengroup/8','addSpecimen' : 'specimengroup/8/add/specimen','update' : 'update/specimengroup/8'}],'RecordMeta' : [{'TagName' : 'SpecimenGroup'}]}",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Pagination NumPerPage='2' NumOfRecords='17' NumOfPages='9' Page='1' /><RecordMeta TagName='SpecimenGroup' /><SpecimenGroup SpecimenGroupNote='Testing Note' OtherPerm='0' AccessGroupId='0' NumOfSpecimens='4' addSpecimen='specimengroup/19/add/specimen' OwnGroupName='admin' AccessGroupPermission='Read/Link' SpecimenGroupName='UPDATE Specimen_41394913362' SpecimenGroupStatus='513' AccessGroupPerm='5' update='update/specimengroup/19' SpecimenGroupStatusName='SpecimenGroupStatus - 44488335532' chgPerm='specimengroup/19/change/permission' chgOwner='specimengroup/19/change/owner' SpecimenGroupTypeId='525' SpecimenGroupLastUpdate='2017-06-28 15:21:49' SpecimenGroupCreated='2015-08-07 00:00:00' SpecimenGroupTypeName='SpecimenGroupType - 00976892378' delete='delete/specimengroup/19' UltimatePermission='Read/Write/Link' OwnGroupId='0' AccessGroupName='admin' SpecimenGroupId='19' OtherPermission='None' OwnGroupPerm='7' OwnGroupPermission='Read/Write/Link' UltimatePerm='7' /><SpecimenGroup AccessGroupName='admin' SpecimenGroupId='18' OwnGroupId='0' OwnGroupPerm='7' OwnGroupPermission='Read/Write/Link' UltimatePerm='7' OtherPermission='None' SpecimenGroupName='SpecimenGroup_83626115868' SpecimenGroupStatus='513' AccessGroupPerm='5' update='update/specimengroup/18' OtherPerm='0' SpecimenGroupNote='' OwnGroupName='admin' NumOfSpecimens='0' AccessGroupId='0' addSpecimen='specimengroup/18/add/specimen' AccessGroupPermission='Read/Link' SpecimenGroupTypeName='SpecimenGroupType - 97389013571' SpecimenGroupCreated='2015-08-07 00:00:00' delete='delete/specimengroup/18' UltimatePermission='Read/Write/Link' chgOwner='specimengroup/18/change/owner' SpecimenGroupStatusName='SpecimenGroupStatus - 44488335532' chgPerm='specimengroup/18/change/permission' SpecimenGroupLastUpdate='' SpecimenGroupTypeId='512' /><StatInfo ServerElapsedTime='0.013' Unit='second' /></DATA>",
+"SuccessMessageJSON": "{'Pagination' : [{'Page' : '1','NumOfPages' : 9,'NumPerPage' : '2','NumOfRecords' : '17'}],'RecordMeta' : [{'TagName' : 'SpecimenGroup'}],'SpecimenGroup' : [{'SpecimenGroupTypeId' : '525','SpecimenGroupLastUpdate' : '2017-06-28 15:21:49','chgPerm' : 'specimengroup/19/change/permission','chgOwner' : 'specimengroup/19/change/owner','SpecimenGroupStatusName' : 'SpecimenGroupStatus - 44488335532','UltimatePermission' : 'Read/Write/Link','delete' : 'delete/specimengroup/19','SpecimenGroupCreated' : '2015-08-07 00:00:00','SpecimenGroupTypeName' : 'SpecimenGroupType - 00976892378','addSpecimen' : 'specimengroup/19/add/specimen','OwnGroupName' : 'admin','AccessGroupPermission' : 'Read/Link','AccessGroupId' : '0','NumOfSpecimens' : '4','OtherPerm' : '0','SpecimenGroupNote' : 'Testing Note','update' : 'update/specimengroup/19','AccessGroupPerm' : '5','SpecimenGroupStatus' : '513','SpecimenGroupName' : 'UPDATE Specimen_41394913362','OtherPermission' : 'None','UltimatePerm' : '7','OwnGroupPermission' : 'Read/Write/Link','OwnGroupPerm' : '7','OwnGroupId' : '0','SpecimenGroupId' : '19','AccessGroupName' : 'admin'},{'SpecimenGroupStatus' : '513','SpecimenGroupName' : 'SpecimenGroup_83626115868','update' : 'update/specimengroup/18','AccessGroupPerm' : '5','OtherPerm' : '0','SpecimenGroupNote' : null,'OwnGroupName' : 'admin','addSpecimen' : 'specimengroup/18/add/specimen','AccessGroupPermission' : 'Read/Link','AccessGroupId' : '0','NumOfSpecimens' : 0,'delete' : 'delete/specimengroup/18','SpecimenGroupCreated' : '2015-08-07 00:00:00','SpecimenGroupTypeName' : 'SpecimenGroupType - 97389013571','UltimatePermission' : 'Read/Write/Link','chgPerm' : 'specimengroup/18/change/permission','chgOwner' : 'specimengroup/18/change/owner','SpecimenGroupStatusName' : 'SpecimenGroupStatus - 44488335532','SpecimenGroupLastUpdate' : null,'SpecimenGroupTypeId' : '512','SpecimenGroupId' : '18','AccessGroupName' : 'admin','OwnGroupId' : '0','OwnGroupPerm' : '7','OwnGroupPermission' : 'Read/Write/Link','UltimatePerm' : '7','OtherPermission' : 'None'}],'StatInfo' : [{'ServerElapsedTime' : '0.010','Unit' : 'second'}]}",
 "ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
 "ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
 "URLParameter": [{"ParameterName": "nperpage", "Description": "Number of records in a page for pagination"}, {"ParameterName": "num", "Description": "The page number of the pagination"}],
@@ -5934,7 +5951,7 @@ sub list_specimen_group_advanced_runmode {
 
   $self->logger->debug("Final list specimengroup SQL: $sql");
 
-  my ($spec_grp_err, $spec_grp_msg, $spec_grp_data) = $self->list_specimen_group(1, $sql, $where_arg, 1);
+  my ($spec_grp_err, $spec_grp_msg, $spec_grp_data) = $self->list_specimen_group(1, $sql, $where_arg, 0);
 
   if ($spec_grp_err) {
 
@@ -5966,8 +5983,8 @@ sub get_specimen_group_runmode {
 "GroupAdminRequired": 0,
 "SignatureRequired": 0,
 "AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><SpecimenGroup SpecimenGroupId='8' SpecimenGroupTypeName='SpecimenGroupType - 7080186' delete='delete/specimengroup/8' SpecimenGroupNote='' addSpecimen='specimengroup/8/add/specimen' SpecimenGroupTypeId='85' update='update/specimengroup/8' SpecimenGroupName='SpecimenGroup_9446508'><Specimen removeSpecimen='specimengroup/8/remove/specimen/450' SpecimenNote='TrialOrigin (testing)' SpecimenId='450' /><Specimen removeSpecimen='specimengroup/8/remove/specimen/451' SpecimenNote='' SpecimenId='451' /></SpecimenGroup><RecordMeta TagName='SpecimenGroup' /></DATA>",
-"SuccessMessageJSON": "{'SpecimenGroup' : [{'SpecimenGroupId' : '8','SpecimenGroupNote' : '','SpecimenGroupTypeId' : '85','SpecimenGroupName' : 'SpecimenGroup_9446508','Specimen' : [{'removeSpecimen' : 'specimengroup/8/remove/specimen/450','SpecimenNote' : 'TrialOrigin (testing)','SpecimenId' : '450'},{'removeSpecimen' : 'specimengroup/8/remove/specimen/451','SpecimenNote' : null,'SpecimenId' : '451'}],'SpecimenGroupTypeName' : 'SpecimenGroupType - 7080186','delete' : 'delete/specimengroup/8','addSpecimen' : 'specimengroup/8/add/specimen','update' : 'update/specimengroup/8'}],'RecordMeta' : [{'TagName' : 'SpecimenGroup'}]}",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><SpecimenGroup SpecimenGroupId='17' AccessGroupName='admin' OwnGroupId='0' OwnGroupPerm='7' OwnGroupPermission='Read/Write/Link' UltimatePerm='7' OtherPermission='None' SpecimenGroupStatus='SpecimenGroupStatus - 44488335532' SpecimenGroupName='SpecimenGroup_23466523131' update='update/specimengroup/17' AccessGroupPerm='5' OtherPerm='0' SpecimenGroupNote='' NumOfSpecimens='2' AccessGroupId='0' OwnGroupName='admin' AccessGroupPermission='Read/Link' addSpecimen='specimengroup/17/add/specimen' SpecimenGroupTypeName='SpecimenGroupType - 97389013571' SpecimenGroupCreated='2015-08-07 00:00:00' delete='delete/specimengroup/17' UltimatePermission='Read/Write/Link' chgOwner='specimengroup/17/change/owner' chgPerm='specimengroup/17/change/permission' SpecimenGroupLastUpdate='' SpecimenGroupTypeId='512'><Specimen SpecimenId='1770' SpecimenNote='TrialOrigin (testing)' SpecimenName='Specimen4TrialUnit_85773855213' removeSpecimen='specimengroup/17/remove/specimen/1770' /><Specimen SpecimenId='1771' SpecimenNote='' SpecimenName='Specimen4TrialUnit_92717617794' removeSpecimen='specimengroup/17/remove/specimen/1771' /></SpecimenGroup><StatInfo ServerElapsedTime='0.007' Unit='second' /><RecordMeta TagName='SpecimenGroup' /></DATA>",
+"SuccessMessageJSON": "{'SpecimenGroup' : [{'SpecimenGroupId' : '17','AccessGroupName' : 'admin','OwnGroupId' : '0','Specimen' : [{'removeSpecimen' : 'specimengroup/17/remove/specimen/1770','SpecimenName' : 'Specimen4TrialUnit_85773855213','SpecimenId' : '1770','SpecimenNote' : 'TrialOrigin (testing)'},{'SpecimenNote' : null,'SpecimenId' : '1771','removeSpecimen' : 'specimengroup/17/remove/specimen/1771','SpecimenName' : 'Specimen4TrialUnit_92717617794'}],'OwnGroupPerm' : '7','UltimatePerm' : '7','OwnGroupPermission' : 'Read/Write/Link','OtherPermission' : 'None','SpecimenGroupStatus' : 'SpecimenGroupStatus - 44488335532','SpecimenGroupName' : 'SpecimenGroup_23466523131','AccessGroupPerm' : '5','update' : 'update/specimengroup/17','OtherPerm' : '0','SpecimenGroupNote' : null,'addSpecimen' : 'specimengroup/17/add/specimen','AccessGroupPermission' : 'Read/Link','OwnGroupName' : 'admin','AccessGroupId' : '0','NumOfSpecimens' : '2','SpecimenGroupTypeName' : 'SpecimenGroupType - 97389013571','delete' : 'delete/specimengroup/17','SpecimenGroupCreated' : '2015-08-07 00:00:00','UltimatePermission' : 'Read/Write/Link','chgPerm' : 'specimengroup/17/change/permission','chgOwner' : 'specimengroup/17/change/owner','SpecimenGroupLastUpdate' : null,'SpecimenGroupTypeId' : '512'}],'StatInfo' : [{'ServerElapsedTime' : '0.006','Unit' : 'second'}],'RecordMeta' : [{'TagName' : 'SpecimenGroup'}]}",
 "ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='SpecimenGroup (10) not found.' /></DATA>"}],
 "ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'SpecimenGroup (10) not found.'}]}"}],
 "URLParameter": [{"ParameterName": "id", "Description": "Existing SpecimenGroupId"}],
@@ -6022,7 +6039,7 @@ sub get_specimen_group_runmode {
   $sql   .= 'LEFT JOIN generaltype AS generaltypestatus ON specimengroup.SpecimenGroupStatus = generaltypestatus.TypeId ';
   $sql   .= "WHERE (($perm_str) & $READ_PERM) = $READ_PERM AND SpecimenGroupId=?";
 
-  my ($specimen_grp_err, $specimen_grp_msg, $specimen_grp_data) = $self->list_specimen_group(1, $sql, [$specimen_grp_id], 0);
+  my ($specimen_grp_err, $specimen_grp_msg, $specimen_grp_data) = $self->list_specimen_group(1, $sql, [$specimen_grp_id], 1);
 
   if ($specimen_grp_err) {
 

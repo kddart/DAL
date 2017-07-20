@@ -220,6 +220,7 @@
   shell: >
     sed -i "s|MONET_PASS='monetdb'|MONET_PASS='{{ monetdbpass }}'|g" {{ local_dir }}/other/create_dbs.sh;
     sed -i "s|DB_PASS='yourSecurePassword'|DB_PASS='{{ dbpass }}'|g" {{ local_dir }}/other/create_dbs.sh;
+    sed -i "s|INLINE_MYSQL_PASS='yourRootPassword'|INLINE_MYSQL_PASS='{{ mysqlrootpass }}'|" {{ local_dir }}/other/create_dbs.sh;
 
 - service: name=mysqld state=started
 
