@@ -169,7 +169,7 @@ our $CONFIG_LOADED          = 0;
 
 our $VALID_CTYPE            = {'xml' => 1, 'json' => 1, 'geojson' => 1};
 
-our $DAL_VERSION            = '2.4.2';
+our $DAL_VERSION            = '2.4.3';
 our $DAL_COPYRIGHT          = 'Copyright (c) 2017, Diversity Arrays Technology, All rights reserved.';
 our $DAL_ABOUT              = 'Data Access Layer';
 
