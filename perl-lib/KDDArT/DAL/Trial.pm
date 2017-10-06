@@ -10783,10 +10783,10 @@ sub get_project_runmode {
     return $data_for_postrun_href;
   }
 
-  my $field_list = ['project.*',
+  my $field_list = ['project.*', 'VCol*',
                     "CONCAT(contact.ContactFirstName, concat(' ', contact.ContactLastName)) As ProjectManagerName"
-      ];
-  
+                   ];
+
   my $other_join = ' LEFT JOIN contact ON project.ProjectManagerId = contact.ContactId ';
 
   my ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_sql($dbh, $field_list, 'project',

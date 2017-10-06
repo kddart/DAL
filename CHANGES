@@ -1,3 +1,11 @@
+Version 2.4.3
+Date: 06/10/2017
+Description: this version is a purely bug fix version to version 2.4.0.
+
+Minor:
+
+  + Fix bug 4003 - get project does not VCol.
+
 Version 2.4.2
 Date: 18/07/2017
 
