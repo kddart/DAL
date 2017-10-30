@@ -1,13 +1,36 @@
+Version 2.4.4
+Date: 30/10/2017
+Description: Add interfaces to list marker data for data set
+
+Minor:
+
+  + Add interface to list markermeta fields from a dataset.
+
+  + Add interface to list markers from a dataset.
+
+  + Add interface to get a marker from a dataset.
+
+  + Add interface to list marker data from a dataset.
+
+  + Add interface to export marker map position in a csv format.
+
+  + Add interface to import marker map position from map data in a marker dataset.
+
+  + Fix bug 4077 regarding export trial data in 2D format.
+
+  + Marker name must be unique within a single dataset.
+
 Version 2.4.3
 Date: 06/10/2017
 Description: this version is a purely bug fix version to version 2.4.0.
 
 Minor:
 
-  + Fix bug 4003 - get project does not VCol.
+  + Fix bug 4003 - get project does not return VCol.
 
 Version 2.4.2
 Date: 18/07/2017
+Description: this version is a purely bug fix version to version 2.4.0.
 
 Minor:
 

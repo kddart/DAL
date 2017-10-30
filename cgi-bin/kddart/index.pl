@@ -757,6 +757,9 @@ CGI::Application::Dispatch->dispatch(
     'analysisgroup/:id/list/markermetafield'            => { app => 'KDDArT::DAL::Marker',
                                                              rm  => 'list_marker_meta_field' },
 
+    'dataset/:dsid/list/markermetafield'                => { app => 'KDDArT::DAL::Marker',
+                                                             rm  => 'list_marker_meta_field' },
+
     'analysisgroup/:analid/list/extract'                => { app => 'KDDArT::DAL::Extract',
                                                              rm  => 'list_extract_advanced' },
 
@@ -772,11 +775,20 @@ CGI::Application::Dispatch->dispatch(
     'analysisgroup/:analid/list/marker/:nperpage/page/:num' => { app => 'KDDArT::DAL::Marker',
                                                                  rm  => 'list_marker' },
 
+    'dataset/:dsid/list/marker/:nperpage/page/:num'     => { app => 'KDDArT::DAL::Marker',
+                                                             rm  => 'list_marker' },
+
     'analysisgroup/:analid/get/marker/:id'              => { app => 'KDDArT::DAL::Marker',
+                                                             rm  => 'get_marker' },
+
+    'dataset/:dsid/get/marker/:id'                      => { app => 'KDDArT::DAL::Marker',
                                                              rm  => 'get_marker' },
 
     'analysisgroup/:analid/list/markerdata/:nperpage/page/:num/n/:nperblock/block/:bnum' => { app => 'KDDArT::DAL::Marker',
                                                                                               rm  => 'list_marker_data' },
+
+    'dataset/:dsid/list/markerdata/:nperpage/page/:num/n/:nperblock/block/:bnum' => { app => 'KDDArT::DAL::Marker',
+                                                                                      rm  => 'list_marker_data' },
 
     'analysisgroup/:id/list/dataset'                    => { app => 'KDDArT::DAL::Extract',
                                                              rm  => 'list_dataset' },
@@ -795,6 +807,12 @@ CGI::Application::Dispatch->dispatch(
 
     'markermap/:mrkmapid/import/mapposition/csv'        => { app => 'KDDArT::DAL::Marker',
                                                              rm  => 'import_markermap_position_gadmin' },
+
+    'markermap/:mrkmapid/export/mapposition/csv'        => { app => 'KDDArT::DAL::Marker',
+                                                             rm  => 'export_markermap_position_gadmin' },
+
+    'markermap/:mrkmapid/import/mapposition/dataset/:dsid' => { app => 'KDDArT::DAL::Marker',
+                                                                rm  => 'import_markermap_position_dataset_gadmin' },
 
     'markermap/:mrkmapid/list/mapposition/:nperpage/page/:num'        => { app => 'KDDArT::DAL::Marker',
                                                                            rm  => 'list_markermap_position_advanced' },

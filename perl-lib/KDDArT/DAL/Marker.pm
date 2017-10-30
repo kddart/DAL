@@ -56,15 +56,19 @@ sub setup {
                                            'update_markermap_gadmin',
                                            'import_markermap_position_gadmin',
                                            'append_markerdata_csv',
+                                           'import_markermap_position_dataset_gadmin',
                                           );
   __PACKAGE__->authen->count_session_request_runmodes(':all');
   __PACKAGE__->authen->check_content_type_runmodes(':all');
   __PACKAGE__->authen->check_signature_runmodes('add_markermap_gadmin',
                                                 'update_markermap_gadmin',
+                                                'import_markermap_position_dataset_gadmin',
                                                );
   __PACKAGE__->authen->check_gadmin_runmodes('add_markermap_gadmin',
                                              'update_markermap_gadmin',
                                              'import_markermap_position_gadmin',
+                                             'import_markermap_position_dataset_gadmin',
+                                             'export_markermap_position_gadmin',
                                              );
   __PACKAGE__->authen->check_sign_upload_runmodes('import_markerdata_dart',
                                                   'import_markermap_position_gadmin',
@@ -111,6 +115,8 @@ sub setup {
     'list_markermap_position_advanced'                => 'list_markermap_position_advanced_runmode',
     'list_extract_marker_data'                        => 'list_extract_marker_data_advanced_runmode',
     'append_markerdata_csv'                           => 'append_markerdata_csv_runmode',
+    'import_markermap_position_dataset_gadmin'        => 'import_markermap_position_dataset_runmode',
+    'export_markermap_position_gadmin'                => 'export_markermap_position_runmode',
       );
 }
 
@@ -186,6 +192,8 @@ sub import_markerdata_dart_runmode {
       $is_forced = 1;
     }
   }
+
+  $self->logger->debug("AnalysisGroupId: $anal_id");
 
   my $data_for_postrun_href = {};
 
@@ -628,6 +636,150 @@ sub import_markerdata_dart_runmode {
   my $mrk_name_field_name = $matched_col->{$marker_name_col};
   my $seq_field_name      = $matched_col->{$sequence_col};
 
+  my $file_rand = makerandom(Size => 8, Strength => 0);
+
+  my $tmp_markerdata_table_name = "markerdata${anal_id}_${file_rand}_tmp";
+
+  if (table_existence($dbh_m_write, $tmp_markerdata_table_name)) {
+
+    $self->logger->debug("$tmp_markerdata_table_name is not supposed to exist.");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $mk_tmp_markerdata_table_sql = qq|CREATE TABLE "$tmp_markerdata_table_name" (|;
+
+  my @monetdb_col_sql_list;
+
+  for (my $i = 0; $i < $num_of_col; $i++) {
+
+    my $field_name        = $matched_col->{"$i"};
+    my $monetdb_datatype  = $monetdb_col_datatype_href->{"$i"};
+
+    my $sql_phrase        = qq|"$field_name" $monetdb_datatype NULL|;
+    push(@monetdb_col_sql_list, $sql_phrase);
+  }
+
+  my $field_sql = join(",\n", @monetdb_col_sql_list);
+
+  $mk_tmp_markerdata_table_sql .= $field_sql . "\n";
+  $mk_tmp_markerdata_table_sql .= ')';
+
+  $self->logger->debug("CREATE TMP MARKERDATA SQL: $mk_tmp_markerdata_table_sql");
+
+  my ($mk_mrkdata_err, $mk_mrkdata_msg) = execute_sql($dbh_m_write, $mk_tmp_markerdata_table_sql, []);
+
+  if ($mk_mrkdata_err) {
+
+    $self->logger->debug("Create temporary markerdata table failed");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $monetdb_csv_file = $TMP_DATA_PATH . "csv4monetdb${anal_id}_${file_rand}.csv";
+
+  my $copy_file_start_time = [gettimeofday()];
+
+  # first line is number one in copy_file
+  copy_file($data_csv_file, $monetdb_csv_file, $header_row + 1 + 1);
+
+  my $copy_file_elapsed_time = tv_interval($copy_file_start_time);
+
+  $self->logger->debug("Copy file takes: $copy_file_elapsed_time");
+
+  my $copy_into_start_time = [gettimeofday()];
+
+  $sql  = qq|COPY INTO "$tmp_markerdata_table_name" FROM '$monetdb_csv_file' |;
+  $sql .= q|USING DELIMITERS ',','\\n','"'|;
+
+  my ($copy_into_err, $copy_into_msg) = execute_sql($dbh_m_write, $sql, []);
+
+  my $copy_into_elapsed_time = tv_interval($copy_into_start_time);
+
+  $self->logger->debug("MonetDB COPY INTO takes: $copy_into_elapsed_time");
+
+  if ($copy_into_err) {
+
+    $copy_into_msg =~ s/failed to import table at.*//g;
+
+    $self->logger->debug("Loading data into table $tmp_markerdata_table_name failed: $copy_into_msg");
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $copy_into_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sql  = qq|SELECT "$mrk_name_field_name", COUNT("$mrk_name_field_name") AS "NB_Copy" FROM |;
+  $sql .= qq|"$tmp_markerdata_table_name" GROUP BY "$mrk_name_field_name" |;
+  $sql .= qq|HAVING COUNT("$mrk_name_field_name") > 1 LIMIT 100|;
+
+  my ($r_dup_err, $r_dup_msg, $dup_marker_data) = read_data($dbh_m_write, $sql, []);
+
+  if ($r_dup_err) {
+
+    $self->logger->debug("Count duplicate marker name failed: $r_dup_msg");
+    $data_for_postrun_href->{'Error'}  = 1;
+    $data_for_postrun_href->{'Data'}   = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (scalar(@{$dup_marker_data}) > 0) {
+
+    $sql  = qq|SELECT COUNT(*) FROM ( |;
+    $sql .= qq|SELECT "$mrk_name_field_name", COUNT("$mrk_name_field_name") AS "NB_Copy" FROM |;
+    $sql .= qq|"$tmp_markerdata_table_name" GROUP BY "$mrk_name_field_name" |;
+    $sql .= qq|HAVING COUNT("$mrk_name_field_name") > 1 ) "final"|;
+
+    my ($r_nb_dup_mrk_err, $nb_dup_mrk) = read_cell($dbh_m_write, $sql, []);
+
+    if ($r_nb_dup_mrk_err) {
+
+      $self->logger->debug("Count the number of duplicate marker failed.");
+      my $err_msg = "Unexpected Error.";
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    $sql = qq|DROP TABLE "$tmp_markerdata_table_name"|;
+
+    my ($d_tmp_mrk_tbl_err, $d_tmp_mrk_tbl_msg) = execute_sql($dbh_m_write, $sql, []);
+
+    if ($d_tmp_mrk_tbl_err) {
+
+      $self->logger->debug("Drop tmp marker data table $tmp_markerdata_table_name failed: $d_tmp_mrk_tbl_msg");
+      my $err_msg = "Unexpected Error.";
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my @dup_mrk_name_msg_list;
+
+    foreach my $dup_marker_rec (@{$dup_marker_data}) {
+
+      my $mrk_name = $dup_marker_rec->{$mrk_name_field_name};
+      my $nb_copy  = $dup_marker_rec->{'NB_Copy'};
+      push(@dup_mrk_name_msg_list, "$mrk_name");
+    }
+
+    my $err_msg = "$nb_dup_mrk markers are duplicate. First 100 of duplicate marker names ($mrk_name_field_name): (" . join(', ', @dup_mrk_name_msg_list) . ")";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
   if ($delete_update_status == 1) {
 
     $sql = 'DELETE FROM "datasetmarkermeta" WHERE "DataSetId"=?';
@@ -742,8 +894,6 @@ sub import_markerdata_dart_runmode {
     $sth->finish();
   }
 
-  my $mk_markerdata_table_sql = '';
-
   my $markerdata_table_name = "markerdata${dataset_id}";
 
   if (table_existence($dbh_m_write, $markerdata_table_name)) {
@@ -755,67 +905,33 @@ sub import_markerdata_dart_runmode {
     return $data_for_postrun_href;
   }
 
-  $mk_markerdata_table_sql = qq|CREATE TABLE "$markerdata_table_name" (|;
+  my $copy_markerdata_table_sql = qq|CREATE TABLE "$markerdata_table_name" |;
+  $copy_markerdata_table_sql   .= qq|AS SELECT * FROM "$tmp_markerdata_table_name" WITH DATA|;
 
-  my @monetdb_col_sql_list;
+  $self->logger->debug("COPY MARKERDATA SQL: $copy_markerdata_table_sql");
 
-  for (my $i = 0; $i < $num_of_col; $i++) {
+  my ($cp_mrkdata_err, $cp_mrkdata_msg) = execute_sql($dbh_m_write, $copy_markerdata_table_sql, []);
 
-    my $field_name        = $matched_col->{"$i"};
-    my $monetdb_datatype  = $monetdb_col_datatype_href->{"$i"};
+  if ($cp_mrkdata_err) {
 
-    my $sql_phrase        = qq|"$field_name" $monetdb_datatype NULL|;
-    push(@monetdb_col_sql_list, $sql_phrase);
-  }
-
-  my $field_sql = join(",\n", @monetdb_col_sql_list);
-
-  $mk_markerdata_table_sql .= $field_sql . "\n";
-  $mk_markerdata_table_sql .= ')';
-
-  $self->logger->debug("CREATE MARKERDATA SQL: $mk_markerdata_table_sql");
-
-  my ($mk_mrkdata_err, $mk_mrkdata_msg) = execute_sql($dbh_m_write, $mk_markerdata_table_sql, []);
-
-  if ($mk_mrkdata_err) {
-
-    $self->logger->debug("Create markerdata table failed");
+    $self->logger->debug("Create markerdata table failed: $cp_mrkdata_msg");
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
     return $data_for_postrun_href;
   }
 
-  my $monetdb_csv_file = $TMP_DATA_PATH . "csv4monetdb${anal_id}.csv";
+  $sql  = qq|DROP TABLE "$tmp_markerdata_table_name"|;
 
-  my $copy_file_start_time = [gettimeofday()];
+  $self->logger->debug("DROP TABLE $tmp_markerdata_table_name: $sql");
 
-  # first line is number one in copy_file
-  copy_file($data_csv_file, $monetdb_csv_file, $header_row + 1 + 1);
+  my ($drop_table_err, $drop_table_msg) = execute_sql($dbh_m_write, $sql, []);
 
-  my $copy_file_elapsed_time = tv_interval($copy_file_start_time);
+  if ($drop_table_err) {
 
-  $self->logger->debug("Copy file takes: $copy_file_elapsed_time");
-
-  my $copy_into_start_time = [gettimeofday()];
-
-  $sql  = qq|COPY INTO "$markerdata_table_name" FROM '$monetdb_csv_file' |;
-  $sql .= q|USING DELIMITERS ',','\\n','"'|;
-
-  my ($copy_into_err, $copy_into_msg) = execute_sql($dbh_m_write, $sql, []);
-
-  my $copy_into_elapsed_time = tv_interval($copy_into_start_time);
-
-  $self->logger->debug("MonetDB COPY INTO takes: $copy_into_elapsed_time");
-
-  if ($copy_into_err) {
-
-    $copy_into_msg =~ s/failed to import table at.*//g;
-
-    $self->logger->debug("Loading data into table $markerdata_table_name failed: $copy_into_msg");
-
+    $self->logger->debug("Drop table $tmp_markerdata_table_name failed: $drop_table_msg");
     $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $copy_into_msg}]};
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
     return $data_for_postrun_href;
   }
@@ -1356,11 +1472,12 @@ sub export_marker_dart_runmode {
     push(@{$extract_field_list}, $pkey_field);
   }
 
-  my ($ex_filter_err, $ex_filter_msg, $extract_filter_phrase, $extract_where_arg) = parse_filtering('"ExtractId"',
-                                                                                                    '"extract"',
-                                                                                                    $extract_filtering_csv,
-                                                                                                    $extract_field_list
-                                                                                                   );
+  my ($ex_filter_err, $ex_filter_msg,
+      $extract_filter_phrase, $extract_where_arg) = parse_filtering('"ExtractId"',
+                                                                    '"extract"',
+                                                                    $extract_filtering_csv,
+                                                                    $extract_field_list
+                                                                   );
 
   $self->logger->debug("Extract Filter phrase: $extract_filter_phrase");
 
@@ -1625,10 +1742,17 @@ sub export_marker_dart_runmode {
 
   $self->logger->debug("Filtering str: $filtering_csv");
 
-  my ($filtering_err, $filtering_msg, $filter_phrase, $where_arg) = parse_filtering(qq|"$mrk_name_fieldname"|,
-                                                                                    qq|"markerdata${dataset_id}"|,
-                                                                                    $filtering_csv,
-                                                                                    \@filterable_fieldlist);
+  my $field_name2table_name  = { $mrk_name_fieldname => qq|"markerdata${dataset_id}"|,
+                                 $seq_fieldname      => qq|"markerdata${dataset_id}"| };
+  my $validation_func_lookup = {};
+
+  my ($filtering_err, $filtering_msg,
+      $filter_phrase, $where_arg) = parse_filtering(qq|"$mrk_name_fieldname"|,
+                                                    qq|"markerdata${dataset_id}"|,
+                                                    $filtering_csv,
+                                                    \@filterable_fieldlist,
+                                                    $validation_func_lookup,
+                                                    $field_name2table_name);
 
   if ($filtering_err) {
 
@@ -1657,8 +1781,6 @@ sub export_marker_dart_runmode {
   my $username          = $self->authen->username();
   my $doc_root          = $ENV{'DOCUMENT_ROOT'};
   my $export_data_path  = "${doc_root}/data/$username";
-  my $current_runmode   = $self->get_current_runmode();
-  my $lock_filename     = "${current_runmode}.lock";
   my $filename          = "export_marker_data_${dataset_id}";
   my $csv_file          = "${export_data_path}/${filename}.csv";
   my $result_filename   = "${filename}.csv";
@@ -1880,27 +2002,56 @@ sub list_marker_meta_field_runmode {
 "SuccessMessageJSON": "{'MarkerMetaField' : [{'Required' : '0','FactorId' : '1','FactorDescription' : 'SNP','FactorDataType' : 'STRING','FactorCaption' : 'SNP','FactorUnit' : null,'FactorValueMaxLength' : '32','FactorName' : 'SNP'},{'Required' : '0','FactorId' : '2','FactorDescription' : 'Chromosome','FactorDataType' : 'STRING','FactorCaption' : 'Chromosome','FactorUnit' : null,'FactorValueMaxLength' : '32','FactorName' : 'Chromosome'},{'Required' : '0','FactorId' : '3','FactorDescription' : 'ChromosomePosition','FactorDataType' : 'STRING','FactorCaption' : 'ChromosomePosition','FactorUnit' : null,'FactorValueMaxLength' : '32','FactorName' : 'ChromosomePosition'},{'Required' : '0','FactorId' : '4','FactorDescription' : 'NumOfAligns','FactorDataType' : 'STRING','FactorCaption' : 'NumOfAligns','FactorUnit' : null,'FactorValueMaxLength' : '32','FactorName' : 'NumOfAligns'},{'Required' : '0','FactorId' : '5','FactorDescription' : 'CallrateREF','FactorDataType' : 'STRING','FactorCaption' : 'CallrateREF','FactorUnit' : null,'FactorValueMaxLength' : '32','FactorName' : 'CallrateREF'},{'Required' : '0','FactorId' : '6','FactorDescription' : 'CallrateSNP','FactorDataType' : 'STRING','FactorCaption' : 'CallrateSNP','FactorUnit' : null,'FactorValueMaxLength' : '32','FactorName' : 'CallrateSNP'},{'Required' : '0','FactorId' : '7','FactorDescription' : 'OneRatioREF','FactorDataType' : 'STRING','FactorCaption' : 'OneRatioREF','FactorUnit' : null,'FactorValueMaxLength' : '32','FactorName' : 'OneRatioREF'},{'Required' : '0','FactorId' : '8','FactorDescription' : 'OneRatioSNP','FactorDataType' : 'STRING','FactorCaption' : 'OneRatioSNP','FactorUnit' : null,'FactorValueMaxLength' : '32','FactorName' : 'OneRatioSNP'},{'Required' : '0','FactorId' : '9','FactorDescription' : 'NumofRefs','FactorDataType' : 'STRING','FactorCaption' : 'NumofRefs','FactorUnit' : null,'FactorValueMaxLength' : '32','FactorName' : 'NumofRefs'},{'Required' : '0','FactorId' : '10','FactorDescription' : 'NumofSNPs','FactorDataType' : 'STRING','FactorCaption' : 'NumofSNPs','FactorUnit' : null,'FactorValueMaxLength' : '32','FactorName' : 'NumofSNPs'},{'Required' : '0','FactorId' : '11','FactorDescription' : 'NumofHomozygotes','FactorDataType' : 'STRING','FactorCaption' : 'NumofHomozygotes','FactorUnit' : null,'FactorValueMaxLength' : '32','FactorName' : 'NumofHomozygotes'},{'Required' : '0','FactorId' : '12','FactorDescription' : 'NumofHomozygotesSNP','FactorDataType' : 'STRING','FactorCaption' : 'NumofHomozygotesSNP','FactorUnit' : null,'FactorValueMaxLength' : '32','FactorName' : 'NumofHomozygotesSNP'},{'Required' : '0','FactorId' : '13','FactorDescription' : 'NumofHomozygotesRef','FactorDataType' : 'STRING','FactorCaption' : 'NumofHomozygotesRef','FactorUnit' : null,'FactorValueMaxLength' : '32','FactorName' : 'NumofHomozygotesRef'},{'Required' : '0','FactorId' : '14','FactorDescription' : 'NumofHeterozygotes','FactorDataType' : 'STRING','FactorCaption' : 'NumofHeterozygotes','FactorUnit' : null,'FactorValueMaxLength' : '32','FactorName' : 'NumofHeterozygotes'},{'Required' : '0','FactorId' : '15','FactorDescription' : 'NumofNAzygotes','FactorDataType' : 'STRING','FactorCaption' : 'NumofNAzygotes','FactorUnit' : null,'FactorValueMaxLength' : '32','FactorName' : 'NumofNAzygotes'},{'Required' : '0','FactorId' : '16','FactorDescription' : 'SNPcall','FactorDataType' : 'STRING','FactorCaption' : 'SNPcall','FactorUnit' : null,'FactorValueMaxLength' : '32','FactorName' : 'SNPcall'},{'Required' : '0','FactorId' : '17','FactorDescription' : 'Rowsum','FactorDataType' : 'STRING','FactorCaption' : 'Rowsum','FactorUnit' : null,'FactorValueMaxLength' : '32','FactorName' : 'Rowsum'},{'Required' : '0','FactorId' : '18','FactorDescription' : 'Countrowsums','FactorDataType' : 'STRING','FactorCaption' : 'Countrowsums','FactorUnit' : null,'FactorValueMaxLength' : '32','FactorName' : 'Countrowsums'}],'RecordMeta' : [{'TagName' : 'MarkerMetaField'}]}",
 "ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='AnalysisGroup (5) not found.' /></DATA>"}],
 "ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'AnalysisGroup (5) not found.'}]}"}],
-"URLParameter": [{"ParameterName": "id", "Description": "Existing AnalysisGroupId"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing AnalysisGroupId"}, {"ParameterName": "dsid", "Description": "Existing DataSetId"}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
 
   my $self    = shift;
   my $query   = $self->query();
-  my $anal_id = $self->param('id');
+  my $anal_id;
+  my $ds_id;
+
+  if (defined $self->param('id')) {
+
+    $anal_id = $self->param('id');
+  }
+
+  if (defined $self->param('dsid')) {
+
+    $ds_id = $self->param('dsid');
+  }
 
   my $data_for_postrun_href = {};
 
   my $dbh_m_read = connect_mdb_read();
 
-  if (!record_existence($dbh_m_read, 'analysisgroup', 'AnalysisGroupId', $anal_id)) {
+  if (defined $anal_id) {
 
-    my $err_msg = "AnalysisGroup ($anal_id) not found.";
+    if (!record_existence($dbh_m_read, 'analysisgroup', 'AnalysisGroupId', $anal_id)) {
 
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+      my $err_msg = "AnalysisGroup ($anal_id) not found.";
 
-    return $data_for_postrun_href;
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  if (defined $ds_id) {
+
+    $anal_id = read_cell_value($dbh_m_read, 'dataset', 'AnalysisGroupId', 'DataSetId', $ds_id);
+
+    if (length($anal_id) == 0) {
+
+      my $err_msg = "DataSet ($ds_id) not found.";
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
   }
 
   my $group_id  = $self->authen->group_id();
@@ -1920,46 +2071,55 @@ sub list_marker_meta_field_runmode {
     return $data_for_postrun_href;
   }
 
+  my $sql;
+
   my $dataset_id_aref = [];
 
-  my $sql = 'SELECT "DataSetId" FROM "dataset" WHERE "AnalysisGroupId"=?';
+  if (defined $ds_id) {
 
-  my ($read_ds_err, $read_ds_msg, $ds_data) = read_data($dbh_m_read, $sql, [$anal_id]);
-
-  if ($read_ds_err) {
-
-    $self->logger->debug("Read dataset failed: $read_ds_msg");
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-    return $data_for_postrun_href;
+    $dataset_id_aref = [$ds_id];
   }
+  else {
 
-  my $nb_dataset = scalar(@{$ds_data});
+    $sql = 'SELECT "DataSetId" FROM "dataset" WHERE "AnalysisGroupId"=?';
 
-  if ($nb_dataset == 0) {
+    my ($read_ds_err, $read_ds_msg, $ds_data) = read_data($dbh_m_read, $sql, [$anal_id]);
 
-    my $err_msg = "AnalysisGroup($anal_id): no dataset.";
+    if ($read_ds_err) {
 
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+      $self->logger->debug("Read dataset failed: $read_ds_msg");
 
-    return $data_for_postrun_href;
-  }
-  elsif ($nb_dataset > 1) {
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
-    my $err_msg = "AnalysisGroup($anal_id): more than one dataset.";
+      return $data_for_postrun_href;
+    }
 
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+    my $nb_dataset = scalar(@{$ds_data});
 
-    return $data_for_postrun_href;
-  }
+    if ($nb_dataset == 0) {
 
-  for my $ds_rec (@{$ds_data}) {
+      my $err_msg = "AnalysisGroup($anal_id): no dataset.";
 
-    push(@{$dataset_id_aref}, $ds_rec->{'DataSetId'});
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+    elsif ($nb_dataset > 1) {
+
+      my $err_msg = "AnalysisGroup($anal_id): more than one dataset.";
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    for my $ds_rec (@{$ds_data}) {
+
+      push(@{$dataset_id_aref}, $ds_rec->{'DataSetId'});
+    }
   }
 
   my $dataset_id_csv = join(',', @{$dataset_id_aref});
@@ -2039,7 +2199,7 @@ sub list_marker_runmode {
 "ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='AnalysisGroup (18) not found.' /></DATA>"}],
 "ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'AnalysisGroup (18) not found.'}]}"}],
 "HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database field name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "FieldList", "Description": "Comma separated value of wanted fields."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases."}],
-"URLParameter": [{"ParameterName": "analid", "Description": "Existing AnalysisGroupId"}, {"ParameterName": "nperpage", "Description": "Number of records in a page for pagination"}, {"ParameterName": "num", "Description": "The page number of the pagination"}],
+"URLParameter": [{"ParameterName": "analid", "Description": "Existing AnalysisGroupId"}, {"ParameterName": "dsid", "Description": "Existing DataSetId"}, {"ParameterName": "nperpage", "Description": "Number of records in a page for pagination"}, {"ParameterName": "num", "Description": "The page number of the pagination"}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
@@ -2089,16 +2249,45 @@ sub list_marker_runmode {
   my $dbh_k = connect_kdb_read();
   my $dbh_m = connect_mdb_read();
 
-  my $anal_id = $self->param('analid');
+  my $anal_id;
+  my $ds_id;
 
-  if (!record_existence($dbh_m, 'analysisgroup', 'AnalysisGroupId', $anal_id)) {
+  if (defined $self->param('analid')) {
 
-    my $err_msg = "AnalsysiGroup ($anal_id): not found.";
+    $anal_id = $self->param('analid');
+  }
 
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+  if (defined $self->param('dsid')) {
 
-    return $data_for_postrun_href;
+    $ds_id = $self->param('dsid');
+  }
+
+  if (defined $anal_id) {
+
+    if (!record_existence($dbh_m, 'analysisgroup', 'AnalysisGroupId', $anal_id)) {
+
+      my $err_msg = "AnalsysiGroup ($anal_id): not found.";
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  if (defined $ds_id) {
+
+    $anal_id = read_cell_value($dbh_m, 'dataset', 'AnalysisGroupId', 'DataSetId', $ds_id);
+
+    if (length($anal_id) == 0) {
+
+      my $err_msg = "DataSet ($ds_id) not found.";
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
   }
 
   my $group_id      = $self->authen->group_id();
@@ -2118,37 +2307,46 @@ sub list_marker_runmode {
     return $data_for_postrun_href;
   }
 
+  my $sql;
+
   my $dataset_id_aref = [];
 
-  my $sql = 'SELECT "DataSetId" FROM "dataset" WHERE "AnalysisGroupId"=?';
+  if (defined $ds_id) {
 
-  my ($read_ds_err, $read_ds_msg, $ds_data) = read_data($dbh_m, $sql, [$anal_id]);
-
-  if ($read_ds_err) {
-
-    $self->logger->debug("Read dataset failed: $read_ds_msg");
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-    return $data_for_postrun_href;
+    $dataset_id_aref = [$ds_id];
   }
+  else {
 
-  my $nb_dataset = scalar(@{$ds_data});
+    $sql = 'SELECT "DataSetId" FROM "dataset" WHERE "AnalysisGroupId"=?';
 
-  if ($nb_dataset == 0) {
+    my ($read_ds_err, $read_ds_msg, $ds_data) = read_data($dbh_m, $sql, [$anal_id]);
 
-    my $err_msg = "AnalysisGroup($anal_id): no dataset.";
+    if ($read_ds_err) {
 
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+      $self->logger->debug("Read dataset failed: $read_ds_msg");
 
-    return $data_for_postrun_href;
-  }
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
-  for my $ds_rec (@{$ds_data}) {
+      return $data_for_postrun_href;
+    }
 
-    push(@{$dataset_id_aref}, $ds_rec->{'DataSetId'});
+    my $nb_dataset = scalar(@{$ds_data});
+
+    if ($nb_dataset == 0) {
+
+      my $err_msg = "AnalysisGroup($anal_id): no dataset.";
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    for my $ds_rec (@{$ds_data}) {
+
+      push(@{$dataset_id_aref}, $ds_rec->{'DataSetId'});
+    }
   }
 
   my $dataset_id_csv = join(',', @{$dataset_id_aref});
@@ -2399,7 +2597,7 @@ sub get_marker_runmode {
 "SuccessMessageJSON": "{'RecordMeta' : [{'TagName' : 'Marker'}], 'Marker' : [{'MarkerAliasName' : null, 'DataSetId' : '14', 'MarkerSequence' : 'CTGCAGCTAAATCCAGCGGCTAACAGAGGACCAGAATGTATTAC', 'MarkerAliasId' : null, 'MarkerExtRef' : null, 'MarkerName' : '4112450_20:A>G', 'AnalysisGroupMarkerId' : '578254', 'MarkerDescription' : null}]}",
 "ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Marker (2761118) not found.' /></DATA>"}],
 "ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Marker (2761118) not found.'}]}"}],
-"URLParameter": [{"ParameterName": "analid", "Description": "Existing AnalysisGroupId"}, {"ParameterName": "id", "Description": "Existing AnalysisGroupMarkerId"}],
+"URLParameter": [{"ParameterName": "analid", "Description": "Existing AnalysisGroupId"}, {"ParameterName": "dsid", "Description": "Existing DataSetId"}, {"ParameterName": "id", "Description": "Existing AnalysisGroupMarkerId"}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
@@ -2413,17 +2611,47 @@ sub get_marker_runmode {
   my $dbh_k = connect_kdb_read();
   my $dbh_m = connect_mdb_read();
 
-  my $anal_id    = $self->param('analid');
   my $marker_id  = $self->param('id');
 
-  if (!record_existence($dbh_m, 'analysisgroup', 'AnalysisGroupId', $anal_id)) {
+  my $anal_id;
+  my $ds_id;
 
-    my $err_msg = "AnalsysiGroup ($anal_id): not found.";
+  if (defined $self->param('analid')) {
 
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+    $anal_id = $self->param('analid');
+  }
 
-    return $data_for_postrun_href;
+  if (defined $self->param('dsid')) {
+
+    $ds_id = $self->param('dsid');
+  }
+
+  if (defined $anal_id) {
+
+    if (!record_existence($dbh_m, 'analysisgroup', 'AnalysisGroupId', $anal_id)) {
+
+      my $err_msg = "AnalsysiGroup ($anal_id): not found.";
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  if (defined $ds_id) {
+
+    $anal_id = read_cell_value($dbh_m, 'dataset', 'AnalysisGroupId', 'DataSetId', $ds_id);
+
+    if (length($anal_id) == 0) {
+
+      my $err_msg = "DataSet ($ds_id) not found.";
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
   }
 
   my $group_id      = $self->authen->group_id();
@@ -2443,37 +2671,46 @@ sub get_marker_runmode {
     return $data_for_postrun_href;
   }
 
+  my $sql;
+
   my $dataset_id_aref = [];
 
-  my $sql = 'SELECT "DataSetId" FROM "dataset" WHERE "AnalysisGroupId"=?';
+  if (defined $ds_id) {
 
-  my ($read_ds_err, $read_ds_msg, $ds_data) = read_data($dbh_m, $sql, [$anal_id]);
-
-  if ($read_ds_err) {
-
-    $self->logger->debug("Read dataset failed: $read_ds_msg");
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-    return $data_for_postrun_href;
+    $dataset_id_aref = [$ds_id];
   }
+  else {
 
-  my $nb_dataset = scalar(@{$ds_data});
+    $sql = 'SELECT "DataSetId" FROM "dataset" WHERE "AnalysisGroupId"=?';
 
-  if ($nb_dataset == 0) {
+    my ($read_ds_err, $read_ds_msg, $ds_data) = read_data($dbh_m, $sql, [$anal_id]);
 
-    my $err_msg = "AnalysisGroup($anal_id): no dataset.";
+    if ($read_ds_err) {
 
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+      $self->logger->debug("Read dataset failed: $read_ds_msg");
 
-    return $data_for_postrun_href;
-  }
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
-  for my $ds_rec (@{$ds_data}) {
+      return $data_for_postrun_href;
+    }
 
-    push(@{$dataset_id_aref}, $ds_rec->{'DataSetId'});
+    my $nb_dataset = scalar(@{$ds_data});
+
+    if ($nb_dataset == 0) {
+
+      my $err_msg = "AnalysisGroup($anal_id): no dataset.";
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    for my $ds_rec (@{$ds_data}) {
+
+      push(@{$dataset_id_aref}, $ds_rec->{'DataSetId'});
+    }
   }
 
   my $dataset_id_csv = join(',', @{$dataset_id_aref});
@@ -2547,7 +2784,7 @@ sub list_marker_data_runmode {
 "ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='AnalysisGroup (18) not found.' /></DATA>"}],
 "ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'AnalysisGroup (18) not found.'}]}"}],
 "HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a marker metadata field name or extract field name like E_6017, a filtering operator and the filtering value."}, {"Required": 0, "Name": "MarkerMetaFieldList", "Description": "CSV value for the list of wanted marker meta data columns if this parameter is not provided, DAL will export all marker meta data columns available in the dataset."}, {"Required": 0, "Name": "MarkerDataFieldList", "Description": "CSV value for the list of wanted sample/extract columns. If this parameter is not provided, DAL will export all samples/extracts available in the dataset."}, {"Required": 0, "Name": "Sorting", "Description": "Sorting parameter string consisting of sorting expressions separated by comma. Each sorting expression is composed of a marker metadata field name and a sorting operation which can be either ASC (Ascending), DESC (Descending), NASC (Ascending order for text that works like sorting numbers - NASC will make '99' before '222') and NASC (Descending order for text that works like sorting nuumbers - NDESC will make '222' before '99'."}],
-"URLParameter": [{"ParameterName": "analid", "Description": "Existing AnalysisGroupId"}, {"ParameterName": "nperpage", "Description": "Number of records in a page for pagination"}, {"ParameterName": "num", "Description": "The page number of the pagination"}, {"ParameterName": "nperblock", "Description": "Number of extracts in the block"}, {"ParameterName": "bnum", "Description": "The page number of the block of extracts"}],
+"URLParameter": [{"ParameterName": "analid", "Description": "Existing AnalysisGroupId"}, {"ParameterName": "dsid", "Description": "Existing DataSetId"}, {"ParameterName": "nperpage", "Description": "Number of records in a page for pagination"}, {"ParameterName": "num", "Description": "The page number of the pagination"}, {"ParameterName": "nperblock", "Description": "Number of extracts in the block"}, {"ParameterName": "bnum", "Description": "The page number of the block of extracts"}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
@@ -2629,16 +2866,45 @@ sub list_marker_data_runmode {
   my $dbh_k = connect_kdb_read();
   my $dbh_m = connect_mdb_read();
 
-  my $anal_id    = $self->param('analid');
+  my $anal_id;
+  my $ds_id;
 
-  if (!record_existence($dbh_m, 'analysisgroup', 'AnalysisGroupId', $anal_id)) {
+  if (defined $self->param('analid')) {
 
-    my $err_msg = "AnalsysiGroup ($anal_id): not found.";
+    $anal_id = $self->param('analid');
+  }
 
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+  if (defined $self->param('dsid')) {
 
-    return $data_for_postrun_href;
+    $ds_id = $self->param('dsid');
+  }
+
+  if (defined $anal_id) {
+
+    if (!record_existence($dbh_m, 'analysisgroup', 'AnalysisGroupId', $anal_id)) {
+
+      my $err_msg = "AnalsysiGroup ($anal_id): not found.";
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  if (defined $ds_id) {
+
+    $anal_id = read_cell_value($dbh_m, 'dataset', 'AnalysisGroupId', 'DataSetId', $ds_id);
+
+    if (length($anal_id) == 0) {
+
+      my $err_msg = "DataSet ($ds_id) not found.";
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
   }
 
   my $group_id      = $self->authen->group_id();
@@ -2658,46 +2924,73 @@ sub list_marker_data_runmode {
     return $data_for_postrun_href;
   }
 
+  my $sql;
+
   my $dataset_id_aref = [];
+  my $ds_data         = [];
 
-  my $sql = 'SELECT * FROM "dataset" WHERE "AnalysisGroupId"=?';
+  my $read_ds_err;
+  my $read_ds_msg;
 
-  my ($read_ds_err, $read_ds_msg, $ds_data) = read_data($dbh_m, $sql, [$anal_id]);
+  if (defined $ds_id) {
 
-  if ($read_ds_err) {
+    $dataset_id_aref = [$ds_id];
 
-    $self->logger->debug("Read dataset failed: $read_ds_msg");
+    $sql = 'SELECT * FROM "dataset" WHERE "DataSetId"=?';
 
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+    ($read_ds_err, $read_ds_msg, $ds_data) = read_data($dbh_m, $sql, [$ds_id]);
 
-    return $data_for_postrun_href;
+    if ($read_ds_err) {
+
+      $self->logger->debug("Read dataset failed: $read_ds_msg");
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
   }
+  else {
 
-  my $nb_dataset = scalar(@{$ds_data});
+    $sql = 'SELECT * FROM "dataset" WHERE "AnalysisGroupId"=?';
 
-  if ($nb_dataset == 0) {
+    ($read_ds_err, $read_ds_msg, $ds_data) = read_data($dbh_m, $sql, [$anal_id]);
 
-    my $err_msg = "AnalysisGroup($anal_id): no dataset.";
+    if ($read_ds_err) {
 
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+      $self->logger->debug("Read dataset failed: $read_ds_msg");
 
-    return $data_for_postrun_href;
-  }
-  elsif ($nb_dataset > 1) {
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
-    my $err_msg = "AnalysisGroup($anal_id): more than one dataset.";
+      return $data_for_postrun_href;
+    }
 
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+    my $nb_dataset = scalar(@{$ds_data});
 
-    return $data_for_postrun_href;
-  }
+    if ($nb_dataset == 0) {
 
-  for my $ds_rec (@{$ds_data}) {
+      my $err_msg = "AnalysisGroup($anal_id): no dataset.";
 
-    push(@{$dataset_id_aref}, $ds_rec->{'DataSetId'});
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+    elsif ($nb_dataset > 1) {
+
+      my $err_msg = "AnalysisGroup($anal_id): more than one dataset.";
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    for my $ds_rec (@{$ds_data}) {
+
+      push(@{$dataset_id_aref}, $ds_rec->{'DataSetId'});
+    }
   }
 
   my $dataset_id = $dataset_id_aref->[0];
@@ -2709,7 +3002,7 @@ sub list_marker_data_runmode {
 
   if ($r_df_val_err) {
 
-    $self->logger->debug("Retrieve dataset default values for optional fields failed: $r_df_val_msg");
+    $self->logger->debug("Retrieve dataset markername and sequence fields failed: $r_df_val_msg");
     $data_for_postrun_href->{'Error'}  = 1;
     $data_for_postrun_href->{'Data'}   = {'Error' => [{'Message' => 'Unexpected Error'}]};
 
@@ -3012,12 +3305,13 @@ sub list_marker_data_runmode {
                                  $seq_fieldname      => qq|"markerdata${dataset_id}"| };
   my $validation_func_lookup = {};
 
-  my ($filtering_err, $filtering_msg, $filter_phrase, $where_arg) = parse_filtering(qq|"$mrk_name_fieldname"|,
-                                                                                    qq|"markerdata${dataset_id}"|,
-                                                                                    $filtering_csv,
-                                                                                    \@filterable_fieldlist,
-                                                                                    $validation_func_lookup,
-                                                                                    $field_name2table_name);
+  my ($filtering_err, $filtering_msg,
+      $filter_phrase, $where_arg) = parse_filtering(qq|"$mrk_name_fieldname"|,
+                                                    qq|"markerdata${dataset_id}"|,
+                                                    $filtering_csv,
+                                                    \@filterable_fieldlist,
+                                                    $validation_func_lookup,
+                                                    $field_name2table_name);
 
   if ($filtering_err) {
 
@@ -3790,7 +4084,7 @@ sub import_markermap_position_runmode {
 "RequiredUpload": 1,
 "UploadFileFormat": "CSV",
 "UploadFileParameterName": "uploadfile",
-"HTTPParameter": [{}],
+"HTTPParameter": [{"Required": 1, "Name": "AnalysisGroupIdValue", "Description": "The ID value of the AnalysisGroupId where marker names can be found."}, {"Required": 1, "Name": "MarkerName", "Description": "Column number (counting from zero) in the upload CSV file which contains MarkerName."}, {"Required": 1, "Name": "ContigName", "Description": "Column number (counting from zero) in the upload CSV file which contains ContigName."}, {"Required": 1, "Name": "MarkerName", "Description": "Column number (counting from zero) in the upload CSV file which contains ContigPosition."}, {"Required": 0, "Name": "Forced", "Description": "Either 1 or 0. If value 1 is provided, marker name uniqueness requirement will be ignored."}],
 "URLParameter": [{"ParameterName": "mrkmapid", "Description": "MarkerMapId"}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
@@ -4228,6 +4522,7 @@ sub list_markermap_position_advanced_runmode {
 "SuccessMessageJSON": "{'Pagination' : [{'NumOfRecords' : '12642', 'NumOfPages' : 6321, 'NumPerPage' : '2', 'Page' : '1'}], 'MarkerMapPosition' : [{'MarkerMapId' : '16', 'AnalysisGroupId' : '26', 'DataSetId' : '20', 'MarkerExtRef' : null, 'MarkerName' : null, 'MarkerDescription' : null, 'MarkerSequence' : 'CTGCAGACATGAGGATCCCATATCTCCGGTTTTGGTTTGTTCTGAGGCTTAGAGAAGAAAAACATTTAGG', 'ContigName' : 'chrA10', 'ContigPosition' : '3549294', 'MarkerMapPositionId' : '218712', 'AnalysisGroupMarkerId' : '656368', 'AnalysisGroupMarkerName' : '3112443'},{'MarkerMapId' : '16', 'AnalysisGroupId' : '26', 'DataSetId' : '20', 'MarkerExtRef' : null, 'MarkerName' : null, 'MarkerDescription' : null, 'MarkerSequence' : 'CTGCAGAGCTCCTTGTCCGTTCATGAGAAGAAGTTTAC', 'ContigName' : 'chrA03', 'ContigPosition' : '22372485', 'MarkerMapPositionId' : '214894', 'AnalysisGroupMarkerId' : '656370', 'AnalysisGroupMarkerName' : '3145772'}], 'RecordMeta' : [{'TagName' : 'MarkerMapPosition'}]}",
 "ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
 "ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
+"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database field name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases."}],
 "URLParameter": [{"ParameterName": "mrkmapid", "Description": "Existing MarkerMapId"}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
@@ -4282,10 +4577,16 @@ sub list_markermap_position_advanced_runmode {
 
   my $field_list = ['MarkerMapId', 'AnalysisGroupMarkerId', 'MarkerName', 'ContigName', 'ContigPosition'];
 
-  my ($filter_err, $filter_msg, $filter_phrase, $where_arg) = parse_filtering('"MarkerMapId"',
-                                                                              '"markermapposition"',
-                                                                              $filtering_csv,
-                                                                              $field_list);
+  my $field_name2table_name  = { "MarkerName" => 'markermapposition' };
+  my $validation_func_lookup = {};
+
+  my ($filter_err, $filter_msg,
+      $filter_phrase, $where_arg) = parse_filtering('"MarkerMapId"',
+                                                    '"markermapposition"',
+                                                    $filtering_csv,
+                                                    $field_list,
+                                                    $validation_func_lookup,
+                                                    $field_name2table_name);
 
   $self->logger->debug("Filter phrase: $filter_phrase");
 
@@ -4378,22 +4679,11 @@ sub list_markermap_position_advanced_runmode {
 
   if (length($sort_sql) > 0) {
 
-    # sort by length first before its value: ordering numeric string in numeric order
-
-    #if ($sort_sql =~ /"markermapposition"."ContigPosition" ASC/i) {
-
-    #  $sort_sql =~ s/"markermapposition"."ContigPosition" ASC/LENGTH("ContigPosition"), "ContigPosition" ASC/i;
-    #}
-    #elsif ($sort_sql =~ /"markermapposition"."ContigPosition" DESC/i) {
-
-    #  $sort_sql =~ s/"markermapposition"."ContigPosition" DESC/LENGTH("ContigPosition") DESC, "ContigPosition" DESC/i;
-    #}
-
     $sql .= " ORDER BY $sort_sql ";
   }
   else {
 
-    $sql .= ' ORDER BY "markermapposition"."MarkerMapId" DESC';
+    $sql .= ' ORDER BY "markermapposition"."MarkerMapPositionId" ASC';
   }
 
   $sql .= " $paged_limit_clause ";
@@ -5768,6 +6058,544 @@ sub append_markerdata_csv_runmode {
 
   $data_for_postrun_href->{'Error'}     = 0;
   $data_for_postrun_href->{'Data'}      = {'Info'     => $info_msg_aref};
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub import_markermap_position_dataset_runmode {
+
+=pod import_markermap_position_dataset_gadmin_HELP_START
+{
+"OperationName": "Import marker map position from a dataset",
+"Description": "Import marker map positions from an existing dataset",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 1,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='Marker map position records (35193,35193) have been imported into markermap (1) from dataset (1) successfully.' /><StatInfo ServerElapsedTime='0.222' Unit='second' /></DATA>",
+"SuccessMessageJSON": "{'StatInfo' : [{'Unit' : 'second','ServerElapsedTime' : '0.475'}],'Info' : [{'Message' : 'Marker map position records (35193,60116) have been imported into markermap (1) from dataset (1) successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='MarkerMap (18) not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'MarkerMap (18) not found.'}]}"}],
+"RequiredUpload": 0,
+"HTTPParameter": [{"Required": 1, "Name": "ContigNameColumn", "Description": "Marker meta data column from the dataset which contains ContigName."}, {"Required": 1, "Name": "ContigPositionColumn", "Description": "Marker meta data column from the dataset which contains ContigPosition."}, {"Required": 0, "Name": "Forced", "Description": "Either 1 or 0. If value 1 is provided, DAL will override any existing position by removing them first. If other value is provided or no value is provided at all, DAL will return an error when the specified map already has any position record(s)."}, {"Required": 1, "Name": "Filtering", "Description": "Filtering expression to be applied to the marker data from the specified dataset for marker map position data."}],
+"URLParameter": [{"ParameterName": "mrkmapid", "Description": "MarkerMapId"}, {"ParameterName": "dsid", "Description": "MarkerMapId"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self    = shift;
+  my $query   = $self->query();
+
+  my $markermap_id = $self->param('mrkmapid');
+  my $dsid         = $self->param('dsid');
+
+  my $data_for_postrun_href = {};
+
+  my $dbh_m_read = connect_mdb_read();
+
+  my $map_operator_id = read_cell_value($dbh_m_read, 'markermap', 'OperatorId', 'MarkerMapId', $markermap_id);
+
+  if (length($map_operator_id) == 0) {
+
+    my $err_msg = "MarkerMap ($markermap_id) not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $user_id = $self->authen->user_id();
+
+  if ("$map_operator_id" ne "$user_id") {
+
+    my $err_msg = "MarkerMap ($markermap_id): permission denied.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $anal_id = read_cell_value($dbh_m_read, 'dataset', 'AnalysisGroupId', 'DataSetId', $dsid);
+
+  if (length($anal_id) == 0) {
+
+    my $err_msg = "DataSet ($dsid) not found.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $group_id  = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  my ($is_anal_ok, $trouble_anal_id_aref) = check_permission($dbh_m_read, 'analysisgroup', 'AnalysisGroupId',
+                                                             [$anal_id], $group_id, $gadmin_status,
+                                                             $READ_PERM);
+
+  if (!$is_anal_ok) {
+
+    my $err_msg = "Permission denied: Group ($group_id) and AnalysisGroup ($anal_id).";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $force                  = $query->param('Forced');
+
+  my $contig_name_colname    = $query->param('ContigNameColumn');
+  my $contig_pos_colname     = $query->param('ContigPositionColumn');
+  my $filtering              = $query->param('Filtering');
+
+  my ($missing_err, $missing_href) = check_missing_href( {
+                                                          'ContigNameColumn'           => $contig_name_colname,
+                                                          'ContigPositionColumn'       => $contig_pos_colname,
+                                                          'Filtering'                  => $filtering,
+                                                         } );
+
+  if ($missing_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $read_dataset_sql  = 'SELECT "MarkerNameFieldName", "MarkerSequenceFieldName" ';
+  $read_dataset_sql    .= 'FROM dataset WHERE "DataSetId"=? ';
+
+  my ($r_ds_err, $r_ds_msg, $dataset_data) = read_data($dbh_m_read, $read_dataset_sql, [$dsid]);
+
+  if ($r_ds_err) {
+
+    $self->logger->debug("Retrieve dataset markername and sequence fields failed: $r_ds_msg");
+    $data_for_postrun_href->{'Error'}  = 1;
+    $data_for_postrun_href->{'Data'}   = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $mrk_name_fieldname =  undef;
+  my $seq_fieldname      =  undef;
+
+  my $nb_ds_rec    =  scalar(@{$dataset_data});
+
+  if ($nb_ds_rec != 1)  {
+
+     $self->logger->debug("Retrieve dataset number of records not acceptable: $nb_ds_rec");
+     $data_for_postrun_href->{'Error'} = 1;
+     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+     return $data_for_postrun_href;
+  }
+
+  $mrk_name_fieldname =  $dataset_data->[0]->{'MarkerNameFieldName'};
+  $seq_fieldname      =  $dataset_data->[0]->{'MarkerSequenceFieldName'};
+
+  my $sql = 'SELECT "FieldName" FROM "datasetmarkermeta" WHERE "DataSetId"=?';
+
+  my ($r_factor_err, $r_factor_msg, $factor_data) = read_data($dbh_m_read, $sql, [$dsid]);
+
+  if ($r_factor_err) {
+
+    $self->logger->debug("Read FactorId for dataset ($dsid) failed");
+    my $err_msg = "Unexpected error.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my @filterable_fieldlist = ($mrk_name_fieldname, $seq_fieldname);
+
+  for my $factor_rec (@{$factor_data}) {
+
+    my $meta_fieldname  = $factor_rec->{'FieldName'};
+
+    push(@filterable_fieldlist, $meta_fieldname);
+  }
+
+  my ($sel_meta_field_err,
+      $sel_meta_field_msg,
+      $sel_meta_field_list) = parse_selected_field("${contig_name_colname},${contig_pos_colname}",
+                                                   \@filterable_fieldlist,
+                                                   $mrk_name_fieldname);
+
+  if ($sel_meta_field_err) {
+
+    $self->logger->debug("Parse selected fields error: $sel_meta_field_msg");
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $sel_meta_field_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $field_name2table_name  = { $mrk_name_fieldname => qq|"markerdata${dsid}"|,
+                                 $seq_fieldname      => qq|"markerdata${dsid}"| };
+  my $validation_func_lookup = {};
+
+  my ($filtering_err, $filtering_msg, $filter_phrase, $where_arg) = parse_filtering(qq|"$mrk_name_fieldname"|,
+                                                                                    qq|"markerdata${dsid}"|,
+                                                                                    $filtering,
+                                                                                    \@filterable_fieldlist,
+                                                                                    $validation_func_lookup,
+                                                                                    $field_name2table_name);
+
+  if ($filtering_err) {
+
+    $self->logger->debug("Parsing filtering failed: $filtering_msg");
+
+    my $err_msg = $filtering_msg;
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $filtering_exp = '';
+  if (length($filter_phrase) > 0) {
+
+    $filtering_exp = " WHERE $filter_phrase ";
+  }
+
+  $self->logger->debug("Filtering EXP: $filtering_exp");
+
+  $sql = 'SELECT COUNT(*) FROM "markermapposition" WHERE "MarkerMapId"=?';
+
+  my ($r_count_err, $mapposition_count) = read_cell($dbh_m_read, $sql, [$markermap_id]);
+
+  if ($r_count_err) {
+
+    $self->logger->debug("Count the number of markermapposition failed.");
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh_m_read->disconnect();
+
+  my $dbh_m_write = connect_mdb_write();
+
+  $self->logger->debug("Number of markermap position: $mapposition_count");
+
+  if ($mapposition_count > 0) {
+
+    if ("$force" ne '1') {
+
+      my $err_msg = "MarkerMap ($markermap_id): already has position(s).";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+    else {
+
+      $sql = 'DELETE FROM "markermapposition" WHERE "MarkerMapId"=?';
+
+      my $sth = $dbh_m_write->prepare($sql);
+      $sth->execute($markermap_id);
+
+      if ($dbh_m_write->err()) {
+
+        $self->logger->debug("Deleting markermap position failed");
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+        return $data_for_postrun_href;
+      }
+
+      $sth->finish();
+    }
+  }
+
+  $sql = qq|SELECT COUNT(*) FROM markerdata${dsid} $filtering_exp|;
+
+  my ($r_ds_count_err, $ds_rec_count) = read_cell($dbh_m_write, $sql, $where_arg);
+
+  if ($r_ds_count_err) {
+
+    $self->logger->debug("Count the number of records matched in markerdata${dsid} failed.");
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if ($ds_rec_count == 0) {
+
+    my $err_msg = "No records from dataset ($dsid) matched with filtering ($filtering).";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sql  = qq|SELECT COUNT(*) FROM markerdata${dsid} |;
+  $sql .= qq|$filtering_exp AND |;
+  $sql .= qq|(length("$contig_name_colname") = 0 OR length("$contig_pos_colname") = 0)|;
+
+  my ($r_empty_count_err, $empty_count) = read_cell($dbh_m_write, $sql, $where_arg);
+
+  if ($r_empty_count_err) {
+
+    $self->logger->debug("Count the number of records empty value in $contig_name_colname or $contig_pos_colname in markerdata${dsid} failed.");
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if ($empty_count > 0) {
+
+    my $err_msg = "There are $empty_count records in dataset ($dsid) matching $filtering with empty value in $contig_name_colname or $contig_pos_colname fields.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh_m_write->disconnect();
+
+  $dbh_m_write = connect_mdb_write();
+
+  $sql  = qq|INSERT INTO "markermapposition"("MarkerMapId","AnalysisGroupMarkerId", "MarkerName", |;
+  $sql .= qq|"ContigName","ContigPosition") |;
+  $sql .= qq|SELECT DISTINCT '$markermap_id', "AnalysisGroupMarkerId", |;
+  $sql .= qq|"analysisgroupmarker"."MarkerName" AS "MarkerName", |;
+  $sql .= qq|"$contig_name_colname" AS "ContigName", |;
+  $sql .= qq|"$contig_pos_colname" AS "ContigPosition" from "markerdata${dsid}" LEFT JOIN |;
+  $sql .= qq|"analysisgroupmarker" ON |;
+  $sql .= qq|"markerdata${dsid}"."$mrk_name_fieldname" = "analysisgroupmarker"."MarkerName" |;
+  $sql .= qq|$filtering_exp AND "analysisgroupmarker"."DataSetId"=$dsid |;
+  $sql .= qq|ORDER BY LENGTH("markerdata${dsid}"."${contig_name_colname}") ASC, |;
+  $sql .= qq|"markerdata${dsid}"."${contig_name_colname}" ASC, |;
+  $sql .= qq|LENGTH("markerdata${dsid}"."${contig_pos_colname}") ASC, |;
+  $sql .= qq|"markerdata${dsid}"."${contig_pos_colname}" ASC|;
+
+  $self->logger->debug("SQL: $sql");
+
+  my ($insert_pos_err, $insert_pos_msg) = execute_sql($dbh_m_write, $sql, $where_arg);
+
+  if ($insert_pos_err) {
+
+    $self->logger->debug("Inserting records into markermap position failed: $insert_pos_msg");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sql = 'SELECT COUNT(*) FROM "markermapposition" WHERE "MarkerMapId"=?';
+
+  ($r_count_err, $mapposition_count) = read_cell($dbh_m_write, $sql, [$markermap_id]);
+
+  if ($r_count_err) {
+
+    $self->logger->debug("Count the number of markermapposition failed.");
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh_m_write->disconnect();
+
+  my $info_msg = "Marker map position records ($ds_rec_count,$mapposition_count) have been imported into markermap ($markermap_id) from dataset ($dsid) successfully.";
+
+  my $info_msg_aref = [{'Message' => $info_msg}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info' => $info_msg_aref};
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub export_markermap_position_runmode {
+
+=pod export_markermap_position_gadmin_HELP_START
+{
+"OperationName": "Export marker map position",
+"Description": "Export marker map positions in CSV format",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 1,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "",
+"SuccessMessageJSON": "",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='MarkerMap (18) not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'MarkerMap (18) not found.'}]}"}],
+"RequiredUpload": 0,
+"HTTPParameter": [{"Required": 1, "Name": "Filtering", "Description": "Filtering expression for the markermapposition"}],
+"URLParameter": [{"ParameterName": "mrkmapid", "Description": "MarkerMapId"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self    = shift;
+  my $query   = $self->query();
+
+  my $markermap_id   = $self->param('mrkmapid');
+  my $filtering_csv  = $query->param('Filtering');
+
+  my $data_for_postrun_href = {};
+
+  my $dbh_m_read = connect_mdb_read();
+
+  my $map_operator_id = read_cell_value($dbh_m_read, 'markermap', 'OperatorId', 'MarkerMapId', $markermap_id);
+
+  if (length($map_operator_id) == 0) {
+
+    my $err_msg = "MarkerMap ($markermap_id) not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $user_id = $self->authen->user_id();
+
+  if ("$map_operator_id" ne "$user_id") {
+
+    my $err_msg = "MarkerMap ($markermap_id): permission denied.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $field_list = ['MarkerMapId', 'AnalysisGroupMarkerId', 'MarkerName', 'ContigName', 'ContigPosition'];
+
+  my $field_name2table_name  = { "MarkerName" => 'markermapposition' };
+  my $validation_func_lookup = {};
+
+  my ($filter_err, $filter_msg,
+      $filter_phrase, $where_arg) = parse_filtering('"MarkerMapId"',
+                                                    '"markermapposition"',
+                                                    $filtering_csv,
+                                                    $field_list,
+                                                    $validation_func_lookup,
+                                                    $field_name2table_name);
+
+  $self->logger->debug("Filter phrase: $filter_phrase");
+
+  if ($filter_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $filter_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $filter_where_phrase = '';
+
+  if (length($filter_phrase) > 0) {
+
+    $filter_where_phrase = " AND $filter_phrase ";
+  }
+
+  my $filtering_exp = qq| WHERE "MarkerMapId"=$markermap_id $filter_where_phrase |;
+
+  my $username          = $self->authen->username();
+  my $doc_root          = $ENV{'DOCUMENT_ROOT'};
+  my $export_data_path  = "${doc_root}/data/$username";
+  my $filename          = "export_markermapposition_${markermap_id}";
+  my $csv_file          = "${export_data_path}/${filename}.csv";
+  my $result_filename   = "${filename}.csv";
+
+  my $file_rand         = makerandom(Size => 8, Strength => 0);
+
+  my $content_file      = "${TMP_DATA_PATH}${filename}_content_${user_id}_${file_rand}.csv";
+
+  my $eol          = "\r\n";
+  my $monetdb_eol  = '\\r\\n';
+
+  if ( !(-e $export_data_path) ) {
+
+    mkdir($export_data_path);
+  }
+
+  my @header_list = ('MarkerMapPositionId', 'AnalysisGroupMarkerId',
+                     'MarkerMapId', 'MarkerName', 'MarkerSequence',
+                     'ContigName', 'ContigPosition');
+
+  my $header_filehandle;
+
+  open($header_filehandle, ">$csv_file") or die "Cannot write to $csv_file: $!";
+
+  print $header_filehandle join(',', @header_list) . $eol;
+
+  close($header_filehandle);
+
+  if ( -e $content_file ) {
+
+    unlink $content_file or die "Could not unlink $content_file: $!";
+  }
+
+  my $sql = qq|COPY (SELECT "MarkerMapPositionId", "markermapposition"."AnalysisGroupMarkerId", |;
+  $sql   .= qq|"MarkerMapId", "markermapposition"."MarkerName", "MarkerSequence", |;
+  $sql   .= qq|"ContigName", "ContigPosition" |;
+  $sql   .= qq|FROM "markermapposition" LEFT JOIN "analysisgroupmarker" ON |;
+  $sql   .= qq|"markermapposition"."AnalysisGroupMarkerId" = "analysisgroupmarker"."AnalysisGroupMarkerId" |;
+  $sql   .= qq|$filtering_exp ORDER BY "MarkerMapPositionId" ASC) |;
+  $sql   .= qq|INTO '$content_file' USING DELIMITERS ',','$monetdb_eol',''|;
+
+  $self->logger->debug("SQL: $sql");
+
+  my ($copy_to_file_err, $copy_to_file_msg) = execute_sql($dbh_m_read, $sql, $where_arg);
+
+  $self->logger->debug($copy_to_file_msg);
+
+  if ($copy_to_file_err) {
+
+    $self->logger->debug("COPY INTO file failed: $copy_to_file_msg");
+
+    my $err_msg = "Unexpected error.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh_m_read->disconnect();
+
+  my ($cp_err, $cp_msg) = copy_file($content_file, $csv_file, 1, '>>');
+
+  if ($cp_err) {
+
+    $self->logger->debug("Copy $content_file to $csv_file failed: $cp_msg");
+
+    my $err_msg = "Unexpected Error.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  unlink $content_file or die "Cannot unlink $content_file: $!";
+
+  my $url = reconstruct_server_url();
+
+  my $href_info = { 'csv' => "$url/data/$username/$result_filename" };
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'OutputFile'     => [$href_info]};
   $data_for_postrun_href->{'ExtraData'} = 0;
 
   return $data_for_postrun_href;

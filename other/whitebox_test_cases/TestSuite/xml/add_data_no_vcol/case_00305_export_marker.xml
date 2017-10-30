@@ -3,7 +3,7 @@
   <INPUT ParaName="AnalysisGroupId" SrcValue="xml/add_data_no_vcol/case_00303_add_analysisgroup.xml" />
   <INPUT ParaName="Filtering" Value="CloneID = '1033160|F|0'" />
   <Match Attr="StatusCode" Value="200" />
-  <Match Attr="csv" MatchingVar="LINE_COUNT" Tag="OutputFile" TargetDataType="CSV_FILE" Value="boolex(x&gt;0)" />
+  <Match Attr="csv" MatchingVar="LINE_COUNT" Tag="OutputFile" TargetDataType="CSV_FILE" Value="boolex(x&gt;5)" />
   <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00304_import_marker.xml" Order="3" />

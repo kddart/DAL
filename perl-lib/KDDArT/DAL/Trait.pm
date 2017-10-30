@@ -6152,11 +6152,18 @@ sub export_datakapture_data_runmode {
 
     my $trial_data_rec = $trial_data_href->{$trialunit_id};
 
-    for my $trial_data_field (keys(%{$trial_data_rec})) {
+    if (defined $trial_data_rec) {
 
-      #my $trait_val = $trial_data_rec->{$trial_data_field};
-      #$self->logger->debug("Trial data field: $trial_data_field - $trait_val");
-      $output_data_row->{$trial_data_field}  = $trial_data_rec->{$trial_data_field};
+      for my $trial_data_field (keys(%{$trial_data_rec})) {
+
+        #my $trait_val = $trial_data_rec->{$trial_data_field};
+        #$self->logger->debug("Trial data field: $trial_data_field - $trait_val");
+        $output_data_row->{$trial_data_field}  = $trial_data_rec->{$trial_data_field};
+      }
+    }
+    else {
+
+      $output_data_row->{'TrialUnitId'} = $trialunit_id;
     }
 
     #$self->logger->debug("Output data keys: " . join(',', keys(%{$output_data_row})));
