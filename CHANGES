@@ -1,3 +1,11 @@
+Version 2.4.5
+Date: 10/11/2017
+Description: Fix single quote bug in trait value for samplemeasurement importation
+
+Minor:
+
+  + Fix bug #4127 regarding single quote in trait value in samplemeasurement importation returning an error.
+
 Version 2.4.4
 Date: 30/10/2017
 Description: Add interfaces to list marker data for data set

@@ -22,7 +22,9 @@
   <Parent CaseFile="xml/add_data_no_vcol/case_00525_get_trial_unit_spec_id.xml" Force="1" Order="4" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00590_get_trial_unit_spec_id_2.xml" Force="1" Order="5" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00359_add_trait.xml" Order="6" />
-  <Parent CaseFile="xml/add_data_no_vcol/case_00201_add_sampletype.xml" Order="7" />
-  <Parent CaseFile="xml/add_data_no_vcol/case_00467_add_trialtrait4import_samplemeasurement.xml" Force="1" Order="8" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00606_add_trait_text.xml" Order="7" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00201_add_sampletype.xml" Order="8" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00467_add_trialtrait4import_samplemeasurement.xml" Force="1" Order="9" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00607_add_trialtrait4import_samplemeasurement.xml" Force="1" Order="10" />
   
 </TestCase>

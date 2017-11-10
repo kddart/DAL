@@ -5298,6 +5298,7 @@ sub insert_samplemeasurement_data {
     }
 
     my $trait_val = $data_row->{'TraitValue'};
+    my $db_trait_val = $dbh_write->quote($trait_val);
 
     if ($validate_trait) {
 
@@ -5354,7 +5355,7 @@ sub insert_samplemeasurement_data {
     }
 
     $bulk_sql .= "($trialunit_id,$samp_type_id,$smgroup_id,$trait_id,$effective_user_id,";
-    $bulk_sql .= "'$measure_dt',$instance_num,'$trait_val',$tu_spec_id,$state_reason),";
+    $bulk_sql .= "'$measure_dt',$instance_num,$db_trait_val,$tu_spec_id,$state_reason),";
 
     $row_counter += 1;
   }

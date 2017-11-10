@@ -729,6 +729,9 @@ sub import_markerdata_dart_runmode {
     return $data_for_postrun_href;
   }
 
+  $dbh_m_write->disconnect();
+  $dbh_m_write = connect_mdb_write();
+
   if (scalar(@{$dup_marker_data}) > 0) {
 
     $sql  = qq|SELECT COUNT(*) FROM ( |;
@@ -779,6 +782,9 @@ sub import_markerdata_dart_runmode {
 
     return $data_for_postrun_href;
   }
+
+  $dbh_m_write->disconnect();
+  $dbh_m_write = connect_mdb_write();
 
   if ($delete_update_status == 1) {
 
