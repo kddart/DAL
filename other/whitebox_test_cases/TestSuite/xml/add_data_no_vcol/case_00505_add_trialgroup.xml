@@ -3,6 +3,7 @@
   <Delete TargetURL="delete/trialgroup/:TrialGroupId" />
   <INPUT ParaName="TrialGroupName" PrefixVal="MultiLocTrialName_" Random="1" />
   <INPUT ParaName="TrialGroupType" SrcValue="xml/add_data_no_vcol/case_00428_add_trialgroup_type.xml" />
+  <INPUT ParaName="TrialGroupLayout" Value='{"Test": "abc"}' />
   <INPUT ParaName="trialgroupentry" Process="1" SrcFile="xml/add_data_no_vcol/trialgroupentry.xml" />
   <Match Attr="StatusCode" Value="200" />
   <Match Attr="Message" Tag="Info" Value="regex(successfully)" />

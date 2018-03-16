@@ -1,5 +1,5 @@
 <TestCase>
-  <CaseInfo Description="Get Trial" TargetURL="get/trial/:TrialId" Type="BLOCKING" />
+  <CaseInfo CaptureFieldName="TULastUpdateTimeStamp" Description="Get Trial" TargetURL="get/trial/:TrialId" Type="BLOCKING" />
   <INPUT ParaName="TrialId" SrcValue="xml/add_data_no_vcol/case_00007_add_trial.xml" />
   <Match Attr="StatusCode" Value="200" />
   <Match Attr="COUNT" Tag="Trial" TargetDataType="MULTI" Value="boolex(x&gt;0)" />

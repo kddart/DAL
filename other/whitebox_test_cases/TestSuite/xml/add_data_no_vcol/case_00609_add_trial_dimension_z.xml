@@ -1,0 +1,16 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Add Trial Dimension" TargetURL="trial/:TrialId/add/dimension" Type="BLOCKING" />
+  <Delete TargetURL="delete/trialdimensions/:TrialTraitId" />
+  <INPUT ParaName="TrialId" SrcValue="xml/add_data_no_vcol/case_00007_add_trial.xml" />
+  <INPUT ParaName="Dimension" Value="Z" />
+  <INPUT ParaName="DimensionName" Value="Block" />
+  <Match Attr="Dimension" Exception="1" Order="1" Tag="Error" Value="regex(already exists)" />
+  <Match Attr="StatusCode" Order="2" Value="200" />
+  <Match Attr="Message" Order="3" Tag="Info" Value="regex(successfully)" />
+  <Match Attr="ParaName" Order="4" Tag="ReturnId" Value="TrialDimensionId" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00007_add_trial.xml" Order="3" />
+  
+  
+</TestCase>

@@ -38,6 +38,8 @@ use Digest::MD5 qw(md5 md5_hex md5_base64);
 use Crypt::Random qw( makerandom );
 use JSON::XS qw(encode_json decode_json);
 use XML::Checker::Parser;
+use Config::Simple;
+
 
 sub setup {
 
@@ -82,6 +84,8 @@ sub setup {
                                            'remove_keyword_from_group_gadmin',
                                            'del_keyword_group_gadmin',
                                            'update_group_gadmin',
+                                           'update_nursery_type_list_csv_gadmin',
+                                           'update_genotype_config_gadmin',
       );
   __PACKAGE__->authen->check_signature_runmodes('add_user_gadmin',
                                                 'update_user_gadmin',
@@ -108,6 +112,8 @@ sub setup {
                                                 'remove_keyword_from_group_gadmin',
                                                 'del_keyword_group_gadmin',
                                                 'update_group_gadmin',
+                                                'update_nursery_type_list_csv_gadmin',
+                                                'update_genotype_config_gadmin',
       );
   __PACKAGE__->authen->check_gadmin_runmodes('add_user_gadmin',
                                              'update_user_gadmin',
@@ -134,6 +140,8 @@ sub setup {
                                              'remove_keyword_from_group_gadmin',
                                              'del_keyword_group_gadmin',
                                              'update_group_gadmin',
+                                             'update_nursery_type_list_csv_gadmin',
+                                             'update_genotype_config_gadmin',
       );
   __PACKAGE__->authen->check_sign_upload_runmodes('add_multimedia',
                                                   'add_keyword_group_gadmin',
@@ -193,6 +201,8 @@ sub setup {
     'del_keyword_group_gadmin'            => 'del_keyword_group_runmode',
     'update_group_gadmin'                 => 'update_group_runmode',
     'get_unique_number'                   => 'get_unique_number_runmode',
+    'update_nursery_type_list_csv_gadmin' => 'update_nursery_type_list_csv_runmode',
+    'update_genotype_config_gadmin'       => 'update_genotype_config_runmode',
    );
 
   my $logger = get_logger();
@@ -6509,7 +6519,7 @@ sub update_keyword_group_runmode {
     return $data_for_postrun_href;
   }
 
-  my $sql = "UPDATE keywordgroup SET ";
+  $sql    = "UPDATE keywordgroup SET ";
   $sql   .= "KeywordGroupName=?, OperatorId=$operator_id ";
   $sql   .= 'WHERE KeywordGroupId=?';
 
@@ -7585,6 +7595,199 @@ sub get_unique_number_runmode {
   $data_for_postrun_href->{'Data'}      = {'Info'      => $info_msg_aref,
                                            'ReturnId'  => $return_id_aref,
   };
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub update_nursery_type_list_csv_runmode {
+
+=pod update_nursery_type_list_csv_gadmin_HELP_START
+{
+"OperationName": "Update the csv list of nursery trial types",
+"Description": "Update the csv list of nursery trial types.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 1,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><StatInfo Unit='second' ServerElapsedTime='0.008' /><Info Message='NUSERY_TYPE_LIST_CSV has been updated successfully.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'NUSERY_TYPE_LIST_CSV has been updated successfully.'}],'StatInfo' : [{'ServerElapsedTime' : '0.008','Unit' : 'second'}]}",
+"ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
+"ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.'}]}"}],
+"HTTPParameter": [{"Required": 1, "Name": "NurseryTypeListCSV", "Description": "Comma separated value of trial type id to be set as nursery types."}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self  = shift;
+  my $query = $self->query();
+
+  my $nursery_type_list_csv = $query->param('NurseryTypeListCSV');
+
+  my $data_for_postrun_href = {};
+
+  if (length($nursery_type_list_csv) == 0) {
+
+    my $err_msg = "NurseryTypeListCSV is missing.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'NurseryTypeListCSV' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if ($nursery_type_list_csv !~ /(\d+,?)+/) {
+
+    my $err_msg = "NurseryTypeListCSV must be comma separated value of unsigned integer.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'NurseryTypeListCSV' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my @nursery_type_list = split(',', $nursery_type_list_csv);
+
+  my $uniq_nursery_type_href = {};
+
+  foreach my $type_id (@nursery_type_list) {
+
+    if (defined $uniq_nursery_type_href->{$type_id}) {
+
+      my $err_msg = "Type ($type_id) is duplicate in $nursery_type_list_csv.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'NurseryTypeListCSV' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+    else {
+
+      $uniq_nursery_type_href->{$type_id} = 1;
+    }
+  }
+
+  my $dbh = connect_kdb_read();
+
+  my ($chk_trial_type_id_err, $unfound_trial_type_id_csv) = type_existence_csv($dbh, 'trial',
+                                                                               $nursery_type_list_csv);
+
+  if ($chk_trial_type_id_err) {
+
+
+    my $err_msg = "Type ($unfound_trial_type_id_csv): not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'NurseryTypeListCSV' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh->disconnect();
+
+  my $config_file_path = $CFG_FILE_PATH;
+
+
+  my $cfg = new Config::Simple($config_file_path);
+
+  my $document_root = $ENV{DOCUMENT_ROOT};
+  my $base_dir      = $main::kddart_base_dir;
+
+  my $config_param_name = $document_root;
+  $config_param_name =~ s/${base_dir}\///g;
+
+  $cfg->param( -block => "NURSERY_TYPE_LIST_CSV",
+               -value => { "$config_param_name" => "$nursery_type_list_csv" } );
+
+  $cfg->save();
+
+  load_config();
+
+  my $info_msg_aref  = [{'Message' => "NUSERY_TYPE_LIST_CSV has been updated successfully."}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'      => $info_msg_aref};
+
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub update_genotype_config_runmode {
+
+=pod update_genotype_config_gadmin_HELP_START
+{
+"OperationName": "Update DAL genotype creation setting",
+"Description": "Update DAL configuration which controls the required privilege level for genotype creation.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 1,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><StatInfo ServerElapsedTime='0.007' Unit='second' /><Info Message='Creating genotype privilege setting has been updated successfully.' /></DATA>",
+"SuccessMessageJSON": "{'StatInfo' : [{'ServerElapsedTime' : '0.007','Unit' : 'second'}],'Info' : [{'Message' : 'Creating genotype privilege setting has been updated successfully.'}]}",
+"ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
+"ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.'}]}"}],
+"HTTPParameter": [{"Required": 1, "Name": "GenotypeConfig", "Description": "Setting which must be either ANY, GADMIN or ADMIN."}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self  = shift;
+  my $query = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  my $user_id = $self->authen->user_id;
+
+  if ( "$user_id" ne '0' ) {
+
+    my $err_msg = "Permission denied: user not admin.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $genotype_config = $query->param('GenotypeConfig');
+
+  if (length($genotype_config) == 0) {
+
+    my $err_msg = "GenotypeConfig is missing.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'GenotypeConfig' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if ($genotype_config !~ /^ADMIN|GADMIN|ANY$/i) {
+
+    my $err_msg = "GenotypeConfig ($genotype_config): invalid.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'GenotypeConfig' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $config_file_path = $CFG_FILE_PATH;
+
+  my $cfg = new Config::Simple($config_file_path);
+
+  my $document_root = $ENV{DOCUMENT_ROOT};
+  my $base_dir      = $main::kddart_base_dir;
+
+  my $config_param_name = $document_root;
+  $config_param_name =~ s/${base_dir}\///g;
+
+  $cfg->param( -block => "WHO_CAN_CREATE_GENOTYPE",
+               -value => { "$config_param_name" => uc("$genotype_config") } );
+
+  $cfg->save();
+
+  load_config();
+
+  my $info_msg_aref  = [{'Message' => "Creating genotype privilege setting has been updated successfully."}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'      => $info_msg_aref};
+
   $data_for_postrun_href->{'ExtraData'} = 0;
 
   return $data_for_postrun_href;

@@ -19,6 +19,8 @@
 <!ATTLIST trialunitspecimen Notes CDATA #IMPLIED  >
 <!ATTLIST trialunitspecimen PlantDate NMTOKEN #IMPLIED >
 <!ATTLIST trialunitspecimen HasDied NMTOKEN #IMPLIED >
+<!ATTLIST trialunitspecimen SpecimenNumber NMTOKEN #IMPLIED >
+<!ATTLIST trialunitspecimen TUSLabel CDATA #IMPLIED >
 <!ATTLIST trialunitspecimen ItemId NMTOKEN #IMPLIED >
 <!ATTLIST trialunitspecimen SpecimenId NMTOKEN #REQUIRED >
 

@@ -36,6 +36,7 @@ use XML::Checker::Parser;
 use Time::HiRes qw( tv_interval gettimeofday );
 use Crypt::Random qw( makerandom );
 
+
 sub setup {
 
   my $self = shift;
@@ -55,6 +56,7 @@ sub setup {
                                            'update_analysisgroup',
                                            'add_plate_n_extract_gadmin',
                                            'import_plate_n_extract_gadmin',
+                                           'del_analysisgroup_gadmin',
       );
   __PACKAGE__->authen->count_session_request_runmodes(':all');
 
@@ -63,6 +65,7 @@ sub setup {
                                                 'add_extract_gadmin',
                                                 'update_extract_gadmin',
                                                 'del_extract_gadmin',
+                                                'del_analysisgroup_gadmin',
       );
   __PACKAGE__->authen->check_gadmin_runmodes('add_plate_gadmin',
                                              'update_plate_gadmin',
@@ -73,7 +76,7 @@ sub setup {
                                              'add_plate_n_extract_gadmin',
                                              'add_plate_gadmin',
                                              'import_plate_n_extract_gadmin',
-
+                                             'del_analysisgroup_gadmin',
       );
   __PACKAGE__->authen->check_sign_upload_runmodes('add_analysisgroup',
                                                   'add_plate_n_extract_gadmin',
@@ -99,6 +102,7 @@ sub setup {
     'add_plate_n_extract_gadmin'    => 'add_plate_n_extract_runmode',
     'list_dataset'                  => 'list_dataset_runmode',
     'import_plate_n_extract_gadmin' => 'import_plate_n_extract_runmode',
+    'del_analysisgroup_gadmin'      => 'del_analysisgroup_runmode',
       );
 
   my $logger = get_logger();
@@ -1978,15 +1982,7 @@ sub add_extract_runmode {
     }
   }
 
-  my $Tissue = undef;
-
-  if (defined($query->param('Tissue'))) {
-
-    if (length($query->param('Tissue')) > 0) {
-
-      $Tissue = $query->param('Tissue');
-    }
-  }
+  my $Tissue = $query->param('Tissue');;
 
   my $WellRow = '';
 
@@ -2552,7 +2548,7 @@ sub update_extract_runmode {
     return $data_for_postrun_href;
   }
 
-  my $read_extract_sql    =  'SELECT "ItemGroupId", "ParentExtractId", "PlateId", "GenotypeId", "Tissue", ';
+  my $read_extract_sql    =  'SELECT "ItemGroupId", "ParentExtractId", "PlateId", "GenotypeId", ';
      $read_extract_sql   .=  '"WellRow", "WellCol", "Quality", "Status" ';
      $read_extract_sql   .=  'FROM "extract" WHERE "ExtractId"=? ';
 
@@ -2567,11 +2563,12 @@ sub update_extract_runmode {
     return $data_for_postrun_href;
   }
 
+  my $Tissue                =  $query->param('Tissue');
+
   my $ItemGroupId           =  undef;
   my $ParentExtractId       =  undef;
   my $PlateId               =  undef;
   my $GenotypeId            =  undef;
-  my $Tissue                =  undef;
   my $WellRow               =  undef;
   my $WellCol               =  undef;
   my $Quality               =  undef;
@@ -2592,7 +2589,6 @@ sub update_extract_runmode {
   $ParentExtractId       =  $extract_df_val_data->[0]->{'ParentExtractId'};
   $PlateId               =  $extract_df_val_data->[0]->{'PlateId'};
   $GenotypeId            =  $extract_df_val_data->[0]->{'GenotypeId'};
-  $Tissue                =  $extract_df_val_data->[0]->{'Tissue'};
   $WellRow               =  $extract_df_val_data->[0]->{'WellRow'};
   $WellCol               =  $extract_df_val_data->[0]->{'WellCol'};
   $Quality               =  $extract_df_val_data->[0]->{'Quality'};
@@ -2654,21 +2650,6 @@ sub update_extract_runmode {
     $GenotypeId = undef;
   }
 
-
-  if (defined($query->param('Tissue'))) {
-
-    if (length($query->param('Tissue')) > 0) {
-
-      $Tissue = $query->param('Tissue');
-    }
-  }
-
-  if (length($Tissue) == 0) {
-
-    $Tissue = undef;
-  }
-
-
   if (defined($query->param('WellRow'))) {
 
     $WellRow = $query->param('WellRow');
@@ -2724,8 +2705,6 @@ sub update_extract_runmode {
       return $data_for_postrun_href;
     }
   }
-
-  #####
 
   my $get_geno_sql;
 
@@ -2859,8 +2838,6 @@ sub update_extract_runmode {
     return $data_for_postrun_href;
   }
 
-  ####
-
   if (defined $PlateId) {
 
     if (!record_existence($dbh_m_read, 'plate', 'PlateId', $PlateId)) {
@@ -2925,16 +2902,13 @@ sub update_extract_runmode {
     }
   }
 
-  if (defined $Tissue) {
+  if (!type_existence($dbh_k_read, 'tissue', $Tissue)) {
 
-    if (!type_existence($dbh_k_read, 'tissue', $Tissue)) {
+    my $err_msg = "Tissue ($Tissue) not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Tissue' => $err_msg}]};
 
-      my $err_msg = "Tissue ($Tissue) not found.";
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Tissue' => $err_msg}]};
-
-      return $data_for_postrun_href;
-    }
+    return $data_for_postrun_href;
   }
 
   my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength ";
@@ -7115,6 +7089,117 @@ sub import_plate_n_extract_runmode {
 
   $data_for_postrun_href->{'Error'}     = 0;
   $data_for_postrun_href->{'Data'}      = {'Info' => $info_msg_aref, 'ReturnIdFile' => [$output_file_href]};
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub del_analysisgroup_runmode {
+
+=pod del_analysisgroup_gadmin_HELP_START
+{
+"OperationName": "Delete analysisgroup",
+"Description": "Delete analysisgroup for a specified analysisgroup id. Analysisgroup can be deleted only if it does not have any dataset.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 1,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='AnalysisGroup (5) has been deleted successfully.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'AnalysisGroup (6) has been deleted successfully.'}]}",
+"ErrorMessageXML": [{"IdUsed": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='AnalysisGroup (1) has dataset.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdUsed": "{'Error' : [{'Message' : 'AnalysisGroup (1) has dataset.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing AnalysisGroupId."}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self       = shift;
+  my $anal_id    = $self->param('id');
+
+  my $data_for_postrun_href = {};
+
+  my $dbh_m_read = connect_mdb_read();
+
+  if (! record_existence($dbh_m_read, 'analysisgroup', 'AnalysisGroupId', $anal_id) ) {
+
+    my $err_msg = "AnalysisGroup ($anal_id) not found.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+
+  if (record_existence($dbh_m_read, 'dataset', 'AnalysisGroupId', $anal_id)) {
+
+    my $err_msg = "AnalysisGroup ($anal_id) has dataset.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh_m_read->disconnect();
+
+  my $dbh_m_write = connect_mdb_write();
+
+  my $sql = 'DELETE FROM "analysisgroupfactor" WHERE "AnalysisGroupId"=?';
+  my $sth = $dbh_m_write->prepare($sql);
+
+  $sth->execute($anal_id);
+
+  if ($dbh_m_write->err()) {
+
+    $self->logger->debug("Delete analysisgroupfactor failed");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sth->finish();
+
+  $sql = 'DELETE FROM "analgroupextract" WHERE "AnalysisGroupId"=?';
+  $sth = $dbh_m_write->prepare($sql);
+
+  $sth->execute($anal_id);
+
+  if ($dbh_m_write->err()) {
+
+    $self->logger->debug("Delete analgroupextract failed");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sth->finish();
+
+  $sql = 'DELETE FROM "analysisgroup" WHERE "AnalysisGroupId"=?';
+  $sth = $dbh_m_write->prepare($sql);
+
+  $sth->execute($anal_id);
+
+  if ($dbh_m_write->err()) {
+
+    $self->logger->debug("Delete analysisgroup failed");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sth->finish();
+
+  $dbh_m_write->disconnect();
+
+  my $info_msg_aref = [{'Message' => "AnalysisGroup ($anal_id) has been deleted successfully."}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'      => $info_msg_aref};
   $data_for_postrun_href->{'ExtraData'} = 0;
 
   return $data_for_postrun_href;

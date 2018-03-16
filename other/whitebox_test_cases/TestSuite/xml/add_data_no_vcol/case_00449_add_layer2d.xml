@@ -1,6 +1,6 @@
 <TestCase>
   <CaseInfo CustomMethod="add_record" Description="Add Layer 2D" TargetURL="add/layer" Type="BLOCKING" />
-  <INPUT ParaName="name" PrefixVal="Layer - " Random="1" />
+  <INPUT ParaName="layername" PrefixVal="Layer - " Random="1" />
   <INPUT ParaName="alias" Value="" />
   <INPUT ParaName="layertype" Value="2D" />
   <INPUT ParaName="iseditable" Value="1" />

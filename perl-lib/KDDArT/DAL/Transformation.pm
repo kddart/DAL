@@ -33,6 +33,7 @@ use JSON::XS;
 use Hash::Merge qw( merge );
 use Time::HiRes qw( tv_interval gettimeofday );
 
+
 sub cgiapp_init {
 
   my $self = shift;
@@ -59,9 +60,13 @@ sub cgiapp_init {
 
   $self->logger->debug("CFG FILE: $CFG_FILE_PATH");
 
+  my $cfg_start_time = gettimeofday();
+
   my ($load_conf_err, $load_conf_msg) = load_config();
 
-  $self->logger->debug("LOAD CONFIG MSG: $load_conf_msg");
+  my $cfg_elapsed_time = sprintf("%.3f", tv_interval([$cfg_start_time]));
+
+  $self->logger->debug("LOAD CONFIG MSG: $load_conf_msg - time: $cfg_elapsed_time");
 
   if ($load_conf_err) {
 

@@ -3,6 +3,7 @@
   <INPUT ParaName="DeviceTypeId" SrcValue="xml/add_data_no_vcol/case_00350_add_device_type_wst.xml" />
   <INPUT ParaName="DeviceId" PrefixVal="autotest-wst01" Random="1" />
   <INPUT ParaName="DeviceNote" Value="Created by the automatic test." />
+  <INPUT ParaName="DeviceConf" Value='{"Testing": 1234}' />
   <Match Attr="StatusCode" Value="200" />
   <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
   <Match Attr="ParaName" Tag="ReturnId" Value="DeviceRegisterId" />

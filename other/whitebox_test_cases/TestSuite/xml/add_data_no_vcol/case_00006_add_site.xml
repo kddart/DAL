@@ -6,7 +6,6 @@
   <INPUT ParaName="SiteAcronym" Value="GH" />
   <INPUT ParaName="CurrentSiteManagerId" SrcValue="xml/add_data_no_vcol/case_00102_add_con.xml" />
   <INPUT ParaName="CurrentMetStationId" Value="0" />
-  <INPUT ParaName="sitelocation" Value="POLYGON((148.99658 -35.48192,149.2067 -35.48192,149.2067 -35.19626,148.99658 -35.19626,148.99658 -35.48192))" />
   <Match Attr="StatusCode" Value="200" />
   <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
   <Match Attr="ParaName" Tag="ReturnId" Value="SiteId" />

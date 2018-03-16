@@ -1,6 +1,5 @@
 <TestCase>
   <CaseInfo CustomMethod="add_record_upload" Description="Import item" TargetURL="import/item/csv" Type="BLOCKING" OutputFormat="JSON" />
-  <INPUT ParaName="ItemSourceId" Value="0" />
   <INPUT ParaName="SpecimenId" Value="1" />
   <INPUT ParaName="UnitId" Value="2" />
   <INPUT ParaName="ItemTypeId" Value="3" />

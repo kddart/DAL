@@ -27,12 +27,12 @@
               "id": "http://kddart.org/DATA/0/dt",
               "type": "string"
             },
-            "systemuserid": {
-              "id": "http://kddart.org/DATA/0/systemuserid",
-              "type": "string"
-            },
             "geometry": {
               "id": "http://kddart.org/DATA/0/geometry",
+              "type": "string"
+            },
+            "deviceid": {
+              "id": "http://kddart.org/DATA/0/deviceid",
               "type": "string"
             }
           },
@@ -41,7 +41,6 @@
             "layerattrib",
             "value",
             "dt",
-            "systemuserid",
             "geometry"
           ],
           "additionalProperties": false

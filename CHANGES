@@ -1,3 +1,33 @@
+Version 2.5.0
+Date: 16/03/2018
+Description: Improved version with unique genotype alias name checking with genotype name.
+
+Major:
+
+  + Enforce the uniqueness of genotype name and genotype alias name within the same genus.
+
+  + Add support for trial and trial group ayout.
+
+  + Support having multiple instances of the same specimen in a trial unit.
+
+  + Able to configure who can create new genotypes from the DAL configuration.
+
+Minor:
+
+  + Support season as general type and in trial.
+
+  + Add count filtering to count groupby interface.
+
+  + By default, add trial unit and add trial unit in bulk will check x, y, z uniqueness. If x, y, z uniqueness checking is not needed, force parameter can be used.
+
+  + Support bulk update of trial units.
+
+  + Trait and traitgroup have extra alternative optional unique identifier.
+
+  + Make sitelocation optional when adding a new site.
+
+  + Provide interfaces to add and retrieve the list of trial types that are defined as nursery trial types.
+
 Version 2.4.5
 Date: 10/11/2017
 Description: Fix single quote bug in trait value for samplemeasurement importation

@@ -10,7 +10,7 @@
   <INPUT ParaName="TraitValueMaxLength" Value="20" />
   <INPUT ParaName="UnitId" SrcValue="xml/add_data_no_vcol/case_00397_add_item_unit4add_trait.xml" />
   <INPUT ParaName="IsTraitUsedForAnalysis" Value="0" />
-  <INPUT ParaName="TraitValRule" Value="BERANGE(-5.0..10.0)" />
+  <INPUT ParaName="TraitValRule" Value="BERANGE(-5..10.0)" />
   <INPUT ParaName="TraitValRuleErrMsg" Value="Invalid value" />
   <INPUT ParaName="AccessGroupId" SrcValue="xml/add_data_no_vcol/owngroup.xml" />
   <INPUT ParaName="OwnGroupPerm" Value="7" />

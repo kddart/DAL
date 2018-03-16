@@ -34,6 +34,7 @@ use CGI::Application::Plugin::Session;
 use Log::Log4perl qw(get_logger :levels);
 use XML::Writer;
 
+
 sub setup {
 
   my $self = shift;
@@ -1439,7 +1440,7 @@ sub add_general_type_runmode {
 "SuccessMessageJSON": "{'ReturnId' : [{'Value' : '225', 'ParaName' : 'TypeId'}], 'Info' : [{'Message' : 'GeneralType (225) has been added successfully.'}]}",
 "ErrorMessageXML": [{"NameAlreadyExists": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Type (Research Station) for class (site) already exists.' /></DATA>"}],
 "ErrorMessageJSON": [{"NameAlreadyExists": "{'Error' : [{'Message' : 'Type (Research Station) for class (site) already exists.'}]}"}],
-"URLParameter": [{"ParameterName": "class", "Description": "Value from a predefined list of values for classification of the type. This list of values is site, item, container, deviceregister, trial, trialevent, sample, specimengroup, state, parent, itemparent, genotypespecimen, dataset, workflow, project, itemlog, plate, genmap, multimedia, tissue, genotypealias, genparent, genotypealiasstatus, traitgroup, unittype and trialgroup."}],
+"URLParameter": [{"ParameterName": "class", "Description": "Value from a predefined list of values for classification of the type. This list of values is site, item, container, deviceregister, trial, trialevent, sample, specimengroup, state, parent, itemparent, genotypespecimen, dataset, workflow, project, itemlog, plate, genmap, multimedia, tissue, genotypealias, genparent, genotypealiasstatus, traitgroup, unittype, trialgroup and season."}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
@@ -1537,6 +1538,7 @@ sub add_general_type_runmode {
                        'trialgroup'           => 1,
                        'breedingmethod'       => 1,
                        'traitdatatype'        => 1,
+                       'season'               => 1,
   };
 
   if (!($class_lookup->{$class})) {
@@ -1687,36 +1689,37 @@ sub list_general_type {
 
   my $data_aref = [];
 
-  my $class2chk_table_lookup = { 'site'                => [{'TableName' => 'site' => 'FieldName' => 'SiteTypeId'}],
-                                 'item'                => [{'TableName' => 'item', 'FieldName' => 'ItemTypeId'}],
-                                 'container'           => [{'TableName' => 'item', 'FieldName' => 'ContainerTypeId'}],
+  my $class2chk_table_lookup = { 'breedingmethod'      => [{'TableName' => 'breedingmethod', 'FieldName' => 'BreedingMethodTypeId'}],
                                  'deviceregister'      => [{'TableName' => 'deviceregister', 'FieldName' => 'DeviceTypeId'}],
-                                 'trial'               => [{'TableName' => 'trial', 'FieldName' => 'TrialTypeId'}],
-                                 'trialevent'          => [{'TableName' => 'trialevent', 'FieldName' => 'EventTypeId'}],
-                                 'sample'              => [{'TableName' => 'samplemeasurement', 'FieldName' => 'SampleTypeId'}],
-                                 'specimengroup'       => [{'TableName' => 'specimengroup', 'FieldName' => 'SpecimenGroupTypeId'}],
-                                 'state'               => [{'TableName' => 'item', 'FieldName' => 'ItemStateId'}],
-                                 'parent'              => [{'TableName' => 'pedigree', 'FieldName' => 'ParentType'}],
-                                 'itemparent'          => [{'TableName' => 'itemparent', 'FieldName' => 'ItemParentType'}],
-                                 'genotypespecimen'    => [{'TableName' => 'genotypespecimen', 'FieldName' => 'GenotypeSpecimenType'}],
                                  'markerdataset'       => [{'TableName' => 'dataset', 'FieldName' => 'DataSetType'}],
-                                 'workflow'            => [{'TableName' => 'workflow', 'FieldName' => 'WorkflowType'}],
-                                 'project'             => [{'TableName' => 'project', 'FieldName' => 'TypeId'}],
+                                 'tissue'              => [{'TableName' => 'extract', 'FieldName' => 'Tissue'}],
+                                 'unittype'            => [{'TableName' => 'generalunit', 'FieldName' => 'UnitTypeId'}],
+                                 'genotypealias'       => [{'TableName' => 'genotypealias', 'FieldName' => 'GenotypeAliasType'}],
+                                 'genotypealiasstatus' => [{'TableName' => 'genotypealias', 'FieldName' => 'GenotypeAliasStatus'}],
+                                 'genotypespecimen'    => [{'TableName' => 'genotypespecimen', 'FieldName' => 'GenotypeSpecimenType'}],
+                                 'genparent'           => [{'TableName' => 'genpedigree', 'FieldName' => 'GenParentType'}],
+                                 'item'                => [{'TableName' => 'item', 'FieldName' => 'ItemTypeId'}],
+                                 'state'               => [{'TableName' => 'item', 'FieldName' => 'ItemStateId'}],
+                                 'container'           => [{'TableName' => 'item', 'FieldName' => 'ContainerTypeId'}],
                                  'itemlog'             => [{'TableName' => 'itemlog', 'FieldName' => 'LogTypeId'}],
-                                 'plate'               => [{'TableName' => 'plate', 'FieldName' => 'PlateType'}],
+                                 'itemparent'          => [{'TableName' => 'itemparent', 'FieldName' => 'ItemParentType'}],
+                                 'unittype'            => [{'TableName' => 'itemunit', 'FieldName' => 'UnitTypeId'}],
                                  'genmap'              => [{'TableName' => 'markermap', 'FieldName' => 'MapType'}],
                                  'multimedia'          => [{'TableName' => 'multimedia', 'FieldName' => 'FileType'}],
-                                 'tissue'              => [{'TableName' => 'extract', 'FieldName' => 'Tissue'}],
-                                 'genotypealias'       => [{'TableName' => 'genotypealias', 'FieldName' => 'GenotypeAliasType'}],
-                                 'genparent'           => [{'TableName' => 'genpedigree', 'FieldName' => 'GenParentType'}],
-                                 'genotypealiasstatus' => [{'TableName' => 'genotypealias', 'FieldName' => 'GenotypeAliasStatus'}],
-                                 'traitgroup'          => [{'TableName' => 'trait', 'FieldName' => 'TraitGroupTypeId'}],
-                                 'unittype'            => [{'TableName' => 'itemunit', 'FieldName' => 'UnitTypeId'}],
-                                 'breedingmethod'      => [{'TableName' => 'breedingmethod', 'FieldName' => 'BreedingMethodTypeId'}],
-                                 'trialgroup'          => [{'TableName' => 'trialgroup', 'FieldName' => 'TrialGroupType'}],
+                                 'project'             => [{'TableName' => 'project', 'FieldName' => 'TypeId'}],
+                                 'plate'               => [{'TableName' => 'plate', 'FieldName' => 'PlateType'}],
+                                 'parent'              => [{'TableName' => 'pedigree', 'FieldName' => 'ParentType'}],
+                                 'site'                => [{'TableName' => 'site' => 'FieldName' => 'SiteTypeId'}],
+                                 'sample'              => [{'TableName' => 'samplemeasurement', 'FieldName' => 'SampleTypeId'}],
+                                 'specimengroup'       => [{'TableName' => 'specimengroup', 'FieldName' => 'SpecimenGroupTypeId'}],
                                  'specimengroupstatus' => [{'TableName' => 'specimengroup', 'FieldName' => 'SpecimenGroupStatus'}],
                                  'traitgroup'          => [{'TableName' => 'trait', 'FieldName' => 'TraitGroupTypeId'}],
-                                 'traitdatatype'       => [{'TableName' => 'trait', 'FieldName' => 'TraitDataType'}]
+                                 'traitdatatype'       => [{'TableName' => 'trait', 'FieldName' => 'TraitDataType'}],
+                                 'season'              => [{'TableName' => 'trial', 'FieldName' => 'SeasonId'}],
+                                 'trial'               => [{'TableName' => 'trial', 'FieldName' => 'TrialTypeId'}],
+                                 'trialevent'          => [{'TableName' => 'trialevent', 'FieldName' => 'EventTypeId'}],
+                                 'trialgroup'          => [{'TableName' => 'trialgroup', 'FieldName' => 'TrialGroupType'}],
+                                 'workflow'            => [{'TableName' => 'workflow', 'FieldName' => 'WorkflowType'}],
   };
 
   my $marker_class_lookup = {'markerdataset'     => 1,
@@ -1831,7 +1834,7 @@ sub list_general_type_runmode {
 "SuccessMessageJSON": "{'VCol' : [], 'RecordMeta' : [{'TagName' : 'GeneralType'}], 'GeneralType' : [{'IsTypeActive' : '0', 'TypeId' : '225', 'TypeName' : 'Farm', 'Class' : 'site', 'update' : 'update/type/site/225', 'TypeNote' : ''},{'IsTypeActive' : '1', 'TypeId' : '224', 'TypeName' : 'Research Station', 'Class' : 'site', 'update' : 'update/type/site/224', 'TypeNote' : ''}]}",
 "ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Class (contact) not supported.' /></DATA>"}],
 "ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Class (contact) not supported.'}]}"}],
-"URLParameter": [{"ParameterName": "class", "Description": "Value from a predefined list of values for classification of the type. This list of values is site, item, container, deviceregister, trial, trialevent, sample, specimengroup, state, parent, itemparent, genotypespecimen, dataset, workflow, project, itemlog, plate, genmap, multimedia, tissue, genotypealias, genparent, genotypealiasstatus, traitgroup, unittype, trialgroup, traitgroup and traitdatatype."}, {"ParameterName": "status", "Description": "Status filtering value which can be 'active', 'inactive' or 'all'."}],
+"URLParameter": [{"ParameterName": "class", "Description": "Value from a predefined list of values for classification of the type. This list of values is site, item, container, deviceregister, trial, trialevent, sample, specimengroup, state, parent, itemparent, genotypespecimen, dataset, workflow, project, itemlog, plate, genmap, multimedia, tissue, genotypealias, genparent, genotypealiasstatus, traitgroup, unittype, trialgroup, traitgroup, traitdatatype and season."}, {"ParameterName": "status", "Description": "Status filtering value which can be 'active', 'inactive' or 'all'."}],
 "HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database field name, a filtering operator and the filtering value."}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
@@ -1891,6 +1894,7 @@ sub list_general_type_runmode {
                        'trialgroup'           => 1,
                        'breedingmethod'       => 1,
                        'traitdatatype'        => 1,
+                       'season'               => 1,
                        'any'                  => 1
   };
 
@@ -2060,7 +2064,7 @@ sub update_general_type_runmode {
 "SuccessMessageJSON": "{'Info' : [{'Message' : 'GeneralType (224) has been updated successfully.'}]}",
 "ErrorMessageXML": [{"NameAlreadyExists": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Type (Farm) for class (site) already exists.' /></DATA>"}],
 "ErrorMessageJSON": [{"NameAlreadyExists": "{'Error' : [{'Message' : 'Type (Farm) for class (site) already exists.'}]}"}],
-"URLParameter": [{"ParameterName": "class", "Description": "Value from a predefined list of values for classification of the type. This list of values is site, item, container, deviceregister, trial, trialevent, sample, specimengroup, state, parent, itemparent, genotypespecimen, dataset, workflow, project, itemlog, plate, genmap, multimedia, tissue, genotypealias, genparent, genotypealiasstatus, traitgroup, unittype and trialgroup."}, {"ParameterName": "id", "Description": "Existing GeneralTypeId"}],
+"URLParameter": [{"ParameterName": "class", "Description": "Value from a predefined list of values for classification of the type. This list of values is site, item, container, deviceregister, trial, trialevent, sample, specimengroup, state, parent, itemparent, genotypespecimen, dataset, workflow, project, itemlog, plate, genmap, multimedia, tissue, genotypealias, genparent, genotypealiasstatus, traitgroup, unittype, trialgroup and season."}, {"ParameterName": "id", "Description": "Existing GeneralTypeId"}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
@@ -2371,7 +2375,7 @@ sub del_general_type_runmode {
 "SuccessMessageJSON": "{ 'Info' : [{ 'Message' : 'GeneralType (225) has been deleted successfully.'} ]}",
 "ErrorMessageXML": [{"IdUsed": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Type (9) used in trial table.' /></DATA>"}],
 "ErrorMessageJSON": [{"IdUsed": "{ 'Error' : [{ 'Message' : 'Type (9) used in trial table.'} ]}"}],
-"URLParameter": [{"ParameterName": "class", "Description": "Value from a predefined list of values for classification of the type. This list of values is site, item, container, deviceregister, trial, trialevent, sample, specimengroup, state, parent, itemparent, genotypespecimen, dataset, workflow, project, itemlog, plate, genmap, multimedia, tissue, genotypealias, genparent, genotypealiasstatus, traitgroup, unittype and trialgroup."}, {"ParameterName": "id", "Description": "Existing GeneralTypeId"}],
+"URLParameter": [{"ParameterName": "class", "Description": "Value from a predefined list of values for classification of the type. This list of values is site, item, container, deviceregister, trial, trialevent, sample, specimengroup, state, parent, itemparent, genotypespecimen, dataset, workflow, project, itemlog, plate, genmap, multimedia, tissue, genotypealias, genparent, genotypealiasstatus, traitgroup, unittype, trialgroup and season."}, {"ParameterName": "id", "Description": "Existing GeneralTypeId"}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
@@ -2400,23 +2404,33 @@ sub del_general_type_runmode {
   }
 
   my @fk_relationship = (
-    { 'table' => 'trial',             'field' => 'TrialTypeId',          'value' => $type_id },
+    { 'table' => 'breedingmethod',    'field' => 'BreedingMethodTypeId', 'value' => $type_id },
+    { 'table' => 'deviceregister',    'field' => 'DeviceTypeId',         'value' => $type_id },
+    { 'table' => 'generalunit',       'field' => 'UnitTypeId',           'value' => $type_id },
+    { 'table' => 'genotypespecimen',  'field' => 'GenotypeSpecimenType', 'value' => $type_id },
+    { 'table' => 'genotypealias',     'field' => 'GenotypeAliasType',    'value' => $type_id },
+    { 'table' => 'genotypealias',     'field' => 'GenotypeAliasStatus',  'value' => $type_id },
+    { 'table' => 'genpedigree',       'field' => 'GenParentType',        'value' => $type_id },
     { 'table' => 'item',              'field' => 'ContainerTypeId',      'value' => $type_id },
     { 'table' => 'item',              'field' => 'ItemTypeId',           'value' => $type_id },
     { 'table' => 'item',              'field' => 'ItemStateId',          'value' => $type_id },
+    { 'table' => 'itemlog',           'field' => 'LogTypeId',            'value' => $type_id },
+    { 'table' => 'itemparent',        'field' => 'ItemParentType',       'value' => $type_id },
+    { 'table' => 'multimedia',        'field' => 'FileType',             'value' => $type_id },
     { 'table' => 'pedigree',          'field' => 'ParentType',           'value' => $type_id },
+    { 'table' => 'project',           'field' => 'TypeId',               'value' => $type_id },
     { 'table' => 'site',              'field' => 'SiteTypeId',           'value' => $type_id },
     { 'table' => 'specimengroup',     'field' => 'SpecimenGroupTypeId',  'value' => $type_id },
-    { 'table' => 'itemparent',        'field' => 'ItemParentType',       'value' => $type_id },
-    { 'table' => 'deviceregister',    'field' => 'DeviceTypeId',         'value' => $type_id },
+    { 'table' => 'specimengroup',     'field' => 'SpecimenGroupStatus',  'value' => $type_id },
     { 'table' => 'samplemeasurement', 'field' => 'SampleTypeId',         'value' => $type_id },
+    { 'table' => 'trait',             'field' => 'TraitGroupTypeId',     'value' => $type_id },
+    { 'table' => 'trait',             'field' => 'TraitDataType',        'value' => $type_id },
+    { 'table' => 'trial',             'field' => 'TrialTypeId',          'value' => $type_id },
+    { 'table' => 'trial',             'field' => 'SeasonId',             'value' => $type_id },
     { 'table' => 'trialevent',        'field' => 'EventTypeId',          'value' => $type_id },
+    { 'table' => 'trialgroup',        'field' => 'TrialGroupType',       'value' => $type_id },
     { 'table' => 'workflow',          'field' => 'WorkflowType',         'value' => $type_id },
-    { 'table' => 'genotypespecimen',  'field' => 'GenotypeSpecimenType', 'value' => $type_id },
-    { 'table' => 'project',           'field' => 'TypeId',               'value' => $type_id },
-    { 'table' => 'itemlog',           'field' => 'LogTypeId',            'value' => $type_id },
-    { 'table' => 'multimedia',        'field' => 'FileType',             'value' => $type_id },
-      );
+                        );
 
   for my $relation (@fk_relationship) {
 
@@ -2516,7 +2530,7 @@ sub count_groupby_runmode {
 "ErrorMessageXML": [{"InvalidValue": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Table name (samplemeasurement) does not support counting.' /></DATA>"}],
 "ErrorMessageJSON": [{"InvalidValue": "{'Error' : [{'Message' : 'Table name (samplemeasurement) does not support counting.'}]}"}],
 "URLParameter": [{"ParameterName": "nperpage", "Description": "Number of records in a page for pagination"}, {"ParameterName": "num", "Description": "The page number of the pagination"}, {"ParameterName": "tname", "Description": "Table name in which record count operation is executed. Most tables in KDDart are supported. However, tables that stores the lowest level data like samplemeasurement or virtual column storage tables are not supported."}],
-"HTTPParameter": [{"Required": 1, "Name": "GroupByField", "Description": "Comma separated value of group by fields in the specified table (tname in the URL parameter)."}, {"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database field name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases. Fields that are applicable for sorting are those specified in the GroupByField parameter and the count field which is named CountResult"}],
+"HTTPParameter": [{"Required": 1, "Name": "GroupByField", "Description": "Comma separated value of group by fields in the specified table (tname in the URL parameter)."}, {"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database field name, a filtering operator and the filtering value. This filtering will be applied before counting. The other filtering that applies after counting is called CountFiltering."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases. Fields that are applicable for sorting are those specified in the GroupByField parameter and the count field which is named CountResult"}, {"Required": 0, "Name": "CountFiltering", "Description": "Filtering that gets applied after counting. This filtering can be used to know the uniqueness on  the combination of the fields provided in the GroupByField. This CountFiltering Parameter has a different syntax from the normal filtering. Its syntax is [eq|ne|gt|lt|ge|lt|le] followed by spaces  then followed by a signed or unsigned number."}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
@@ -2544,7 +2558,36 @@ sub count_groupby_runmode {
     $sorting = $query->param('Sorting');
   }
 
+  my $count_filtering = '';
+
+  if (defined $query->param('CountFiltering')) {
+
+    $count_filtering = $query->param('CountFiltering');
+  }
+
   my $data_for_postrun_href = {};
+
+  my $count_filtering_oper = '';
+  my $count_filtering_val  = '';
+
+  $self->logger->debug("Count filtering: $count_filtering");
+
+  if (length($count_filtering) > 0) {
+
+    if ($count_filtering =~ /^(eq|ne|gt|ge|lt|le)\s+([-+]?\d+)$/i) {
+
+      $count_filtering_oper = lc($1);
+      $count_filtering_val  = $2;
+    }
+    else {
+
+      my $err_msg = "CountFiltering ($count_filtering) invalid.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'CountFiltering' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
 
   my @restricted_table_list = ('samplemeasurement', '.+factor', '.+loc', 'layer\d+',
                                'layer\d+attrib', 'markerdata\d+');
@@ -2595,96 +2638,159 @@ sub count_groupby_runmode {
     return $data_for_postrun_href;
   }
 
-  my $gis_table = 0;
+  my $other_join_lookup = {};
 
-  my $dbh_gis = connect_gis_read();
-  my $tbl_info_sth = $dbh_gis->table_info();
-  $tbl_info_sth->execute();
+  $other_join_lookup->{'specimen'}  = ' LEFT JOIN genotypespecimen ON specimen.SpecimenId = genotypespecimen.SpecimenId ';
+  $other_join_lookup->{'specimen'} .= ' LEFT JOIN genotype ON genotypespecimen.GenotypeId = genotype.GenotypeId ';
 
-  while( my @gis_table = $tbl_info_sth->fetchrow_array() ) {
+  $other_join_lookup->{'trialunit'} = ' LEFT JOIN trial ON trialunit.TrialId = trial.TrialId ';
 
-    if ($gis_table[2] eq $table_name) {
+  $other_join_lookup->{'trialunitspecimen'}  = ' LEFT JOIN trialunit ON trialunitspecimen.TrialUnitId = trialunit.TrialUnitId ';
+  $other_join_lookup->{'trialunitspecimen'} .= ' LEFT JOIN trial ON trialunit.TrialId = trial.TrialId ';
 
-      $gis_table = 1;
-      last;
-    }
+  $other_join_lookup->{'analgroupextract'}   = ' LEFT JOIN analysisgroup ON ';
+  $other_join_lookup->{'analgroupextract'}  .= 'analgroupextract.AnalysisGroupId = analysisgroup.AnalysisGroupId ';
+
+  $other_join_lookup->{'analysisgroupmarker'}  = ' LEFT JOIN analysisgroup ON ';
+  $other_join_lookup->{'analysisgroupmarker'} .= 'analysisgroupmarker.AnalysisGroupId = analysisgroup.AnalysisGroupId ';
+
+  $other_join_lookup->{'genotypealias'}   = ' LEFT JOIN genotype ON genotypealias.GenotypeId = genotype.GenotypeId ';
+
+  $other_join_lookup->{'genotypetrait'}   = ' LEFT JOIN genotype ON genotypetrait.GenotypeId = genotype.GenotypeId ';
+
+  $other_join_lookup->{'traitalias'}      = ' LEFT JOIN trait ON traitalias.TraitId = trait.TraitId ';
+
+  $other_join_lookup->{'trialtrait'}      = ' LEFT JOIN trial ON trialtrait.TrialId = trial.TrialId ';
+
+  $other_join_lookup->{'layerattrib'}     = ' LEFT JOIN layer ON layerattrib.layer = layer.id ';
+
+  $other_join_lookup->{'trialdimension'}  = ' LEFT JOIN trial ON trialdimension.TrialId = trial.TrialId ';
+
+  $other_join_lookup->{'trialunit'}       = ' LEFT JOIN trial ON trialunit.TrialId = trial.TrialId ';
+
+  $other_join_lookup->{'trialworkflow'}   = ' LEFT JOIN trial ON trialworkflow.TrialId = trial.TrialId ';
+
+  $other_join_lookup->{'trialevent'}      = ' LEFT JOIN trial ON trialevent.TrialId = trial.TrialId ';
+
+  my @table_name_list = ($table_name);
+
+  my $other_join = '';
+
+  if (defined $other_join_lookup->{$table_name}) {
+
+    $other_join = $other_join_lookup->{$table_name};
   }
 
-  $tbl_info_sth->finish();
+  if ($other_join =~ /LEFT JOIN (\w+) ON/) {
 
-  my $scol_aref = [];
-  my $pkey_aref = [];
+    my $other_table = $1;
+    push(@table_name_list, $other_table);
+  }
+
+  my $gis_table = 0;
 
   my $dbh;
+
+  my $dbh_gis = connect_gis_read();
   my $dbh_k = connect_kdb_read();
   my $dbh_m = connect_mdb_read();
 
-  if ($gis_table) {
+  my $field_name_lookup = {};
 
-    my ($gis_sfield_err, $gis_sfield_msg, $gis_sfield_aref, $gis_pkey) = get_static_field($dbh_gis, $table_name);
+  my $first_primary_key = '';
 
-    if ($gis_sfield_err) {
+  my $field_name2table_name = {};
 
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+  foreach my $tbl_name (@table_name_list) {
 
-      return $data_for_postrun_href;
+    my $tbl_info_sth = $dbh_gis->table_info();
+    $tbl_info_sth->execute();
+
+    while( my @gis_table = $tbl_info_sth->fetchrow_array() ) {
+
+      if ($gis_table[2] eq $tbl_name) {
+
+        $gis_table = 1;
+        last;
+      }
     }
 
-    $scol_aref = $gis_sfield_aref;
-    $pkey_aref = $gis_pkey;
+    $tbl_info_sth->finish();
 
-    $dbh = $dbh_gis;
-  }
-  else {
+    my $scol_aref = [];
+    my $pkey_aref = [];
 
-    my ($k_sfield_err, $k_sfield_msg, $k_sfield_aref, $k_pkey) = get_static_field($dbh_k, $table_name);
+    if ($gis_table) {
 
-    if ($k_sfield_err) {
+      my ($gis_sfield_err, $gis_sfield_msg, $gis_sfield_aref, $gis_pkey) = get_static_field($dbh_gis, $tbl_name);
 
-      # this table is not in the main database, maybe it is in the marker database.
-      my ($m_sfield_err, $m_sfield_msg, $m_sfield_aref, $m_pkey) = get_static_field($dbh_m, $table_name);
+      if ($gis_sfield_err) {
 
-      if ($m_sfield_err) {
-
-        my $err_msg = "Table ($table_name) does not exist.";
         $data_for_postrun_href->{'Error'} = 1;
-        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
         return $data_for_postrun_href;
       }
-      else {
 
-        $scol_aref = $m_sfield_aref;
-        $pkey_aref = $m_pkey;
+      $scol_aref = $gis_sfield_aref;
+      $pkey_aref = $gis_pkey;
 
-        $dbh = $dbh_m;
-      }
+      $dbh = $dbh_gis;
     }
     else {
 
-      $scol_aref = $k_sfield_aref;
-      $pkey_aref = $k_pkey;
+      my ($k_sfield_err, $k_sfield_msg, $k_sfield_aref, $k_pkey) = get_static_field($dbh_k, $tbl_name);
 
-      $dbh = $dbh_k;
+      if ($k_sfield_err) {
+
+        # this table is not in the main database, maybe it is in the marker database.
+        my ($m_sfield_err, $m_sfield_msg, $m_sfield_aref, $m_pkey) = get_static_field($dbh_m, $tbl_name);
+
+        if ($m_sfield_err) {
+
+          my $err_msg = "Table ($tbl_name) does not exist.";
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+          return $data_for_postrun_href;
+        }
+        else {
+
+          $scol_aref = $m_sfield_aref;
+          $pkey_aref = $m_pkey;
+
+          $dbh = $dbh_m;
+        }
+      }
+      else {
+
+        $scol_aref = $k_sfield_aref;
+        $pkey_aref = $k_pkey;
+
+        $dbh = $dbh_k;
+      }
     }
-  }
 
-  my $first_primary_key = $pkey_aref->[0];
 
-  $self->logger->debug("Primary key [0]: $first_primary_key");
+    if (length($first_primary_key) == 0) {
 
-  my $field_name_lookup = {};
+      $first_primary_key = $pkey_aref->[0];
+    }
 
-  for my $scol_rec (@{$scol_aref}) {
+    $self->logger->debug("Primary key [0]: $first_primary_key");
 
-    my $field_name = $scol_rec->{'Name'};
-    $field_name_lookup->{$field_name} = 1;
-  }
+    for my $scol_rec (@{$scol_aref}) {
 
-  for my $pkey_name (@{$pkey_aref}) {
+      my $field_name = $scol_rec->{'Name'};
+      $field_name_lookup->{$field_name} = 1;
+      $field_name2table_name->{$field_name} = $tbl_name;
+    }
 
-    $field_name_lookup->{$pkey_name} = 1;
+    for my $pkey_name (@{$pkey_aref}) {
+
+      $field_name_lookup->{$pkey_name} = 1;
+      $field_name2table_name->{$pkey_name} = $tbl_name;
+    }
   }
 
   my @groupby_field_list = split(',', $groupby_field_csv);
@@ -2723,32 +2829,6 @@ sub count_groupby_runmode {
                                 'layerattrib'          => 'layer',
                                 };
 
-  my $other_join_lookup = {};
-
-  $other_join_lookup->{'specimen'}  = ' LEFT JOIN genotypespecimen ON specimen.SpecimenId = genotypespecimen.SpecimenId ';
-  $other_join_lookup->{'specimen'} .= ' LEFT JOIN genotype ON genotypespecimen.GenotypeId = genotype.GenotypeId ';
-
-  $other_join_lookup->{'trialunit'} = ' LEFT JOIN trial ON trialunit.TrialId = trial.TrialId ';
-
-  $other_join_lookup->{'trialunitspecimen'}  = ' LEFT JOIN trialunit ON trialunitspecimen.TrialUnitId = trialunit.TrialUnitId ';
-  $other_join_lookup->{'trialunitspecimen'} .= ' LEFT JOIN trial ON trialunit.TrialId = trial.TrialId ';
-
-  $other_join_lookup->{'analgroupextract'}   = ' LEFT JOIN analysisgroup ON ';
-  $other_join_lookup->{'analgroupextract'}  .= 'analgroupextract.AnalysisGroupId = analysisgroup.AnalysisGroupId ';
-
-  $other_join_lookup->{'analysisgroupmarker'}  = ' LEFT JOIN analysisgroup ON ';
-  $other_join_lookup->{'analysisgroupmarker'} .= 'analysisgroupmarker.AnalysisGroupId = analysisgroup.AnalysisGroupId ';
-
-  $other_join_lookup->{'genotypealias'}   = ' LEFT JOIN genotype ON genotypealias.GenotypeId = genotype.GenotypeId ';
-
-  $other_join_lookup->{'genotypetrait'}   = ' LEFT JOIN genotype ON genotypetrait.GenotypeId = genotype.GenotypeId ';
-
-  $other_join_lookup->{'traitalias'}      = ' LEFT JOIN trait ON traitalias.TraitId = trait.TraitId ';
-
-  $other_join_lookup->{'trialtrait'}      = ' LEFT JOIN trial ON trialtrait.TrialId = trial.TrialId ';
-
-  $other_join_lookup->{'layerattrib'}     = ' LEFT JOIN layer ON layerattrib.layer = layer.id ';
-
   my $group_id      = $self->authen->group_id();
   my $gadmin_status = $self->authen->gadmin_status();
   my $perm_str      = '';
@@ -2776,7 +2856,23 @@ sub count_groupby_runmode {
     return $data_for_postrun_href;
   }
 
+  #
+  # Put table name replacement in here
+  #
+
   if (length($filter_phrase) > 0) {
+
+    my $test_filter_phrase = $filter_phrase;
+
+    while ( $test_filter_phrase =~ /${table_name}\.(\w+)/ ) {
+
+      my $fld_name = $1;
+
+      my $correct_tbl_name = $field_name2table_name->{$fld_name};
+
+      $filter_phrase =~ s/${table_name}\.${fld_name}/${correct_tbl_name}\.$fld_name/;
+      $test_filter_phrase =~ s/${table_name}\.${fld_name}//;
+    }
 
     if (length($perm_str) > 0) {
 
@@ -2788,14 +2884,37 @@ sub count_groupby_runmode {
     }
   }
 
-  my $other_join = '';
-
-  if (defined $other_join_lookup->{$table_name}) {
-
-    $other_join = $other_join_lookup->{$table_name};
-  }
+  $self->logger->debug("Filter phrase: $filter_phrase");
 
   my $valid_groupby_field_csv = join(',', @full_groupby_field_list);
+
+  my $having_exp = '';
+
+  my $oper_lookup = { 'eq' => '=',
+                      'ne' => '<>',
+                      'gt' => '>',
+                      'ge' => '>=',
+                      'lt' => '<',
+                      'le' => '<='
+                    };
+
+  if (length($count_filtering) > 0) {
+
+    if (length($count_filtering_oper) > 0 && length($count_filtering_val) > 0) {
+
+      $having_exp  = " HAVING COUNT(DISTINCT ${table_name}.${first_primary_key}) ";
+      $having_exp .= $oper_lookup->{$count_filtering_oper} . " $count_filtering_val";
+    }
+    else {
+
+      $self->logger->debug("Count filtering not right ($count_filtering : $count_filtering_oper - $count_filtering_val");
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+  }
 
   my $pagination_aref = [];
 
@@ -2803,7 +2922,8 @@ sub count_groupby_runmode {
   $count_sql    .= "SELECT COUNT(DISTINCT ${table_name}.${first_primary_key}) AS CountResult FROM $table_name ";
   $count_sql    .= "$other_join ";
   $count_sql    .= "$filtering_exp ";
-  $count_sql    .= "GROUP BY $valid_groupby_field_csv) AS subq";
+  $count_sql    .= "GROUP BY $valid_groupby_field_csv";
+  $count_sql    .= "$having_exp ) AS subq";
 
   $self->logger->debug("COUNT SQL: $count_sql");
 
@@ -2858,6 +2978,7 @@ sub count_groupby_runmode {
   $sql    .= "$other_join ";
   $sql    .= "$filtering_exp ";
   $sql    .= "GROUP BY $valid_groupby_field_csv ";
+  $sql    .= "$having_exp ";
 
   if (length($sort_sql) > 0) {
 

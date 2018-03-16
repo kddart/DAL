@@ -1,8 +1,8 @@
--- generated on: Fri May 12 15:24:37 2017
+-- generated on: Tue Feb 27 16:15:37 2018
 -- input file: ER_dbmodel_Marker.xml
 
 
--- Copyright (C) 2017 by Diversity Arrays Technology Pty Ltd
+-- Copyright (C) 2018 by Diversity Arrays Technology Pty Ltd
 --
 -- This program is free software: you can redistribute it and/or modify
 -- it under the terms of the GNU General Public License as published by
@@ -16,7 +16,7 @@
 
 
 -- model name: Marker ER diagram
--- model version: 2.4.0.95
+-- model version: 2.5.0.100
 
 -- table analysisgroup
 CREATE TABLE "analysisgroup" (

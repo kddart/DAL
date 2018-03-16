@@ -2,7 +2,7 @@
   <CaseInfo Description="Export Sample Measurement" TargetURL="export/samplemeasurement/csv" Type="BLOCKING" />
   <INPUT ParaName="SMGroupIdCSV" SrcValue="xml/add_data_no_vcol/case_00591_import_smgroup_data.xml" />
   <Match Attr="StatusCode" Value="200" />
-  <Match Attr="csv" MatchingVar="LINE_COUNT" Tag="OutputFile" TargetDataType="CSV_FILE" Value="boolex(x=4)" />
+  <Match Attr="csv" MatchingVar="LINE_COUNT" Tag="OutputFile" TargetDataType="CSV_FILE" Value="boolex(x&gt;4)" />
   <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00591_import_smgroup_data.xml" Order="3" />

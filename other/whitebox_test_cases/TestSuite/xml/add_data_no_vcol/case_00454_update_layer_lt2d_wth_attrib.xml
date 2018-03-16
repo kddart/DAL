@@ -1,7 +1,7 @@
 <TestCase>
   <CaseInfo CustomMethod="add_record" Description="Update Layer" TargetURL="update/layer/:LayerId" Type="BLOCKING" />
   <INPUT ParaName="LayerId" SrcValue="xml/add_data_no_vcol/case_10144_add_layer_n_attribute.xml" />
-  <INPUT ParaName="name" PrefixVal="Update Layer - " Random="1" />
+  <INPUT ParaName="layername" PrefixVal="Update Layer - " Random="1" />
   <INPUT ParaName="alias" Value="" />
   <INPUT ParaName="layertype" Value="2D" />
   <INPUT ParaName="iseditable" Value="0" />

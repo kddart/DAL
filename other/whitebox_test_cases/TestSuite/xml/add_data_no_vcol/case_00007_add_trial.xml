@@ -2,6 +2,7 @@
   <CaseInfo CustomMethod="add_record" Description="Add a trial" TargetURL="add/trial" Type="BLOCKING" />
   <Delete TargetURL="delete/trial/:TrialId" />
   <INPUT ParaName="SiteId" SrcValue="xml/add_data_no_vcol/case_00006_add_site.xml" />
+  <INPUT ParaName="SeasonId" SrcValue="xml/add_data_no_vcol/case_00619_add_season.xml" />
   <INPUT ParaName="TrialName" PrefixVal="Trial_" Random="1" />
   <INPUT ParaName="TrialTypeId" SrcValue="xml/add_data_no_vcol/case_00339_add_trialtype.xml" />
   <INPUT ParaName="TrialNumber" Value="1" />
@@ -11,6 +12,7 @@
   <INPUT ParaName="TrialStartDate" Value="2010-10-15" />
   <INPUT ParaName="TrialEndDate" Value="2011-03-31" />
   <INPUT ParaName="TrialNote" Value="none" />
+  <INPUT ParaName="TrialLayout" Value="{}" />
   <INPUT ParaName="OwnGroupPerm" Value="7" />
   <INPUT ParaName="AccessGroupId" SrcValue="xml/add_data_no_vcol/owngroup.xml" />
   <INPUT ParaName="AccessGroupPerm" Value="5" />
@@ -25,6 +27,5 @@
   <Parent CaseFile="xml/add_data_no_vcol/case_00339_add_trialtype.xml" Force="1" Order="4" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00118_add_designtype.xml" Force="1" Order="5" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00102_add_con.xml" Order="6" />
-  <ReturnId ParaName="TrialId" Value="7" />
-  
+  <Parent CaseFile="xml/add_data_no_vcol/case_00619_add_season.xml" Order="7" />
 </TestCase>

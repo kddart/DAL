@@ -1,8 +1,8 @@
--- generated on: Fri May 12 15:24:35 2017
+-- generated on: Tue Feb 27 16:15:36 2018
 -- input file: ER_dbmodel_GIS_Enviro.xml
 
 
--- Copyright (C) 2017 by Diversity Arrays Technology Pty Ltd
+-- Copyright (C) 2018 by Diversity Arrays Technology Pty Ltd
 --
 -- This program is free software: you can redistribute it and/or modify
 -- it under the terms of the GNU General Public License as published by
@@ -16,7 +16,7 @@
 
 
 -- model name: GIS enviro ER diagram
--- model version: 2.4.0.95
+-- model version: 2.5.0.100
 
 
 -- postgis definition for version 2.x
@@ -80,12 +80,14 @@ CREATE TABLE "layernattrib" (
   "value" character varying(254),
   "dt" timestamp,
   "systemuserid" bigint,
+  "deviceid" character varying(100),
   PRIMARY KEY ("id")
 );
 CREATE INDEX "xlayernattrib_dt" on "layernattrib" ("dt");
 CREATE INDEX "xlayernattrib_sysuid" on "layernattrib" ("systemuserid");
 CREATE INDEX "xlayernattrib_layerattrib" on "layernattrib" ("layerattrib");
 CREATE INDEX "xlayernattrib_layerid" on "layernattrib" ("layerid");
+CREATE INDEX "xlayernattrib_deviceid" on "layernattrib" ("deviceid");
 
 CREATE TABLE "siteloc" (
   "siteid" bigint NOT NULL,
@@ -227,6 +229,8 @@ COMMENT ON COLUMN layernattrib.value IS 'value of the parameter';
 COMMENT ON COLUMN layernattrib.dt IS 'date and time';
 
 COMMENT ON COLUMN layernattrib.systemuserid IS 'system user, who inserted the data value (links to core database)';
+
+COMMENT ON COLUMN layernattrib.deviceid IS 'device id used to measure this data point - one of the devices registered in the system';
 
 COMMENT ON COLUMN siteloc.siteid IS '(FK) site id from main database';
 

@@ -42,6 +42,8 @@ use DateTime;
 use DateTime::Format::Pg;
 use JSON::Validator;
 use JSON::XS qw(decode_json);
+use Text::CSV;
+
 
 sub setup {
 
@@ -217,7 +219,7 @@ sub add_layer_n_attrib_runmode {
                     'srid'             => 1,
                    };
 
-  my $field_name_translation = {'layername' => 'name'};
+  my $field_name_translation = {};
 
   my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
                                                                                 'layer', $skip_field,
@@ -245,7 +247,7 @@ sub add_layer_n_attrib_runmode {
     }
   }
 
-  my $layer_name                = $query->param('name');
+  my $layer_name                = $query->param('layername');
 
   my $layer_type                = $query->param('layertype');
 
@@ -650,7 +652,7 @@ sub add_layer_runmode {
                     'srid'             => 1,
                    };
 
-  my $field_name_translation = {'layername' => 'name'};
+  my $field_name_translation = {};
 
   my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
                                                                                 'layer', $skip_field,
@@ -678,8 +680,7 @@ sub add_layer_runmode {
     }
   }
 
-  my $layer_name                = $query->param('name');
-
+  my $layer_name                = $query->param('layername');
   my $layer_type                = $query->param('layertype');
 
   my $layer_mdata               = '';
@@ -989,9 +990,10 @@ sub register_device_runmode {
     return $data_for_postrun_href;
   }
 
-  my $note = '';
-  my $lng  = '0.0';
-  my $lat  = '0.0';
+  my $note = undef;
+  my $lng  = undef;
+  my $lat  = undef;
+  my $conf = undef;
 
   if (length($query->param('DeviceNote')) > 0) { $note = $query->param('DeviceNote'); }
 
@@ -999,14 +1001,16 @@ sub register_device_runmode {
 
   if (length($query->param('Latitude')) > 0) { $lat = $query->param('Latitude'); }
 
+  if (length($query->param('DeviceConf')) > 0) { $conf = $query->param('DeviceConf'); }
+
   my $dbh_write = connect_kdb_write();
 
   if ( !type_existence($dbh_write, 'deviceregister', $device_type_id) ) {
-    
+
     my $err_msg = "DeviceTypeId ($device_type_id): not found or inactive.";
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-    
+
     return $data_for_postrun_href;
   }
 
@@ -1027,14 +1031,15 @@ sub register_device_runmode {
   $sql    .= 'DeviceId = ?, ';
   $sql    .= 'DeviceNote = ?, ';
   $sql    .= 'Latitude = ?, ';
-  $sql    .= 'Longitude = ?';
+  $sql    .= 'Longitude = ?, ';
+  $sql    .= 'DeviceConf = ?';
 
   my $sth = $dbh_write->prepare($sql);
-  $sth->execute($device_type_id, $device_id, $note, $lat, $lng);
+  $sth->execute($device_type_id, $device_id, $note, $lat, $lng, $conf);
 
   my $device_reg_id = -1;
   if ($dbh_write->err()) {
-    
+
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
@@ -1128,8 +1133,8 @@ sub update_device_registration_runmode {
     return $data_for_postrun_href;
   }
 
-  my $read_device_sql     =  'SELECT DeviceNote, Longitude, Latitude ';
-     $read_device_sql    .=  'FROM deviceregister WHERE DeviceRegisterId=? ';
+  my $read_device_sql  = 'SELECT DeviceNote, Longitude, Latitude, DeviceConf ';
+  $read_device_sql    .= 'FROM deviceregister WHERE DeviceRegisterId=? ';
 
   my ($r_df_val_err, $r_df_val_msg, $device_df_val_data) = read_data($dbh_write, $read_device_sql, [$reg_id]);
 
@@ -1143,9 +1148,10 @@ sub update_device_registration_runmode {
     return $data_for_postrun_href;
   }
 
-  my $note      =   undef;
-  my $lng       =   undef;
-  my $lat       =   undef;
+  my $note  = undef;
+  my $lng   = undef;
+  my $lat   = undef;
+  my $conf  = undef;
 
   my $nb_df_val_rec    =  scalar(@{$device_df_val_data});
 
@@ -1158,33 +1164,88 @@ sub update_device_registration_runmode {
      return $data_for_postrun_href;
   }
 
-  $note     =  $device_df_val_data->[0]->{'DeviceNote'};
-  $lng      =  $device_df_val_data->[0]->{'Longitude'};
-  $lat      =  $device_df_val_data->[0]->{'Latitude'};
+  $note     = $device_df_val_data->[0]->{'DeviceNote'};
+  $lng      = $device_df_val_data->[0]->{'Longitude'};
+  $lat      = $device_df_val_data->[0]->{'Latitude'};
+  $conf     = $device_df_val_data->[0]->{'DeviceConf'};
+
+  if (length($note) == 0) {
+
+    $note = undef;
+  }
+
+  if (length($lng) == 0) {
+
+    $lng = undef;
+  }
+
+  if (length($lat) == 0) {
+
+    $lat = undef;
+  }
+
+  if (length($conf) == 0) {
+
+    $conf = undef;
+  }
 
   if (defined $query->param('DeviceNote')) {
 
-    $note = $query->param('DeviceNote');
+    if (length($query->param('DeviceNote')) > 0) {
+
+      $note = $query->param('DeviceNote');
+    }
+    else {
+
+      $note = undef;
+    }
   }
 
   if (defined $query->param('Longitude')) {
 
-    $lng = $query->param('Longitude');
+    if (length($query->param('Longitude')) > 0) {
+
+      $lng = $query->param('Longitude');
+    }
+    else {
+
+      $lng = undef;
+    }
   }
 
   if (defined $query->param('Latitude')) {
 
-    $lat = $query->param('Latitude');
+    if (length($query->param('Latitude')) > 0) {
+
+      $lat = $query->param('Latitude');
+    }
+    else {
+
+      $lat = undef;
+    }
+  }
+
+  if (defined $query->param('DeviceConf')) {
+
+    if (length($query->param('DeviceConf')) > 0) {
+
+      $conf = $query->param('DeviceConf');
+    }
+    else {
+
+      $conf = undef;
+    }
   }
 
   my $sql  = 'UPDATE deviceregister SET ';
   $sql    .= 'DeviceNote = ?, ';
   $sql    .= 'Latitude = ?, ';
-  $sql    .= 'Longitude = ? ';
+  $sql    .= 'Longitude = ?, ';
+  $sql    .= 'DeviceConf = ? ';
   $sql    .= 'WHERE DeviceRegisterId=?';
 
   my $sth = $dbh_write->prepare($sql);
-  $sth->execute($note, $lat, $lng, $reg_id);
+  $sth->execute($note, $lat, $lng, $conf, $reg_id);
 
   if ($dbh_write->err()) {
 
@@ -1739,7 +1800,7 @@ sub log_environment_data_bulk_runmode {
   for my $dev_id (keys(%{$hierarchical_env_data})) {
 
     $self->logger->debug("Device Id: $dev_id");
-    $sql  = 'SELECT Longitude, Latitude ';
+    $sql  = 'SELECT DeviceRegisterId, Longitude, Latitude ';
     $sql .= 'FROM deviceregister ';
     $sql .= 'WHERE DeviceId=?';
 
@@ -1754,15 +1815,17 @@ sub log_environment_data_bulk_runmode {
       return $data_for_postrun_href;
     }
 
+    my $dev_reg_id;
     my $dev_reg_lng;
     my $dev_reg_lat;
 
-    $sth_k->bind_col(1, \$dev_reg_lng);
-    $sth_k->bind_col(2, \$dev_reg_lat);
+    $sth_k->bind_col(1, \$dev_reg_id);
+    $sth_k->bind_col(2, \$dev_reg_lng);
+    $sth_k->bind_col(3, \$dev_reg_lat);
     $sth_k->fetch();
     $sth_k->finish();
 
-    if (length($dev_reg_lng) == 0) {
+    if (length($dev_reg_id) == 0) {
 
       my $err_msg = "Device ($dev_id) has not been registered yet.";
 
@@ -1827,9 +1890,9 @@ sub log_environment_data_bulk_runmode {
         $layer_id_href->{$layer_id} = 1;
 
         # Nov 2014 - attempting to log environment data to 2D table which needs colname and layertype.
-        # However, it turns out that it is unnecessary complex. So the idea of log sensor data (data with timestamp)
-        # was abandoned. However, colname and layertype were left here. layertype is later used in insert_data_into_layer 
-        # but no colname.
+        # However, it turns out that it is unnecessary complex. So the idea of log sensor data
+        # (data with timestamp) was abandoned. However, colname and layertype were left here.
+        # layertype is later used in insert_data_into_layer but no colname.
 
         $attrib_info->{$attr_id} = [$layer_id, $colname, $layertype];
 
@@ -3291,7 +3354,7 @@ sub export_layer_data_shape_runmode {
 "SuccessMessageJSON": "{'OutputFile' : [{'shp' : 'http://kddart-d.diversityarrays.com/data/admin/export_1_6_1_4_3_7_2_5__68fe6e93f44f5120d599477caef61d6a.shp','csv' : 'http://kddart-d.diversityarrays.com/data/admin/export_1_6_1_4_3_7_2_5__68fe6e93f44f5120d599477caef61d6a.csv','dbf' : 'http://kddart-d.diversityarrays.com/data/admin/export_1_6_1_4_3_7_2_5__68fe6e93f44f5120d599477caef61d6a.dbf','shx' : 'http://kddart-d.diversityarrays.com/data/admin/export_1_6_1_4_3_7_2_5__68fe6e93f44f5120d599477caef61d6a.shx'}]}",
 "ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
 "ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
-"HTTPParameter": [{"Required": 0, "Name": "AttributeIdCSV", "Description": "Comma separated value of wanted layer attribute id list"}, {"Required": 0, "Name": "TimeFrom", "Description": "The starting time of wanted layer data. It is inclusive."}, {"Required": 0, "Name": "TimeTo", "Description": "The ending time of wanted layer data. It is inclusive"}, {"Required": 0, "Name": "AOITopLeftLong", "Description": "Area of Interest longitude. Area of Interest parameters define a rectangular geographic area where wanted data were recorded. If data over an area of interest is wanted, all four parameter must be provided."}, {"Required": 0, "Name": "AOITopLeftLat", "Description": "Area of Interest latitude"}, {"Required": 0, "Name": "AOIBottomRightLong", "Description": "Area of Interest bottom right longitude"}, {"Required": 0, "Name": "AOIBottomRightLat", "Description": "Area of Interest bottom right latitude"}],
+"HTTPParameter": [{"Required": 0, "Name": "AttributeIdCSV", "Description": "Comma separated value of wanted layer attribute id list"}, {"Required": 0, "Name": "TimeFrom", "Description": "The starting time of wanted layer data. It is inclusive."}, {"Required": 0, "Name": "TimeTo", "Description": "The ending time of wanted layer data. It is inclusive"}, {"Required": 0, "Name": "AOITopLeftLong", "Description": "Area of Interest longitude. Area of Interest parameters define a rectangular geographic area where wanted data were recorded. If data over an area of interest is wanted, all four parameter must be provided."}, {"Required": 0, "Name": "AOITopLeftLat", "Description": "Area of Interest latitude"}, {"Required": 0, "Name": "AOIBottomRightLong", "Description": "Area of Interest bottom right longitude"}, {"Required": 0, "Name": "AOIBottomRightLat", "Description": "Area of Interest bottom right latitude"}, {"Required": 0, "Name": "DeviceIdCSV", "Description": "Comma separated value of wanted device ids."}],
 "URLParameter": [{"ParameterName": "id", "Description": "Existing LayerId."}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
@@ -3311,6 +3374,7 @@ sub export_layer_data_shape_runmode {
   my $aoi_topleft_lat        = $query->param('AOITopLeftLat');
   my $aoi_bottomright_long   = $query->param('AOIBottomRightLong');
   my $aoi_bottomright_lat    = $query->param('AOIBottomRightLat');
+  my $device_id_csv          = $query->param('DeviceIdCSV');
 
   my $time_filter = '';
   if (length($time_from) > 0) {
@@ -3443,6 +3507,40 @@ sub export_layer_data_shape_runmode {
     return $data_for_postrun_href;
   }
 
+  my $db_device_id_csv = '';
+
+  if (length($device_id_csv) > 0) {
+
+    my $csv_parser = Text::CSV->new ( { binary => 1 } );
+
+    my $success = $csv_parser->parse($device_id_csv);
+
+    if (!$success) {
+
+      my $err_msg = "DeviceIdCSV ($device_id_csv): not valid CSV.";
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my @device_id_list = $csv_parser->fields();
+
+    my @db_device_id_list;
+
+    foreach my $dev_id (@device_id_list) {
+
+      $dev_id = trim($dev_id);
+      $dev_id =~ s/^'//g;
+      $dev_id =~ s/'$//g;
+
+      push(@db_device_id_list, "'$dev_id'");
+    }
+
+    $db_device_id_csv = join(',', @db_device_id_list);
+  }
+
   $sql    = 'SELECT id, colname, colsize FROM layerattrib WHERE layer=?';
 
   my $sth = $dbh->prepare($sql);
@@ -3486,7 +3584,7 @@ sub export_layer_data_shape_runmode {
   push(@{$shp_fieldtype}, 'String:19');      # for dt (datetime) field
   push(@{$csv_colnum}, 2);
 
-  $sql = 'SELECT layerid, dt, ST_AsText(geometry) AS geo, ';
+  $sql = 'SELECT layerid, dt, deviceid, ST_AsText(geometry) AS geo, ';
 
   my $attr_counter = 1;
   for my $sel_attr (@selected_attr) {
@@ -3508,13 +3606,13 @@ sub export_layer_data_shape_runmode {
     my $attr_name = $attr_info_href->{$sel_attr}->{'colname'};
     my $attr_size = $attr_info_href->{$sel_attr}->{'colsize'};
     my $attr_sql = pg_case_st('=', 'layerattrib', $sel_attr, 'value', 'null');
-    $attr_sql   = "group_concat($attr_sql) AS $attr_name,";
+    $attr_sql    = "group_concat($attr_sql) AS $attr_name,";
 
     $sql .= $attr_sql;
     $attr_csv_colheader .= "$attr_name,";
     push(@{$shp_fieldtype}, "String:$attr_size");
     push(@{$shp_fieldname}, $attr_name);
-    push(@{$csv_colnum}, 2+$attr_counter);
+    push(@{$csv_colnum}, 3+$attr_counter);
     $attr_counter += 1;
   }
 
@@ -3523,7 +3621,7 @@ sub export_layer_data_shape_runmode {
 
   $sql .= " FROM layer${layer_id} LEFT JOIN layer${layer_id}attrib ON ";
   $sql .= " layer${layer_id}.id = layer${layer_id}attrib.layerid ";
-  $sql .= " GROUP BY layerid, dt, geometry ";
+  $sql .= " GROUP BY layerid, dt, geometry, deviceid ";
 
   my $having = '';
 
@@ -3547,6 +3645,16 @@ sub export_layer_data_shape_runmode {
 
     my $aoi_polygon  = "ST_GeomFromText('POLYGON($aoi_polyring)')";
     $having .= " ST_Within(ST_GeomFromText(ST_AsText(geometry)), $aoi_polygon)";
+  }
+
+  if (length($db_device_id_csv) > 0) {
+
+    if (length($having) > 0) {
+
+      $having .= ' AND ';
+    }
+
+    $having .= " deviceid IN ($db_device_id_csv) ";
   }
 
   if (length($having) > 0) {
@@ -3610,26 +3718,27 @@ sub export_layer_data_shape_runmode {
 
   open(my $layer_csv_fh, ">$csv_file") or die "Can't open $csv_file for writing: $!";
 
-  print $layer_csv_fh "#longitude,latitude,dt,$attr_csv_colheader\n";
+  print $layer_csv_fh "#longitude,latitude,dt,deviceid,$attr_csv_colheader\n";
 
   my $data_in_csv_counter = 0;
   while ( my $row_aref = $sth->fetchrow_arrayref() ) {
 
-    my $geo = $row_aref->[2];
+    my $geo = $row_aref->[3];
 
     if ($geo =~ /POINT\((.+) (.+)\)/) {
 
       my $lng = $1;
       my $lat = $2;
 
-      my $dt = $row_aref->[1];
-      my $csv_line = "$lng,$lat,$dt,";
+      my $dt       = $row_aref->[1];
+      my $dev_id   = $row_aref->[2];
+      my $csv_line = "$lng,$lat,$dt,$dev_id,";
 
       for(my $i = 0; $i < scalar(@selected_attr); $i++) {
 
         # in theory, there could be duplicate records.
         # but in practice, duplicate records should be rare.
-        my $unsplitted_attr_val = $row_aref->[3+$i];
+        my $unsplitted_attr_val = $row_aref->[4+$i];
         my @splited_attr_val = split(/ /, $unsplitted_attr_val);
         my $attr_val = $splited_attr_val[0];
         $csv_line .= "$attr_val,";
@@ -3646,7 +3755,7 @@ sub export_layer_data_shape_runmode {
   if ($data_in_csv_counter == 0) {
 
     $lockfile->remove();
-    my $msg_aref = [{'Message' => "Layer ($layer_id) has no POINT data."}];
+    my $msg_aref = [{'Message' => "Layer ($layer_id): no POINT data matched the filtering criteria."}];
 
     $data_for_postrun_href->{'Error'}     = 0;
     $data_for_postrun_href->{'Data'}      = {'Info' => $msg_aref};
@@ -3654,6 +3763,8 @@ sub export_layer_data_shape_runmode {
 
     return $data_for_postrun_href;
   }
+
+  $self->logger->debug("CSV file: $csv_file - csv colnum: " . join(',', @{$csv_colnum}));
 
   csvfile2shp($csv_file, $shp_file, $csv_colnum, $shp_fieldname, $shp_fieldtype);
 
@@ -3698,6 +3809,7 @@ sub import_layer_data_csv_bulk_runmode {
 "RequiredUpload": 1,
 "UploadFileFormat": "CSV",
 "UploadFileParameterName": "uploadfile",
+"HTTPParameter": [{"Required": 1, "Name": "geometry", "Description": "Column number starting from zero in the upload CSV file in which geometry well known text values locate."}, {"Required": 1, "Name": "timestamp", "Description": "Column number starting from zero in the upload CSV file in which timestamp values locate."}, {"Required": 1, "Name": "attrib_[layerattribid]", "Description": "[layerattribid] must be replaced with the actual value for the particular layer attribute id. This parameter represents a column number starting from zero in the upload CSV file in which attribute values (data) locate. There could be more than one of this column in the CSV file. If there is more than one column, all data column mapping parameters must be provided using this template that [layerattribid] must be replaced with the actual value for the corresponding layer attribute id."}, {"Required": 0, "Name": "deviceid", "Description": "Column number starting from zero in the upload CSV file in which deviceid values locate."}],
 "URLParameter": [{"ParameterName": "id", "Description": "Existing LayerId."}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
@@ -3848,6 +3960,8 @@ sub import_layer_data_csv_bulk_runmode {
 
   my $attrib_id_csv = join(',', @matched_attrib);
 
+  $self->logger->debug("Matched attributes: $attrib_id_csv");
+
   $sql  = 'SELECT id, validation ';
   $sql .= 'FROM layerattrib ';
   $sql .= "WHERE id IN ($attrib_id_csv)";
@@ -3873,11 +3987,22 @@ sub import_layer_data_csv_bulk_runmode {
   my $geometry_col  = $query->param('geometry');
   my $timestamp_col = $query->param('timestamp');
 
-  my ($col_def_err, $col_def_msg) = check_col_definition( { 'geometry'  => $geometry_col,
-                                                            'timestamp' => $timestamp_col,
-                                                          },
-                                                          $num_of_col
-      );
+  my $chk_col_href = { 'geometry'  => $geometry_col,
+                       'timestamp' => $timestamp_col };
+
+  if (defined $query->param('deviceid')) {
+
+    if (length($query->param('deviceid')) > 0) {
+
+      my $deviceid_col = $query->param('deviceid');
+      $matched_col->{$deviceid_col} = 'deviceid';
+
+      $chk_col_href->{'deviceid'} = $deviceid_col;
+    }
+  }
+
+  my ($col_def_err, $col_def_msg) = check_col_definition( $chk_col_href,
+                                                          $num_of_col );
 
   if ($col_def_err) {
 
@@ -3903,6 +4028,8 @@ sub import_layer_data_csv_bulk_runmode {
     }
   }
 
+  $self->logger->debug("Fieldname list: " . join(',', @fieldname_list));
+
   my ($data_aref, $csv_err, $err_msg) = csvfile2arrayref($data_csv_file, \@fieldname_list);
 
   if ($csv_err) {
@@ -3920,12 +4047,7 @@ sub import_layer_data_csv_bulk_runmode {
 
   my $data_insertion_start_time = [gettimeofday()];
 
-  #my $cur_dt = DateTime->now( time_zone => $TIMEZONE );
-  #my $rand = makerandom(Size => 8, Strength => 0);
-
-  #my $bulk_insert_fname = $TMP_DATA_PATH . 'import_layerdata-' . "${cur_dt}-${rand}.csv";
-
-  #open(my $bulk_insert_fh, ">$bulk_insert_fname");
+  my $uniq_deviceid_attr_href  = {};
 
   my $row_counter = 0;
   for my $data_row (@{$data_aref}) {
@@ -3956,6 +4078,13 @@ sub import_layer_data_csv_bulk_runmode {
       return $data_for_postrun_href;
     }
 
+    my $dev_id = undef;
+
+    if (defined $data_row->{'deviceid'}) {
+
+      $dev_id = $data_row->{'deviceid'};
+    }
+
     for my $attr (@matched_attrib) {
 
       my $attr_para_name = "attrib_$attr";
@@ -3972,14 +4101,107 @@ sub import_layer_data_csv_bulk_runmode {
           return $data_for_postrun_href;
         }
       }
+
+      if (defined $dev_id) {
+
+        if (defined $uniq_deviceid_attr_href->{$dev_id}) {
+
+          my $attr_href = $uniq_deviceid_attr_href->{$dev_id};
+          $attr_href->{"$attr"} = 1;
+          $uniq_deviceid_attr_href->{$dev_id} = $attr_href;
+        }
+        else {
+
+          $uniq_deviceid_attr_href->{$dev_id} = { "$attr" => '1' };
+        }
+      }
     }
 
     $row_counter += 1;
   }
 
+  my @uniq_dev_id_list;
+
+  foreach my $dev_id (keys(%{$uniq_deviceid_attr_href})) {
+
+    push(@uniq_dev_id_list, "'$dev_id'");
+  }
+
+  my $db_uniq_deviceid_attr_href = {};
+
+  $self->logger->debug("Number of unique deviceid: " . scalar(@uniq_dev_id_list));
+
+  if (scalar(@uniq_dev_id_list) > 0) {
+
+    my $dev_id_csv = join(',', @uniq_dev_id_list);
+    my $chk_dev_sql = "SELECT layerattrib, deviceid FROM datadevice ";
+    $chk_dev_sql   .= "LEFT JOIN layerattrib ON datadevice.layerattrib = layerattrib.id ";
+    $chk_dev_sql   .= "WHERE deviceid IN ($dev_id_csv) AND layer=?";
+
+    $self->logger->debug("UNIQUE DEVICEID CSV: $dev_id_csv");
+
+    my ($r_chk_dev_err, $r_chk_dev_msg, $device_attr_data) = read_data($dbh_gis_write, $chk_dev_sql, [$layer_id]);
+
+    if ($r_chk_dev_err) {
+
+      $self->logger->debug("Read attribute mapping failed: $r_chk_dev_msg");
+
+      my $err_msg = 'Unexpected Error.';
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    foreach my $dev_attr_rec (@{$device_attr_data}) {
+
+      my $dev_id  = $dev_attr_rec->{'deviceid'};
+      my $attr_id = $dev_attr_rec->{'layerattrib'};
+
+      if (defined $db_uniq_deviceid_attr_href->{$dev_id}) {
+
+        my $attr_href = $db_uniq_deviceid_attr_href->{$dev_id};
+        $attr_href->{"$attr_id"} = '1';
+        $db_uniq_deviceid_attr_href->{$dev_id} = $attr_href;
+      }
+      else {
+
+        $db_uniq_deviceid_attr_href->{$dev_id} = { "$attr_id" => '1' };
+      }
+    }
+  }
+
+  foreach my $dev_id (keys(%{$uniq_deviceid_attr_href})) {
+
+    if (! defined $db_uniq_deviceid_attr_href->{"$dev_id"}) {
+
+      my $err_msg = "DeviceId ($dev_id): not found in layer attribute mapping.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my $attr_href = $uniq_deviceid_attr_href->{"$dev_id"};
+
+    my $db_attr_href = $db_uniq_deviceid_attr_href->{"$dev_id"};
+
+    foreach my $attr (keys(%{$attr_href})) {
+
+      if (! defined $db_attr_href->{"$attr"}) {
+
+        my $err_msg = "DeviceId ($dev_id) and layer attribute ($attr): not found in layer attribute mapping for layer ($layer_id).";
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+        return $data_for_postrun_href;
+      }
+    }
+  }
+
   my $bulk_sql = '';
   $bulk_sql   .= "INSERT INTO layer${layer_id}attrib ";
-  $bulk_sql   .= "(layerid,layerattrib,value,dt,systemuserid) ";
+  $bulk_sql   .= "(layerid,layerattrib,value,dt,systemuserid,deviceid) ";
   $bulk_sql   .= "VALUES ";
 
   $row_counter = 0;
@@ -4033,7 +4255,19 @@ sub import_layer_data_csv_bulk_runmode {
 
       #print $bulk_insert_fh "$geo_id,$attr,$para_val,$para_dt,$user_id\n";
 
-      $bulk_sql .= "($geo_id,$attr,'$para_val','$para_dt',$user_id),";
+      my $db_para_val = $dbh_gis_write->quote($para_val);
+
+      my $db_deviceid = 'NULL';
+
+      if (defined $data_row->{'deviceid'}) {
+
+        if (length($data_row->{'deviceid'}) > 0) {
+
+          $db_deviceid = $dbh_gis_write->quote($data_row->{'deviceid'});
+        }
+      }
+
+      $bulk_sql .= "($geo_id,$attr,$db_para_val,'$para_dt',$user_id,$db_deviceid),";
     }
 
     $row_counter += 1;
@@ -4216,7 +4450,7 @@ sub update_layer_runmode {
                     'srid'             => 1,
                    };
 
-  my $field_name_translation = {'layername' => 'name'};
+  my $field_name_translation = {};
 
   my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
                                                                                 'layer', $skip_field,
@@ -4318,8 +4552,7 @@ sub update_layer_runmode {
     }
   }
 
-  my $layer_name                = $query->param('name');
-
+  my $layer_name = $query->param('layername');
 
   if (length($layer_mdata) == 0) {
 
@@ -4330,12 +4563,11 @@ sub update_layer_runmode {
 
     if (length($query->param('layermetadata')) > 0) {
 
-      $layer_mdata               = $query->param('layermetadata');
+      $layer_mdata = $query->param('layermetadata');
     }
   }
 
-  my $is_editable               = $query->param('iseditable');
-
+  my $is_editable = $query->param('iseditable');
 
   if (length($layer_srid) == 0) {
 
@@ -5845,7 +6077,8 @@ sub insert_data_into_layer {
 
     my $store_dev_reg_position = 0;
 
-    if ($dev_reg_lng == 0.0 && $dev_reg_lat == 0.0) {
+    if ( ($dev_reg_lng == 0.0 && $dev_reg_lat == 0.0) ||
+         (length($dev_reg_lng) == 0 && length($dev_reg_lat) == 0) ) {
 
       $store_dev_reg_position = 1;
     }
@@ -5879,7 +6112,7 @@ sub insert_data_into_layer {
 
         my $bulk_sql = '';
         $bulk_sql   .= "INSERT INTO layer${l_id}attrib ";
-        $bulk_sql   .= "(layerid,layerattrib,value,dt,systemuserid) ";
+        $bulk_sql   .= "(layerid,layerattrib,value,dt,systemuserid,deviceid) ";
         $bulk_sql   .= "VALUES ";
 
         for my $env_data_point (@{$actual_env_data}) {
@@ -5957,7 +6190,11 @@ sub insert_data_into_layer {
             $store_dev_reg_position = 0;
           }
 
-          $bulk_sql .= "($layer_n_id,$at_id,'$para_val','$para_dt',$user_id),";
+          my $db_dev_id       = $dbh_gis_write->quote($dev_id);
+          my $db_para_val     = $dbh_gis_write->quote($para_val);
+          my $db_para_dt      = $dbh_gis_write->quote($para_dt);
+
+          $bulk_sql .= "($layer_n_id,$at_id,$db_para_val,$db_para_dt,$user_id,$db_dev_id),";
           $num_row_inserted += 1;
         }
 
@@ -7408,6 +7645,8 @@ sub add_layer_data_runmode {
   my @attrib_sql_row;
   my $uniq_attrib_id_href = {};
 
+  my $uniq_deviceid_attr_href  = {};
+
   for my $row (@{$data_aref}) {
 
     my $attrib_id = $row->{'layerattrib'};
@@ -7451,6 +7690,25 @@ sub add_layer_data_runmode {
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
       return $data_for_postrun_href;
+    }
+
+    my $db_dev_id = 'NULL';
+
+    if (defined $row->{'deviceid'}) {
+
+      my $dev_id = $row->{'deviceid'};
+      $db_dev_id = $dbh_write->quote($dev_id);
+
+      if (defined $uniq_deviceid_attr_href->{$dev_id}) {
+
+        my $attr_href = $uniq_deviceid_attr_href->{$dev_id};
+        $attr_href->{"$attrib_id"} = 1;
+        $uniq_deviceid_attr_href->{$dev_id} = $attr_href;
+      }
+      else {
+
+        $uniq_deviceid_attr_href->{$dev_id} = { "$attrib_id" => '1' };
+      }
     }
 
     if (length($attrib_info_href->{$layer_id}->{'validation'}) > 0) {
@@ -7537,13 +7795,92 @@ sub add_layer_data_runmode {
       $sth->finish();
     }
 
-    my $value = $row->{'value'};
+    my $value = $dbh_write->quote($row->{'value'});
 
-    push(@attrib_sql_row, qq|($geometry_id,$attrib_id,$value,'$dt',$user_id)|);
+    push(@attrib_sql_row, qq|($geometry_id,$attrib_id,$value,'$dt',$user_id,$db_dev_id)|);
+  }
+
+  my @uniq_dev_id_list;
+
+  foreach my $dev_id (keys(%{$uniq_deviceid_attr_href})) {
+
+    push(@uniq_dev_id_list, "'$dev_id'");
+  }
+
+  my $db_uniq_deviceid_attr_href = {};
+
+  $self->logger->debug("Number of unique deviceid: " . scalar(@uniq_dev_id_list));
+
+  if (scalar(@uniq_dev_id_list) > 0) {
+
+    my $dev_id_csv = join(',', @uniq_dev_id_list);
+    my $chk_dev_sql = "SELECT layerattrib, deviceid FROM datadevice ";
+    $chk_dev_sql   .= "LEFT JOIN layerattrib ON datadevice.layerattrib = layerattrib.id ";
+    $chk_dev_sql   .= "WHERE deviceid IN ($dev_id_csv) AND layer=?";
+
+    $self->logger->debug("UNIQUE DEVICEID CSV: $dev_id_csv");
+
+    my ($r_chk_dev_err, $r_chk_dev_msg, $device_attr_data) = read_data($dbh_write, $chk_dev_sql, [$layer_id]);
+
+    if ($r_chk_dev_err) {
+
+      $self->logger->debug("Read attribute mapping failed: $r_chk_dev_msg");
+
+      my $err_msg = 'Unexpected Error.';
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    foreach my $dev_attr_rec (@{$device_attr_data}) {
+
+      my $dev_id  = $dev_attr_rec->{'deviceid'};
+      my $attr_id = $dev_attr_rec->{'layerattrib'};
+
+      if (defined $db_uniq_deviceid_attr_href->{$dev_id}) {
+
+        my $attr_href = $db_uniq_deviceid_attr_href->{$dev_id};
+        $attr_href->{"$attr_id"} = '1';
+        $db_uniq_deviceid_attr_href->{$dev_id} = $attr_href;
+      }
+      else {
+
+        $db_uniq_deviceid_attr_href->{$dev_id} = { "$attr_id" => '1' };
+      }
+    }
+  }
+
+  foreach my $dev_id (keys(%{$uniq_deviceid_attr_href})) {
+
+    if (! defined $db_uniq_deviceid_attr_href->{"$dev_id"}) {
+
+      my $err_msg = "DeviceId ($dev_id): not found in layer attribute mapping.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my $attr_href = $uniq_deviceid_attr_href->{"$dev_id"};
+
+    my $db_attr_href = $db_uniq_deviceid_attr_href->{"$dev_id"};
+
+    foreach my $attr (keys(%{$attr_href})) {
+
+      if (! defined $db_attr_href->{"$attr"}) {
+
+        my $err_msg = "DeviceId ($dev_id) and layer attribute ($attr): not found in layer attribute mapping for layer ($layer_id).";
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+        return $data_for_postrun_href;
+      }
+    }
   }
 
   $sql  = "INSERT INTO layer${layer_id}attrib ";
-  $sql .= "(layerid,layerattrib,value,dt,systemuserid) ";
+  $sql .= "(layerid,layerattrib,value,dt,systemuserid,deviceid) ";
   $sql .= "VALUES " . join(',', @attrib_sql_row);
 
   $sth = $dbh_write->prepare($sql);
@@ -7590,7 +7927,7 @@ sub update_layer_data_runmode {
 "SuccessMessageJSON": "{'Info' : [{'Message' : 'Data of 2 records with 2 unique record ID has been updated in layer (43).'}]}",
 "ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='recordid (1910): not found.' /></DATA>"}],
 "ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'recordid (1910): not found.'}]}"}],
-"HTTPParameter": [{"Required": 1, "Name": "data", "Description": "JSON string or blob in a structure as the following: {'DATA': [{'recordid' : 1409, 'layerattrib' : '45', 'value' : '34.48', 'dt' : '2010-11-23 22:00:00', 'systemuserid' : '0', 'geometry' : 'POINT(149.094063 -35.30235)'},{'recordid' : 1910, 'layerattrib' : '44', 'value' : '40.98', 'dt' : '2010-11-23 22:00:00', 'systemuserid' : '0', 'geometry' : 'POINT(149.094063 -35.30335)'}]}."}],
+"HTTPParameter": [{"Required": 1, "Name": "data", "Description": "JSON string or blob in a structure as the following: {'DATA': [{'recordid' : 1409, 'layerattrib' : '45', 'value' : '34.48', 'dt' : '2010-11-23 22:00:00', 'geometry' : 'POINT(149.094063 -35.30235)'},{'recordid' : 1910, 'layerattrib' : '44', 'value' : '40.98', 'dt' : '2010-11-23 22:00:00', 'geometry' : 'POINT(149.094063 -35.30335)'}]}."}],
 "URLParameter": [{"ParameterName": "id", "Description": "Existing layer id."}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
@@ -7774,6 +8111,10 @@ sub update_layer_data_runmode {
 
   my $dbh_k_read = connect_kdb_read();
 
+  my $uniq_deviceid_attr_href = {};
+
+  my $user_id = $self->authen->user_id();
+
   for my $row (@{$data_aref}) {
 
     my $rec_id = $row->{'recordid'};
@@ -7795,18 +8136,6 @@ sub update_layer_data_runmode {
     if ( !(defined $attrib_info_href->{$attrib_id}) ) {
 
       my $err_msg = "layerattrib ($attrib_id): not found.";
-
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-      return $data_for_postrun_href;
-    }
-
-    my $user_id = $row->{'systemuserid'};
-
-    if (!record_existence($dbh_k_read, 'systemuser', 'UserId', $user_id)) {
-
-      my $err_msg = "systemuserid ($user_id): not found.";
 
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
@@ -7859,6 +8188,45 @@ sub update_layer_data_runmode {
       }
     }
 
+    my $db_dev_id = undef;
+
+    if (defined $row->{'deviceid'}) {
+
+      my $dev_id = $row->{'deviceid'};
+      $db_dev_id = $dev_id;
+
+      if (! (defined $uniq_deviceid_attr_href->{"${dev_id}___attrib${attrib_id}"}) ) {
+
+        my $chk_dev_sql = "SELECT layerattrib FROM datadevice ";
+        $chk_dev_sql   .= "LEFT JOIN layerattrib ON datadevice.layerattrib = layerattrib.id ";
+        $chk_dev_sql   .= "WHERE deviceid=? AND layerattrib=? AND layer=?";
+
+        my ($chk_err, $db_attrib_id) = read_cell($dbh_write, $chk_dev_sql, [$dev_id, $attrib_id, $layer_id]);
+
+        if ($chk_err) {
+
+          $self->logger->debug("Read attribute mapping failed");
+
+          my $err_msg = 'Unexpected Error.';
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+          return $data_for_postrun_href;
+        }
+
+        if (length($db_attrib_id) == 0) {
+
+          my $err_msg = "DeviceId ($dev_id) and layer attribute ($attrib_id): not found in layer attribute mapping for layer ($layer_id).";
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+          return $data_for_postrun_href;
+        }
+
+        $uniq_deviceid_attr_href->{"${dev_id}___attrib${attrib_id}"} = 1;
+      }
+    }
+
     my $geometry_id = -1;
 
     $sql  = "SELECT id ";
@@ -7905,11 +8273,12 @@ sub update_layer_data_runmode {
     $sql .= "layerattrib=?, ";
     $sql .= "value=?, ";
     $sql .= "dt=?, ";
-    $sql .= "systemuserid=? ";
+    $sql .= "systemuserid=?, ";
+    $sql .= "deviceid=? ";
     $sql .= "WHERE id=?";
 
     $sth = $dbh_write->prepare($sql);
-    $sth->execute($geometry_id, $attrib_id, $value, $dt, $user_id, $rec_id);
+    $sth->execute($geometry_id, $attrib_id, $value, $dt, $user_id, $db_dev_id, $rec_id);
 
     if ($dbh_write->err()) {
 

@@ -3,7 +3,8 @@
   <Delete TargetURL="delete/trial/:TrialId" />
   <INPUT ParaName="TrialId" SrcValue="xml/add_data_no_vcol/case_00007_add_trial.xml" />
   <INPUT ParaName="SiteId" SrcValue="xml/add_data_no_vcol/case_00006_add_site.xml" />
-  <INPUT ParaName="TrialName" PrefixVal="Trial_" Random="1" />
+  <INPUT ParaName="SeasonId" SrcValue="xml/add_data_no_vcol/case_00619_add_season.xml" />
+  <INPUT ParaName="TrialName" PrefixVal="Update_Trial_" Random="1" />
   <INPUT ParaName="TrialTypeId" SrcValue="xml/add_data_no_vcol/case_00339_add_trialtype.xml" />
   <INPUT ParaName="TrialNumber" Value="1" />
   <INPUT ParaName="TrialAcronym" Value="TEST" />
@@ -12,6 +13,7 @@
   <INPUT ParaName="TrialStartDate" Value="2010-10-15" />
   <INPUT ParaName="TrialEndDate" Value="2011-03-31" />
   <INPUT ParaName="TrialNote" Value="none" />
+  <INPUT ParaName="TrialLayout" Value='{"Testing": "123"}' />
   <INPUT ParaName="OwnGroupPerm" Value="7" />
   <INPUT ParaName="AccessGroupId" SrcValue="xml/add_data_no_vcol/owngroup.xml" />
   <INPUT ParaName="AccessGroupPerm" Value="5" />
@@ -22,5 +24,5 @@
   <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00007_add_trial.xml" Order="3" />
-  
+  <Parent CaseFile="xml/add_data_no_vcol/case_00619_add_season.xml" Order="4" Force="1" />
 </TestCase>

@@ -7,5 +7,4 @@
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00351_map_dev_para_tem.xml" Order="3" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00352_map_dev_para_hum.xml" Order="4" />
-  
 </TestCase>

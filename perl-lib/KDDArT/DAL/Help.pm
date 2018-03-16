@@ -34,6 +34,7 @@ use CGI::Application::Plugin::Session;
 use Log::Log4perl qw(get_logger :levels);
 use JSON::XS;
 
+
 sub setup {
 
   my $self = shift;
@@ -54,6 +55,7 @@ sub setup {
     'get_dal_error_info'                => 'get_dal_error_info_runmode',
     'list_dal_error_info'               => 'list_dal_error_info_runmode',
     'get_version'                       => 'get_version_runmode',
+    'get_config'                        => 'get_config_runmode',
       );
 
   my $logger = get_logger();
@@ -280,16 +282,16 @@ sub help_runmode {
 
             $vcol_href->{'Description'}   = "$vcol_name - $vcol_desc";
             $vcol_href->{'Type'}          = 'VCol';
-          
+
             push(@{$help_field_aref}, $vcol_href);
           }
         }
 
         $dbh->disconnect();
-        
+
         $help_href->{'HTTPParameter'} = $help_field_aref;
       }
-      
+
       my $err_info_aref = $ERR_INFO_AREF;
 
       my $errid_lookup = {};
@@ -304,7 +306,7 @@ sub help_runmode {
       if (defined $help_href->{'DALReturnedErrorCode'}) {
 
         my $dal_return_err_id_aref = $help_href->{'DALReturnedErrorCode'};
-      
+
         my $complete_dal_ret_err_id_aref = [];
 
         for my $err_id_href (@{$dal_return_err_id_aref}) {
@@ -342,7 +344,7 @@ sub help_runmode {
 
         $help_href->{'DTDContentForUploadXML'} = $dtd_content;
       }
-  
+
       $data_for_postrun_href->{'Error'}     = 0;
       $data_for_postrun_href->{'Data'}      = {'Help'       => [$help_href],
                                                'RecordMeta' => [{'TagName' => 'Help'}],
@@ -485,6 +487,64 @@ sub get_version_runmode {
 
   $data_for_postrun_href->{'Error'}     = 0;
   $data_for_postrun_href->{'Data'}      = {'Info' => $info_msg_aref};
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub get_config_runmode {
+
+=pod get_config_HELP_START
+{
+"OperationName": "Get DAL configuration",
+"Description": "Ask DAL to give its configuration.",
+"AuthRequired": 0,
+"GroupRequired": 0,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<DATA><Config WhoCanCreateGenotype='ANY' NurseryTypeListCSV=''/><StatInfo Unit='second' ServerElapsedTime='0.001'/><RecordMeta TagName='Config'/></DATA>",
+"SuccessMessageJSON": "{'Config' : [{'NurseryTypeListCSV' : '','WhoCanCreateGenotype' : 'ANY'}],'RecordMeta' : [{'TagName' : 'Config'}],'StatInfo' : [{'Unit' : 'second','ServerElapsedTime' : '0.001'}]}",
+"ErrorMessageXML": [],
+"ErrorMessageJSON": [],
+"HTTPReturnedErrorCode": []
+}
+=cut
+
+  my $self = shift;
+
+  my $data_for_postrun_href = {};
+
+  my $who_can_create_genotype  = $WHO_CAN_CREATE_GENOTYPE->{$ENV{DOCUMENT_ROOT}};
+  my $nursery_type_list_csv    = '';
+
+  if (defined $NURSERY_TYPE_LIST_CSV->{$ENV{DOCUMENT_ROOT}}) {
+
+    $self->logger->debug("Nursery type list csv found");
+    if (ref $NURSERY_TYPE_LIST_CSV->{$ENV{DOCUMENT_ROOT}} eq 'ARRAY') {
+
+      $self->logger->debug("Nursery type list csv found as array");
+      $nursery_type_list_csv = join(',', @{$NURSERY_TYPE_LIST_CSV->{$ENV{DOCUMENT_ROOT}}});
+    }
+    else {
+
+      $self->logger->debug("Nursery type list csv found as scalar");
+      $nursery_type_list_csv = $NURSERY_TYPE_LIST_CSV->{$ENV{DOCUMENT_ROOT}};
+    }
+  }
+  else {
+
+    $self->logger->debug("Nursery type list csv not found");
+  }
+
+  my $info_msg_aref = [{ 'NurseryTypeListCSV'       => $nursery_type_list_csv,
+                         'WhoCanCreateGenotype'     => $who_can_create_genotype,
+                       }];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Config'     => $info_msg_aref,
+                                           'RecordMeta' => [{'TagName' => 'Config'}]
+                                          };
   $data_for_postrun_href->{'ExtraData'} = 0;
 
   return $data_for_postrun_href;

@@ -26,6 +26,10 @@
             "geometry": {
               "id": "http://kddart.org/DATA/0/geometry",
               "type": "string"
+            },
+            "deviceid": {
+              "id": "http://kddart.org/DATA/0/deviceid",
+              "type": "string"
             }
           },
           "required": [

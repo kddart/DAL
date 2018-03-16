@@ -1,0 +1,12 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Add Layer Data" TargetURL="layer/:LayerId/update/data" Type="BLOCKING" />
+  <INPUT ParaName="data" Value='{"DATA": [{ "recordid": 1, "geometry": "POINT(148.99658 -35.48192)", "dt": "2018-02-27 13:01:00", "value": "29.2", "layerattrib": "|:AttribId1:|", "deviceid": "autotest-wst01"}, { "geometry": "POINT(148.99658 -35.48192)", "dt": "2018-02-27 13:01:00", "value": "48.2", "layerattrib": "|:AttribId2:|", "deviceid": "autotest-wst01", "recordid": 2}]}' />
+  <INPUT ParaName="LayerId" SrcValue="xml/add_data_no_vcol/case_00345_add_layer.xml" />
+  <INPUT ParaName="AttribId1" SrcValue="xml/add_data_no_vcol/case_00347_add_layer_attribute_tem.xml" />
+  <INPUT ParaName="AttribId2" SrcValue="xml/add_data_no_vcol/case_00348_add_layer_attribute_hum.xml" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(been updated in)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00636_add_layer_data.xml" Order="3" />
+</TestCase>

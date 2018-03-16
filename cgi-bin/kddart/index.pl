@@ -508,6 +508,9 @@ CGI::Application::Dispatch->dispatch(
     'trial/:id/add/trialunit/bulk'                      => { app => 'KDDArT::DAL::Trial',
                                                              rm  => 'add_trial_unit_bulk' },
 
+    'trial/:id/update/trialunit/bulk'                   => { app => 'KDDArT::DAL::Trial',
+                                                             rm  => 'update_trial_unit_bulk' },
+
     'trial/:id/add/trait'                               => { app => 'KDDArT::DAL::Trial',
                                                              rm  => 'add_trial_trait' },
 
@@ -835,6 +838,9 @@ CGI::Application::Dispatch->dispatch(
     'delete/extract/:id'                                => { app => 'KDDArT::DAL::Extract',
                                                              rm  => 'del_extract_gadmin' },
 
+    'delete/analysisgroup/:id'                          => { app => 'KDDArT::DAL::Extract',
+                                                             rm  => 'del_analysisgroup_gadmin' },
+
     'get/extract/:id'                                   => { app => 'KDDArT::DAL::Extract',
                                                              rm  => 'get_extract' },
 
@@ -1159,6 +1165,15 @@ CGI::Application::Dispatch->dispatch(
     'trial/:trialid/list/crossing'                      => { app => 'KDDArT::DAL::Trial',
                                                              rm  => 'list_crossing_advanced' },
 
+    'trial/:id/add/crossing'                            => { app => 'KDDArT::DAL::Trial',
+                                                             rm  => 'add_crossing' },
+
+    'update/crossing/:id'                               => { app => 'KDDArT::DAL::Trial',
+                                                             rm  => 'update_crossing' },
+
+    'get/crossing/:id'                                  => { app => 'KDDArT::DAL::Trial',
+                                                             rm  => 'get_crossing' },
+
     'list/solrcore'                                     => { app => 'KDDArT::DAL::Search',
                                                              rm  => 'list_solr_core' },
 
@@ -1167,6 +1182,15 @@ CGI::Application::Dispatch->dispatch(
 
     'get/uniquenumber'                                  => { app => 'KDDArT::DAL::System',
                                                              rm  => 'get_unique_number' },
+
+    'get/config'                                        => { app => 'KDDArT::DAL::Help',
+                                                             rm  => 'get_config' },
+
+    'update/nurserytypelistcsv'                         => { app => 'KDDArT::DAL::System',
+                                                             rm  => 'update_nursery_type_list_csv_gadmin' },
+
+    'update/genotypeconfig'                             => { app => 'KDDArT::DAL::System',
+                                                             rm  => 'update_genotype_config_gadmin' },
 
   ],
 );

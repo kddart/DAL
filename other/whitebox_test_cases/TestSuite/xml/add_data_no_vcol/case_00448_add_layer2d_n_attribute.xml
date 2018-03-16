@@ -1,6 +1,6 @@
 <TestCase>
   <CaseInfo CustomMethod="add_record_upload" Description="Add Layer N Attribute" TargetURL="add/layer/n/attribute" Type="BLOCKING" />
-  <INPUT ParaName="name" PrefixVal="Layer - " Random="1" />
+  <INPUT ParaName="layername" PrefixVal="Layer - " Random="1" />
   <INPUT ParaName="alias" Value="" />
   <INPUT ParaName="layertype" Value="2D" />
   <INPUT ParaName="iseditable" Value="1" />

@@ -39,6 +39,7 @@ use File::Lockfile;
 use DateTime::Format::MySQL;
 use XML::Checker::Parser;
 
+
 sub setup {
 
   my $self = shift;
@@ -619,6 +620,16 @@ sub add_trait_runmode {
   my $access_perm            = $query->param('AccessGroupPerm');
   my $other_perm             = $query->param('OtherPerm');
 
+  my $alt_id                 = undef;
+
+  if (defined $query->param('AltIdentifier')) {
+
+    if (length($query->param('AltIdentifier')) > 0) {
+
+      $alt_id = $query->param('AltIdentifier');
+    }
+  }
+
   my $trait_level_lookup = {'trialunit'     => 1,
                             'subtrialunit'  => 1,
                             'notetrialunit' => 1,
@@ -646,6 +657,22 @@ sub add_trait_runmode {
   }
 
   my $dbh_k_read = connect_kdb_read();
+
+  if (length($alt_id) > 0) {
+
+    if (record_existence($dbh_k_read, 'trait', 'AltIdentifier', $alt_id)) {
+
+      my $err_msg = "AltIdentifier ($alt_id): already exists.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'AltIdentifier' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+  else {
+
+    $alt_id = undef;
+  }
 
   if (length($trait_group_type) > 0) {
 
@@ -764,12 +791,14 @@ sub add_trait_runmode {
   $sql   .= 'AccessGroupId=?, ';
   $sql   .= 'OwnGroupPerm=?, ';
   $sql   .= 'AccessGroupPerm=?, ';
-  $sql   .= 'OtherPerm=?';
+  $sql   .= 'OtherPerm=?, ';
+  $sql   .= 'AltIdentifier=?';
 
   my $sth = $dbh_k_write->prepare($sql);
   $sth->execute($trait_group_type, $trait_name, $trait_caption, $trait_description, $trait_data_type,
                 $trait_val_maxlen, $trait_level, $trait_unit, $trait_used_in_analysis, $trait_val_rule,
-                $trait_invalid_msg, $group_id, $access_group, $own_perm, $access_perm, $other_perm);
+                $trait_invalid_msg, $group_id, $access_group, $own_perm, $access_perm, $other_perm,
+                $alt_id);
 
   my $trait_id = -1;
   if (!$dbh_k_write->err()) {
@@ -1906,8 +1935,8 @@ sub update_trait_runmode {
     return $data_for_postrun_href;
   }
 
-  my $read_tr_sql    =  'SELECT TraitName, TraitGroupTypeId ';
-  $read_tr_sql      .=  'FROM trait WHERE TraitId=? ';
+  my $read_tr_sql    = 'SELECT TraitName, TraitGroupTypeId, AltIdentifier ';
+  $read_tr_sql      .= 'FROM trait WHERE TraitId=? ';
 
   my ($r_df_val_err, $r_df_val_msg, $trait_df_val_data) = read_data($dbh_k_read, $read_tr_sql, [$trait_id]);
 
@@ -1920,8 +1949,9 @@ sub update_trait_runmode {
     return $data_for_postrun_href;
   }
 
-  my $db_trait_name        =  undef;
-  my $trait_group_type_id  =  undef;
+  my $db_trait_name        = undef;
+  my $trait_group_type_id  = undef;
+  my $alt_id               = undef;
 
   my $nb_df_val_rec    =  scalar(@{$trait_df_val_data});
 
@@ -1934,9 +1964,9 @@ sub update_trait_runmode {
      return $data_for_postrun_href;
   }
 
-  $db_trait_name            =   $trait_df_val_data->[0]->{'TraitName'};
-  $trait_group_type_id      =   $trait_df_val_data->[0]->{'TraitGroupTypeId'};
-
+  $db_trait_name            = $trait_df_val_data->[0]->{'TraitName'};
+  $trait_group_type_id      = $trait_df_val_data->[0]->{'TraitGroupTypeId'};
+  $alt_id                   = $trait_df_val_data->[0]->{'AltIdentifier'};
 
   if ($trait_name ne $db_trait_name) {
 
@@ -1987,11 +2017,39 @@ sub update_trait_runmode {
     $trait_group_type_id = undef;
   }
 
+  if (defined $query->param('AltIdentifier')) {
+
+    if (length($query->param('AltIdentifier')) > 0) {
+
+      $alt_id = $query->param('AltIdentifier');
+    }
+    else {
+
+      $alt_id = undef;
+    }
+  }
+
+  my $sql = '';
+
+  if (length($alt_id) > 0) {
+
+    $sql = 'SELECT TraitId FROM trait WHERE AltIdentifier=? AND TraitId<>?';
+
+    my ($chk_alt_id_err, $db_trait_id) = read_cell($dbh_k_read, $sql, [$alt_id, $trait_id]);
+
+    if (length($db_trait_id) > 0) {
+
+      my $err_msg = "AltIdentifier ($alt_id): already exists.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'AltIdentifier' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
   $dbh_k_read->disconnect();
 
   my $dbh_k_write = connect_kdb_write();
-
-  my $sql = '';
 
   $sql    = 'UPDATE trait SET ';
   $sql   .= 'TraitName=?, ';
@@ -7497,6 +7555,32 @@ sub add_traitgroup_runmode {
     return $data_for_postrun_href;
   }
 
+  my $alt_id                 = undef;
+
+  if (defined $query->param('AltIdentifier')) {
+
+    if (length($query->param('AltIdentifier')) > 0) {
+
+      $alt_id = $query->param('AltIdentifier');
+    }
+  }
+
+  if (length($alt_id) > 0) {
+
+    if (record_existence($dbh_k_read, 'traitgroup', 'AltIdentifier', $alt_id)) {
+
+      my $err_msg = "AltIdentifier ($alt_id): already exists.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'AltIdentifier' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+  else {
+
+    $alt_id = undef;
+  }
+
   my $entry_xml_file           = $self->authen->get_upload_file();
   my $traitgroupentry_dtd_file = $self->get_traitgroupentry_dtd_file();
 
@@ -7608,10 +7692,11 @@ sub add_traitgroup_runmode {
 
   my $sql = 'INSERT INTO traitgroup SET ';
   $sql   .= 'TraitGroupName=?, ';
-  $sql   .= 'OperatorId=?';
+  $sql   .= 'OperatorId=?, ';
+  $sql   .= 'AltIdentifier=?';
 
   my $sth = $dbh_k_write->prepare($sql);
-  $sth->execute($t_grp_name, $user_id);
+  $sth->execute($t_grp_name, $user_id, $alt_id);
 
   if ($dbh_k_write->err()) {
 
@@ -7778,8 +7863,11 @@ sub update_traitgroup_runmode {
   }
 
   my $t_grp_name = $query->param('TraitGroupName');
+  my $alt_id     = undef;
 
-  my $sql = 'SELECT TraitGroupId FROM traitgroup WHERE TraitGroupName=? AND OperatorId=? AND TraitGroupId<>?';
+  my $sql = 'SELECT TraitGroupId ';
+  $sql   .= 'FROM traitgroup ';
+  $sql   .= 'WHERE TraitGroupName=? AND OperatorId=? AND TraitGroupId<>?';
 
   my ($r_t_grp_id_err, $db_t_grp_id) = read_cell($dbh_k_read, $sql, [$t_grp_name, $user_id, $t_grp_id]);
 
@@ -7801,14 +7889,51 @@ sub update_traitgroup_runmode {
     return $data_for_postrun_href;
   }
 
+  $alt_id = read_cell_value($dbh_k_read, 'traitgroup', 'AltIdentifier', 'TraitGroupId', $t_grp_id);
+
+  if (length($alt_id) == 0) {
+
+    $alt_id = undef;
+  }
+
+  if (defined $query->param('AltIdentifier')) {
+
+    if (length($query->param('AltIdentifier')) > 0) {
+
+      $alt_id = $query->param('AltIdentifier')
+    }
+    else {
+
+      $alt_id = undef;
+    }
+  }
+
+  if (length($alt_id) > 0) {
+
+    $sql  = 'SELECT TraitGroupId FROM traitgroup ';
+    $sql .= 'WHERE AltIdentifier=? AND TraitGroupId<>?';
+
+    my ($chk_alt_id_err, $db_t_grp_id) = read_cell($dbh_k_read, $sql, [$alt_id, $t_grp_id]);
+
+    if (length($db_t_grp_id) > 0) {
+
+      my $err_msg = "AltIdentifier ($alt_id): already exists.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'AltIdentifier' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
   $sql  = 'UPDATE traitgroup SET ';
-  $sql .= 'TraitGroupName=? ';
+  $sql .= 'TraitGroupName=?, ';
+  $sql .= 'AltIdentifier=? ';
   $sql .= 'WHERE TraitGroupId=?';
 
   my $dbh_k_write = connect_kdb_write();
 
   my $sth = $dbh_k_write->prepare($sql);
-  $sth->execute($t_grp_name, $t_grp_id);
+  $sth->execute($t_grp_name, $alt_id, $t_grp_id);
 
   if ($dbh_k_write->err()) {
 

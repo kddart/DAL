@@ -39,6 +39,8 @@ use DateTime;
 use DateTime::Format::MySQL;
 use JSON::Validator;
 use JSON::XS qw(decode_json);
+
+
 use feature qw(switch);
 
 sub setup {
@@ -3235,9 +3237,6 @@ sub add_item_runmode {
     return $data_for_postrun_href;
   }
 
-  $cur_dt = DateTime->now( time_zone => $TIMEZONE );
-  $cur_dt = DateTime::Format::MySQL->format_datetime($cur_dt);
-
   my $insert_statement = "
         INSERT into item SET
             TrialUnitSpecimenId=?,
@@ -3371,7 +3370,6 @@ sub update_item_runmode {
 
   my $item_specimen        = $query->param('SpecimenId');
   my $item_type            = $query->param('ItemTypeId');
-  my $item_barcode         = $query->param('ItemBarcode');
   my $last_update_ts       = $query->param('LastUpdateTimeStamp');
 
   my $dbh_k_write = connect_kdb_write();
@@ -3385,7 +3383,7 @@ sub update_item_runmode {
     return $data_for_postrun_href;
   }
 
-  my $read_item_sql   =   'SELECT TrialUnitSpecimenId, ItemSourceId, ContainerTypeId, ScaleId, ';
+  my $read_item_sql   =   'SELECT TrialUnitSpecimenId, ItemSourceId, ContainerTypeId, ScaleId, ItemBarcode, ';
   $read_item_sql     .=   'StorageId, UnitId, ItemStateId, Amount, LastMeasuredUserId, ItemOperation, ItemNote  ';
   $read_item_sql     .=   'FROM item WHERE ItemId=? ';
 
@@ -3411,6 +3409,7 @@ sub update_item_runmode {
   my $item_measure_by_user        =   undef;
   my $item_operation              =   undef;
   my $item_note                   =   undef;
+  my $item_barcode                =   undef;
 
   my $nb_df_val_rec    =  scalar(@{$item_df_val_data});
 
@@ -3429,6 +3428,25 @@ sub update_item_runmode {
   $item_scale                  =   $item_df_val_data->[0]->{'ScaleId'};
   $item_storage                =   $item_df_val_data->[0]->{'StorageId'};
   $item_unit                   =   $item_df_val_data->[0]->{'UnitId'};
+  $item_state                  =   $item_df_val_data->[0]->{'ItemStateId'};
+  $item_operation              =   $item_df_val_data->[0]->{'ItemOperation'};
+  $item_note                   =   $item_df_val_data->[0]->{'ItemNote'};
+  $item_barcode                =   $item_df_val_data->[0]->{'ItemBarcode'};
+  $item_amount                 =   $item_df_val_data->[0]->{'Amount'};
+  $item_measure_by_user        =   $item_df_val_data->[0]->{'LastMeasuredUserId'};
+
+  if (length($item_barcode) == 0) {
+
+    $item_barcode = undef;
+  }
+
+  if (defined $query->param('ItemBarcode')) {
+
+    if (length($query->param('ItemBarcode')) > 0) {
+
+      $item_barcode = $query->param('ItemBarcode');
+    }
+  }
 
   if (length($trial_unit_spec_id) == 0) {
 
@@ -3456,12 +3474,6 @@ sub update_item_runmode {
       $item_source = $query->param('ItemSourceId');
     }
   }
-
-  if (length($item_source) == 0) {
-
-    $item_source = '0';
-  }
-
 
   if (length($item_container_type) == 0) {
 
@@ -3532,6 +3544,10 @@ sub update_item_runmode {
     }
   }
 
+  if (length($item_amount) == 0) {
+
+    $item_amount = '0';
+  }
 
   if (defined $query->param('Amount')) {
 
@@ -3539,11 +3555,6 @@ sub update_item_runmode {
 
       $item_amount = $query->param('Amount');
     }
-  }
-
-  if (length($item_amount) == 0) {
-
-    $item_amount = '0';
   }
 
   my $cur_dt = DateTime->now( time_zone => $TIMEZONE );
@@ -3559,6 +3570,10 @@ sub update_item_runmode {
     }
   }
 
+  if (length($item_measure_by_user) == 0) {
+
+    $item_measure_by_user = '-1';
+  }
 
   if (defined $query->param('LastMeasuredUserId')) {
 
@@ -3568,11 +3583,10 @@ sub update_item_runmode {
     }
   }
 
-  if (length($item_measure_by_user) == 0) {
+  if (length($item_operation) == 0) {
 
-    $item_measure_by_user = '-1';
+    $item_operation = undef;
   }
-
 
   if (defined $query->param('ItemOperation')) {
 
@@ -3582,10 +3596,17 @@ sub update_item_runmode {
     }
   }
 
+  if (length($item_note) == 0) {
+
+    $item_note = undef;
+  }
 
   if (defined $query->param('ItemNote')) {
 
-    $item_note = $query->param('ItemNote');
+    if (length($query->param('ItemNote')) > 0) {
+
+      $item_note = $query->param('ItemNote');
+    }
   }
 
   my $item_added_date      = $cur_dt;
@@ -3945,7 +3966,7 @@ sub update_item_runmode {
 
     $self->logger->debug("Number of affected rows: $affected_rows");
 
-    my $err_msg = "Operation is unsuccessful.";
+    my $err_msg = "Operation failed due to timestamp mismatched.";
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
@@ -4205,7 +4226,7 @@ sub add_storage_runmode {
 
   my $dbh_read = connect_kdb_read();
 
-  my $skip_field = {};
+  my $skip_field = { 'StorageBarcode' => 1};
 
   my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
                                                                                 'storage', $skip_field);
@@ -4261,14 +4282,21 @@ sub add_storage_runmode {
     }
   }
 
-  if (record_existence($dbh_k_write, 'storage', 'StorageBarcode', $storage_barcode)) {
+  if (length($storage_barcode) > 0) {
 
-    my $err_msg = "StorageBarcode ($storage_barcode): already used.";
+    if (record_existence($dbh_k_write, 'storage', 'StorageBarcode', $storage_barcode)) {
 
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'StorageBarcode' => $err_msg}]};
+      my $err_msg = "StorageBarcode ($storage_barcode): already used.";
 
-    return $data_for_postrun_href;
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'StorageBarcode' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+  else {
+
+    $storage_barcode = undef;
   }
 
   my $sql = 'INSERT INTO storage SET ';
@@ -4361,10 +4389,10 @@ sub update_storage_runmode {
 
   my $dbh_k_write = connect_kdb_write();
 
-  my $storage_barcode   = $query->param('StorageBarcode');
+  my $storage_barcode   = undef;
   my $storage_loc       = $query->param('StorageLocation');
 
-  my $read_st_sql       =  'SELECT StorageDetails, StorageNote, StorageParentId ';
+  my $read_st_sql       =  'SELECT StorageDetails, StorageNote, StorageParentId, StorageBarcode ';
      $read_st_sql      .=  'FROM storage WHERE StorageId=? ';
 
   my ($r_df_val_err, $r_df_val_msg, $storage_df_val_data) = read_data($dbh_k_write, $read_st_sql, [$storage_id]);
@@ -4377,7 +4405,7 @@ sub update_storage_runmode {
 
     return $data_for_postrun_href;
   }
- 
+
   my $storage_details     =  undef;
   my $storage_note        =  undef;
   my $storage_parent_id   =  undef;
@@ -4385,21 +4413,27 @@ sub update_storage_runmode {
   my $nb_df_val_rec    =  scalar(@{$storage_df_val_data});
 
   if ($nb_df_val_rec != 1)  {
-  
+
      $self->logger->debug("Retrieve storage default values - number of records unacceptable: $nb_df_val_rec");
      $data_for_postrun_href->{'Error'} = 1;
      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
-  
+
      return $data_for_postrun_href;
   }
 
   $storage_details    =   $storage_df_val_data->[0]->{'StorageDetails'};
   $storage_note       =   $storage_df_val_data->[0]->{'StorageNote'};
   $storage_parent_id  =   $storage_df_val_data->[0]->{'StorageParentId'};
+  $storage_barcode    =   $storage_df_val_data->[0]->{'StorageBarcode'};
 
   if (length($storage_parent_id) == 0) {
 
     $storage_parent_id = undef;
+  }
+
+  if (length($storage_barcode) == 0) {
+
+    $storage_barcode = undef;
   }
 
   if (defined $query->param('StorageParentId')) {
@@ -4407,6 +4441,14 @@ sub update_storage_runmode {
     if (length($query->param('StorageParentId')) > 0) {
 
       $storage_parent_id = $query->param('StorageParentId');
+    }
+  }
+
+  if (defined $query->param('StorageBarcode')) {
+
+    if (length($query->param('StorageBarcode')) > 0) {
+
+      $storage_barcode = $query->param('StorageBarcode');
     }
   }
 
@@ -4443,29 +4485,32 @@ sub update_storage_runmode {
     }
   }
 
-  my $storage_barcode_sql = 'SELECT StorageBarcode FROM storage WHERE StorageBarcode=? AND StorageId<>?';
+  if (defined $storage_barcode) {
 
-  my ($r_storage_barcode_err, $db_storage_barcode) = read_cell($dbh_k_write, $storage_barcode_sql,
-                                                               [$storage_barcode, $storage_id]);
+    my $storage_barcode_sql = 'SELECT StorageBarcode FROM storage WHERE StorageBarcode=? AND StorageId<>?';
 
-  if ($r_storage_barcode_err) {
+    my ($r_storage_barcode_err, $db_storage_barcode) = read_cell($dbh_k_write, $storage_barcode_sql,
+                                                                 [$storage_barcode, $storage_id]);
 
-    my $err_msg = "Unexpected Error.";
-      
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+    if ($r_storage_barcode_err) {
 
-    return $data_for_postrun_href;
-  }
+      my $err_msg = "Unexpected Error.";
 
-  if (length($db_storage_barcode) > 0) {
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
-    my $err_msg = "StorageBarcode ($storage_barcode): already used.";
-      
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'StorageBarcode' => $err_msg}]};
+      return $data_for_postrun_href;
+    }
 
-    return $data_for_postrun_href;
+    if (length($db_storage_barcode) > 0) {
+
+      my $err_msg = "StorageBarcode ($storage_barcode): already used.";
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'StorageBarcode' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
   }
 
   my $sql = 'UPDATE storage SET ';
@@ -4546,7 +4591,6 @@ sub del_storage_runmode {
     my $err_msg = "StorageId ($storage_id): item(s) in this storage.";
     return $self->_set_error($err_msg);
   }
-  
 
   my $sql = 'DELETE FROM storage ';
   $sql   .= 'WHERE StorageId=?';
@@ -4564,7 +4608,7 @@ sub del_storage_runmode {
   $sth->finish();
 
   $dbh_k_write->disconnect();
-  
+
   my $info_msg_aref  = [{'Message' => "StorageId ($storage_id) has been deleted successfully."}];
 
   $data_for_postrun_href->{'Error'}     = 0;
@@ -4660,17 +4704,17 @@ sub list_storage {
        $used_id_href, $not_used_id_href) = id_existence_bulk($dbh, $chk_table_aref, $storage_id_aref);
 
       if ($chk_id_err) {
-        
+
         $self->logger->debug("Check id existence error: $chk_id_msg");
         $err = 1;
         $msg = $chk_id_msg;
-        
+
         return ($err, $msg, []);
       }
     }
 
     for my $row (@{$storage_data}) {
-    
+
       if ($gadmin_status eq '1') {
 
         my $storage_id = $row->{'StorageId'};
@@ -4709,25 +4753,112 @@ sub list_storage_runmode {
 "SuccessMessageJSON": "{'RecordMeta' : [{'TagName' : 'Storage'}], 'Storage' : [{'StorageParentId' : '0', 'StorageDetails' : 'Testing', 'StorageId' : '16', 'delete' : 'delete/storage/16', 'StorageBarcode' : 'S_3304968', 'update' : 'update/storage/16', 'StorageLocation' : 'Non existing', 'StorageNote' : ''}]}",
 "ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
 "ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
+"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database field name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases."}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
 
   my $self  = shift;
+  my $query = $self->query();
+
+  my $filtering_csv = '';
+
+  if (defined $query->param('Filtering')) {
+
+    $filtering_csv = $query->param('Filtering');
+  }
+
+  my $sorting = '';
+
+  if (defined $query->param('Sorting')) {
+
+    $sorting = $query->param('Sorting');
+  }
 
   my $data_for_postrun_href = {};
 
   my $group_id = $self->authen->group_id();
 
-  my $sql = 'SELECT * FROM storage ';
-  $sql   .= ' ORDER BY StorageId DESC';
+  my $dbh = connect_kdb_read();
 
-  my ($read_storage_err, $read_storage_msg, $storage_data) = $self->list_storage(1, $sql);
+  my @field_list_all;
+
+  my ($sfield_err, $sfield_msg, $sfield_data, $pkey_data) = get_static_field($dbh, 'storage');
+
+  if ($sfield_err) {
+
+    $self->logger->debug("Get static field failed: $sfield_msg");
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  for my $sfield_rec (@{$sfield_data}) {
+
+    push(@field_list_all, $sfield_rec->{'Name'});
+  }
+
+  for my $pkey_field (@{$pkey_data}) {
+
+    push(@field_list_all, $pkey_field);
+  }
+
+  my ($filter_err, $filter_msg, $filter_phrase, $where_arg) = parse_filtering('StorageId',
+                                                                              'storage',
+                                                                              $filtering_csv,
+                                                                              \@field_list_all);
+
+  $self->logger->debug("Filter phrase: $filter_phrase");
+
+  if ($filter_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $filter_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $filter_where_phrase = '';
+
+  if (length($filter_phrase) > 0) {
+
+    $filter_where_phrase = " WHERE $filter_phrase ";
+  }
+
+  $dbh->disconnect();
+
+  my $sql = 'SELECT * FROM storage ';
+  $sql   .= "$filter_where_phrase ";
+
+  my ($sort_err, $sort_msg, $sort_sql) = parse_sorting($sorting, \@field_list_all);
+
+  if ($sort_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $sort_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (length($sort_sql) > 0) {
+
+    $sql .= " ORDER BY $sort_sql ";
+  }
+  else {
+
+    $sql .= ' ORDER BY storage.StorageId DESC';
+  }
+
+  $self->logger->debug("SQL: $sql");
+
+  my ($read_storage_err, $read_storage_msg, $storage_data) = $self->list_storage(1, $sql, $where_arg);
 
   if ($read_storage_err) {
 
     $self->logger->debug($read_storage_msg);
-    
+
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
@@ -9332,6 +9463,8 @@ sub update_item_bulk_runmode {
     return $data_for_postrun_href;
   }
 
+  $self->logger->debug("JSON STR: $json_data_str");
+
   my $data_obj;
 
   eval {
@@ -9341,6 +9474,7 @@ sub update_item_bulk_runmode {
 
   if ($@) {
 
+    $self->logger->debug($@);
     my $err_msg = "Invalid json string.";
 
     $data_for_postrun_href->{'Error'} = 1;
@@ -10032,8 +10166,8 @@ sub update_item_bulk_runmode {
 
     my $con_type_id_csv = join(',', @con_type_id_list);
 
-    my ($chk_con_type_id_err, $unfound_con_type_id_csv) = type_existence($dbh_write, 'container',
-                                                                         $con_type_id_csv);
+    my ($chk_con_type_id_err, $unfound_con_type_id_csv) = type_existence_csv($dbh_write, 'container',
+                                                                             $con_type_id_csv);
 
     if ($chk_con_type_id_err) {
 
@@ -10189,8 +10323,8 @@ sub update_item_bulk_runmode {
 
     my $itm_state_id_csv = join(',', @itm_state_id_list);
 
-    my ($chk_itm_state_id_err, $unfound_itm_state_id_csv) = type_existence($dbh_write, 'state',
-                                                                           $itm_state_id_csv);
+    my ($chk_itm_state_id_err, $unfound_itm_state_id_csv) = type_existence_csv($dbh_write, 'state',
+                                                                               $itm_state_id_csv);
 
     if ($chk_itm_state_id_err) {
 
@@ -10279,27 +10413,29 @@ sub update_item_bulk_runmode {
 
     my $item_oper         = $item_lookup->{$item_id}->{'ItemOperation'};
 
+    if (length($item_oper) == 0) {
+
+      $item_oper = undef;
+    }
+
     if (defined $data_rec->{'ItemOperation'}) {
 
       if (length($data_rec->{'ItemOperation'}) > 0) {
 
         $item_oper = $data_rec->{'ItemOperation'};
       }
-    }
+      else {
 
-    if (length($item_oper) == 0) {
-
-      $item_oper = undef;
-    }
-    else {
-
-      if ($item_oper eq 'NULL') {
-
-        $item_oper = '';
+        $item_oper = undef;
       }
     }
 
     my $item_barcode = $item_lookup->{$item_id}->{'ItemBarcode'};
+
+    if (length($item_barcode) == 0) {
+
+      $item_barcode = undef;
+    }
 
     if (defined $data_rec->{'ItemBarcode'}) {
 
@@ -10307,14 +10443,18 @@ sub update_item_bulk_runmode {
 
         $item_barcode = $data_rec->{'ItemBarcode'};
       }
-    }
+      else {
 
-    if (length($item_barcode) == 0) {
-
-      $item_barcode = undef;
+        $item_barcode = undef;
+      }
     }
 
     my $item_source_id = $item_lookup->{$item_id}->{'ItemSourceId'};
+
+    if (length($item_source_id) == 0) {
+
+      $item_source_id = undef;
+    }
 
     if (defined $data_rec->{'ItemSourceId'}) {
 
@@ -10322,14 +10462,18 @@ sub update_item_bulk_runmode {
 
         $item_source_id = $data_rec->{'ItemSourceId'};
       }
-    }
+      else {
 
-    if (length($item_source_id) == 0) {
-
-      $item_source_id = undef;
+        $item_source_id = undef;
+      }
     }
 
     my $tu_spec_id = $item_lookup->{$item_id}->{'TrialUnitSpecimenId'};
+
+    if (length($tu_spec_id) == 0) {
+
+      $tu_spec_id = undef;
+    }
 
     if (defined $data_rec->{'TrialUnitSpecimenId'}) {
 
@@ -10337,14 +10481,18 @@ sub update_item_bulk_runmode {
 
         $tu_spec_id = $data_rec->{'TrialUnitSpecimenId'};
       }
-    }
+      else {
 
-    if (length($tu_spec_id) == 0) {
-
-      $tu_spec_id = undef;
+        $tu_spec_id = undef;
+      }
     }
 
     my $con_type_id = $item_lookup->{$item_id}->{'ContainerTypeId'};
+
+    if (length($con_type_id) == 0) {
+
+      $con_type_id = undef;
+    }
 
     if (defined $data_rec->{'ContainerTypeId'}) {
 
@@ -10352,14 +10500,18 @@ sub update_item_bulk_runmode {
 
         $con_type_id = $data_rec->{'ContainerTypeId'};
       }
-    }
+      else {
 
-    if (length($con_type_id) == 0) {
-
-      $con_type_id = undef;
+        $con_type_id = undef;
+      }
     }
 
     my $scale_id = $item_lookup->{$item_id}->{'ScaleId'};
+
+    if (length($scale_id) == 0) {
+
+      $scale_id = undef;
+    }
 
     if (defined $data_rec->{'ScaleId'}) {
 
@@ -10367,14 +10519,18 @@ sub update_item_bulk_runmode {
 
         $scale_id = $data_rec->{'ScaleId'};
       }
-    }
+      else {
 
-    if (length($scale_id) == 0) {
-
-      $scale_id = undef;
+        $scale_id = undef;
+      }
     }
 
     my $storage_id = $item_lookup->{$item_id}->{'StorageId'};
+
+    if (length($storage_id) == 0) {
+
+      $storage_id = undef;
+    }
 
     if (defined $data_rec->{'StorageId'}) {
 
@@ -10382,14 +10538,18 @@ sub update_item_bulk_runmode {
 
         $storage_id = $data_rec->{'StorageId'};
       }
-    }
+      else {
 
-    if (length($storage_id) == 0) {
-
-      $storage_id = undef;
+        $storage_id = undef;
+      }
     }
 
     my $unit_id = $item_lookup->{$item_id}->{'UnitId'};
+
+    if (length($unit_id) == 0) {
+
+      $unit_id = undef;
+    }
 
     if (defined $data_rec->{'UnitId'}) {
 
@@ -10397,14 +10557,18 @@ sub update_item_bulk_runmode {
 
         $unit_id = $data_rec->{'UnitId'};
       }
-    }
+      else {
 
-    if (length($unit_id) == 0) {
-
-      $unit_id = undef;
+        $unit_id = undef;
+      }
     }
 
     my $item_state_id = $item_lookup->{$item_id}->{'ItemStateId'};
+
+    if (length($item_state_id) == 0) {
+
+      $item_state_id = undef;
+    }
 
     if (defined $data_rec->{'ItemStateId'}) {
 
@@ -10412,14 +10576,18 @@ sub update_item_bulk_runmode {
 
         $item_state_id = $data_rec->{'ItemStateId'};
       }
-    }
+      else {
 
-    if (length($item_state_id) == 0) {
-
-      $item_state_id = undef;
+        $item_state_id = undef;
+      }
     }
 
     my $amount = $item_lookup->{$item_id}->{'Amount'};
+
+    if (length($amount) == 0) {
+
+      $amount = undef;
+    }
 
     if (defined $data_rec->{'Amount'}) {
 
@@ -10427,14 +10595,18 @@ sub update_item_bulk_runmode {
 
         $amount = $data_rec->{'Amount'};
       }
-    }
+      else {
 
-    if (length($amount) == 0) {
-
-      $amount = undef;
+        $amount = undef;
+      }
     }
 
     my $last_measured_user_id = $item_lookup->{$item_id}->{'LastMeasuredUserId'};
+
+    if (length($last_measured_user_id) == 0) {
+
+      $last_measured_user_id = undef;
+    }
 
     if (defined $data_rec->{'LastMeasuredUserId'}) {
 
@@ -10442,14 +10614,18 @@ sub update_item_bulk_runmode {
 
         $last_measured_user_id = $data_rec->{'LastMeasuredUserId'};
       }
-    }
+      else {
 
-    if (length($last_measured_user_id) == 0) {
-
-      $last_measured_user_id = undef;
+        $last_measured_user_id = undef;
+      }
     }
 
     my $item_note = $item_lookup->{$item_id}->{'ItemNote'};
+
+    if (length($item_note) == 0) {
+
+      $item_note = undef;
+    }
 
     if (defined $data_rec->{'ItemNote'}) {
 
@@ -10457,17 +10633,9 @@ sub update_item_bulk_runmode {
 
         $item_note = $data_rec->{'ItemNote'};
       }
-    }
+      else {
 
-    if (length($item_note) == 0) {
-
-      $item_note = undef;
-    }
-    else {
-
-      if ($item_note =~ /^null$/i) {
-
-        $item_note = '';
+        $item_note = undef;
       }
     }
 

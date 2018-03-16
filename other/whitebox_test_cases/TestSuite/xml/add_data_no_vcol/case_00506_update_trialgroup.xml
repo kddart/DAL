@@ -6,6 +6,7 @@
   <INPUT ParaName="TrialGroupType" SrcValue="xml/add_data_no_vcol/case_00428_add_trialgroup_type.xml" />
   <INPUT ParaName="TrialGroupStart" Value="2015-08-27" />
   <INPUT ParaName="TrialGroupNote" Value="Upated by automatic testing framework" />
+  <INPUT ParaName="TrialGroupLayout" Value="" />
   <Match Attr="StatusCode" Value="200" />
   <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
   <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />

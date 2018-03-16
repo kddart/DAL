@@ -43,6 +43,7 @@ use LWP::UserAgent;
 use HTTP::Request::Common qw(POST GET);
 use JSON::XS qw(decode_json);
 
+
 our @ISA      = qw(Exporter);
 our @EXPORT   = qw($DTD_PATH $RPOSTGRES_UP_FILE $GIS_BUFFER_DISTANCE
                    $CGI_INDEX_SCRIPT $LINK_PERM $READ_PERM $WRITE_PERM
@@ -57,9 +58,10 @@ our @EXPORT   = qw($DTD_PATH $RPOSTGRES_UP_FILE $GIS_BUFFER_DISTANCE
                    $DSN_MDB_WRITE $DSN_GIS_READ $DSN_GIS_WRITE $RMYSQL_UP_FILE
                    $MONETDB_UP_FILE $GENOTYPE2SPECIMEN_CFG $OAUTH2_SITE
                    $OAUTH2_AUTHORIZE_PATH $OAUTH2_CLIENT_ID $OAUTH2_CLIENT_SECRET
-                   $OAUTH2_SCOPE $OAUTH2_ACCESS_TOKEN_URL $JSON_SCHEMA_PATH $CONFIG_LOADED
+                   $OAUTH2_SCOPE $OAUTH2_ACCESS_TOKEN_URL $JSON_SCHEMA_PATH
                    $SOLR_URL $POINT2POLYGON_BUFFER4SITE $POINT2POLYGON_BUFFER4TRIAL
                    $MAX_RECURSIVE_ANCESTOR_LEVEL $MAX_RECURSIVE_DESCENDANT_LEVEL
+                   $WHO_CAN_CREATE_GENOTYPE $NURSERY_TYPE_LIST_CSV
                    trim ltrim rtrim read_uname_pass connect_kdb_read
                    execute_sql read_cell permission_phrase
                    read_cookie arrayref2csvfile arrayref2xml reconstruct_server_url
@@ -165,11 +167,9 @@ our $ACCEPT_HEADER_LOOKUP   = { 'application/json' => 'JSON',
                                 'text/xml'         => 'XML',
 };
 
-our $CONFIG_LOADED          = 0;
-
 our $VALID_CTYPE            = {'xml' => 1, 'json' => 1, 'geojson' => 1};
 
-our $DAL_VERSION            = '2.4.5';
+our $DAL_VERSION            = '2.5.0';
 our $DAL_COPYRIGHT          = 'Copyright (c) 2017, Diversity Arrays Technology, All rights reserved.';
 our $DAL_ABOUT              = 'Data Access Layer';
 
@@ -190,6 +190,10 @@ $M2M_RELATION->{'specimen'}      = ['genotypespecimen'];
 $M2M_RELATION->{'specimengroup'} = ['specimengroupentry'];
 $M2M_RELATION->{'trialunit'}     = ['trialunitspecimen'];
 $M2M_RELATION->{'itemgroup'}     = ['itemgroupentry'];
+
+our $WHO_CAN_CREATE_GENOTYPE     = {};
+
+our $NURSERY_TYPE_LIST_CSV       = {};
 
 our $ERR_INFO_AREF = [];
 
@@ -2570,15 +2574,22 @@ sub is_within {
   my $wkt         = $_[4];
   my $id_val      = $_[5];
 
+  my $is_within = 0;
+  my $err = 0;
+
+  if ( ! record_existence($dbh, $tname, $id_fname, $id_val) ) {
+
+    $is_within = 1;
+    return ($err, $is_within);
+  }
+
   my $sql = "SELECT ST_Within(ST_GeomFromText(?, 4326), CAST($geo_fname AS Geometry)) AS IsWithin ";
   $sql   .= "FROM $tname ";
   $sql   .= "WHERE $id_fname=?";
 
-  my $is_within = 0;
   my $sth = $dbh->prepare($sql);
   $sth->execute($wkt, $id_val);
 
-  my $err = 0;
   if ($dbh->err()) {
 
     $err = 1;
@@ -2608,12 +2619,24 @@ sub csvfile2shp {
     FieldTypes      => $datatype_list,
   };
 
+  my $csv_parser = Text::CSV->new( { binary => 1 } );
+
   open(my $csv_fh, "$csv_filename");
 
   while (my $line = <$csv_fh>) {
 
     chomp($line);
-    my @line_array = split(/,/, $line);
+
+    if ($line =~ /^#/) { next; }
+
+    my $success = $csv_parser->parse($line);
+
+    if (!$success) {
+
+      die "Cannot parse CSV line: $line";
+    }
+
+    my @line_array = $csv_parser->fields();
 
     my $shp_x   = $line_array[0];
     my $shp_y   = $line_array[1];
@@ -2861,7 +2884,7 @@ sub csvfh2aref {
       next;
     }
 
-    if ( $ignore_line0 && ($line_counter == 0) ) { 
+    if ( $ignore_line0 && ($line_counter == 0) ) {
 
       $line_counter += 1;
       next;
@@ -4125,6 +4148,14 @@ sub is_correct_validation_rule {
 
         $correct = 0;
         $msg     = 'Invalid range expression';
+      }
+      else {
+
+        if ($validation_rule_body =~ /\.{3,}/) {
+
+          $correct = 0;
+          $msg = 'Invalid range expression (more than 2 consecutive dot characters).';
+        }
       }
     }
     else {
@@ -6984,10 +7015,11 @@ sub load_config {
   my $err = 0;
   my $msg = '';
 
-  if ($CONFIG_LOADED) {
+  my $logger = undef;
 
-    $msg = 'Config has already loaded';
-    return ($err, $msg);
+  if (defined $_[0]) {
+
+    $logger = $_[0];
   }
 
   if (-e $CFG_FILE_PATH) {
@@ -7002,7 +7034,7 @@ sub load_config {
 
       foreach my $block_param (@block_param_list) {
 
-        #$r->log_error("BLOCK: $block_param");
+        if (defined $logger) { $logger->debug("BLOCK: $block_param"); }
 
         my $param_val = $config_hash->{$block_param};
 
@@ -7011,13 +7043,13 @@ sub load_config {
           my $block_name = $1;
           my $param_name = $2;
 
-          #$r->log_error("BLOCK NAME: $block_name - PARAM NAME: $param_name - PARAM VALUE: $param_val");
+          if (defined $logger) { $logger->debug("BLOCK NAME: $block_name - PARAM NAME: $param_name - PARAM VALUE: $param_val"); }
 
           if (defined $${block_name}) {
 
             # use plain text variable referencing
             my $variable_data_type = ref $${block_name};
-            #$r->log_error("Variable data type: $variable_data_type");
+            if (defined $logger) { $logger->debug("Variable data type: $variable_data_type"); }
 
             my $local_val = '';
 
@@ -7025,13 +7057,13 @@ sub load_config {
 
               # need   no strict 'refs' to work
 
-              #$r->log_error("Base DIR: " . $main::kddart_base_dir);
+              if (defined $logger) { $logger->debug("Base DIR: " . $main::kddart_base_dir); }
 
-              if (defined $${block_name}->{"$main::kddart_base_dir/$param_name"}) {
+              if (defined $${block_name}->{"$main::kddart_base_dir"}) {
 
                 $local_val = $${block_name}->{"$main::kddart_base_dir/$param_name"};
 
-                #$r->log_error("Block local before replacement: $local_val");
+                if (defined $logger) { $logger->debug("Block local before replacement: $local_val"); }
 
                 if ($local_val eq 'FROM CFG_FILE') {
 
@@ -7061,14 +7093,14 @@ sub load_config {
             }
             else {
 
-              #$r->log_error("Variable data type: $variable_data_type for $block_name UNSUPPORTED");
+              if (defined $logger) { $logger->debug("Variable data type: $variable_data_type for $block_name UNSUPPORTED"); }
               $msg = "Variable data type: $variable_data_type for $block_name UNSUPPORTED";
               $err = 1;
             }
           }
           else {
 
-            #$r->log_error("$block_name is undefined.");
+            if (defined $logger) { $logger->debug("$block_name is undefined."); }
             $msg = "$block_name is undefined.";
             $err = 1;
           }
@@ -7077,21 +7109,16 @@ sub load_config {
     }
     else {
 
-      #$r->log_error("Config file $CFG_FILE_PATH : NOT READABLE");
+      if (defined $logger) { $logger->debug("Config file $CFG_FILE_PATH : NOT READABLE"); }
       $msg = "Config file $CFG_FILE_PATH : NOT READABLE";
       $err = 1;
     }
   }
   else {
 
-    #$r->log_error("Config file $CFG_FILE_PATH : NOT FOUND");
+    if (defined $logger) { $logger->debug("Config file $CFG_FILE_PATH : NOT FOUND"); }
     $msg = "Config file $CFG_FILE_PATH : NOT FOUND";
     $err = 1;
-  }
-
-  if (!$err) {
-
-    $CONFIG_LOADED = 1;
   }
 
   return ($err, $msg);

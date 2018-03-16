@@ -43,6 +43,7 @@ use Time::HiRes qw( tv_interval gettimeofday );
 use File::Lockfile;
 use Crypt::Random qw( makerandom );
 
+
 sub setup {
 
   my $self   = shift;
@@ -3954,6 +3955,8 @@ sub list_markermap {
 
       $row->{'OperatorName'} = $operator_lookup->{$operator_id}->{'UserName'};
       $row->{'update'}       = "update/markermap/$marker_map_id";
+      $row->{'import'}       = "markermap/${marker_map_id}/import/mapposition/csv";
+      $row->{'export'}       = "markermap/${marker_map_id}/export/mapposition/csv";
 
       push(@{$extra_attr_marker_map_data}, $row);
     }

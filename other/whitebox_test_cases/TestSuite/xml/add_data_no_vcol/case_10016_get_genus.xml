@@ -1,5 +1,5 @@
 <TestCase>
-  <CaseInfo Description="Get Genus" TargetURL="get/genus/:GenusId" Type="BLOCKING" />
+  <CaseInfo CaptureFieldName="GenusId" Description="Get Genus" TargetURL="get/genus/:GenusId" Type="BLOCKING" />
   <INPUT ParaName="GenusId" SrcValue="xml/add_data_no_vcol/case_00105_add_genus.xml" />
   <Match Attr="StatusCode" Value="200" />
   <Match Attr="COUNT" Tag="Genus" TargetDataType="MULTI" Value="boolex(x&gt;0)" />

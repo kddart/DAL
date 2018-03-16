@@ -62,6 +62,7 @@ use Time::HiRes qw( tv_interval gettimeofday );
 use DateTime;
 use Digest::MD5;
 
+
 sub import {
   my $pkg     = shift;
   my $callpkg = caller;
@@ -455,6 +456,24 @@ sub check_gadmin_runmodes {
   return @{$config->{CHECK_GADMIN_RUNMODES}};
 }
 
+sub check_genotype_config_runmodes {
+
+  my $self   = shift;
+  my $config = $self->_config;
+
+  if (@_) {
+
+    $config->{CHECK_GENOTYPE_CONFIG_RUNMODES} = [];
+    push(@{$config->{CHECK_GENOTYPE_CONFIG_RUNMODES}}, @_);
+  }
+  else {
+
+    $config->{CHECK_GENOTYPE_CONFIG_RUNMODES} ||= [];
+  }
+
+  return @{$config->{CHECK_GENOTYPE_CONFIG_RUNMODES}};
+}
+
 sub transform_xml_error_message {
 
   my $self   = $_[0];
@@ -509,6 +528,7 @@ sub init_config_parameters {
   $self->check_gadmin_runmodes('');
   $self->transform_xml_error_message('');
   $self->check_content_type_runmodes('');
+  $self->check_genotype_config_runmodes('');
   $self->xsl_url('');
 }
 
@@ -800,6 +820,34 @@ sub is_gadmin_runmode {
   return;
 }
 
+sub is_genotype_config_runmode {
+
+  my $self    = shift;
+  my $runmode = shift;
+
+  foreach my $runmode_test ($self->check_genotype_config_runmodes) {
+
+    if (overload::StrVal($runmode_test) =~ /^Regexp=/) {
+      # We were passed a regular expression
+      return 1 if $runmode =~ $runmode_test;
+    } elsif (ref $runmode_test && ref $runmode_test eq 'CODE') {
+      # We were passed a code reference
+      return 1 if $runmode_test->($runmode);
+    } elsif ($runmode_test eq ':all') {
+      # all runmodes are protected
+      return 1;
+    } else {
+      # assume we were passed a string
+      return 1 if $runmode eq $runmode_test;
+    }
+  }
+
+  # See if the user is using attributes
+  my $sub = $self->_cgiapp->can($runmode);
+  return 1 if $sub && $RUNMODES{$sub};
+
+  return;
+}
 
 sub setup_runmodes {
 
@@ -823,6 +871,7 @@ sub setup_runmodes {
   $self->_cgiapp->run_modes( require_gadmin           => \&require_gadmin_runmode );
   $self->_cgiapp->run_modes( ctrl_char_not_allowed    => \&ctrl_char_not_allowed_runmode );
   $self->_cgiapp->run_modes( content_type_not_allowed => \&content_type_not_allowed_runmode );
+  $self->_cgiapp->run_modes( genotype_config_error    => \&genotype_config_error_runmode );
 
   return;
 }
@@ -1260,7 +1309,7 @@ sub prerun_callback {
 
           $authen->logger->debug("$rand is in the deferred mode");
           # this random number has not waited long enough
-          # waiting message 
+          # waiting message
 
           return $authen->redirect_to_defer_request();
         }
@@ -1373,6 +1422,16 @@ sub prerun_callback {
       $authen->store->save( $rand => 0 );
     }
   }
+
+  if ($authen->is_genotype_config_runmode($current_runmode)) {
+
+    my $success = $authen->check_genotype_config();
+
+    if (!$success) {
+
+      return $authen->redirect_to_genotype_config_error;
+    }
+  }
 }
 
 sub redirect_to_login {
@@ -1401,7 +1460,7 @@ sub redirect_to_content_type_error {
 
   my $self   = shift;
   my $cgiapp = $self->_cgiapp;
-  
+
   $cgiapp->prerun_mode('content_type_not_allowed');
 }
 
@@ -1409,40 +1468,40 @@ sub redirect_to_group_assignment {
 
   my $self   = shift;
   my $cgiapp = $self->_cgiapp;
-  
+
   $cgiapp->prerun_mode('require_group_assignment');
 }
 
 sub redirect_to_rand_error {
-  
+
   my $self   = shift;
   my $cgiapp = $self->_cgiapp;
-  
+
   $cgiapp->prerun_mode('rand_error');
 }
 
 sub redirect_to_sign_upload_error {
-  
+
   my $self   = shift;
   my $cgiapp = $self->_cgiapp;
-  
+
   $cgiapp->prerun_mode('signature_error');
 }
 
 sub redirect_to_signature_error {
-  
+
   my $self   = shift;
   my $cgiapp = $self->_cgiapp;
-  
+
   $cgiapp->prerun_mode('signature_error');
 }
 
 
 sub redirect_to_upload_2large_error {
-  
+
   my $self   = shift;
   my $cgiapp = $self->_cgiapp;
-  
+
   $cgiapp->prerun_mode('upload_2large_error');
 }
 
@@ -1452,6 +1511,14 @@ sub redirect_to_gadmin_error {
   my $cgiapp = $self->_cgiapp;
 
   $cgiapp->prerun_mode('require_gadmin');
+}
+
+sub redirect_to_genotype_config_error {
+
+  my $self   = shift;
+  my $cgiapp = $self->_cgiapp;
+
+  $cgiapp->prerun_mode('genotype_config_error');
 }
 
 sub redirect_to_ctrl_char_error {
@@ -1553,7 +1620,7 @@ sub require_group_assignment_runmode {
   $data_for_postrun_href->{'Error'}         = 1;
   $data_for_postrun_href->{'HTTPErrorCode'} = 401;
   $data_for_postrun_href->{'Data'}          = {'Error' => $msg_aref};
-  
+
   if (uc($self->authen->transform_xml_error_message()) eq 'YES') {
 
     $data_for_postrun_href->{'XSL'} = $self->authen->xsl_url();
@@ -1563,18 +1630,18 @@ sub require_group_assignment_runmode {
 }
 
 sub rand_error_runmode {
-  
+
   my $self  = shift;
   my $query = $self->query();
   my $rand  = $query->param('rand_num');
 
   my $msg_aref = [{'Message' => "($rand): Random number has already been used."}];
-  
+
   my $data_for_postrun_href = {};
 
   $data_for_postrun_href->{'Error'} = 1;
   $data_for_postrun_href->{'Data'}  = {'Error' => $msg_aref};
-  
+
   if (uc($self->authen->transform_xml_error_message()) eq 'YES') {
 
     $data_for_postrun_href->{'XSL'} = $self->authen->xsl_url();
@@ -1588,12 +1655,12 @@ sub signature_error_runmode {
   my $self = shift;
 
   my $msg_aref = [{'Message' => 'Data signature verification failed.'}];
-  
+
   my $data_for_postrun_href = {};
 
   $data_for_postrun_href->{'Error'} = 1;
   $data_for_postrun_href->{'Data'}  = {'Error' => $msg_aref};
-  
+
   if (uc($self->authen->transform_xml_error_message()) eq 'YES') {
 
     $data_for_postrun_href->{'XSL'} = $self->authen->xsl_url();
@@ -1603,7 +1670,7 @@ sub signature_error_runmode {
 }
 
 sub upload_2large_error_runmode {
-  
+
   my $self = shift;
 
   my $msg_aref = [{'Message' => 'File could be TOO large or upload file missing with CGI error.'}];
@@ -1612,7 +1679,7 @@ sub upload_2large_error_runmode {
 
   $data_for_postrun_href->{'Error'} = 1;
   $data_for_postrun_href->{'Data'}  = {'Error' => $msg_aref};
-  
+
   if (uc($self->authen->transform_xml_error_message()) eq 'YES') {
 
     $data_for_postrun_href->{'XSL'} = $self->authen->xsl_url();
@@ -1631,7 +1698,7 @@ sub already_login_runmode {
 
   $data_for_postrun_href->{'Error'} = 1;
   $data_for_postrun_href->{'Data'}  = {'Error' => $msg_aref};
-  
+
   if (uc($self->authen->transform_xml_error_message()) eq 'YES') {
 
     $data_for_postrun_href->{'XSL'} = $self->authen->xsl_url();
@@ -1651,7 +1718,7 @@ sub require_gadmin_runmode {
   $data_for_postrun_href->{'Error'}         = 1;
   $data_for_postrun_href->{'HTTPErrorCode'} = 401;
   $data_for_postrun_href->{'Data'}          = {'Error' => $msg_aref};
-  
+
   if (uc($self->authen->transform_xml_error_message()) eq 'YES') {
 
     $data_for_postrun_href->{'XSL'} = $self->authen->xsl_url();
@@ -1670,7 +1737,7 @@ sub ctrl_char_not_allowed_runmode {
 
   $data_for_postrun_href->{'Error'} = 1;
   $data_for_postrun_href->{'Data'}  = {'Error' => $msg_aref};
-  
+
   if (uc($self->authen->transform_xml_error_message()) eq 'YES') {
 
     $data_for_postrun_href->{'XSL'} = $self->authen->xsl_url();
@@ -1692,7 +1759,7 @@ sub content_type_not_allowed_runmode {
 
   $data_for_postrun_href->{'Error'} = 1;
   $data_for_postrun_href->{'Data'}  = {'Error' => $msg_aref};
-  
+
   if (uc($self->authen->transform_xml_error_message()) eq 'YES') {
 
     $data_for_postrun_href->{'XSL'} = $self->authen->xsl_url();
@@ -1721,7 +1788,39 @@ sub over_session_quota_runmode {
 
   $data_for_postrun_href->{'Error'} = 1;
   $data_for_postrun_href->{'Data'}  = {'Error' => $msg_aref};
-  
+
+  if (uc($self->authen->transform_xml_error_message()) eq 'YES') {
+
+    $data_for_postrun_href->{'XSL'} = $self->authen->xsl_url();
+  }
+
+  return $data_for_postrun_href;
+}
+
+sub genotype_config_error_runmode {
+
+  my $self = shift;
+
+  my $user_id         = $self->authen->user_id;
+  my $username        = $self->authen->username;
+  my $gadmin_status   = '0';
+
+  if (length($self->authen->gadmin_status) > 0) {
+
+    $gadmin_status = $self->authen->gadmin_status;
+  }
+
+  my $genotype_creation_config = $WHO_CAN_CREATE_GENOTYPE->{$ENV{DOCUMENT_ROOT}};
+
+  my $msg = "Permission denied: requiring $genotype_creation_config privilege - current privilege user: $username - user id: $user_id - group admin status: $gadmin_status.";
+
+  my $msg_aref = [{'Message' => $msg}];
+
+  my $data_for_postrun_href = {};
+
+  $data_for_postrun_href->{'Error'} = 1;
+  $data_for_postrun_href->{'Data'}  = {'Error' => $msg_aref};
+
   if (uc($self->authen->transform_xml_error_message()) eq 'YES') {
 
     $data_for_postrun_href->{'XSL'} = $self->authen->xsl_url();
@@ -2148,6 +2247,45 @@ sub check_counter {
   else {
 
     return 0;
+  }
+}
+
+sub check_genotype_config {
+
+  my $self          = $_[0];
+
+  my $user_id       = $self->user_id;
+  my $gadmin_status = $self->gadmin_status;
+
+  $self->logger->debug("User Id: $user_id - GADMIN status: $gadmin_status");
+
+  my $genotype_creation_config = $WHO_CAN_CREATE_GENOTYPE->{$ENV{DOCUMENT_ROOT}};
+
+  if (lc($genotype_creation_config) eq 'gadmin') {
+
+    if ( "$gadmin_status" eq '1' ) {
+
+      return 1;
+    }
+    else {
+
+      return 0;
+    }
+  }
+  elsif (lc($genotype_creation_config) eq 'admin') {
+
+    if ( "$user_id" eq '0' ) {
+
+      return 1;
+    }
+    else {
+
+      return 0;
+    }
+  }
+  else {
+
+    return 1;
   }
 }
 

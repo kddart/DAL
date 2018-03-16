@@ -1,7 +1,6 @@
 <TestCase>
   <CaseInfo CustomMethod="add_record" Description="Add Item" TargetURL="add/item" Type="BLOCKING" />
   <Delete TargetURL="delete/item/:ItemId" />
-  <INPUT ParaName="ItemSourceId" SrcValue="xml/add_data_no_vcol/case_00226_add_con4add_item.xml" />
   <INPUT ParaName="ContainerTypeId" SrcValue="xml/add_data_no_vcol/case_00227_add_container_type.xml" />
   <INPUT ParaName="SpecimenId" SrcValue="xml/add_data_no_vcol/case_00228_add_spec4add_item.xml" />
   <INPUT ParaName="ScaleId" SrcValue="xml/add_data_no_vcol/case_00229_register_scale.xml" />
@@ -18,7 +17,6 @@
   <Match Attr="ParaName" Tag="ReturnId" Value="ItemId" />
   <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
-  <Parent CaseFile="xml/add_data_no_vcol/case_00226_add_con4add_item.xml" Order="3" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00227_add_container_type.xml" Force="1" Order="4" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00228_add_spec4add_item.xml" Order="5" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00229_register_scale.xml" Force="1" Order="6" />

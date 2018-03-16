@@ -6,6 +6,9 @@
   <INPUT ParaName="ItemId" SrcValue="xml/add_data_no_vcol/case_00435_add_item4update_tuspec.xml" />
   <INPUT ParaName="HasDied" Value="0" />
   <INPUT ParaName="Notes" Value="None" />
+  <INPUT ParaName="HarvestDate" Value="2017-11-28" />
+  <INPUT ParaName="SpecimenNumber" Value="1" />
+  <INPUT ParaName="TUSLabel" Value="Plant Label" />
   <Match Attr="StatusCode" Value="200" />
   <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
   <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />

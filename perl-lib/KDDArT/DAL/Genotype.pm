@@ -84,7 +84,8 @@ sub setup {
                                            'import_genpedigree_csv',
                                            'update_genpedigree_gadmin',
                                            'del_genpedigree_gadmin',
-      );
+                                          );
+
   __PACKAGE__->authen->count_session_request_runmodes(':all');
   __PACKAGE__->authen->check_signature_runmodes('add_genotype',
                                                 'add_genus_gadmin',
@@ -115,7 +116,8 @@ sub setup {
                                                 'remove_specimen_keyword',
                                                 'update_genpedigree_gadmin',
                                                 'del_genpedigree_gadmin',
-      );
+                                               );
+
   __PACKAGE__->authen->check_gadmin_runmodes('add_genus_gadmin',
                                              'remove_genotype_from_specimen_gadmin',
                                              'update_genus_gadmin',
@@ -134,7 +136,8 @@ sub setup {
                                              'del_pedigree_gadmin',
                                              'update_genpedigree_gadmin',
                                              'del_genpedigree_gadmin',
-      );
+                                            );
+
   __PACKAGE__->authen->check_sign_upload_runmodes('add_specimen',
                                                   'add_specimen_group',
                                                   'remove_specimen_from_specimen_group_bulk_gadmin',
@@ -143,7 +146,11 @@ sub setup {
                                                   'import_specimen_csv',
                                                   'import_pedigree_csv',
                                                   'import_genpedigree_csv',
-      );
+                                                 );
+
+  __PACKAGE__->authen->check_genotype_config_runmodes('add_genotype',
+                                                      'import_genotype_csv',
+                                                     );
 
   $self->run_modes(
     'add_genotype'                              => 'add_genotype_runmode',
@@ -400,7 +407,20 @@ sub add_genotype_runmode {
 
   if (length($lookup_geno_id) > 0) {
 
-    my $err_msg = " $genotype_name already exists.";
+    my $err_msg = "GenotypeName ($genotype_name): already exists.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'GenotypeName' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $geno_lookup_sql = 'SELECT GenotypeId FROM genotypealias WHERE GenotypeAliasName=? AND GenusId=?';
+
+  ($lookp_err, $lookup_geno_id) = read_cell($dbh_k_read, $geno_lookup_sql, [$genotype_name, $genus_id]);
+
+  if (length($lookup_geno_id) > 0) {
+
+    my $err_msg = "$genotype_name is already used.";
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'GenotypeName' => $err_msg}]};
 
@@ -2544,7 +2564,6 @@ sub update_genotype_runmode {
   }
 
   my $genus_existence = record_existence($dbh_k_read, 'genus', 'GenusId', $genus_id);
-  $dbh_k_read->disconnect();
 
   if (!$genus_existence) {
 
@@ -2554,6 +2573,43 @@ sub update_genotype_runmode {
 
     return $data_for_postrun_href;
   }
+
+  my $geno_lookup_sql = 'SELECT GenotypeId FROM genotype WHERE GenotypeName=? AND GenusId=? AND GenotypeId<>?';
+
+  my ($lookp_err, $lookup_geno_id) = read_cell($dbh_k_read, $geno_lookup_sql,
+                                               [$genotype_name, $genus_id, $genotype_id]);
+
+  if (length($lookup_geno_id) > 0) {
+
+    my $err_msg = "$genotype_name already exists.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'GenotypeName' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $db_geno_name = read_cell_value($dbh_k_read, 'genotype', 'GenotypeName', 'GenotypeId', $genotype_id);
+
+  $sql = 'SELECT GenotypeAliasId FROM genotypealias WHERE GenotypeId=? AND GenotypeAliasName=?';
+
+  my ($geno_alias_err, $geno_alias_id) = read_cell($dbh_k_read, $sql, [$genotype_id, $genotype_name]);
+
+  $geno_lookup_sql  = 'SELECT GenotypeId FROM genotypealias ';
+  $geno_lookup_sql .= 'WHERE GenotypeAliasName=? AND GenusId=? AND GenotypeAliasId<>?';
+
+  ($lookp_err, $lookup_geno_id) = read_cell($dbh_k_read, $geno_lookup_sql,
+                                            [$genotype_name, $genus_id, $geno_alias_id]);
+
+  if (length($lookup_geno_id) > 0) {
+
+    my $err_msg = "$genotype_name is already used.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'GenotypeName' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh_k_read->disconnect();
 
   my $dbh_k_write = connect_kdb_write();
 
@@ -2590,7 +2646,7 @@ sub update_genotype_runmode {
       $sql  = 'SELECT Count(*) ';
       $sql .= 'FROM genotypefactor ';
       $sql .= 'WHERE GenotypeId=? AND FactorId=?';
-      
+
       my ($read_err, $count) = read_cell($dbh_k_write, $sql, [$genotype_id, $vcol_id]);
 
       if (length($factor_value) > 0) {
@@ -2602,9 +2658,9 @@ sub update_genotype_runmode {
           $sql .= 'WHERE GenotypeId=? AND FactorId=?';
           my $factor_sth = $dbh_k_write->prepare($sql);
           $factor_sth->execute($factor_value, $genotype_id, $vcol_id);
-          
+
           if ($dbh_k_write->err()) {
-        
+
             $data_for_postrun_href->{'Error'} = 1;
             $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
@@ -2620,15 +2676,15 @@ sub update_genotype_runmode {
           $sql .= 'FactorValue=?';
           my $factor_sth = $dbh_k_write->prepare($sql);
           $factor_sth->execute($genotype_id, $vcol_id, $factor_value);
-      
+
           if ($dbh_k_write->err()) {
-        
+
             $data_for_postrun_href->{'Error'} = 1;
             $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
             return $data_for_postrun_href;
           }
-    
+
           $factor_sth->finish();
         }
       }
@@ -2641,9 +2697,9 @@ sub update_genotype_runmode {
 
           my $factor_sth = $dbh_k_write->prepare($sql);
           $factor_sth->execute($genotype_id, $vcol_id);
-      
+
           if ($dbh_k_write->err()) {
-        
+
             $data_for_postrun_href->{'Error'} = 1;
             $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
@@ -3377,7 +3433,7 @@ sub add_genotype_alias_runmode {
 "AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
 "KDDArTModule": "main",
 "KDDArTTable": "genotypealias",
-"SkippedField": ["GenotypeId"],
+"SkippedField": ["GenotypeId", "GenusId"],
 "SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><ReturnId Value='2' ParaName='GenotypeAliasId' /><Info Message='GenotypeAlias (2) has been added successfully.' /></DATA>",
 "SuccessMessageJSON": "{ 'ReturnId' : [  {   'Value' : '3',   'ParaName' : 'GenotypeAliasId'  } ], 'Info' : [  {   'Message' : 'GenotypeAlias (3) has been added successfully.'  } ]}",
 "ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Genotype (66527) not found.' /></DATA>"}],
@@ -3397,7 +3453,10 @@ sub add_genotype_alias_runmode {
 
   my $dbh_read = connect_kdb_read();
 
-  my $skip_field = {'GenotypeId' => 1};
+  my $skip_field = {'GenotypeId'     => 1,
+                    'GenusId'        => 1,
+                    'IsGenotypeName' => 1,
+                   };
 
   my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
                                                                                 'genotypealias', $skip_field);
@@ -3415,9 +3474,9 @@ sub add_genotype_alias_runmode {
 
   my $dbh_write = connect_kdb_write();
 
-  my $genotype_exist = record_existence($dbh_write, 'genotype', 'GenotypeId', $geno_id);
+  my $genus_id = read_cell_value($dbh_write, 'genotype', 'GenusId', 'GenotypeId', $geno_id);
 
-  if (!$genotype_exist) {
+  if (length($genus_id) == 0) {
 
     my $err_msg = "Genotype ($geno_id) not found.";
     $data_for_postrun_href->{'Error'} = 1;
@@ -3444,7 +3503,7 @@ sub add_genotype_alias_runmode {
     return $data_for_postrun_href;
   }
 
-  my $geno_alias_name = $query->param('GenotypeAliasName');
+  my $geno_alias_name   = $query->param('GenotypeAliasName');
 
   my $geno_alias_type   = undef;
   my $geno_alias_status = undef;
@@ -3473,7 +3532,7 @@ sub add_genotype_alias_runmode {
       $geno_alias_lang = $query->param('GenotypeAliasLang');
     }
   }
-  
+
   if (defined $geno_alias_type) {
 
     if (!type_existence($dbh_write, 'genotypealias', $geno_alias_type)) {
@@ -3500,15 +3559,45 @@ sub add_genotype_alias_runmode {
     }
   }
 
-  my $sql = 'INSERT INTO genotypealias SET ';
+  my $sql = 'SELECT GenotypeAliasId FROM genotypealias WHERE GenotypeAliasName=? AND GenusId=?';
+
+  my ($lookup_err, $alias_id) = read_cell($dbh_write, $sql, [$geno_alias_name, $genus_id]);
+
+  if (length($alias_id) > 0) {
+
+    my $err_msg = "GenotypeAliasName ($geno_alias_name): already exists.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'GenotypeAliasName' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sql = 'SELECT GenotypeId FROM genotype WHERE GenotypeName=? AND GenusId=?';
+
+  my ($lookup_geno_err, $db_geno_id) = read_cell($dbh_write, $sql, [$geno_alias_name, $genus_id]);
+
+  if (length($db_geno_id) > 0) {
+
+    my $err_msg = "GenotypeAliasName ($geno_alias_name): already used as GenotypeName in genotype ($db_geno_id).";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'GenotypeAliasName' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sql    = 'INSERT INTO genotypealias SET ';
   $sql   .= 'GenotypeAliasName=?, ';
   $sql   .= 'GenotypeId=?, ';
   $sql   .= 'GenotypeAliasType=?, ';
   $sql   .= 'GenotypeAliasStatus=?, ';
-  $sql   .= 'GenotypeAliasLang=?';
+  $sql   .= 'GenotypeAliasLang=?, ';
+  $sql   .= 'GenusId=?';
 
   my $sth = $dbh_write->prepare($sql);
-  $sth->execute($geno_alias_name, $geno_id, $geno_alias_type, $geno_alias_status, $geno_alias_lang);
+  $sth->execute($geno_alias_name, $geno_id, $geno_alias_type, $geno_alias_status,
+                $geno_alias_lang, $genus_id);
 
   if ($dbh_write->err()) {
 
@@ -3548,7 +3637,7 @@ sub update_genotype_alias_runmode {
 "AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
 "KDDArTModule": "main",
 "KDDArTTable": "genotypealias",
-"SkippedField": ["GenotypeId"],
+"SkippedField": ["GenotypeId", "GenusId"],
 "SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='GenotypeAlias (1) has been updated successfully.' /></DATA>",
 "SuccessMessageJSON": "{ 'Info' : [  {   'Message' : 'GenotypeAlias (1) has been updated successfully.'  } ]}",
 "ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='GenotypeAlias (5) not found.' /></DATA>"}],
@@ -3568,7 +3657,10 @@ sub update_genotype_alias_runmode {
 
   my $dbh_read = connect_kdb_read();
 
-  my $skip_field = {'GenotypeId' => 1};
+  my $skip_field = {'GenotypeId'     => 1,
+                    'GenusId'        => 1,
+                    'IsGenotypeName' => 1,
+                   };
 
   my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
                                                                                 'genotypealias', $skip_field);
@@ -3584,10 +3676,12 @@ sub update_genotype_alias_runmode {
 
   # Finish generic required static field checking
 
+  $self->logger->debug("Genotype alias id: $geno_alias_id");
+
   my $dbh_write = connect_kdb_write();
 
-  my $read_sql   = 'SELECT GenotypeId, GenotypeAliasName, GenotypeAliasType, GenotypeAliasStatus, GenotypeAliasLang ';
-     $read_sql  .= 'FROM genotypealias WHERE GenotypeAliasId=? ';
+  my $read_sql  = 'SELECT GenotypeId, GenusId, GenotypeAliasType, GenotypeAliasStatus, GenotypeAliasLang ';
+  $read_sql    .= 'FROM genotypealias WHERE GenotypeAliasId=? ';
 
   my ($r_df_val_err, $r_df_val_msg, $geno_df_val_data) = read_data($dbh_write, $read_sql, [$geno_alias_id]);
 
@@ -3600,8 +3694,9 @@ sub update_genotype_alias_runmode {
     return $data_for_postrun_href;
   }
 
+  my $geno_alias_name   = $query->param('GenotypeAliasName');
+
   my $geno_id            = undef;
-  my $geno_alias_name    = undef;
   my $geno_alias_type    = undef;
   my $geno_alias_status  = undef;
   my $geno_alias_lang    = undef;
@@ -3616,38 +3711,95 @@ sub update_genotype_alias_runmode {
 
      return $data_for_postrun_href;
   }
- 
+
   $geno_id           = $geno_df_val_data->[0]->{'GenotypeId'};
-  $geno_alias_name   = $geno_df_val_data->[0]->{'GenotypeAliasName'};
   $geno_alias_type   = $geno_df_val_data->[0]->{'GenotypeAliasType'};
   $geno_alias_status = $geno_df_val_data->[0]->{'GenotypeAliasStatus'};
   $geno_alias_lang   = $geno_df_val_data->[0]->{'GenotypeAliasLang'};
+  my $genus_id       = $geno_df_val_data->[0]->{'GenusId'};
+
+  if (length($geno_alias_type) == 0) {
+
+    $geno_alias_type = undef;
+  }
+
+  if (length($geno_alias_status) == 0) {
+
+    $geno_alias_status = undef;
+  }
+
+  if (length($geno_alias_lang) == 0) {
+
+    $geno_alias_lang = undef;
+  }
 
   if (length($geno_id) == 0) {
-  
+
     my $err_msg = "GenotypeAlias ($geno_alias_id) not found.";
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-    
+
     return $data_for_postrun_href;
-  } 
-  
+  }
+
   my $group_id = $self->authen->group_id();
   my $gadmin_status = $self->authen->gadmin_status();
-  
+
   my ($is_geno_ok, $trouble_geno_id_aref) = check_permission($dbh_write, 'genotype', 'GenotypeId',
                                                              [$geno_id], $group_id, $gadmin_status,
                                                              $READ_WRITE_PERM);
-                                                             
-  if (!$is_geno_ok) {                                        
-  
+
+  if (!$is_geno_ok) {
+
     my $trouble_geno_id = $trouble_geno_id_aref->[0];
     my $err_msg = "Permission denied: Group ($group_id) and genotype ($geno_id).";
-    
+
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-    
+
     return $data_for_postrun_href;
+  }
+
+  my $sql = 'SELECT GenotypeAliasId FROM genotypealias ';
+  $sql   .= 'WHERE GenotypeAliasName=? AND GenusId=? AND GenotypeAliasId<>?';
+
+  my ($chk_name_err, $db_geno_alias_id) = read_cell($dbh_write, $sql, [$geno_alias_name, $genus_id,
+                                                                       $geno_alias_id]);
+
+  if (length($db_geno_alias_id) > 0) {
+
+    my $err_msg = "GenotypeAliasName ($geno_alias_name) - GenusId ($genus_id): already used.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sql  = 'SELECT GenotypeId FROM genotype ';
+  $sql .= 'WHERE GenotypeName=? AND GenusId=? AND GenotypeId<>?';
+
+  my ($chk_geno_name_err, $db_geno_id) = read_cell($dbh_write, $sql, [$geno_alias_name, $genus_id,
+                                                                      $geno_id]);
+
+  if (length($db_geno_id) > 0) {
+
+    my $err_msg = "GenotypeAliasName ($geno_alias_name): already used as GenotypeName in genotype ($db_geno_id).";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (defined $query->param('GenotypeAliasType')) {
+
+    if (length($query->param('GenotypeAliasType')) > 0) {
+
+      $geno_alias_type = $query->param('GenotypeAliasType');
+    }
+    else {
+
+      $geno_alias_type = undef;
+    }
   }
 
   if (length($geno_alias_type) > 0) {
@@ -3667,6 +3819,18 @@ sub update_genotype_alias_runmode {
     $geno_alias_type = undef;
   }
 
+  if (defined $query->param('GenotypeAliasStatus')) {
+
+    if (length($query->param('GenotypeAliasStatus')) > 0) {
+
+      $geno_alias_status = $query->param('GenotypeAliasStatus');
+    }
+    else {
+
+      $geno_alias_status = undef;
+    }
+  }
+
   if (length($geno_alias_status) > 0) {
 
     if (!type_existence($dbh_write, 'genotypealiasstatus', $geno_alias_status)) {
@@ -3684,17 +3848,31 @@ sub update_genotype_alias_runmode {
     $geno_alias_status = undef;
   }
 
+  if (defined $query->param('GenotypeAliasLang')) {
+
+    if (length($query->param('GenotypeAliasLang')) > 0) {
+
+      $geno_alias_lang = $query->param('GenotypeAliasLang');
+    }
+    else {
+
+      $geno_alias_lang = undef;
+    }
+  }
+
   if (length($geno_alias_lang) == 0) {
 
     $geno_alias_lang = undef;
   }
 
-  my $sql = 'UPDATE genotypealias SET ';
-     $sql   .= 'GenotypeAliasName=?, ';
-     $sql   .= 'GenotypeAliasType=?, ';
-     $sql   .= 'GenotypeAliasStatus=?, ';
-     $sql   .= 'GenotypeAliasLang=? ';
-     $sql   .= 'WHERE GenotypeAliasId=?';
+  $sql    = 'UPDATE genotypealias SET ';
+  $sql   .= 'GenotypeAliasName=?, ';
+  $sql   .= 'GenotypeAliasType=?, ';
+  $sql   .= 'GenotypeAliasStatus=?, ';
+  $sql   .= 'GenotypeAliasLang=? ';
+  $sql   .= 'WHERE GenotypeAliasId=?';
+
+  $self->logger->debug("SQL: $sql");
 
   my $sth = $dbh_write->prepare($sql);
   $sth->execute($geno_alias_name, $geno_alias_type, $geno_alias_status, $geno_alias_lang, $geno_alias_id);
@@ -8038,7 +8216,8 @@ sub import_genotype_csv_runmode {
 
       #$self->logger->debug("Check GenotypeName SQL: $check_geno_name_sql");
 
-      my ($chk_geno_read_err, $chk_geno_read_msg, $geno_name_data) = read_data($dbh_write, $check_geno_name_sql);
+      my ($chk_geno_read_err, $chk_geno_read_msg, $geno_name_data) = read_data($dbh_write,
+                                                                               $check_geno_name_sql);
 
       if ( scalar(@{$geno_name_data}) ) {
 
@@ -8046,6 +8225,27 @@ sub import_genotype_csv_runmode {
         for my $geno_row (@{$geno_name_data}) {
 
           push(@duplicate_geno, $geno_row->{'GenotypeName'});
+        }
+
+        my $start_row = $i + 1;
+        my $end_row   = $smallest_num;
+        my $err_msg = "Row ($start_row, $end_row): (" . join(',', @duplicate_geno) . ') genotypes already exist.';
+        return $self->_set_error($err_msg);
+      }
+
+      my $check_alias_name_sql  = "SELECT GenotypeAliasName FROM genotypealias ";
+      $check_alias_name_sql    .= "WHERE CONCAT(GenotypeAliasName, '_G_', GenusId) IN ";
+      $check_alias_name_sql    .= "($uniq_geno_name_where)";
+
+      my ($chk_alias_read_err, $chk_alias_read_msg, $alias_name_data) = read_data($dbh_write,
+                                                                                  $check_alias_name_sql);
+
+      if ( scalar(@{$alias_name_data}) ) {
+
+        my @duplicate_geno;
+        for my $alias_row (@{$alias_name_data}) {
+
+          push(@duplicate_geno, $alias_row->{'GenotypeAliasName'});
         }
 
         my $start_row = $i + 1;

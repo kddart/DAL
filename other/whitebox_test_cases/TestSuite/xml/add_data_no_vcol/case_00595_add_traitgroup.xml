@@ -3,6 +3,7 @@
   <Delete TargetURL="delete/traitgroup/:TraitGroupId" />
   <INPUT ParaName="TraitGroupName" PrefixVal="TraitGroup_" Random="1" />
   <INPUT ParaName="traitgroupentry" Process="1" SrcFile="xml/add_data_no_vcol/traitgroupentry.xml" />
+  <INPUT ParaName="AltIdentifier" PrefixVal="486_" Random="1" />
   <Match Attr="StatusCode" Value="200" />
   <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
   <Match Attr="ParaName" Tag="ReturnId" Value="TraitGroupId" />

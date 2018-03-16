@@ -34,6 +34,7 @@ use CGI::Application::Plugin::Session;
 use Log::Log4perl qw(get_logger :levels);
 use Apache::Solr;
 
+
 sub setup {
 
   my $self = shift;

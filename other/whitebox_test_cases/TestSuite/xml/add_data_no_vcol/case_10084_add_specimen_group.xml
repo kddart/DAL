@@ -18,6 +18,4 @@
   <Parent CaseFile="xml/add_data_no_vcol/case_10085_add_specimen_group_type.xml" Force="1" Order="3" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00114_add_specimen1.xml" Order="4" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00115_add_specimen2.xml" Order="5" />
-  <ReturnId ParaName="SpecimenGroupId" Value="4" />
-  
 </TestCase>

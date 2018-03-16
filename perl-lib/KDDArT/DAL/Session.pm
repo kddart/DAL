@@ -29,6 +29,7 @@ use lib "$main::kddart_base_dir/perl-lib";
 use Log::Log4perl qw(get_logger :levels);
 use CGI::Session;
 
+
 use base qw(CGI::Application::Plugin::Authentication::Store);
 
 =head1 NAME

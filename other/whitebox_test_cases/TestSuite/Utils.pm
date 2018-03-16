@@ -651,9 +651,16 @@ sub get_case_parameter {
           $src_tag = $input_href->{'SrcTag'};
         }
 
-        if (defined $src_case_data_ref->{"$src_tag"}->[0]->{'Value'}) {
+        my $val_attr      = 'Value';
 
-          $para_val = $src_case_data_ref->{"$src_tag"}->[0]->{'Value'};
+        if (defined $input_href->{'Attr'}) {
+
+          $val_attr   = $input_href->{'Attr'};
+        }
+
+        if (defined $src_case_data_ref->{"$src_tag"}->[0]->{$val_attr}) {
+
+          $para_val = $src_case_data_ref->{"$src_tag"}->[0]->{$val_attr};
         }
         elsif (defined $src_case_data_ref->{"$src_tag"}->[0]->{'IdFile'}) {
 
@@ -668,7 +675,6 @@ sub get_case_parameter {
           my $id_data         = undef;
 
           my $record_idx = $input_href->{'Idx'};
-          my $val_attr   = $input_href->{'Attr'};
 
           if (defined $id_data_lookup_href->{$id_file}) {
 
@@ -708,7 +714,7 @@ sub get_case_parameter {
         }
         else {
 
-          $logger->debug("$case_file: $para_name source case $src_case_file value not found");
+          $logger->debug("$case_file: $para_name source case $src_case_file: $src_tag - $val_attr : value not found");
           die "$case_file: $para_name source case $src_case_file value not found";
         }
 
@@ -1316,6 +1322,15 @@ sub add_record_upload {
     }
 
     my $param_value = $parameter->{$param_name};
+
+    while ($param_value =~ /\|:(\w+):\|/ ) {
+
+      my $lookup_param_name = $1;
+      my $lookup_param_val  = $parameter->{$lookup_param_name};
+
+      $param_value =~ s/\|:${lookup_param_name}:\|/${lookup_param_val}/;
+    }
+
     $atomic_data   .= "$param_value";
     $para_order    .= "${param_name},";
 
@@ -1633,6 +1648,15 @@ sub add_record {
     }
 
     my $param_value = $parameter->{$param_name};
+
+    while ($param_value =~ /\|:(\w+):\|/ ) {
+
+      my $lookup_param_name = $1;
+      my $lookup_param_val  = $parameter->{$lookup_param_name};
+
+      $param_value =~ s/\|:${lookup_param_name}:\|/${lookup_param_val}/;
+    }
+
     $atomic_data   .= "$param_value";
     $para_order    .= "${param_name},";
 
