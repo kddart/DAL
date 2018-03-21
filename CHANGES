@@ -1,3 +1,11 @@
+Version 2.5.1
+Date: 21/03/2018
+Description: Fix list layer attribute
+
+Minor:
+
+  + Fix bug #4367 for list layer attribute interface to return all fields in layerattrib table.
+
 Version 2.5.0
 Date: 16/03/2018
 Description: Improved version with unique genotype alias name checking with genotype name.

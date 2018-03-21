@@ -2844,8 +2844,8 @@ sub list_layer_attribute_runmode {
 "GroupAdminRequired": 0,
 "SignatureRequired": 0,
 "AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><layerattrib layer='9' layerattribid='19' colname='Temperature_8268518' update='update/layerattrib/' /><layerattrib layer='9' layerattribid='20' colname='Humidity_4789086' update='update/layerattrib/' /><RecordMeta TagName='layerattrib' /></DATA>",
-"SuccessMessageJSON": "{'layerattrib' : [{'layerattribid' : '20','layer' : '9','colname' : 'Humidity_4789086','update' : 'update/layerattrib/'}],'RecordMeta' : [{'TagName' : 'layerattrib'}]}",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><layerattrib colunits='percentage' colname='hum_15411235529' unitid='7' validation='' layer='11' coltype='Humidity' colsize='20' layerattribid='16' update='update/layerattrib/' /><layerattrib colunits='degree c' colname='temperature_33601405048' unitid='7' layer='11' validation='' coltype='Temperature' colsize='20' update='update/layerattrib/' layerattribid='15' /><RecordMeta TagName='layerattrib' /><StatInfo ServerElapsedTime='0.009' Unit='second' /></DATA>",
+"SuccessMessageJSON": "{'layerattrib' : [{'colsize' : 20,'update' : 'update/layerattrib/','layerattribid' : 16,'coltype' : 'Humidity','unitid' : 7,'layer' : 11,'validation' : null,'colname' : 'hum_15411235529','colunits' : 'percentage'},{'unitid' : 7,'validation' : null,'layer' : 11,'colname' : 'temperature_33601405048','colunits' : 'degree c','colsize' : 20,'layerattribid' : 15,'update' : 'update/layerattrib/','coltype' : 'Temperature'}],'RecordMeta' : [{'TagName' : 'layerattrib'}],'StatInfo' : [{'ServerElapsedTime' : '0.012','Unit' : 'second'}]}",
 "ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
 "ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
 "URLParameter": [{"ParameterName": "id", "Description": "Existing layer id", "Optional": 1}],
@@ -2859,7 +2859,7 @@ sub list_layer_attribute_runmode {
 
   my $data_for_postrun_href = {};
 
-  my $sql = 'SELECT id as layerattribid, layer, colname ';
+  my $sql = 'SELECT id as layerattribid, layer, colname, coltype, colsize, validation, colunits, unitid ';
   $sql   .= 'FROM layerattrib';
 
   if (defined $self->param('id')) {
