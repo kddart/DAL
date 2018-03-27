@@ -1009,7 +1009,7 @@ sub register_device_runmode {
 
     my $err_msg = "DeviceTypeId ($device_type_id): not found or inactive.";
     $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'DeviceTypeId' => $err_msg}]};
 
     return $data_for_postrun_href;
   }
@@ -1097,9 +1097,7 @@ sub update_device_registration_runmode {
 
   my $dbh_read = connect_kdb_read();
 
-  my $skip_field = {'DeviceTypeId' => 1,
-                    'DeviceId'     => 1,
-                   };
+  my $skip_field = {};
 
   my $field_name_translation = {};
 
@@ -1119,6 +1117,21 @@ sub update_device_registration_runmode {
 
   # Finish generic required static field checking
 
+  my $device_id      = $query->param('DeviceId');
+  my $device_type_id = $query->param('DeviceTypeId');
+
+  $device_id = lc($device_id);
+
+  if ($device_id =~ /[\/|\\]/) {
+
+    my $err_msg = "DeviceId cannot have slash (/) or backslash (\\).";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'DeviceId' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
   my $dbh_write = connect_kdb_write();
 
   my $reg_exist = record_existence($dbh_write, 'deviceregister', 'DeviceRegisterId', $reg_id);
@@ -1129,6 +1142,40 @@ sub update_device_registration_runmode {
 
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if ( !type_existence($dbh_write, 'deviceregister', $device_type_id) ) {
+
+    my $err_msg = "DeviceTypeId ($device_type_id): not found or inactive.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'DeviceTypeId' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $chk_dev_id_sql = 'SELECT DeviceRegisterId FROM deviceregister ';
+  $chk_dev_id_sql   .= 'WHERE DeviceId=? AND DeviceRegisterId<>?';
+
+  my ($chk_dev_id_err, $db_dev_id) = read_cell($dbh_write, $chk_dev_id_sql,
+                                               [$device_id, $reg_id]);
+
+  if ($chk_dev_id_err) {
+
+    $self->logger->debug("Check device id uniqueness failed");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (length($db_dev_id) > 0) {
+
+    my $err_msg = "DeviceId ($device_id): already exists.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'DeviceId' => $err_msg}]};
 
     return $data_for_postrun_href;
   }
@@ -1238,6 +1285,8 @@ sub update_device_registration_runmode {
   }
 
   my $sql  = 'UPDATE deviceregister SET ';
+  $sql    .= 'DeviceId = ?, ';
+  $sql    .= 'DeviceTypeId = ?, ';
   $sql    .= 'DeviceNote = ?, ';
   $sql    .= 'Latitude = ?, ';
   $sql    .= 'Longitude = ?, ';
@@ -1245,7 +1294,7 @@ sub update_device_registration_runmode {
   $sql    .= 'WHERE DeviceRegisterId=?';
 
   my $sth = $dbh_write->prepare($sql);
-  $sth->execute($note, $lat, $lng, $conf, $reg_id);
+  $sth->execute($device_id, $device_type_id, $note, $lat, $lng, $conf, $reg_id);
 
   if ($dbh_write->err()) {
 
@@ -7480,6 +7529,7 @@ sub add_layer_data_runmode {
 "ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Layer (72) not found.'}]}"}],
 "HTTPParameter": [{"Required": 1, "Name": "data", "Description": "JSON string or blob in a structure as the following: {'DATA': [{'layerattrib' : '44', 'value' : '24.69', 'dt' : '2010-11-23 19:00:00', 'geometry' : 'POINT(149.094063 -35.30635)'},{'layerattrib' : '45', 'value' : '46.88', 'dt' : '2010-11-23 19:00:00', 'geometry' : 'POINT(149.094063 -35.30635)'}]}. The value of layerattrib attribute is an attribute id in the layer specified in the id URL parameter."}],
 "URLParameter": [{"ParameterName": "id", "Description": "Existing layer id."}],
+"InputDataJSONSchema": "addlayerdata.schema.json",
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut

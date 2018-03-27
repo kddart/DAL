@@ -69,9 +69,9 @@ sub setup {
         );
 
     my $layout = Log::Log4perl::Layout::PatternLayout->new("[%d] [%H] [%X{client_ip}] [%p] [%F{1}:%L] [%M] [%m]%n");
-    
+
     $app->layout($layout);
-    
+
     $logger->add_appender($app);
   }
   $logger->level($DEBUG);
@@ -125,7 +125,7 @@ sub help_runmode {
 
   my $i = 0;
   while ( $i < scalar(@{$dispatch_table->{'table'}}) ) {
-      
+
     my $url_part     = $dispatch_table->{'table'}->[$i];
     my $pck_info_str = $dispatch_table->{'table'}->[$i+1]->{'app'};
     my $run_mode     = $dispatch_table->{'table'}->[$i+1]->{'rm'};
@@ -184,7 +184,7 @@ sub help_runmode {
       $help_href->{'URI'} = $operation;
 
       if (defined $help_href->{'KDDArTModule'}) {
-      
+
         my $kddart_module = lc($help_href->{'KDDArTModule'});
 
         my $dbh;
@@ -208,7 +208,7 @@ sub help_runmode {
           my $err_msg = "Help is not available.";
           $data_for_postrun_href->{'Error'} = 1;
           $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg, 'ErrorId' => 1}]};
-    
+
           return $data_for_postrun_href;
         }
 
@@ -230,11 +230,11 @@ sub help_runmode {
         if ($sfield_err) {
 
           $self->logger->debug("$sfield_msg");
-          
+
           my $err_msg = "Help is not available.";
           $data_for_postrun_href->{'Error'} = 1;
           $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg, 'ErrorId' => 1}]};
-          
+
           return $data_for_postrun_href;
         }
 
@@ -333,7 +333,7 @@ sub help_runmode {
 
         my $url = reconstruct_server_url();
 
-        my $dtd_url = "$url/dtd/" . $dtd_file_name;
+        my $dtd_url = "$url/$DTD_PATH/" . $dtd_file_name;
         $help_href->{'DTDURLForUploadXML'} = $dtd_url;
 
         my $dtd_full_path = $ENV{DOCUMENT_ROOT} . '/' . $DTD_PATH . '/' . $dtd_file_name;
@@ -343,6 +343,24 @@ sub help_runmode {
         $dtd_content =~ s/\n//g;
 
         $help_href->{'DTDContentForUploadXML'} = $dtd_content;
+      }
+
+      if (defined $help_href->{'InputDataJSONSchema'}) {
+
+        my $json_schema_file_name = $help_href->{'InputDataJSONSchema'};
+
+        my $url = reconstruct_server_url();
+
+        my $jschema_url = "$url/$JSON_SCHEMA_PATH/" . $json_schema_file_name;
+        $help_href->{'InputDataJSONSchemaURL'} = $jschema_url;
+
+        my $jschema_full_path = $ENV{DOCUMENT_ROOT} . '/' . $JSON_SCHEMA_PATH . '/' . $json_schema_file_name;
+        my $jschema_content   = read_file($jschema_full_path);
+
+        $jschema_content =~ s/"/'/g;
+        $jschema_content =~ s/\n//g;
+
+        $help_href->{'InputDataJSONSchema'} = $jschema_content;
       }
 
       $data_for_postrun_href->{'Error'}     = 0;

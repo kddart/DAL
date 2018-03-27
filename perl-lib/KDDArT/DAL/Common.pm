@@ -169,7 +169,7 @@ our $ACCEPT_HEADER_LOOKUP   = { 'application/json' => 'JSON',
 
 our $VALID_CTYPE            = {'xml' => 1, 'json' => 1, 'geojson' => 1};
 
-our $DAL_VERSION            = '2.5.1';
+our $DAL_VERSION            = '2.5.2';
 our $DAL_COPYRIGHT          = 'Copyright (c) 2018, Diversity Arrays Technology, All rights reserved.';
 our $DAL_ABOUT              = 'Data Access Layer';
 
