@@ -1,5 +1,13 @@
+Version 2.5.3
+Date: 23/04/2018
+Description: Fix SQL upgrade script.
+
+Minor:
+
+  + Fix bug in SQL upgrade script that clean up duplicate genotypealias.
+
 Version 2.5.2
-Data: 27/03/2018
+Date: 27/03/2018
 Description: Fix update device register to update device id and device type id.
 
 Minor:

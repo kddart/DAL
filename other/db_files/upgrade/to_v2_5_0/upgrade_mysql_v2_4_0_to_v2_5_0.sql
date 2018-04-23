@@ -44,18 +44,17 @@ COMMIT;
 
 BEGIN;
 
-CREATE TEMPORARY TABLE IF NOT EXISTS dup_genotypealias AS (SELECT MIN(GenotypeAliasId) AS KeepGenotypeAliasId FROM genotypealias GROUP BY GenotypeId, GenotypeAliasName);
+UPDATE genotypealias LEFT JOIN genotype ON genotypealias.GenotypeId = genotype.GenotypeId SET genotypealias.GenusId = genotype.GenusId;
 
-DELETE FROM genotypealias WHERE GenotypeAliasId NOT IN (SELECT KeepGenotypeAliasId FROM dup_genotypealias);
+CREATE TEMPORARY TABLE IF NOT EXISTS uniq_genotypealias AS (SELECT MIN(GenotypeAliasId) AS KeepGenotypeAliasId FROM genotypealias GROUP BY GenusId, GenotypeAliasName);
 
-DROP TABLE dup_genotypealias;
+CREATE TEMPORARY TABLE IF NOT EXISTS del_genotypealias AS (SELECT GenotypeAliasId FROM genotypealias WHERE GenotypeAliasId NOT IN (SELECT KeepGenotypeAliasId FROM uniq_genotypealias));
 
-UPDATE genotypealias LEFT JOIN genotype ON genotypealias.GenotypeId = genotype.GenotypeId SET genotypealias.GenusId = genotype.GenotypeId;
+DELETE FROM a USING genotypealias AS a INNER JOIN del_genotypealias AS b ON a.GenotypeAliasId = b.GenotypeAliasId;
 
-ALTER TABLE genotypealias CHANGE COLUMN GenusId GenusId integer(11) NOT NULL comment 'genus id - same as for main genotype record - to assure uniqness inside the genus - should be managed by trigger',
-                          ADD UNIQUE xga_GenotypeAliasUniq (GenusId, GenotypeAliasName),
-                          ADD CONSTRAINT genotypealias_ibfk_4 FOREIGN KEY (GenusId) REFERENCES genus (GenusId) ON DELETE NO ACTION ON UPDATE NO ACTION,
-                          ENGINE=InnoDB  DEFAULT CHARACTER SET utf8 comment='One genotype may have many historical names (aliases) under which it has been known.';
+DROP TABLE uniq_genotypealias;
+
+DROP TABLE del_genotypealias;
 
 
 COMMIT;
@@ -287,6 +286,12 @@ DELIMITER ;
 
 -- This statement is make GenotypeName be added as GenotypeAliasName in genotypelias via the triggers
 UPDATE genotype SET GenotypeName=GenotypeName;
+
+ALTER TABLE genotypealias CHANGE COLUMN GenusId GenusId integer(11) NOT NULL comment 'genus id - same as for main genotype record - to assure uniqness inside the genus - should be managed by trigger',
+                          ADD UNIQUE xga_GenotypeAliasUniq (GenusId, GenotypeAliasName),
+                          ADD CONSTRAINT genotypealias_ibfk_4 FOREIGN KEY (GenusId) REFERENCES genus (GenusId) ON DELETE NO ACTION ON UPDATE NO ACTION,
+                          ENGINE=InnoDB  DEFAULT CHARACTER SET utf8 comment='One genotype may have many historical names (aliases) under which it has been known.';
+
 
 BEGIN;
 
