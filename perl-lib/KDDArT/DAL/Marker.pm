@@ -371,7 +371,7 @@ sub import_markerdata_dart_runmode {
 
   if ($csv_header_err) {
 
-    $self->logger->debug("Error reading header");
+    $self->logger->debug("Error reading header: $csv_header_msg");
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $csv_header_msg}]};
 

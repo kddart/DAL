@@ -2491,7 +2491,6 @@ sub get_contact_runmode {
 
   my $dbh = connect_kdb_read();
   my $contact_exist = record_existence($dbh, 'contact', 'ContactId', $contact_id);
-  $dbh->disconnect();
 
   if (!$contact_exist) {
 

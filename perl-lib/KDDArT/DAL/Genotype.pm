@@ -390,7 +390,6 @@ sub add_genotype_runmode {
   }
 
   my $genus_existence = record_existence($dbh_k_read, 'genus', 'GenusId', $genus_id);
-  $dbh_k_read->disconnect();
 
   if (!$genus_existence) {
 
@@ -464,6 +463,8 @@ sub add_genotype_runmode {
 
     return $data_for_postrun_href;
   }
+
+  $dbh_k_read->disconnect();
 
   my $dbh_k_write = connect_kdb_write();
 
@@ -9916,8 +9917,6 @@ sub add_breedingmethod_runmode {
 
   my $bmeth_type_existence = type_existence($dbh_k_read, 'breedingmethod', $breedingmethod_type);
 
-  $dbh_k_read->disconnect();
-
   if (!$bmeth_type_existence) {
 
     my $err_msg = "BreedingMethodType ($breedingmethod_type) does not exist.";
@@ -9947,6 +9946,8 @@ sub add_breedingmethod_runmode {
       return $data_for_postrun_href;
     }
   }
+
+  $dbh_k_read->disconnect();
 
   my $dbh_k_write = connect_kdb_write();
 

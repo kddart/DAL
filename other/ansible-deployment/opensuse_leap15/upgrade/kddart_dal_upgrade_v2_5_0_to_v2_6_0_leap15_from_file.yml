@@ -1,0 +1,131 @@
+#
+# DAL upgrade script for OpenSUSE Leap 42.2
+# Copyright (c) 2017, Diversity Arrays Technology, All rights reserved.
+#
+# Author: Puthick Hok
+# Date: 23/06/2011
+# Usage: ansible-playbook kddart_dal_upgrade_v2_4_0_to_v2_5_0_leap42_2_from_file.yml
+# Description: By running the usage command, ansible will upgrade DAL.
+#              This script can be run by root.
+#              For more information about how to read and write an ansible playbook,
+#              please refer to ansible documentation on the web.
+#
+
+- hosts: kddartserver
+  gather_facts: no
+
+  pre_tasks:
+    - name: Install sudo
+      raw: zypper --non-interactive --no-gpg-checks install sudo
+    - setup: # does gather_facts
+  
+  vars_prompt:  
+    - name: "local_tar_gz_file"
+      prompt: "Enter the source tar.gz file of KDDart wih either relative or full path."
+      private: no
+
+  vars:
+    dal_version: v2.6.0
+    dal_db_version: v2_6_0
+    src_file: /root/KDDArT-DAL-{{ dal_version }}.tar.gz
+    old_dal_db_version: v2_5_0
+    local_dir: /root/KDDArT-DAL-{{ dal_version }}
+    backup_dir: /root/dal_upgrade_db_backup
+    apache_base_dir: /srv/www
+    solr_home: /var/solr
+    force_tasks: True
+
+  tasks:
+
+    - name: Copy the tar.gz file
+      copy: src={{ local_tar_gz_file }} dest={{ src_file }}
+
+    - name: Create local_dir
+      shell: "[[ -d {{ local_dir }} ]] || mkdir {{ local_dir }}"
+
+    - name: Untar and decompress KDDart source
+      shell: >
+        if [ -d {{ local_dir }} ]; then 
+        cd {{ local_dir }};
+        tar --no-same-owner -zxvf {{ src_file }} --strip 1;
+        fi;
+
+    - name: Install Perl Libraries used in DAL
+      cpanm: name={{item}}
+      with_items:
+        - DateTime::Format::Flexible
+
+    - name: Retrieve kddart_dal password
+      shell: grep 'password' {{ apache_base_dir }}/secure/mysql_user.txt | gawk 'BEGIN{FS="="}{print $2}END{}' | sed 's| ||g'
+      register: kddart_dal_pass
+
+    - name: Adjust create_dbs.sh update the password
+      shell: >
+        sed -i "s|DB_PASS='yourSecurePassword'|DB_PASS='{{ kddart_dal_pass.stdout }}'|g" {{ local_dir }}/other/create_dbs.sh;
+
+    - name: Copy Perl packages
+      shell: >
+        export VHOST_DIRS=`sed -n -e '/DSN_KDB_READ/,/DSN_KDB_WRITE/p' {{ apache_base_dir }}/secure/kddart_dal.cfg | grep 'DBI:mysql:database' | gawk 'BEGIN{FS="="}{print $1}END{}'`;
+
+        for EACH_VHOST_DIR in $VHOST_DIRS; do
+        cp -rp {{ local_dir }}/vhosts/kddart.example.com/* {{ apache_base_dir }}/$EACH_VHOST_DIR;
+        chown wwwrun:www {{ apache_base_dir }}/$EACH_VHOST_DIR -R;
+        done;
+
+        cp -rp {{ local_dir}}/perl-lib/* {{ apache_base_dir }}/perl-lib;
+        cp {{local_dir}}/cgi-bin/kddart/* {{ apache_base_dir }}/cgi-bin/kddart;
+
+    - name: Upgrade configuration
+      shell: >
+        export VHOST_DIRS=`sed -n -e '/DSN_KDB_READ/,/DSN_KDB_WRITE/p' {{ apache_base_dir }}/secure/kddart_dal.cfg | grep 'DBI:mysql:database' | gawk 'BEGIN{FS="="}{print $1}END{}'`;
+
+    - name: Backup databases
+      shell: >
+        mkdir -p {{ backup_dir }};
+        cd {{ backup_dir }};
+        mysqldump -u root kddart_{{ old_dal_db_version }} > {{ backup_dir }}/kddart_{{ old_dal_db_version }}-`date +"%Y%m%d"`.sql;
+        pg_dump -U postgres -d kddart_gis_enviro_{{ old_dal_db_version }} > {{ backup_dir }}/kddart_gis_enviro_{{ old_dal_db_version }}-`date +"%Y%m%d"`.sql;
+        export export DOTMONETDBFILE="./.monetdbuser";
+        echo -e "user=monetdb\npassword=monetdb\nlanguage=sql" > ./.monetdbuser;
+        /usr/local/bin/msqldump -d kddart_marker_{{ old_dal_db_version }} > {{ backup_dir }}/kddart_marker_{{ old_dal_db_version }}-`date +"%Y%m%d"`.sql;
+
+    - name: Recreating databases from backup file into a new version for upgrade
+      shell: >
+        {{ local_dir }}/other/create_dbs.sh 1 kddart_gis_enviro_{{ dal_db_version }} {{ backup_dir }}/kddart_gis_enviro_{{ old_dal_db_version }}-`date +"%Y%m%d"`.sql kddart_{{ dal_db_version }} {{ backup_dir }}/kddart_{{ old_dal_db_version }}-`date +"%Y%m%d"`.sql kddart_marker_{{ dal_db_version }} {{ backup_dir }}/kddart_marker_{{ old_dal_db_version }}-`date +"%Y%m%d"`.sql 1 > /root/recreate_dbs.log 2>&1;
+
+    - name: Upgrade KDDart marker database structure
+      shell: >
+        export export DOTMONETDBFILE="./.monetdbuser";
+        echo -e "user=monetdb\npassword=monetdb\nlanguage=sql" > ./.monetdbuser;
+        mclient -d kddart_marker_{{ dal_db_version }} < {{ local_dir }}/other/db_files/upgrade/to_v2_6_0/upgrade_marker_{{ old_dal_db_version }}_to_{{ dal_db_version }}.sql > /root/upgrade_marker.log 2>&1;
+
+    - name: Save commands that recreate and upgrade databases
+      shell: >
+        echo "{{ local_dir }}/other/create_dbs.sh 1 kddart_gis_enviro_{{ dal_db_version }} {{ backup_dir }}/kddart_gis_enviro_{{ old_dal_db_version }}-`date +"%Y%m%d"`.sql kddart_{{ dal_db_version }} {{ backup_dir }}/kddart_{{ old_dal_db_version }}-`date +"%Y%m%d"`.sql kddart_marker_{{ dal_db_version }} {{ backup_dir }}/kddart_marker_{{ old_dal_db_version }}-`date +"%Y%m%d"`.sql 1 > /root/recreate_dbs.log 2>&1;" > {{ local_dir }}/other/run_upgrade_dbs.sh;
+        echo "mclient -u monetdb -d kddart_marker_{{ dal_db_version }} < {{ local_dir }}/other/db_files/upgrade/to_v2_6_0/upgrade_marker_{{ old_dal_db_version }}_to_{{ dal_db_version }}.sql > /root/upgrade_marker.log 2>&1;" >> {{ local_dir }}/other/run_upgrade_dbs.sh;
+        chmod 755 {{ local_dir }}/other/run_upgrade_dbs.sh;
+
+    - name: Change DAL config file for new version
+      shell: >
+        sed -i "s|{{ old_dal_db_version }}|{{ dal_db_version }}|g" {{ apache_base_dir }}/secure/kddart_dal.cfg;
+
+    - name: Change owner to wwwrun for dal config file
+      shell: chown wwwrun:www {{ apache_base_dir }}/secure/kddart_dal.cfg
+
+    - name: Change Solr config files
+      shell: >
+        [[ ! -e {{ solr_home }}/data/db/conf/db-data-config.xml ]] || sed -i "s|v[0-9]_[0-9]_[0-9]|{{ dal_db_version }}?useSSL=false|g" {{ solr_home }}/data/db/conf/db-data-config.xml;
+        [[ ! -e {{ solr_home }}/data/monetdb/conf/monetdb-data-config.xml ]] || sed -i "s|v[0-9]_[0-9]_[0-9]|{{ dal_db_version }}?useSSL=false|g" {{ solr_home }}/data/monetdb/conf/monetdb-data-config.xml;
+
+    - name: Restart mysql
+      shell: systemctl restart mysql
+
+    - name: Restart postgresql
+      shell: systemctl restart postgresql
+
+    - name: Restart apache
+      shell: systemctl restart apache2
+
+    - name: Restart solr
+      shell: >
+        [[ ! -e /etc/init.d/solr ]] || /etc/init.d/solr restart;

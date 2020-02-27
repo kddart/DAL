@@ -237,10 +237,13 @@ xml/add_data_no_vcol/case_10026_get_version.xml
 xml/add_data_no_vcol/case_10027_list_operation.xml
 xml/add_data_no_vcol/case_10028_get_session_expiry.xml
 xml/add_data_no_vcol/case_00301_add_plate.xml
+xml/add_data_no_vcol/case_00641_add_plate_with_metadata.xml
 xml/add_data_no_vcol/case_10033_get_plate.xml
 xml/add_data_no_vcol/case_10031_list_plate.xml
 xml/add_data_no_vcol/case_00373_add_platetype1.xml
+xml/add_data_no_vcol/case_00640_add_plate_n_extract_with_metadata.xml
 xml/add_data_no_vcol/case_10032_update_plate.xml
+xml/add_data_no_vcol/case_00642_update_plate_with_metadata.xml
 xml/add_data_no_vcol/case_10042_list_group.xml
 xml/add_data_no_vcol/case_10043_list_user.xml
 xml/add_data_no_vcol/case_00302_add_extract.xml
@@ -260,6 +263,7 @@ xml/add_data_no_vcol/case_00464_add_marker_map.xml
 xml/add_data_no_vcol/case_00474_import_markermap_brassica.xml
 xml/add_data_no_vcol/case_00604_export_markermapposition.xml
 xml/add_data_no_vcol/case_00605_import_markermap_brassica_ds.xml
+xml/add_data_no_vcol/case_00638_add_analysisgroup_with_metadata.xml
 xml/add_data_no_vcol/case_10009_list_extract.xml
 xml/add_data_no_vcol/case_10011_get_genotype.xml
 xml/add_data_no_vcol/case_10012_list_genotype.xml

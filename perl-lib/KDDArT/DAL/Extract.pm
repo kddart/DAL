@@ -784,7 +784,8 @@ sub update_plate_runmode {
   my $PlateName        = $query->param('PlateName');
   my $OperatorId       = $query->param('OperatorId');
 
-  my $read_p_sql       =  'SELECT "PlateType", "PlateDescription", "StorageId", "PlateWells", "PlateStatus" ';
+  my $read_p_sql       =  'SELECT "PlateType", "PlateDescription", "StorageId", "PlateWells", ';
+     $read_p_sql      .=  '"PlateStatus", "PlateMetaData" ';
      $read_p_sql      .=  'FROM plate WHERE "PlateId"=? ';
 
 
@@ -804,6 +805,7 @@ sub update_plate_runmode {
   my $StorageId           =  undef;
   my $PlateWells          =  undef;
   my $PlateStatus         =  undef;
+  my $PlateMetaData       =  undef;
 
   my $nb_df_val_rec    =  scalar(@{$p_df_val_data});
 
@@ -821,7 +823,7 @@ sub update_plate_runmode {
   $StorageId             =   $p_df_val_data->[0]->{'StorageId'};
   $PlateWells            =   $p_df_val_data->[0]->{'PlateWells'};
   $PlateStatus           =   $p_df_val_data->[0]->{'PlateStatus'};
-
+  $PlateMetaData         =   $p_df_val_data->[0]->{'PlateMetaData'};
 
   if (defined($query->param('PlateType'))) {
 
@@ -886,6 +888,11 @@ sub update_plate_runmode {
   else {
 
     $PlateWells = undef;
+  }
+
+  if (defined($query->param('PlateMetaData'))) {
+
+    $PlateMetaData = $query->param('PlateMetaData');
   }
 
   my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength ";
@@ -990,12 +997,13 @@ sub update_plate_runmode {
   $sql .= '"PlateDescription"=?, ';
   $sql .= '"StorageId"=?, ';
   $sql .= '"PlateWells"=?, ';
-  $sql .= '"PlateStatus"=? ';
+  $sql .= '"PlateStatus"=?, ';
+  $sql .= '"PlateMetaData"=? ';
   $sql .= 'WHERE "PlateId"=?';
 
   my $sth = $dbh_m_write->prepare($sql);
   $sth->execute($PlateName, $OperatorId, $PlateType,
-                $PlateDescription, $StorageId, $PlateWells, $PlateStatus, $plate_id);
+                $PlateDescription, $StorageId, $PlateWells, $PlateStatus, $PlateMetaData, $plate_id);
 
   if ($dbh_m_write->err()) {
 
@@ -3845,6 +3853,13 @@ sub add_analysisgroup_runmode {
     $AnalysisGroupDescription = $query->param('AnalysisGroupDescription');
   }
 
+  my $AnalysisGroupMetaData = '';
+
+  if (defined($query->param('AnalysisGroupMetaData'))) {
+
+      $AnalysisGroupMetaData = $query->param('AnalysisGroupMetaData');
+  }
+
   my $ContactId                 = '0';
 
   if (defined($query->param('ContactId'))) {
@@ -4226,19 +4241,21 @@ sub add_analysisgroup_runmode {
   $sql   .= '"AnalysisGroupId", ';
   $sql   .= '"AnalysisGroupName", ';
   $sql   .= '"AnalysisGroupDescription", ';
+  $sql   .= '"AnalysisGroupMetaData", ';
   $sql   .= '"ContactId", ';
   $sql   .= '"OwnGroupId", ';
   $sql   .= '"AccessGroupId", ';
   $sql   .= '"OwnGroupPerm", ';
   $sql   .= '"AccessGroupPerm", ';
   $sql   .= '"OtherPerm") ';
-  $sql   .= 'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)';
+  $sql   .= 'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
 
   my $sth = $dbh_m_write->prepare($sql);
   $sth->execute(
                 $anal_id,
                 $AnalysisGroupName,
                 $AnalysisGroupDescription,
+                $AnalysisGroupMetaData,
                 $ContactId,
                 $group_id,
                 $AccessGroupId,
@@ -4457,7 +4474,7 @@ sub update_analysisgroup_runmode {
   my $dbh_k_read = connect_kdb_read();
   my $dbh_m_read = connect_mdb_read();
 
-  my $read_anagroup_sql   =  'SELECT "AnalysisGroupDescription", "ContactId" ';
+  my $read_anagroup_sql   =  'SELECT "AnalysisGroupDescription", "ContactId", "AnalysisGroupMetaData" ';
      $read_anagroup_sql  .=  'FROM "analysisgroup" ';
      $read_anagroup_sql  .=  'WHERE "AnalysisGroupId"=? ';
 
@@ -4473,6 +4490,7 @@ sub update_analysisgroup_runmode {
   }
 
   my $AnalysisGroupDescription = undef;
+  my $AnalysisGroupMetaData    = undef;
   my $ContactId                = undef;
 
   my $nb_df_val_rec    =  scalar(@{$anagroup_df_val_data});
@@ -4488,6 +4506,7 @@ sub update_analysisgroup_runmode {
 
   $AnalysisGroupDescription  = $anagroup_df_val_data->[0]->{'AnalysisGroupDescription'};
   $ContactId                 = $anagroup_df_val_data->[0]->{'ContactId'};
+  $AnalysisGroupMetaData     = $anagroup_df_val_data->[0]->{'AnalysisGroupMetaData'};
 
   if (defined($query->param('AnalysisGroupDescription'))) {
 
@@ -4500,6 +4519,11 @@ sub update_analysisgroup_runmode {
 
       $ContactId = $query->param('ContactId');
     }
+  }
+
+  if (defined($query->param('AnalysisGroupMetaData'))) {
+
+      $AnalysisGroupMetaData = $query->param('AnalysisGroupMetaData');
   }
 
   $self->logger->debug('Adding Analysis Group');
@@ -4589,6 +4613,7 @@ sub update_analysisgroup_runmode {
   $sql    = 'UPDATE "analysisgroup" SET ';
   $sql   .= '"AnalysisGroupName"=?, ';
   $sql   .= '"AnalysisGroupDescription"=?, ';
+  $sql   .= '"AnalysisGroupMetaData"=?, ';
   $sql   .= '"ContactId"=? ';
   $sql   .= 'WHERE "AnalysisGroupId"=? ';
 
@@ -4596,6 +4621,7 @@ sub update_analysisgroup_runmode {
      $sth->execute(
                 $AnalysisGroupName,
                 $AnalysisGroupDescription,
+	        $AnalysisGroupMetaData,
                 $ContactId,
                 $AnalysisGroupId
      );
@@ -4609,7 +4635,7 @@ sub update_analysisgroup_runmode {
   }
 
   $sth->finish();
-  
+
   #update factor table
   for my $vcol_id (keys(%{$vcol_data})) {
 
@@ -4808,6 +4834,16 @@ sub add_plate_n_extract_runmode {
     if (length($query->param('PlateStatus')) > 0) {
 
       $PlateStatus = $query->param('PlateStatus');
+    }
+  }
+
+  my $PlateMetaData = undef;
+
+  if (defined($query->param('PlateMetaData'))) {
+
+    if (length($query->param('PlateMetaData'))) {
+
+      $PlateMetaData = $query->param('PlateMetaData');
     }
   }
 
@@ -5320,12 +5356,13 @@ sub add_plate_n_extract_runmode {
   $sql .= '"PlateDescription", ';
   $sql .= '"StorageId", ';
   $sql .= '"PlateWells", ';
-  $sql .= '"PlateStatus") ';
-  $sql .= 'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)';
+  $sql .= '"PlateStatus", ';
+  $sql .= '"PlateMetaData") ';
+  $sql .= 'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
 
   my $sth = $dbh_m_write->prepare($sql);
   $sth->execute($plt_id, $PlateName, $DateCreated, $OperatorId, $PlateType,
-                $PlateDescription, $StorageId, $PlateWells, $PlateStatus);
+                $PlateDescription, $StorageId, $PlateWells, $PlateStatus, $PlateMetaData);
 
   $self->logger->debug("Add Plate SQL: $sql");
 
@@ -5642,6 +5679,16 @@ sub add_plate_runmode {
     $PlateStatus = $query->param('PlateStatus');
   }
 
+  my $PlateMetaData = undef;
+
+  if (defined($query->param('PlateMetaData'))) {
+
+    if (length($query->param('PlateMetaData'))) {
+
+      $PlateMetaData = $query->param('PlateMetaData');
+    }
+  }
+
   my $dbh_k_read = connect_kdb_read();
 
   if (length($PlateWells) > 0) {
@@ -5880,12 +5927,13 @@ sub add_plate_runmode {
   $sql .= '"PlateDescription", ';
   $sql .= '"StorageId", ';
   $sql .= '"PlateWells", ';
-  $sql .= '"PlateStatus") ';
-  $sql .= 'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)';
+  $sql .= '"PlateStatus", ';
+  $sql .= '"PlateMetaData") ';
+  $sql .= 'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
 
   my $sth = $dbh_m_write->prepare($sql);
   $sth->execute($plt_id, $PlateName, $DateCreated, $OperatorId, $PlateType,
-                $PlateDescription, $StorageId, $PlateWells, $PlateStatus);
+                $PlateDescription, $StorageId, $PlateWells, $PlateStatus, $PlateMetaData);
 
   my $plate_id = -1;
   if (!$dbh_m_write->err()) {

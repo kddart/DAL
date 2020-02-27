@@ -281,6 +281,39 @@ curl -X POST -H 'Content-type:application/json' --data-binary '{
 "add-field": {'indexed': 'true', 'stored': 'true', 'type': 'text_general', 'name': 'ItemNote', 'required': 'false', 'multiValued': 'false'}
 }' "${SOLRURL}/solr/db/schema"
 
+#
+
+
+curl -X POST -H 'Content-type:application/json' --data-binary '{
+"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'int', 'name': 'GenotypeList', 'required': 'false', 'multiValued': 'true'}
+}' "${SOLRURL}/solr/db/schema"
+
+
+curl -X POST -H 'Content-type:application/json' --data-binary '{
+"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'int', 'name': 'SpecimenList', 'required': 'false', 'multiValued': 'true'}
+}' "${SOLRURL}/solr/db/schema"
+
+curl -X POST -H 'Content-type:application/json' --data-binary '{
+"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'int', 'name': 'GenotypeAnalysisGroupList', 'required': 'false', 'multiValued': 'true'}
+}' "${SOLRURL}/solr/db/schema"
+
+curl -X POST -H 'Content-type:application/json' --data-binary '{
+"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'int', 'name': 'GenotypeDataSetList', 'required': 'false', 'multiValued': 'true'}
+}' "${SOLRURL}/solr/db/schema"
+
+curl -X POST -H 'Content-type:application/json' --data-binary '{
+"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'int', 'name': 'ItemGroupList', 'required': 'false', 'multiValued': 'true'}
+}' "${SOLRURL}/solr/db/schema"
+
+curl -X POST -H 'Content-type:application/json' --data-binary '{
+"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'int', 'name': 'ItemGroupAnalysisGroupList', 'required': 'false', 'multiValued': 'true'}
+}' "${SOLRURL}/solr/db/schema"
+
+curl -X POST -H 'Content-type:application/json' --data-binary '{
+"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'int', 'name': 'ItemGroupDataSetList', 'required': 'false', 'multiValued': 'true'}
+}' "${SOLRURL}/solr/db/schema"
+
+#
 
 curl -X POST -H 'Content-type:application/json' --data-binary '{
 "add-field": {'indexed': 'true', 'stored': 'false', 'type': 'text_general', 'name': 'text', 'multiValued': 'true'}

@@ -42,6 +42,7 @@ use Config::Simple;
 use LWP::UserAgent;
 use HTTP::Request::Common qw(POST GET);
 use JSON::XS qw(decode_json);
+use DateTime::Format::Flexible;
 
 
 our @ISA      = qw(Exporter);
@@ -169,8 +170,8 @@ our $ACCEPT_HEADER_LOOKUP   = { 'application/json' => 'JSON',
 
 our $VALID_CTYPE            = {'xml' => 1, 'json' => 1, 'geojson' => 1};
 
-our $DAL_VERSION            = '2.5.3';
-our $DAL_COPYRIGHT          = 'Copyright (c) 2018, Diversity Arrays Technology, All rights reserved.';
+our $DAL_VERSION            = '2.6.0';
+our $DAL_COPYRIGHT          = 'Copyright (c) 2020, Diversity Arrays Technology, All rights reserved.';
 our $DAL_ABOUT              = 'Data Access Layer';
 
 our $GENO_SPEC_ONE2ONE      = '1-TO-1';
@@ -2132,10 +2133,16 @@ sub check_dt_value {
   my $msg = q{};
   for my $param_name (keys(%args)) {
 
-    if (!($args{$param_name} =~ /^\d{4}\-\d{2}\-\d{2}( \d{2}\:\d{2}\:\d{2})?$/)) {
+    my $dt = undef;
+    eval {
+
+      $dt = DateTime::Format::Flexible->parse_datetime( $args{$param_name}, lang => ['en'] );
+    };
+
+    if ( $@ ) {
 
       $err = 1;
-      $msg .= "[$param_name], ";
+      $msg .= "[$param_name (" . $args{$param_name} . ") ], ";
     }
   }
 
@@ -2151,10 +2158,16 @@ sub check_dt_href {
   my $err_detail = {};
   for my $param_name (keys(%args)) {
 
-    if (!($args{$param_name} =~ /^\d{4}\-\d{2}\-\d{2}( \d{2}\:\d{2}\:\d{2})?$/)) {
+    my $dt = undef;
+    eval {
+
+      $dt = DateTime::Format::Flexible->parse_datetime( $args{$param_name}, lang => ['en'] );
+    };
+
+    if ( $@ ) {
 
       $err = 1;
-      $err_detail->{$param_name} = "$param_name is not in datetime (yyyy-mm-dd HH:MM:SS) format.";
+      $err_detail->{$param_name} = "$param_name is not a standard datetime format.";
     }
   }
 
@@ -3870,10 +3883,9 @@ sub validate_trait_db {
   my $err     = 0;
   my $err_msg = '';
 
-  # should it '[^<>=]=' => '=='
-  my $operator_lookup = { 'AND'    => '&&',
-                          'OR'     => '||',
-                          '[^<>]=' => '==',
+  my $operator_lookup = { 'AND'     => '&&',
+                          'OR'      => '||',
+                          '[^<>!]=' => '==',
   };
 
   if ($validation_rule =~ /(\w+)\((.*)\)/) {
@@ -3921,7 +3933,7 @@ sub validate_trait_db {
         for my $operator (keys(%{$operator_lookup})) {
 
           my $perl_operator = $operator_lookup->{$operator};
-          $validation_rule_body =~ s/$operator/$perl_operator/ig;
+          $validation_rule_body =~ s/$operator/$perl_operator/g;
         }
 
         my $test_condition;
@@ -4064,10 +4076,9 @@ sub is_correct_validation_rule {
   my $correct = 1;
   my $msg     = '';
 
-  # should it '[^<>=]=' => '=='
-  my $operator_lookup = { 'AND'    => '&&',
-                          'OR'     => '||',
-                          '[^<>]=' => '==',
+  my $operator_lookup = { 'AND'     => '&&',
+                          'OR'      => '||',
+                          '[^<>!]=' => '==',
   };
 
   if ($validation_rule =~ /(\w+)\((.*)\)/) {
@@ -4100,7 +4111,7 @@ sub is_correct_validation_rule {
         for my $operator (keys(%{$operator_lookup})) {
 
           my $perl_operator = $operator_lookup->{$operator};
-          $validation_rule_body =~ s/$operator/$perl_operator/ig;
+          $validation_rule_body =~ s/$operator/$perl_operator/g;
         }
 
         my $test_condition;
@@ -5355,7 +5366,7 @@ sub get_static_field {
 
           # somehow for text in Postgres the precision is 4 higher than what \d command display
           # in the psql client for the table
-          $col_size -= 4;
+          $col_size = 1000000000000000;
         }
 
         if (defined $comment_lookup_href->{$field_name}->{'description'}) {
@@ -6865,11 +6876,11 @@ sub get_file_block {
 
       if ($line =~ /^$end_tag/) {
 
-	last;
+        last;
       }
       else {
 
-	$content .= $line;
+        $content .= $line;
       }
     }
   }
@@ -7442,10 +7453,9 @@ sub validate_trait_db_bulk {
     $trait_id2validation_href->{$trait_id} = [$val_rule, $val_msg];
   }
 
-  # should it '[^<>=]=' => '=='
-  my $operator_lookup = { 'AND'    => '&&',
-                          'OR'     => '||',
-                          '[^<>]=' => '==',
+  my $operator_lookup = { 'AND'     => '&&',
+                          'OR'      => '||',
+                          '[^<>!]=' => '==',
   };
 
   foreach my $trait_id (@trait_id_list) {
@@ -7512,7 +7522,7 @@ sub validate_trait_db_bulk {
             for my $operator (keys(%{$operator_lookup})) {
 
               my $perl_operator = $operator_lookup->{$operator};
-              $validation_rule_body =~ s/$operator/$perl_operator/ig;
+              $validation_rule_body =~ s/$operator/$perl_operator/g;
             }
 
             my $test_condition;

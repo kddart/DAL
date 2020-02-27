@@ -40,7 +40,6 @@ username = monetdb
 password = monetdb
 
  - change the owner of these files to wwwrun and change the permission to 640
- - copy kddart.mal from other folder into /usr/local/lib64/monetdb5/autoload. This file contains group_concat definition in MonetDB Algebra Language.
  - restart monetdb daemon and login to monetdb via monetdb client tool by issuing command:
 
    mclient -u monetdb -d kddart_marker_v2_3

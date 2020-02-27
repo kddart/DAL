@@ -3066,7 +3066,6 @@ sub list_site {
     }
   }
 
-  $dbh->disconnect();
   my $site_loc_gis_count = scalar(keys(%{$site_loc_gis}));
   $self->logger->debug("GIS site loc count: $site_loc_gis_count");
 
@@ -3138,6 +3137,8 @@ sub list_site {
     push(@extra_attr_site_data, $site_row);
   }
 
+  $dbh->disconnect();
+
   return ($err, $msg, \@extra_attr_site_data);
 }
 
@@ -3186,6 +3187,7 @@ sub get_site_full_runmode {
 
   my ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_sql($dbh, $field_list, 'site',
                                                                         'SiteId', $other_join);
+
   $dbh->disconnect();
 
   if ($vcol_err) {
@@ -3750,7 +3752,6 @@ sub list_designtype {
   }
 
   $sth->finish();
-  $dbh->disconnect();
 
   my $extra_attr_designtype_data = [];
 
@@ -3804,6 +3805,8 @@ sub list_designtype {
 
     $extra_attr_designtype_data = $designtype_data;
   }
+
+  $dbh->disconnect();
 
   return ($err, $msg, $extra_attr_designtype_data);
 }
@@ -5664,21 +5667,6 @@ sub update_trial_runmode {
     return $data_for_postrun_href;
   }
 
-  my $chk_trial_name_sql = 'SELECT TrialId ';
-  $chk_trial_name_sql   .= 'FROM trial ';
-  $chk_trial_name_sql   .= 'WHERE TrialName=? AND TrialId<>?';
-
-  my ($chk_trial_id_err, $collided_trial_id) = read_cell($dbh_k_read, $chk_trial_name_sql, [$trial_name, $trial_id]);
-
-  if (length($collided_trial_id) > 0) {
-
-    my $err_msg = " ($trial_name) already exists.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'TrialName' => $err_msg}]};
-
-    return $data_for_postrun_href;
-  }
-
   $dbh_k_read->disconnect();
 
   my $dbh_k_write = connect_kdb_write();
@@ -6899,8 +6887,6 @@ sub list_trial_unit_specimen {
     return ($err, $msg, []);
   }
 
-  $dbh->disconnect();
-
   my $extra_attr_tunit_specimen_data = [];
 
   if ($extra_attr_yes) {
@@ -6967,6 +6953,8 @@ sub list_trial_unit_specimen {
 
     $extra_attr_tunit_specimen_data = $data_aref;
   }
+
+  $dbh->disconnect();
 
   return ($err, $msg, $extra_attr_tunit_specimen_data);
 }
@@ -9103,7 +9091,7 @@ sub list_trial_trait {
   $sql   .= 'generalunit.UnitName AS TrialTraitUnitName, ';
   $sql   .= 'trait.UnitId AS TraitUnitId, ';
   $sql   .= 'TraitGroupTypeId, TraitName, TraitCaption, TraitDescription, TraitDataType, ';
-  $sql   .= 'TraitValueMaxLength, IsTraitUsedForAnalysis, TraitValRule, TraitValRuleErrMsg ';
+  $sql   .= 'TraitValueMaxLength, TraitLevel, IsTraitUsedForAnalysis, TraitValRule, TraitValRuleErrMsg ';
   $sql   .= 'FROM trialtrait ';
   $sql   .= 'LEFT JOIN trait ON trialtrait.TraitId = trait.TraitId ';
   $sql   .= 'LEFT JOIN generalunit ON trialtrait.UnitId = generalunit.UnitId ';

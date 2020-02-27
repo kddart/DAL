@@ -1,3 +1,27 @@
+Version 2.6.0
+Date: 27/02/2020
+Description: Ease the integration with Online Ordering
+
+Major:
+
+  + Include a new field AnalysisGroupMetaData in analysisgroup table.
+
+  + Include a new field PlateMetaData in plate table.
+
+Minor:
+
+  + Include TraitLevel in list trial trait.
+
+  + Allow managers to list all users in the system.
+
+  + Fix the order of fields in export samplemeasurement.
+
+  + Correct the matching expression that is used to replace = with == in BOOLEX.
+
+  + Remove trial name uniqueness checking in update trial.
+
+  + Fix list multimedia for extract record.
+
 Version 2.5.3
 Date: 23/04/2018
 Description: Fix SQL upgrade script.

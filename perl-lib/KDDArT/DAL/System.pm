@@ -1205,7 +1205,7 @@ sub list_user {
 
     $extra_attr_user_data = $data_aref;
   }
-    
+
   $dbh->disconnect();
 
   return ($err, $msg, $extra_attr_user_data);
@@ -1237,22 +1237,12 @@ sub list_user_runmode {
   my $group_id = $self->authen->group_id();
   my $user_id  = $self->authen->user_id();
 
-  my $where_arg    = [$group_id];
-  my $where_clause = 'WHERE authorisedsystemgroup.SystemGroupId=?';
-
-  if ("$group_id" eq '0') {
-
-    $where_arg    = [];
-    $where_clause = '';
-  }
-
   my $sql = 'SELECT DISTINCT systemuser.UserId, UserName, ContactId, UserType ';
   $sql   .= 'FROM systemuser LEFT JOIN authorisedsystemgroup ';
   $sql   .= 'ON systemuser.UserId = authorisedsystemgroup.UserId ';
-  $sql   .= $where_clause;
-  $sql   .= ' ORDER BY systemuser.UserId DESC';
+  $sql   .= 'ORDER BY systemuser.UserId DESC';
 
-  my ($read_user_err, $read_user_msg, $user_data) = $self->list_user(1, $sql, $where_arg);
+  my ($read_user_err, $read_user_msg, $user_data) = $self->list_user(1, $sql, []);
 
   if ($read_user_err) {
 
@@ -3062,7 +3052,18 @@ sub list_multimedia_runmode {
     return $data_for_postrun_href;
   }
 
-  my $dbh = connect_kdb_read();
+  my $monetdb_table_href = { 'extract' => 1 };
+
+  my $dbh = undef;
+
+  if ( $monetdb_table_href->{lc($table_name)} == 1 ) {
+
+    $dbh = connect_mdb_read();
+  }
+  else {
+
+    $dbh = connect_kdb_read();
+  }
 
   my $chk_rec_sql = $multimedia_setting_href->{$table_name}->{'ChkRecSql'};
 

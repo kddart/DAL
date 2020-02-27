@@ -708,8 +708,16 @@ sub list_itemgroup_advanced_runmode {
   $sql  = 'SELECT ' . join(',', @{$final_field_list}) . ' ';
   $sql .= "FROM itemgroup $join ";
 
-  my ( $filter_err, $filter_msg, $filter_phrase, $where_arg ) = parse_filtering('ItemGroupId', 'itemgroup',
-                                                                                $filtering_csv, $final_field_list );
+  my $field_name2table_name  = { 'ItemId' => 'itemgroupentry' };
+  my $validation_func_lookup = {};
+
+  my ( $filter_err, $filter_msg, $filter_phrase, $where_arg ) = parse_filtering('ItemGroupId',
+                                                                                'itemgroup',
+                                                                                $filtering_csv,
+                                                                                $final_field_list,
+                                                                                $validation_func_lookup,
+                                                                                $field_name2table_name
+                                                                               );
   if ($filter_err) {
 
     $self->logger->debug("Parse filtering failed: $filter_msg");

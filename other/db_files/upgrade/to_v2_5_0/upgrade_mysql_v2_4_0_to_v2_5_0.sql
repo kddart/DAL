@@ -297,7 +297,7 @@ BEGIN;
 
 SELECT TypeId+1 INTO @season_id FROM generaltype ORDER BY TypeId DESC LIMIT 1;
 
-INSERT INTO generaltype(TypeId,Class,TypeName,IsTypeActive,IsFixed) Values(@season_id,'season','UnknownSeasonFromMigration',0,0);
+INSERT INTO generaltype(TypeId,Class,TypeName,IsTypeActive,IsFixed) Values(@season_id,'season','UnknownSeasonFromMigration',1,0);
 
 UPDATE trial SET SeasonId=@season_id;
 

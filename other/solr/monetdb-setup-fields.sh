@@ -41,6 +41,58 @@ curl -X POST -H 'Content-type:application/json' --data-binary '{
 "add-field": {'indexed': 'true', 'stored': 'true', 'type': 'string', 'name': 'MarkerExtRef', 'required': 'false', 'multiValued': 'false'}
 }' "${SOLRURL}/solr/monetdb/schema"
 
+#
+
+curl -X POST -H 'Content-type:application/json' --data-binary '{
+"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'int', 'name': 'ExtractId', 'required': 'false', 'multiValued': 'false'}
+}' "${SOLRURL}/solr/monetdb/schema"
+
+curl -X POST -H 'Content-type:application/json' --data-binary '{
+"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'int', 'name': 'GenotypeId', 'required': 'false', 'multiValued': 'false'}
+}' "${SOLRURL}/solr/monetdb/schema"
+
+curl -X POST -H 'Content-type:application/json' --data-binary '{
+"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'int', 'name': 'ItemGroupId', 'required': 'false', 'multiValued': 'false'}
+}' "${SOLRURL}/solr/monetdb/schema"
+
+curl -X POST -H 'Content-type:application/json' --data-binary '{
+"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'int', 'name': 'AnalysisGroupId', 'required': 'false', 'multiValued': 'false'}
+}' "${SOLRURL}/solr/monetdb/schema"
+
+curl -X POST -H 'Content-type:application/json' --data-binary '{
+"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'int', 'name': 'GenotypeTrialList', 'required': 'false', 'multiValued': 'true'}
+}' "${SOLRURL}/solr/monetdb/schema"
+
+curl -X POST -H 'Content-type:application/json' --data-binary '{
+"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'int', 'name': 'GenotypeTrialUnitList', 'required': 'false', 'multiValued': 'true'}
+}' "${SOLRURL}/solr/monetdb/schema"
+
+curl -X POST -H 'Content-type:application/json' --data-binary '{
+"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'int', 'name': 'GenotypeTrialUnitSpecimenList', 'required': 'false', 'multiValued': 'true'}
+}' "${SOLRURL}/solr/monetdb/schema"
+
+curl -X POST -H 'Content-type:application/json' --data-binary '{
+"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'int', 'name': 'ItemGroupTrialList', 'required': 'false', 'multiValued': 'true'}
+}' "${SOLRURL}/solr/monetdb/schema"
+
+curl -X POST -H 'Content-type:application/json' --data-binary '{
+"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'int', 'name': 'ItemGroupTrialUnitList', 'required': 'false', 'multiValued': 'true'}
+}' "${SOLRURL}/solr/monetdb/schema"
+
+curl -X POST -H 'Content-type:application/json' --data-binary '{
+"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'int', 'name': 'ItemGroupTrialUnitSpecimenList', 'required': 'false', 'multiValued': 'true'}
+}' "${SOLRURL}/solr/monetdb/schema"
+
+curl -X POST -H 'Content-type:application/json' --data-binary '{
+"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'int', 'name': 'ItemGroupSpecimenList', 'required': 'false', 'multiValued': 'true'}
+}' "${SOLRURL}/solr/monetdb/schema"
+
+curl -X POST -H 'Content-type:application/json' --data-binary '{
+"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'int', 'name': 'ItemGroupGenotypeList', 'required': 'false', 'multiValued': 'true'}
+}' "${SOLRURL}/solr/monetdb/schema"
+
+#
+
 curl -X POST -H 'Content-type:application/json' --data-binary '{
 "add-field": {'indexed': 'true', 'stored': 'false', 'type': 'text_general', 'name': 'text', 'multiValued': 'true'}
 }' "${SOLRURL}/solr/monetdb/schema"

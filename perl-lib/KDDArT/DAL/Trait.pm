@@ -2864,7 +2864,18 @@ sub export_samplemeasurement_csv_runmode {
 
   push(@where_phrases, $where_measure_time);
 
-  my $sql = 'SELECT samplemeasurement.* ';
+  my @field_headers = ('TrialUnitId', 'TraitId', 'OperatorId', 'MeasureDateTime',
+                       'InstanceNumber', 'SampleTypeId', 'TrialUnitSpecimenId', 'TraitValue',
+                       'SMGroupId', 'StateReason');
+
+  my @sql_field_list;
+
+  foreach my $field_name (@field_headers) {
+
+    push(@sql_field_list, "samplemeasurement.${field_name}");
+  }
+
+  my $sql = 'SELECT ' . join(',', @sql_field_list) . ' ';
   $sql   .= 'FROM samplemeasurement LEFT JOIN trialunit ';
   $sql   .= 'ON samplemeasurement.TrialUnitId = trialunit.TrialUnitId ';
 
@@ -2939,12 +2950,6 @@ sub export_samplemeasurement_csv_runmode {
   $self->logger->debug("csv: $csv_file");
 
   open(my $smeasure_csv_fh, ">$csv_file") or die "Can't open $csv_file for writing: $!";
-
-  my @field_headers;
-  for (my $i = 0; $i < $sth->{NUM_OF_FIELDS}; $i++) {
-
-    push(@field_headers, $sth->{NAME}->[$i]);
-  }
 
   print $smeasure_csv_fh '#' . join(',', @field_headers) . "\n";
 
