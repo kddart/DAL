@@ -64,6 +64,7 @@ sub setup {
                                            'del_site_gadmin',
                                            'del_trial_gadmin',
                                            'del_trial_unit_gadmin',
+                                           'del_trial_crossing_gadmin',
                                            'add_trial_trait',
                                            'update_trial_trait',
                                            'remove_trial_trait',
@@ -103,6 +104,7 @@ sub setup {
                                                 'del_site_gadmin',
                                                 'del_trial_gadmin',
                                                 'del_trial_unit_gadmin',
+                                                'del_trial_crossing_gadmin',
                                                 'add_site_gadmin',
                                                 'add_trial_trait',
                                                 'update_trial_trait',
@@ -136,6 +138,7 @@ sub setup {
                                              'del_site_gadmin',
                                              'del_trial_gadmin',
                                              'del_trial_unit_gadmin',
+                                             'del_trial_crossing_gadmin',
                                              'add_project_gadmin',
                                              'update_project_gadmin',
                                              'del_project_gadmin',
@@ -180,6 +183,7 @@ sub setup {
     'del_site_gadmin'                        => 'del_site_runmode',
     'del_trial_gadmin'                       => 'del_trial_runmode',
     'del_trial_unit_gadmin'                  => 'del_trial_unit_runmode',
+    'del_trial_crossing_gadmin'              => 'del_trial_crossing_runmode',
     'add_trial_trait'                        => 'add_trial_trait_runmode',
     'list_trial_trait'                       => 'list_trial_trait_runmode',
     'get_trial_trait'                        => 'get_trial_trait_runmode',
@@ -1896,7 +1900,7 @@ sub add_trial_unit_runmode {
   my $dbh_gis_write = connect_gis_write();
 
   $sql  = 'INSERT INTO trialunitloc (trialunitid, trialunitlocation) ';
-  $sql .= "VALUES (?, ST_Force_Collection(ST_GeomFromText(?, -1)))";
+  $sql .= "VALUES (?, ST_ForceCollection(ST_GeomFromText(?, -1)))";
 
   my $gis_sth = $dbh_gis_write->prepare($sql);
   $gis_sth->execute($trial_unit_id, $trialunitlocation);
@@ -2244,7 +2248,7 @@ sub add_trial_unit_bulk_runmode {
         if (defined $uniq_coord_href->{$coord_key}) {
 
           my $err_msg = "Dimension (" . join(',', @coord_dim_list) . ") value (" . join(',', @coord_val_list) . '): ';
-          $err_msg   .= 'duplicate.';
+          $err_msg   .= 'duplicate. ';
           $data_for_postrun_href->{'Error'} = 1;
           $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
@@ -2883,7 +2887,7 @@ sub add_trial_unit_bulk_runmode {
 
     if (length($trialunit_location) > 0) {
 
-      my $tu_loc_sql_str = qq|(${trialunit_id},ST_Force_Collection(ST_GeomFromText('$trialunit_location', -1)))|;
+      my $tu_loc_sql_str = qq|(${trialunit_id},ST_ForceCollection(ST_GeomFromText('$trialunit_location', -1)))|;
 
       push(@tu_loc_sql_list, $tu_loc_sql_str);
     }
@@ -3066,6 +3070,7 @@ sub list_site {
     }
   }
 
+  $dbh->disconnect();
   my $site_loc_gis_count = scalar(keys(%{$site_loc_gis}));
   $self->logger->debug("GIS site loc count: $site_loc_gis_count");
 
@@ -3090,7 +3095,7 @@ sub list_site {
         $self->logger->debug("Check id existence error: $chk_id_msg");
         $err = 1;
         $msg = $chk_id_msg;
-        
+
         return ($err, $msg, []);
       }
 
@@ -3101,7 +3106,7 @@ sub list_site {
 
     my $site_id       = $site_row->{'SiteId'};
     my $site_centroid = $site_loc_gis->{$site_id}->{'sitecentroid'};
-    
+
     $site_centroid    =~ /POINT\((.+) (.+)\)/;
     my $longitude     = $1;
     my $latitude      = $2;
@@ -3136,8 +3141,6 @@ sub list_site {
 
     push(@extra_attr_site_data, $site_row);
   }
-
-  $dbh->disconnect();
 
   return ($err, $msg, \@extra_attr_site_data);
 }
@@ -3187,7 +3190,6 @@ sub get_site_full_runmode {
 
   my ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_sql($dbh, $field_list, 'site',
                                                                         'SiteId', $other_join);
-
   $dbh->disconnect();
 
   if ($vcol_err) {
@@ -3328,17 +3330,18 @@ sub update_site_runmode {
 
 
   if (defined $query->param('SiteStartDate')) {
+    if (length($query->param('SiteStartDate')) > 0) {
+      $site_sdate         = $query->param('SiteStartDate');
+      my ($sdate_err, $sdate_msg) = check_dt_value( {'SiteStartDate' => $site_sdate} );
 
-    $site_sdate         = $query->param('SiteStartDate');
-    my ($sdate_err, $sdate_msg) = check_dt_value( {'SiteStartDate' => $site_sdate} );
+      if ($sdate_err) {
 
-    if ($sdate_err) {
+        my $err_msg = "$sdate_msg not date/time.";
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
-      my $err_msg = "$sdate_msg not date/time.";
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-      return $data_for_postrun_href;
+        return $data_for_postrun_href;
+      }
     }
   }
 
@@ -3358,17 +3361,21 @@ sub update_site_runmode {
 
   if (defined $query->param('SiteEndDate')) {
 
-    $site_edate         = $query->param('SiteEndDate');
-    my ($edate_err, $edate_msg) = check_dt_value( {'SiteEndDate' => $site_edate} );
+    if (length($query->param('SiteEndDate')) > 0) {
+      $site_edate         = $query->param('SiteEndDate');
+      my ($edate_err, $edate_msg) = check_dt_value( {'SiteEndDate' => $site_edate} );
 
-    if ($edate_err) {
+      if ($edate_err) {
 
-      my $err_msg = "$edate_msg not date/time.";
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+        my $err_msg = "$edate_msg not date/time.";
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
-      return $data_for_postrun_href;
+        return $data_for_postrun_href;
+      }
     }
+
+
   }
 
   # Unknown End DateTime value from database 0000-00-00 00:00:00 which should be reset to undef,
@@ -3722,7 +3729,7 @@ sub list_designtype {
   my $dbh = connect_kdb_read();
   my $sth = $dbh->prepare($sql);
   # parameters provided by the caller
-  # for example, ('WHERE FieldA=?', '1') 
+  # for example, ('WHERE FieldA=?', '1')
   $sth->execute(@_);
 
   my $err = 0;
@@ -3752,6 +3759,7 @@ sub list_designtype {
   }
 
   $sth->finish();
+  $dbh->disconnect();
 
   my $extra_attr_designtype_data = [];
 
@@ -3783,13 +3791,13 @@ sub list_designtype {
         $self->logger->debug("Check id existence error: $chk_id_msg");
         $err = 1;
         $msg = $chk_id_msg;
-        
+
         return ($err, $msg, []);
       }
     }
 
     for my $row (@{$designtype_data}) {
-    
+
       my $designtype_id = $row->{'DesignTypeId'};
       $row->{'update'}   = "update/designtype/$designtype_id";
 
@@ -3797,7 +3805,7 @@ sub list_designtype {
 
         $row->{'delete'}   = "delete/designtype/$designtype_id";
       }
-      
+
       push(@{$extra_attr_designtype_data}, $row);
     }
   }
@@ -3805,8 +3813,6 @@ sub list_designtype {
 
     $extra_attr_designtype_data = $designtype_data;
   }
-
-  $dbh->disconnect();
 
   return ($err, $msg, $extra_attr_designtype_data);
 }
@@ -3831,7 +3837,7 @@ sub list_designtype_runmode {
 =cut
 
   my $self = shift;
-  
+
   my $data_for_postrun_href = {};
 
   my $msg = '';
@@ -4005,7 +4011,7 @@ sub update_designtype_runmode {
 
     return $data_for_postrun_href;
   }
- 
+
   my $read_sql     =  'SELECT DesignSoftware, DesignTemplateFile, DesignGenotypeFormat, DesignFactorAliasPrefix ';
      $read_sql    .=  'FROM designtype ';
      $read_sql    .=  'WHERE DesignTypeId=? ';
@@ -5102,7 +5108,7 @@ sub list_trial_advanced_runmode {
 
   $self->logger->debug('Where arg: ' . join(',', @{$where_arg}));
 
-  # where_arg here in the list function because of the filtering 
+  # where_arg here in the list function because of the filtering
   my ($read_trial_err, $read_trial_msg, $trial_data) = $self->list_trial(1,
                                                                          $final_field_list,
                                                                          $sql,
@@ -6101,7 +6107,7 @@ sub list_trial_unit {
 
     if (scalar(@trial_unit_id_list) > 0) {
 
-      $tu_specimen_sql   .= 'SELECT trialunitspecimen.*, specimen.SpecimenName ';
+      $tu_specimen_sql   .= 'SELECT trialunitspecimen.*, specimen.SpecimenName, specimen.Pedigree ';
       $tu_specimen_sql   .= 'FROM trialunitspecimen LEFT JOIN specimen ON ';
       $tu_specimen_sql   .= 'trialunitspecimen.SpecimenId = specimen.SpecimenId ';
       $tu_specimen_sql   .= 'WHERE TrialUnitId IN (' . join(',', @trial_unit_id_list) . ')';
@@ -6458,7 +6464,7 @@ sub update_trial_unit_runmode {
 
 
   my $nb_df_val_rec    =  scalar(@{$trial_u_df_val_data});
- 
+
   if ($nb_df_val_rec != 1)  {
 
      $self->logger->debug("Retrieve trialunit default values - number of records unacceptable: $nb_df_val_rec");
@@ -6838,7 +6844,7 @@ sub update_trial_unit_geography_runmode {
   my $dbh_gis_write = connect_gis_write();
 
   $sql    = 'UPDATE trialunitloc SET  ';
-  $sql   .= 'trialunitlocation=ST_Force_Collection(ST_GeomFromText(?, -1)) ';
+  $sql   .= 'trialunitlocation=ST_ForceCollection(ST_GeomFromText(?, -1)) ';
   $sql   .= 'WHERE trialunitid=?';
 
   my $gis_sth = $dbh_gis_write->prepare($sql);
@@ -6886,6 +6892,8 @@ sub list_trial_unit_specimen {
 
     return ($err, $msg, []);
   }
+
+  $dbh->disconnect();
 
   my $extra_attr_tunit_specimen_data = [];
 
@@ -6953,8 +6961,6 @@ sub list_trial_unit_specimen {
 
     $extra_attr_tunit_specimen_data = $data_aref;
   }
-
-  $dbh->disconnect();
 
   return ($err, $msg, $extra_attr_tunit_specimen_data);
 }
@@ -8377,6 +8383,7 @@ sub list_trial_unit_advanced_runmode {
   push(@{$sql_field_list}, 'site.SiteName');
   push(@{$sql_field_list}, "$perm_str AS UltimatePerm ");
 
+
   my $field_list_str = join(', ', @{$sql_field_list});
 
   $sql  = "SELECT $field_list_str ";
@@ -9091,7 +9098,7 @@ sub list_trial_trait {
   $sql   .= 'generalunit.UnitName AS TrialTraitUnitName, ';
   $sql   .= 'trait.UnitId AS TraitUnitId, ';
   $sql   .= 'TraitGroupTypeId, TraitName, TraitCaption, TraitDescription, TraitDataType, ';
-  $sql   .= 'TraitValueMaxLength, TraitLevel, IsTraitUsedForAnalysis, TraitValRule, TraitValRuleErrMsg ';
+  $sql   .= 'TraitValueMaxLength, IsTraitUsedForAnalysis, TraitValRule, TraitValRuleErrMsg ';
   $sql   .= 'FROM trialtrait ';
   $sql   .= 'LEFT JOIN trait ON trialtrait.TraitId = trait.TraitId ';
   $sql   .= 'LEFT JOIN generalunit ON trialtrait.UnitId = generalunit.UnitId ';
@@ -9412,7 +9419,7 @@ sub list_unitposition_field_runmode {
     for my $unitposition_field (@unitposition_parts) {
 
       $unitposition_field =~ s/^(\D+)(\d+)$/$1/g;
-      
+
       if ($unique_field->{$unitposition_field}) { next; }
 
       my $up_href = {};
@@ -9482,7 +9489,7 @@ sub update_trial_trait_runmode {
   }
 
   my $dbh_read = connect_kdb_read();
- 
+
   my $read_trial_trait_sql   =   'SELECT TrialId, UnitId ';
      $read_trial_trait_sql  .=   'FROM trialtrait WHERE TrialTraitId=? ';
 
@@ -9646,7 +9653,7 @@ sub remove_trial_trait_runmode {
 
     return $data_for_postrun_href;
   }
-  
+
   my $trait_exist = record_existence($dbh_read, 'trait', 'TraitId', $trait_id);
 
   if (!$trait_exist) {
@@ -10146,32 +10153,32 @@ sub del_trial_unit_runmode {
 
   $sql = "DELETE FROM trialunitspecimen WHERE TrialUnitId=?";
   $sth = $dbh_k_write->prepare($sql);
-  
+
   $sth->execute($tunit_id);
-  
+
   if ($dbh_k_write->err()) {
-    
+
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
     return $data_for_postrun_href;
   }
-  
+
   $sth->finish();
 
   $sql = "DELETE FROM trialunit WHERE TrialUnitId=?";
   $sth = $dbh_k_write->prepare($sql);
-  
+
   $sth->execute($tunit_id);
-  
+
   if ($dbh_k_write->err()) {
-    
+
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
     return $data_for_postrun_href;
   }
-  
+
   $sth->finish();
 
   $dbh_k_write->disconnect();
@@ -10184,6 +10191,95 @@ sub del_trial_unit_runmode {
 
   return $data_for_postrun_href;
 }
+
+sub del_trial_crossing_runmode {
+
+=pod del_trial_crossing_gadmin_HELP_START
+{
+"OperationName": "Delete trial crossing",
+"Description": "Delete trial crossing from the trial specified by id. ",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 1,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='Crossing (76) has been deleted successfully.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'Crossing (75) has been deleted successfully.'}]}",
+"URLParameter": [{"ParameterName": "id", "Description": "Existing TrialUnitId."}],
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error CrossingId='Crossing (269) does not exist.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'TypeId' : 'CrossingId (269) does not exist.'}]}"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self = shift;
+  my $crossing_id = $self->param('id');
+
+  my $data_for_postrun_href = {};
+
+  my $group_id = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+  my $perm_str = permission_phrase($group_id, 0, $gadmin_status);
+
+  my $dbh_k_read = connect_kdb_read();
+
+  my $trial_id = read_cell_value($dbh_k_read, 'crossing', 'TrialId', 'CrossingId', $crossing_id);
+
+  if (length($trial_id) == 0) {
+
+    my $err_msg = "Crossing ($crossing_id) not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $sql = "SELECT $perm_str AS UltimatePerm FROM trial WHERE TrialId=?";
+
+  my $trial_perm = read_cell($dbh_k_read, $sql, [$trial_id]);
+
+  if ( ($trial_perm & $READ_WRITE_PERM) != $READ_WRITE_PERM ) {
+
+    my $err_msg = "Crossing ($crossing_id): permission denied.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $dbh_write = connect_kdb_write();
+
+  $self->logger->debug($crossing_id);
+
+  $sql = 'DELETE FROM crossing where CrossingId=?';
+
+  my $sth = $dbh_write->prepare($sql);
+  $sth->execute($crossing_id);
+
+  if ($dbh_write->err()) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sth->finish();
+
+  $dbh_write->disconnect();
+
+  my $info_msg_aref = [{'Message' => "Crossing ($crossing_id) has been deleted successfully."}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'     => $info_msg_aref};
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+
+
+
+}
+
 
 sub add_project_runmode {
 
@@ -10276,10 +10372,10 @@ sub add_project_runmode {
 
     }
   }
- 
+
   if (defined $query->param('ProjectStatus')) {
     if (length($query->param('ProjectStatus')) > 0) {
- 
+
      $project_status = $query->param('ProjectStatus');
     }
   }
@@ -10401,9 +10497,9 @@ sub add_project_runmode {
       $sql .= 'FactorValue=?';
       my $factor_sth = $dbh_k_write->prepare($sql);
       $factor_sth->execute($project_id, $vcol_id, $factor_value);
-      
+
       if ($dbh_k_write->err()) {
-        
+
         $data_for_postrun_href->{'Error'} = 1;
         $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
@@ -10519,7 +10615,7 @@ sub update_project_runmode {
 
     return $data_for_postrun_href;
   }
- 
+
   my $project_sdate    = undef;
   my $project_edate    = undef;
   my $project_status   = undef;
@@ -10553,7 +10649,7 @@ sub update_project_runmode {
 
         $data_for_postrun_href->{'Error'} = 1;
         $data_for_postrun_href->{'Data'}  = {'Error' => [$sdate_href]};
-        
+
         return $data_for_postrun_href;
       }
     }
@@ -10732,9 +10828,9 @@ sub update_project_runmode {
 
           my $factor_sth = $dbh_k_write->prepare($sql);
           $factor_sth->execute($factor_value, $project_id, $vcol_id);
-      
+
           if ($dbh_k_write->err()) {
-        
+
             $data_for_postrun_href->{'Error'} = 1;
             $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
@@ -10750,9 +10846,9 @@ sub update_project_runmode {
           $sql .= 'FactorValue=?';
           my $factor_sth = $dbh_k_write->prepare($sql);
           $factor_sth->execute($project_id, $vcol_id, $factor_value);
-          
+
           if ($dbh_k_write->err()) {
-        
+
             $data_for_postrun_href->{'Error'} = 1;
             $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
@@ -10770,9 +10866,9 @@ sub update_project_runmode {
 
           my $factor_sth = $dbh_k_write->prepare($sql);
           $factor_sth->execute($project_id, $vcol_id);
-      
+
           if ($dbh_k_write->err()) {
-        
+
             $data_for_postrun_href->{'Error'} = 1;
             $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
@@ -10815,7 +10911,7 @@ sub list_project {
   }
 
   if ( scalar(@{$where_para_aref}) != $count ) {
-    
+
     my $msg = 'Number of arguments does not match with ';
     $msg   .= 'number of SQL parameter.';
     return (1, $msg, []);
@@ -10824,7 +10920,7 @@ sub list_project {
   my $dbh = connect_kdb_read();
   my $sth = $dbh->prepare($sql);
   # parameters provided by the caller
-  # for example, ('WHERE FieldA=?', '1') 
+  # for example, ('WHERE FieldA=?', '1')
   $sth->execute(@{$where_para_aref});
 
   my $err = 0;
@@ -10883,7 +10979,7 @@ sub list_project {
         $self->logger->debug("Check id existence error: $chk_id_msg");
         $err = 1;
         $msg = $chk_id_msg;
-        
+
         return ($err, $msg, []);
       }
     }
@@ -10891,7 +10987,7 @@ sub list_project {
     my $gadmin_status = $self->authen->gadmin_status();
 
     for my $row (@{$project_data}) {
-    
+
       if ($gadmin_status eq '1') {
 
         my $project_id = $row->{'ProjectId'};
@@ -11197,9 +11293,9 @@ sub list_project_advanced_runmode {
     $self->logger->debug("SQL Row count time: $rcount_time");
 
     if ($pg_id_err == 1) {
-    
+
       $self->logger->debug($pg_id_msg);
-    
+
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
@@ -11207,7 +11303,7 @@ sub list_project_advanced_runmode {
     }
 
     if ($pg_id_err == 2) {
-      
+
       $page = 0;
     }
 
@@ -11219,7 +11315,7 @@ sub list_project_advanced_runmode {
 
     $paged_limit_clause = $limit_clause;
   }
-  
+
   $dbh->disconnect();
 
   my ($sort_err, $sort_msg, $sort_sql) = parse_sorting($sorting, $final_field_list);
@@ -11247,7 +11343,7 @@ sub list_project_advanced_runmode {
 
   $self->logger->debug('Where arg: ' . join(',', @{$where_arg}));
 
-  # where_arg here in the list function because of the filtering 
+  # where_arg here in the list function because of the filtering
   my ($read_project_err, $read_project_msg, $project_data) = $self->list_project(1, $sql, $where_arg);
 
   if ($read_project_err) {
@@ -11481,7 +11577,7 @@ sub get_trial_unit_specimen_runmode {
   $tu_spec_sql   .= "FROM trialunitspecimen LEFT JOIN trialunit ";
   $tu_spec_sql   .= "ON trialunitspecimen.TrialUnitId = trialunit.TrialUnitId ";
   $tu_spec_sql   .= "WHERE TrialUnitSpecimenId=?";
-  
+
   my ($r_trial_id_err, $trial_id) = read_cell($dbh, $tu_spec_sql, [$tu_spec_id]);
 
   if ($r_trial_id_err) {
@@ -16816,10 +16912,10 @@ sub update_trial_unit_bulk_runmode {
 
   $sql  = 'UPDATE trial SET ';
   $sql .= 'TULastUpdateTimeStamp=? ';
-  $sql .= 'WHERE TULastUpdateTimeStamp=?';
+  $sql .= 'WHERE TULastUpdateTimeStamp=? AND TrialId=?';
 
   my $sth = $dbh_k_write->prepare($sql);
-  $sth->execute( $cur_dt, $tu_last_update_ts );
+  $sth->execute($cur_dt ,  $tu_last_update_ts, $trial_id);
 
   if ( $dbh_k_write->err() ) {
 
@@ -16837,7 +16933,7 @@ sub update_trial_unit_bulk_runmode {
 
     $self->logger->debug("Number of affected rows: $affected_rows");
 
-    my $err_msg = "Operation failed due to timestamp mismatched.";
+    my $err_msg = "Operation failed due to timestamp mismatched. $tu_last_update_ts vs $cur_dt";
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
@@ -17711,7 +17807,7 @@ sub update_trial_unit_bulk_runmode {
 
     if (length($trialunit_location) > 0) {
 
-      my $tu_loc_sql_str = qq|(${trialunit_id},ST_Force_Collection(ST_GeomFromText('$trialunit_location', -1)))|;
+      my $tu_loc_sql_str = qq|(${trialunit_id},ST_ForceCollection(ST_GeomFromText('$trialunit_location', -1)))|;
 
       push(@tu_loc_sql_list, $tu_loc_sql_str);
     }

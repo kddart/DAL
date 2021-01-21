@@ -1,3 +1,26 @@
+Version 2.6.1
+Date: 22/01/2021
+Description: Bug fixing version
+
+Minor:
+
+  + Fixed issue regarding that DAL cannot update a trial that has multiple while trial name is not unique in the database.
+
+  + Fixed issue regarding updating SiteStartDate and SiteEndDate in Sites
+
+  + Fixed issue regarding deleting Items with Item Logs
+
+  + Fixed issue regarding deleting Genotypes that are children in GenPedigree
+
+  + Fixed issue regarding duplicate Extracts being returned from Analysis Groups
+
+  + Add interface to delete Crossing
+
+  + Add interface to delete Genotype Alias
+
+  + List Genpedigree includes Names of Genotype and ParentGenotype
+
+
 Version 2.6.0
 Date: 27/02/2020
 Description: Ease the integration with Online Ordering
@@ -446,13 +469,13 @@ Feature changes:
 - Specimen lists support has been extended. System user has a better control of ownership and sharing germplasm resources.
 
 - Trial unit positions concept has been re-worked. trialunitpostion table and it's factor is no longer present in the database. trialdimension table has been introduced and relevant changes has been done to the trialunit table instead. Please, see database schema for model changes details.
-  
+
   REMOVED INTERFACES:
   * list/unitposition
   * get/unitposition/_id
   * update/unitposition/_id
   * delete/unitposition/_id
-  
+
   NEW INTERFACES:
   * trial/_id/add/dimension
   * trial/_id/list/dimension
@@ -522,7 +545,7 @@ Feature changes:
   * group/_id/add/member/_username (from previous URL: group/_id/add/member/_username/_random)
 
 - All configuration settings are now moved to a configuration file.
-  
+
 - DAL now checks the maximum length of all text fields. If the input is longer than the maximum number of characters specified in the database, DAL will return a DAL error with an HTTP status error code of 420.
 
 - Number of bug fixes and a lot of new test cases added.
@@ -658,7 +681,7 @@ Version 2.2.2
 
 Major:
 
-+ Genotype alias has type, status and language fields. 
++ Genotype alias has type, status and language fields.
 + Introduction of genotype pedigree in addition to specimen pedigree. Genotype pedigree or gen pedigree is seen as the breeding history (pedigree) while specimen pedigress is seen as selection history.
 + Add/list multimedia files for genotype, specimen and site.
 + Being able to filter on factor columns in organisation, contact, site, trial and project.
@@ -689,4 +712,3 @@ Minor:
 
 + Analysisgroup has an interface to list the meta data fields.
 + Due to circular foreign key references between item and trialunitspecimen and other tables and time constraint, the foreign key references are not available in the database schemas embedded with this release.
-

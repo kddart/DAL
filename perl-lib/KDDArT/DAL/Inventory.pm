@@ -315,7 +315,7 @@ sub add_itemparent_runmode {
   my $item_id          = $self->param('id');
   my $parent_item_id   = $query->param('ParentId');
   my $parent_item_type = $query->param('ItemParentType');
-  
+
   my $dbh_k_read = connect_kdb_read();
 
   if (!type_existence($dbh_k_read, 'itemparent', $parent_item_type)) {
@@ -386,7 +386,7 @@ sub add_itemparent_runmode {
 
   my $info_msg_aref = [ { 'Message' => "ItemId ($parent_item_id) is now a parent of ItemId ($item_id)." } ];
   my $return_id_aref = [ { 'Value' => $parent_id, 'ParaName' => 'ItemParentId' } ];
-  
+
   return {
     'Error' => 0,
     'Data'  => {
@@ -466,7 +466,7 @@ sub list_itemgroup {
     my $gadmin_status = $self->authen->gadmin_status();
 
     my $itm_grp_id_aref = [];
-    
+
     my $item_lookup     = {};
 
     for my $row (@{$itemgrp_data}) {
@@ -506,7 +506,7 @@ sub list_itemgroup {
           $item_lookup->{$itm_grp_id} = $itm_aref;
         }
         else {
-          
+
           delete($grp_entry_row->{'ItemGroupId'});
           $item_lookup->{$itm_grp_id} = [$grp_entry_row];
         }
@@ -522,7 +522,7 @@ sub list_itemgroup {
         $self->logger->debug("Check id existence error: $chk_id_msg");
         $err = 1;
         $msg = $chk_id_msg;
-        
+
         return ($err, $msg, []);
       }
     }
@@ -832,7 +832,7 @@ sub list_itemgroup_advanced_runmode {
 
     return $data_for_postrun_href;
   }
-  
+
   $data_for_postrun_href->{'Error'}     = 0;
   $data_for_postrun_href->{'Data'}      = {'ItemGroup'     => $itmgrp_data,
                                            'Pagination'    => $pagination_aref,
@@ -887,7 +887,7 @@ sub get_itemgroup_runmode {
   if ($read_itemgroup_err) {
 
     $self->logger->debug($read_itemgroup_msg);
-    
+
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
@@ -1002,7 +1002,7 @@ sub add_itemgroup_runmode {
   eval {
 
     local $XML::Checker::FAIL = sub {
-      
+
       my $code = shift;
       my $err_str = XML::Checker::error_string ($code, @_);
       $self->logger->debug("XML Parsing ERR: $code : $err_str");
@@ -1099,7 +1099,7 @@ sub add_itemgroup_runmode {
     if ($dbh_k_write->err()) {
 
       $self->logger->debug("Database error");
-      
+
       my $err_msg     = "Unexpected Error.";
 
       $data_for_postrun_href->{'Error'} = 1;
@@ -1331,14 +1331,14 @@ sub del_itemgroup_runmode {
   }
 
   $dbh_m_read->disconnect();
-  
+
   my $dbh_k_write = connect_kdb_write();
 
   my $sql = 'DELETE FROM itemgroupentry WHERE ItemGroupId=?';
   my $sth = $dbh_k_write->prepare($sql);
 
   $sth->execute($item_grp_id);
-  
+
   if ( $dbh_k_write->err() ) {
 
     $self->logger->debug("Delete itemgroupentry failed");
@@ -1349,11 +1349,11 @@ sub del_itemgroup_runmode {
 
     return $data_for_postrun_href;
   }
-  
+
   $sql = "DELETE FROM itemgroup WHERE ItemGroupId=?";
   $sth = $dbh_k_write->prepare($sql);
   $sth->execute($item_grp_id);
-  
+
   if ( $dbh_k_write->err() ) {
 
     $self->logger->debug("Delete itemgroup failed");
@@ -1370,7 +1370,7 @@ sub del_itemgroup_runmode {
   $dbh_k_write->disconnect();
 
   my $info_msg_aref = [ { 'Message' => "ItemGroupId ($item_grp_id) has been successfully deleted." } ];
-  
+
   return {
     'Error'     => 0,
     'Data'      => { 'Info' => $info_msg_aref, },
@@ -2135,7 +2135,7 @@ sub update_general_unit_runmode {
 
   my $read_gu_sql    =   'SELECT UnitTypeId, UnitNote, UnitSource ';
      $read_gu_sql   .=   'FROM generalunit WHERE UnitId=? ';
- 
+
   my ($r_df_val_err, $r_df_val_msg, $gu_df_val_data) = read_data($dbh_k_read, $read_gu_sql, [$unit_id]);
 
   if ($r_df_val_err) {
@@ -2762,8 +2762,22 @@ sub del_item_runmode {
 
   my $dbh_k_write = connect_kdb_write();
 
-  my $statement = "DELETE FROM item WHERE ItemId=?";
+  my $statement = "DELETE FROM itemlog WHERE ItemId=?";
   my $sth       = $dbh_k_write->prepare($statement);
+  $sth->execute($item_id);
+
+  if ( $dbh_k_write->err() ) {
+
+    my $err_msg = "Unexpected Error.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+
+  $statement = "DELETE FROM item WHERE ItemId=?";
+  $sth       = $dbh_k_write->prepare($statement);
   $sth->execute($item_id);
 
   if ( $dbh_k_write->err() ) {
@@ -4072,7 +4086,7 @@ sub add_item_to_group_runmode {
 
     return $data_for_postrun_href;
   }
-  
+
   my $insert_statement = "
         INSERT into itemgroupentry SET
             ItemId=?,
@@ -4085,14 +4099,14 @@ sub add_item_to_group_runmode {
 
     return $self->_set_error();
   }
-  
+
   $sth->finish();
   $dbh_k_write->disconnect();
 
   my $msg = "ItemId ($item_id) has been added successfully to ItemGroupId ($item_group_id).";
 
   my $info_msg_aref = [ { 'Message' => $msg } ];
-  
+
   return {
     'Error' => 0,
     'Data'  => {
@@ -4182,19 +4196,19 @@ sub remove_item_from_group_runmode {
 
   my $sth = $dbh_k_write->prepare($del_statement);
   $sth->execute( $item_id, $item_group_id, );
-  
+
   if ( $dbh_k_write->err() ) {
 
     return $self->_set_error();
   }
-  
+
   $sth->finish();
   $dbh_k_write->disconnect();
 
   my $msg = "ItemId ($item_id) has been removed successfully from ItemGroupId ($item_group_id).";
 
   my $info_msg_aref = [ { 'Message' => $msg } ];
-  
+
   return {
     'Error' => 0,
     'Data'  => {
@@ -4333,7 +4347,7 @@ sub add_storage_runmode {
   $sth->finish();
 
   $dbh_k_write->disconnect();
-  
+
   my $info_msg_aref  = [{'Message' => "StorageId ($storage_id) has been added successfully."}];
   my $return_id_aref = [{'Value' => "$storage_id", 'ParaName' => 'StorageId'}];
 
@@ -4542,7 +4556,7 @@ sub update_storage_runmode {
   $sth->finish();
 
   $dbh_k_write->disconnect();
-  
+
   my $info_msg_aref  = [{'Message' => "StorageId ($storage_id) has been updated successfully."}];
 
   $data_for_postrun_href->{'Error'}     = 0;
@@ -4923,7 +4937,7 @@ sub get_storage_runmode {
   if ($read_storage_err) {
 
     $self->logger->debug($read_storage_msg);
-    
+
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
@@ -5254,7 +5268,7 @@ sub list_itemparent {
       }
 
       for my $item_row (@{$item_data}) {
-        
+
         my $parent_id = $item_row->{'ParentId'};
 
         if (defined $item_parent_lookup->{$parent_id}) {
@@ -5274,7 +5288,7 @@ sub list_itemparent {
   }
 
   for my $row (@{$itemparent_data}) {
-    
+
     delete $row->{'ItemId'};
 
     my $parent_id = $row->{'ParentId'};
@@ -5345,7 +5359,7 @@ sub list_itemparent_runmode {
   if ($read_itemparent_err) {
 
     $self->logger->debug($read_itemparent_msg);
-    
+
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
@@ -8762,7 +8776,7 @@ sub list_item_log {
   }
 
   if ( scalar(@{$where_para_aref}) != $count ) {
-    
+
     my $msg = 'Number of arguments does not match with ';
     $msg   .= 'number of SQL parameter.';
     return (1, $msg, []);
@@ -8771,7 +8785,7 @@ sub list_item_log {
   my $dbh = connect_kdb_read();
   my $sth = $dbh->prepare($sql);
   # parameters provided by the caller
-  # for example, ('WHERE FieldA=?', '1') 
+  # for example, ('WHERE FieldA=?', '1')
   $sth->execute(@{$where_para_aref});
 
   my $err = 0;
@@ -10775,7 +10789,7 @@ sub _get_item_factor {
   my $query  = $self->query();
   my $sql    = "
         SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength
-        FROM factor 
+        FROM factor
         WHERE TableNameOfFactor='itemfactor'
     ";
   my $dbh_k_read = connect_kdb_read();

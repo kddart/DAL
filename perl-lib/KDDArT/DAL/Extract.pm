@@ -6,9 +6,9 @@
 # Author    : Puthick Hok
 # Created   : 02/09/2013
 # Modified  :
-# Purpose   : 
-#          
-#          
+# Purpose   :
+#
+#
 
 package KDDArT::DAL::Extract;
 
@@ -414,7 +414,7 @@ sub list_plate_advanced_runmode {
 
   my $data_start_time = [gettimeofday()];
 
-  # where_arg here in the list function because of the filtering 
+  # where_arg here in the list function because of the filtering
   my ($read_plate_err, $read_plate_msg, $plate_data) = $self->list_plate(1,
                                                                          $sql,
                                                                          $where_arg);
@@ -1875,6 +1875,10 @@ sub list_extract_advanced_runmode {
   }
 
   $sql .= " $paged_limit_clause ";
+
+  # Remove duplicate from the fact that a plate is used in many analysisgroups
+
+  $sql =~ s/^SELECT/SELECT DISTINCT/;
 
   $self->logger->debug("SQL with VCol: $sql");
 

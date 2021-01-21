@@ -1389,7 +1389,7 @@ sub export_marker_dart_runmode {
   }
 
   $mrk_name_fieldname    = $dataset_df_val_data->[0]->{'MarkerNameFieldName'};
-  $seq_fieldname         = $dataset_df_val_data->[0]->{'MarkerSequenceFieldName'}; 
+  $seq_fieldname         = $dataset_df_val_data->[0]->{'MarkerSequenceFieldName'};
 
   my @filterable_fieldlist = ($mrk_name_fieldname, $seq_fieldname);
 
@@ -3457,7 +3457,7 @@ sub list_marker_data_runmode {
   $dbh_m = connect_mdb_read();
   # Need to disconnect and reconnect for the VM to work due to problem with Perl connector to Monetdb
 
-  # where_arg here in the list function because of the filtering 
+  # where_arg here in the list function because of the filtering
   my ($read_mrk_data_err, $read_mrk_data_msg, $mrk_data) = read_data($dbh_m, $sql, $where_arg);
 
   my $data_elapsed = tv_interval($data_start_time);
@@ -3736,7 +3736,7 @@ sub update_markermap_runmode {
      $self->logger->debug("Retrieve markermap default values - number of records unacceptable: $nb_df_val_rec");
      $data_for_postrun_href->{'Error'} = 1;
      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
-  
+
      return $data_for_postrun_href;
   }
 
@@ -3887,7 +3887,7 @@ sub list_markermap {
 
   my $sth = $dbh->prepare($sql);
   # parameters provided by the caller
-  # for example, ('WHERE FieldA=?', '1') 
+  # for example, ('WHERE FieldA=?', '1')
   $sth->execute(@_);
 
   my $err = 0;

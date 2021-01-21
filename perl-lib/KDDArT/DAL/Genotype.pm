@@ -6,9 +6,9 @@
 # Author    : Puthick Hok
 # Created   : 02/06/2010
 # Modified  :
-# Purpose   : 
-#          
-#          
+# Purpose   :
+#
+#
 
 package KDDArT::DAL::Genotype;
 
@@ -56,6 +56,7 @@ sub setup {
                                            'remove_genotype_from_specimen_gadmin',
                                            'add_genotype_alias',
                                            'update_genotype_alias',
+                                           'delete_genotype_alias',
                                            'update_genus_gadmin',
                                            'add_trait2genotype',
                                            'update_genotype_trait',
@@ -95,6 +96,7 @@ sub setup {
                                                 'remove_genotype_from_specimen_gadmin',
                                                 'add_genotype_alias',
                                                 'update_genotype_alias',
+                                                'delete_genotype_alias',
                                                 'update_genus_gadmin',
                                                 'add_trait2genotype',
                                                 'update_genotype_trait',
@@ -166,6 +168,7 @@ sub setup {
     'get_specimen'                              => 'get_specimen_runmode',
     'add_genotype_alias'                        => 'add_genotype_alias_runmode',
     'update_genotype_alias'                     => 'update_genotype_alias_runmode',
+    'delete_genotype_alias'                     => 'delete_genotype_alias_runmode',
     'list_genotype_alias_advanced'              => 'list_genotype_alias_advanced_runmode',
     'get_genotype_alias'                        => 'get_genotype_alias_runmode',
     'update_genus_gadmin'                       => 'update_genus_runmode',
@@ -419,7 +422,7 @@ sub add_genotype_runmode {
 
   if (length($lookup_geno_id) > 0) {
 
-    my $err_msg = "$genotype_name is already used.";
+    my $err_msg = "$genotype_name is already used as a Genotype Alias.";
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'GenotypeName' => $err_msg}]};
 
@@ -486,7 +489,7 @@ sub add_genotype_runmode {
   $sql   .= 'OtherPerm=?';
 
   my $sth = $dbh_k_write->prepare($sql);
-  $sth->execute($genotype_name, $genus_id, $species_name, $acronym, 
+  $sth->execute($genotype_name, $genus_id, $species_name, $acronym,
                 $origin_id, $can_publish, $note, $genotype_color,
                 $group_id, $access_group, $own_perm, $access_perm, $other_perm);
 
@@ -518,9 +521,9 @@ sub add_genotype_runmode {
       $sql .= 'FactorValue=?';
       my $factor_sth = $dbh_k_write->prepare($sql);
       $factor_sth->execute($genotype_id, $vcol_id, $factor_value);
-      
+
       if ($dbh_k_write->err()) {
-        
+
         $data_for_postrun_href->{'Error'} = 1;
         $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
@@ -668,7 +671,7 @@ sub list_genus {
 
   my $sth = $dbh->prepare($sql);
   # parameters provided by the caller
-  # for example, ('WHERE FieldA=?', '1') 
+  # for example, ('WHERE FieldA=?', '1')
   $sth->execute(@_);
 
   my $err = 0;
@@ -1024,7 +1027,7 @@ sub get_genotype_runmode {
   my $field_list = ['genotype.*', 'VCol*',
                     "$perm_str AS UltimatePerm",
       ];
-  
+
   my $other_join = '';
 
   my ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_sql($dbh, $field_list, 'genotype',
@@ -1035,7 +1038,7 @@ sub get_genotype_runmode {
 
     my $err_msg = "Problem with virtual column ($trouble_vcol) containing space.";
   }
-  
+
   $self->logger->debug('Number of vcols: ' . scalar(@{$vcol_list}));
 
   my $where_clause = " WHERE (($perm_str) & $READ_PERM) = $READ_PERM AND genotype.GenotypeId=? ";
@@ -2601,12 +2604,12 @@ sub update_genotype_runmode {
   ($lookp_err, $lookup_geno_id) = read_cell($dbh_k_read, $geno_lookup_sql,
                                             [$genotype_name, $genus_id, $geno_alias_id]);
 
+
   if (length($lookup_geno_id) > 0) {
 
-    my $err_msg = "$genotype_name is already used.";
+    my $err_msg = "$genotype_name is already used as a Genotype Alias.";
     $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'GenotypeName' => $err_msg}]};
-
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'GenotypeName' => $err_msg}] };
     return $data_for_postrun_href;
   }
 
@@ -2722,6 +2725,7 @@ sub update_genotype_runmode {
 
   return $data_for_postrun_href;
 }
+
 
 sub update_specimen_runmode {
 
@@ -3161,7 +3165,7 @@ sub add_genotype_to_specimen_runmode {
   }
 
   my $dbh_read = connect_kdb_read();
-  
+
   my $specimen_exist = record_existence($dbh_read, 'specimen', 'SpecimenId', $specimen_id);
 
   if (!$specimen_exist) {
@@ -3332,7 +3336,7 @@ sub remove_genotype_from_specimen_runmode {
   }
 
   my $dbh_read = connect_kdb_read();
-  
+
   my $specimen_exist = record_existence($dbh_read, 'specimen', 'SpecimenId', $specimen_id);
 
   if (!$specimen_exist) {
@@ -3898,6 +3902,117 @@ sub update_genotype_alias_runmode {
   return $data_for_postrun_href;
 }
 
+sub delete_genotype_alias_runmode {
+
+=pod delete_genotype_alias_HELP_START
+{
+"OperationName": "Delete genotype alias",
+"Description": "Delete genotype alias (alternative name) for specified alias id.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"SkippedField": ["GenotypeId", "GenusId"],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='GenotypeAlias (1) has been deleted successfully.' /></DATA>",
+"SuccessMessageJSON": "{ 'Info' : [  {   'Message' : 'GenotypeAlias (1) has been deleted successfully.'  } ]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='GenotypeAlias (5) not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{ 'Error' : [  {   'Message' : 'GenotypeAlias (5) not found.'  } ]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing GenotypeAliasId"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self          = shift;
+  my $geno_alias_id = $self->param('id');
+  my $query         = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  # Generic required static field checking
+
+  # Finish generic required static field checking
+
+  $self->logger->debug("Genotype alias id: $geno_alias_id");
+
+  my $dbh_write = connect_kdb_write();
+
+  my $read_sql  = 'SELECT GenotypeId, IsGenotypeName, GenotypeAliasName ';
+  $read_sql    .= 'FROM genotypealias WHERE GenotypeAliasId=? ';
+
+  my ($r_df_val_err, $r_df_val_msg, $geno_df_val_data) = read_data($dbh_write, $read_sql, [$geno_alias_id]);
+
+  if ($r_df_val_err) {
+
+    $self->logger->debug("Retrieve genoalias default values for optional fields failed: $r_df_val_msg");
+    $data_for_postrun_href->{'Error'}  = 1;
+    $data_for_postrun_href->{'Data'}   = {'Error' => [{'Message' => "Unexpected Error"}]};
+
+    return $data_for_postrun_href;
+  }
+
+
+  my $is_name_flag   = $geno_df_val_data->[0]->{'IsGenotypeName'};
+  my $genotypealias_name   = $geno_df_val_data->[0]->{'GenotypeAliasName'};
+  my $geno_id   = $geno_df_val_data->[0]->{'GenotypeId'};
+
+  if ($is_name_flag == 1) {
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => "$genotypealias_name is the name of Genotype $geno_id and cannot be removed"}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $group_id = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  my ($is_geno_ok, $trouble_geno_id_aref) = check_permission($dbh_write, 'genotype', 'GenotypeId',
+                                                             [$geno_id], $group_id, $gadmin_status,
+                                                             $READ_WRITE_PERM);
+
+
+   if (!$is_geno_ok) {
+
+     my $trouble_geno_id = $trouble_geno_id_aref->[0];
+     my $err_msg = "Permission denied: Group ($group_id) and genotype ($geno_id).";
+
+     $data_for_postrun_href->{'Error'} = 1;
+     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+     return $data_for_postrun_href;
+   }
+
+   my $dbh_write = connect_kdb_write();
+
+   $self->logger->debug("Deleting Genotype ALias $geno_alias_id");
+
+   my $sql = 'DELETE FROM genotypealias where GenotypeAliasId=?';
+
+   my $sth = $dbh_write->prepare($sql);
+   $sth->execute($geno_alias_id);
+
+   if ($dbh_write->err()) {
+
+     $data_for_postrun_href->{'Error'} = 1;
+     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error'}]};
+
+     return $data_for_postrun_href;
+   }
+
+   $sth->finish();
+
+   $dbh_write->disconnect();
+
+   my $info_msg_aref = [{'Message' => "Genotype Alias ($geno_alias_id) has been deleted successfully."}];
+
+   $data_for_postrun_href->{'Error'}     = 0;
+   $data_for_postrun_href->{'Data'}      = {'Info'     => $info_msg_aref};
+   $data_for_postrun_href->{'ExtraData'} = 0;
+
+   return $data_for_postrun_href;
+}
+
+
 sub list_genotype_alias {
 
   my $self            = $_[0];
@@ -3944,7 +4059,7 @@ sub list_genotype_alias {
       }
 
       my $geno_perm     = $row->{'UltimatePerm'};
-      
+
       if (($geno_perm & $READ_WRITE_PERM) == $READ_WRITE_PERM) {
 
         my $geno_alias_id = $row->{'GenotypeAliasId'};
@@ -4067,7 +4182,7 @@ sub list_genotype_alias_advanced_runmode {
 
   my $dbh = connect_kdb_read();
   my $field_list = ['genotypealias.*', 'VCol*'];
-  
+
   my ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_sql($dbh, $field_list, 'genotypealias',
                                                                         'GenotypeAliasId', '');
 
@@ -4247,9 +4362,9 @@ sub list_genotype_alias_advanced_runmode {
     $self->logger->debug("SQL Row count time: $rcount_time");
 
     if ($pg_id_err == 1) {
-    
+
       $self->logger->debug($pg_id_msg);
-    
+
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
@@ -4257,7 +4372,7 @@ sub list_genotype_alias_advanced_runmode {
     }
 
     if ($pg_id_err == 2) {
-      
+
       $page = 0;
     }
 
@@ -4296,8 +4411,8 @@ sub list_genotype_alias_advanced_runmode {
   $sql .= " $paged_limit_clause ";
 
   $self->logger->debug("SQL with VCol: $sql");
-  
-  # where_arg here in the list function because of the filtering 
+
+  # where_arg here in the list function because of the filtering
   my ($read_alias_err, $read_alias_msg, $alias_data) = $self->list_genotype_alias(1,
                                                                                   $sql,
                                                                                   $where_arg);
@@ -4380,7 +4495,7 @@ sub get_genotype_alias_runmode {
 
   $sql  = 'SELECT * ';
   $sql .= 'FROM genotypealias ';
-  $sql .= 'WHERE GenotypeAliasId=?'; 
+  $sql .= 'WHERE GenotypeAliasId=?';
 
   my ($geno_alias_err, $geno_alias_msg, $geno_alias_data) = $self->list_genotype_alias(1, $sql, [$geno_alias_id]);
 
@@ -4760,16 +4875,18 @@ sub list_genotype_trait {
 
   my $dbh = connect_kdb_read();
 
-  my $sql = 'SELECT * ';
+  my $sql = 'SELECT trait.TraitName, genotypetrait.GenotypeTraitId, genotypetrait.GenotypeId, genotypetrait.TraitId,genotypetrait.TraitValue, generalunit.UnitName ';
   $sql   .= 'FROM genotypetrait ';
-  $sql   .= $where_clause;
-  $sql   .= ' ORDER BY GenotypeTraitId DESC';
+  $sql   .= ' INNER JOIN trait on trait.TraitId=genotypetrait.TraitId ';
+  $sql   .= ' INNER JOIN generalunit on trait.UnitId=generalunit.UnitId ';
+  $sql   .= $where_clause . ' ';
+  $sql   .= ' ORDER BY GenotypeTraitId DESC ';
 
   $self->logger->debug("SQL: $sql");
 
   my $sth = $dbh->prepare($sql);
   # parameters provided by the caller
-  # for example, ('WHERE FieldA=?', '1') 
+  # for example, ('WHERE FieldA=?', '1')
   $sth->execute(@_);
 
   my $err = 0;
@@ -5191,7 +5308,7 @@ sub remove_genotype_trait_runmode {
 
     my $err_msg = "Trait ($trait_id) not part of genotype ($genotype_id).";
     $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'TraitId' => $err_msg}]};
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message'=> $err_msg, 'TraitId' => $err_msg}]};
 
     return $data_for_postrun_href;
   }
@@ -5201,10 +5318,10 @@ sub remove_genotype_trait_runmode {
   my $dbh_write = connect_kdb_write();
 
   $sql  = 'DELETE FROM genotypetrait ';
-  $sql .= 'WHERE GenotypeTraitId=?';
+  $sql .= 'WHERE GenotypeId=? AND TraitId=?';
 
   my $sth = $dbh_write->prepare($sql);
-  $sth->execute($genotype_trait_id);
+  $sth->execute($genotype_id,$trait_id);
 
   if ($dbh_write->err()) {
 
@@ -6613,7 +6730,7 @@ sub remove_specimen_from_specimen_group_bulk_runmode {
   eval {
 
     local $XML::Checker::FAIL = sub {
-      
+
       my $code = shift;
       my $err_str = XML::Checker::error_string ($code, @_);
       $self->logger->debug("XML Parsing ERR: $code : $err_str");
@@ -7044,7 +7161,7 @@ sub list_genotype_advanced_runmode {
 
   my $data_start_time = [gettimeofday()];
 
-  # where_arg here in the list function because of the filtering 
+  # where_arg here in the list function because of the filtering
   my ($read_geno_err, $read_geno_msg, $geno_data) = $self->list_genotype(1, $sql, $where_arg);
 
   my $data_elapsed = tv_interval($data_start_time);
@@ -7777,11 +7894,22 @@ sub del_genotype_runmode {
     return $data_for_postrun_href;
   }
 
+  my $genpedigree_parent = record_existence($dbh_k_read, 'genpedigree', 'ParentGenotypeId', $genotype_id);
+
+  if ($genpedigree_parent) {
+
+    my $err_msg = "Genotype ($genotype_id) is a parent for Genotype Pedigrees.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
   $dbh_k_read->disconnect();
 
   my $dbh_k_write = connect_kdb_write();
 
-  my $del_from_table = ['genotypefactor', 'genotypealias', 'genotypetrait', 'genotype'];
+  my $del_from_table = ['genotypefactor', 'genotypealias', 'genotypetrait', 'genpedigree','genotype'];
 
   for my $from_table (@{$del_from_table}) {
 
@@ -8585,7 +8713,7 @@ sub export_genotype_runmode {
   }
 
   my $filtering_csv = '';
-  
+
   if (defined $query->param('Filtering')) {
 
     $filtering_csv = $query->param('Filtering');
@@ -8640,9 +8768,9 @@ sub export_genotype_runmode {
   my $export_data_path     = "${doc_root}/data/$username";
   my $current_runmode      = $self->get_current_runmode();
   my $lock_filename        = "${current_runmode}.lock";
-  
+
   if ( !(-e $export_data_path) ) {
-      
+
     mkdir($export_data_path);
   }
 
@@ -8654,14 +8782,14 @@ sub export_genotype_runmode {
     $msg   .= 'there was an unexpected error regarding clearing this lockfile.';
     return $self->_set_error( $msg );
   }
-  
+
   my $group_id = $self->authen->group_id();
   my $gadmin_status = $self->authen->gadmin_status();
   my $perm_str = permission_phrase($group_id, 0, $gadmin_status, 'genotype');
 
   my $dbh = connect_kdb_read();
   my $field_list = ['genotype.*', 'VCol*'];
-  
+
   my ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_sql($dbh, $field_list, 'genotype',
                                                                         'GenotypeId', '');
 
@@ -8949,9 +9077,12 @@ sub import_specimen_csv_runmode {
     $matched_col->{$geno_id_field_col}  = 'GenotypeId';
   }
 
-  for (my $i = 1; $i < 5; $i++) {
+  my $geno_i = 1;
+  my $geno_break_flag = 0;
 
-    my $geno_id_field   = "GenotypeId$i";
+  while ($geno_break_flag == 0) {
+
+    my $geno_id_field   = "GenotypeId$geno_i";
 
     if (defined $query->param($geno_id_field)) {
 
@@ -8960,6 +9091,10 @@ sub import_specimen_csv_runmode {
       push(@genotypeid_field, $geno_id_field);
       $chk_col_def_data->{$geno_id_field} = $geno_id_field_col;
       $matched_col->{$geno_id_field_col}  = $geno_id_field;
+      $geno_i++;
+    }
+    else {
+      $geno_break_flag = 1;
     }
   }
 
@@ -10001,7 +10136,7 @@ sub add_breedingmethod_runmode {
 
   $data_for_postrun_href->{'Error'}     = 0;
   $data_for_postrun_href->{'Data'}      = {'Info'      => $info_msg_aref,
-                                           'ReturnId'  => $return_id_aref, 
+                                           'ReturnId'  => $return_id_aref,
   };
   $data_for_postrun_href->{'ExtraData'} = 0;
 
@@ -10812,7 +10947,7 @@ sub import_pedigree_csv_runmode {
   }
 
   my @fieldname_list;
-  
+
   for (my $i = 0; $i < $num_of_col; $i++) {
 
     if ($matched_col->{$i}) {
@@ -11182,7 +11317,7 @@ sub export_specimen_runmode {
   }
 
   my $filtering_csv = '';
-  
+
   if (defined $query->param('Filtering')) {
 
     $filtering_csv = $query->param('Filtering');
@@ -11202,9 +11337,9 @@ sub export_specimen_runmode {
   my $export_data_path     = "${doc_root}/data/$username";
   my $current_runmode      = $self->get_current_runmode();
   my $lock_filename        = "${current_runmode}.lock";
-  
+
   if ( !(-e $export_data_path) ) {
-      
+
     mkdir($export_data_path);
   }
 
@@ -11371,11 +11506,11 @@ sub export_specimen_runmode {
       my $new_geno_field_name = "GenotypeId${field_num}";
 
       if ($i < $nb_genotype) {
-        
+
         $specimen_row->{$new_geno_field_name} = $geno_data->[$i]->{'GenotypeId'};
       }
       else {
-        
+
         $specimen_row->{$new_geno_field_name} = '';
       }
     }
@@ -11451,7 +11586,7 @@ sub list_pedigree {
         $pedigree_row->{'update'} = "update/pedigree/$pedigree_id";
         $pedigree_row->{'delete'} = "delete/pedigree/$pedigree_id";
       }
-    
+
       push(@{$extra_attr_pedigree_data}, $pedigree_row);
     }
   }
@@ -11501,7 +11636,7 @@ sub list_gen_pedigree {
         $gen_pedigree_row->{'update'} = "update/genpedigree/$gen_pedigree_id";
         $gen_pedigree_row->{'delete'} = "delete/genpedigree/$gen_pedigree_id";
       }
-    
+
       push(@{$extra_attr_gen_pedigree_data}, $gen_pedigree_row);
     }
   }
@@ -11549,7 +11684,7 @@ sub export_pedigree_runmode {
   }
 
   my $filtering_csv = '';
-  
+
   if (defined $query->param('Filtering')) {
 
     $filtering_csv = $query->param('Filtering');
@@ -11569,9 +11704,9 @@ sub export_pedigree_runmode {
   my $export_data_path     = "${doc_root}/data/$username";
   my $current_runmode      = $self->get_current_runmode();
   my $lock_filename        = "${current_runmode}.lock";
-  
+
   if ( !(-e $export_data_path) ) {
-      
+
     mkdir($export_data_path);
   }
 
@@ -11674,7 +11809,7 @@ sub export_pedigree_runmode {
   my $pedigree_filename    = "export_pedigree_$sql2md5.csv";
   my $pedigree_file        = "${export_data_path}/$pedigree_filename";
 
-  # where_arg here because of the filtering 
+  # where_arg here because of the filtering
   my ($read_ped_err, $read_ped_msg, $pedigree_data) = $self->list_pedigree(0, $sql, $where_arg);
 
   if ($read_ped_err) {
@@ -12130,7 +12265,7 @@ sub del_pedigree_runmode {
 
   my $self             = shift;
   my $pedigree_id = $self->param('id');
-  
+
   my $data_for_postrun_href = {};
 
   my $dbh_k_read = connect_kdb_read();
@@ -12241,7 +12376,7 @@ sub add_genpedigree_runmode {
 
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [$int_err_href]};
-    
+
     return $data_for_postrun_href;
   }
 
@@ -12252,7 +12387,7 @@ sub add_genpedigree_runmode {
     my $err_msg = "ParentType ($parent_type): not found or inactive.";
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-    
+
     return $data_for_postrun_href;
   }
 
@@ -12985,7 +13120,7 @@ sub list_spec_descendant_runmode {
     my $err_msg = "Unexpected Error.";
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-    
+
     return $data_for_postrun_href;
   }
 
@@ -13119,7 +13254,7 @@ sub list_pedigree_advanced_runmode {
 
       push(@{$final_field_list}, 'generaltype.TypeName AS ParentTypeName');
       $join = ' LEFT JOIN generaltype ON pedigree.ParentType = generaltype.TypeId ';
-    } 
+    }
   }
 
   $self->logger->debug("Final field list: " . join(',', @{$final_field_list}));
@@ -13243,7 +13378,7 @@ sub list_pedigree_advanced_runmode {
 
     return $data_for_postrun_href;
   }
-  
+
   $data_for_postrun_href->{'Error'}     = 0;
   $data_for_postrun_href->{'Data'}      = {'Pedigree'      => $pedigree_data,
                                            'Pagination'    => $pagination_aref,
@@ -13348,6 +13483,7 @@ sub list_gen_pedigree_advanced_runmode {
   $self->logger->debug("Field list all: " . join(',', @field_list_all));
 
   my $final_field_list = \@field_list_all;
+  my @filtering_field_list = ('GenotypeId','ParentGenotypeId', 'GenotypeName','ParentGenotypeName', 'GenParentTypeId','GenParentTypeName','GenPedigreeId');
 
   $self->logger->debug("Final field list: " . join(',', @{$final_field_list}));
 
@@ -13372,26 +13508,45 @@ sub list_gen_pedigree_advanced_runmode {
   for my $field (@{$final_field_list}) {
 
     if ($field eq 'GenParentType') {
-
       push(@{$final_field_list}, 'generaltype.TypeName AS GenParentTypeName');
       $join = ' LEFT JOIN generaltype ON genpedigree.GenParentType = generaltype.TypeId ';
     }
+
+    if ($field eq 'GenotypeId') {
+      push(@{$final_field_list}, 'g1.GenotypeId AS GenotypeId');
+      $field = 'g1.GenotypeId';
+    }
+
+    if ($field eq 'ParentGenotypeId') {
+      push(@{$final_field_list}, 'genpedigree.ParentGenotypeId AS ParentGenotypeId');
+      $field = 'genpedigree.ParentGenotypeId';
+    }
+
+
   }
+
+  #get parent names
+  push(@{$final_field_list}, 'g1.GenotypeName AS GenotypeName');
+  push(@{$final_field_list}, 'g2.GenotypeName AS ParentGenotypeName');
+
+  $join = ' LEFT JOIN generaltype ON genpedigree.GenParentType = generaltype.TypeId ';
+  $join .= ' LEFT JOIN genotype g1 ON g1.GenotypeId = genpedigree.GenotypeId ';
+  $join .= ' LEFT JOIN genotype g2 ON g2.GenotypeId = genpedigree.ParentGenotypeId ';
 
   $self->logger->debug("Final field list: " . join(',', @{$final_field_list}));
 
   $sql  = 'SELECT ' . join(',', @{$final_field_list}) . ' ';
   $sql .= "FROM genpedigree $join ";
 
-  my ( $filter_err, $filter_msg, $filter_phrase, $where_arg ) = parse_filtering('GenPedigreeId', 'genpedigree',
-                                                                                $filtering_csv, $final_field_list );
+  my ( $filter_err, $filter_msg, $filter_phrase, $where_arg, $debug_array ) = parse_filtering('GenPedigreeId', 'genpedigree',
+                                                                                $filtering_csv, \@filtering_field_list );
   if ($filter_err) {
 
     $self->logger->debug("Parse filtering failed: $filter_msg");
     my $err_msg = $filter_msg;
 
     $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg, 'Debug'=>$debug_array}]};
 
     return $data_for_postrun_href;
   }

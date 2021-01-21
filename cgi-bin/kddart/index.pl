@@ -292,6 +292,9 @@ CGI::Application::Dispatch->dispatch(
     'update/genotypealias/:id'                          => { app => 'KDDArT::DAL::Genotype',
                                                              rm  => 'update_genotype_alias' },
 
+    'delete/genotypealias/:id'                          => { app => 'KDDArT::DAL::Genotype',
+                                                             rm  => 'delete_genotype_alias' },
+
     'get/genotypealias/:id'                             => { app => 'KDDArT::DAL::Genotype',
                                                              rm  => 'get_genotype_alias' },
 
@@ -306,6 +309,9 @@ CGI::Application::Dispatch->dispatch(
 
     'get/genotypetrait/:genotraitid'                    => { app => 'KDDArT::DAL::Genotype',
                                                              rm  => 'get_genotype_trait' },
+
+    'list/genotypetrait/:nperpage/page/:num'            => { app => 'KDDArT::DAL::Genotype',
+                                                              rm  => 'list_genotype_trait' },
 
     'genotype/:id/list/trait'                           => { app => 'KDDArT::DAL::Genotype',
                                                              rm  => 'list_genotype_trait' },
@@ -603,6 +609,10 @@ CGI::Application::Dispatch->dispatch(
 
     'delete/trialunit/:id'                              => { app => 'KDDArT::DAL::Trial',
                                                              rm  => 'del_trial_unit_gadmin' },
+
+    'delete/crossing/:id'                              => { app => 'KDDArT::DAL::Trial',
+                                                          rm  => 'del_trial_crossing_gadmin' },
+
 
     'trial/:trialid/list/trialunit'                     => { app => 'KDDArT::DAL::Trial',
                                                              rm  => 'list_trial_unit_advanced' },

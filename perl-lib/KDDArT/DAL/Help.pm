@@ -6,9 +6,9 @@
 # Author    : Puthick Hok
 # Created   : 17/05/2014
 # Modified  :
-# Purpose   : 
-#          
-#          
+# Purpose   :
+#
+#
 
 package KDDArT::DAL::Help;
 

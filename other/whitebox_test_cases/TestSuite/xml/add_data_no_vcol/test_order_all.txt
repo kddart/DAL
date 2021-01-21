@@ -64,10 +64,12 @@ xml/add_data_no_vcol/case_10187_list_trial_type.xml
 xml/add_data_no_vcol/case_10171_update_trial_type.xml
 xml/add_data_no_vcol/case_00394_add_project.xml
 xml/add_data_no_vcol/case_00007_add_trial.xml
+xml/add_data_no_vcol/case_00644_add_trial_dup_name1.xml
 xml/add_data_no_vcol/case_00339_add_trialtype.xml
 xml/add_data_no_vcol/case_10052_list_trial.xml
 xml/add_data_no_vcol/case_10053_get_trial.xml
 xml/add_data_no_vcol/case_10054_update_trial.xml
+xml/add_data_no_vcol/case_00645_update_trial_dup_name.xml
 xml/add_data_no_vcol/case_00358_add_trialunit.xml
 xml/add_data_no_vcol/case_10134_update_trialunit_specimen.xml
 xml/add_data_no_vcol/case_00436_update_tuspec_change_spec_only.xml
@@ -346,6 +348,8 @@ xml/add_data_no_vcol/case_10172_delete_parent_type.xml
 xml/add_data_no_vcol/case_10082_delete_trialunit.xml
 xml/add_data_no_vcol/case_10080_delete_trial.xml
 xml/add_data_no_vcol/case_10070_delete_genus.xml
+xml/add_data_no_vcol/case_10203_delete_genotypealias.xml
+xml/add_data_no_vcol/case_00207_import_specimen.xml
 xml/add_data_no_vcol/case_10116_itemgroup_remove_item.xml
 xml/add_data_no_vcol/case_00571_add_trial_with_point.xml
 xml/add_data_no_vcol/case_00572_update_trial_with_point.xml

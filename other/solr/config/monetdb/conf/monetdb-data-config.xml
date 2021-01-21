@@ -1,13 +1,13 @@
 <dataConfig>
   <dataSource name="monetdb-ds" type="JdbcDataSource"
             driver="nl.cwi.monetdb.jdbc.MonetDriver"
-            url="jdbc:monetdb://localhost/kddart_marker_v2_5_0"
+            url="jdbc:monetdb://localhost/kddart_marker_v2_6_0"
             user="monetdb"
             password="monetdb" />
 
   <dataSource name="mysql-ds" type="JdbcDataSource"
             driver="com.mysql.jdbc.Driver"
-            url="jdbc:mysql://localhost:3306/kddart_v2_5_0?useSSL=false"
+            url="jdbc:mysql://localhost:3306/kddart_v2_6_0?useSSL=false"
             user="kddart_dal"
             password="yourSecurePassword" />
 

@@ -6,9 +6,9 @@
 # Author    : Puthick Hok
 # Created   : 02/06/2010
 # Modified  :
-# Purpose   : 
-#          
-#          
+# Purpose   :
+#
+#
 
 package KDDArT::DAL::Common;
 require Exporter;
@@ -170,7 +170,7 @@ our $ACCEPT_HEADER_LOOKUP   = { 'application/json' => 'JSON',
 
 our $VALID_CTYPE            = {'xml' => 1, 'json' => 1, 'geojson' => 1};
 
-our $DAL_VERSION            = '2.6.0';
+our $DAL_VERSION            = '2.6.1';
 our $DAL_COPYRIGHT          = 'Copyright (c) 2020, Diversity Arrays Technology, All rights reserved.';
 our $DAL_ABOUT              = 'Data Access Layer';
 
@@ -842,14 +842,14 @@ sub dispatch_table2xml {
 
         if ( $gadmin_status ) {
 
-          $op_list_xml_writer->emptyTag('Operation', 
+          $op_list_xml_writer->emptyTag('Operation',
                                         'REST'       => $url_part,
               );
         }
       }
       else {
 
-        $op_list_xml_writer->emptyTag('Operation', 
+        $op_list_xml_writer->emptyTag('Operation',
                                       'REST'       => $url_part,
             );
       }
@@ -2355,7 +2355,7 @@ sub add_dtd {
   my @lines = <READ_XML_FH>;
   close(READ_XML_FH);
 
-  open(UPDATE_XML_FH, ">$xml_file_name") or 
+  open(UPDATE_XML_FH, ">$xml_file_name") or
       die "Cannot save $xml_file_name back.";
 
   my $dtd_added = 0;
@@ -2393,7 +2393,7 @@ sub remove_dtd {
   my @lines = <READ_XML_FH>;
   close(READ_XML_FH);
 
-  open(UPDATE_XML_FH, ">$xml_file_name") or 
+  open(UPDATE_XML_FH, ">$xml_file_name") or
       die "Cannot save $xml_file_name back.";
   for my $line (@lines) {
 
@@ -2548,7 +2548,7 @@ sub read_data {
 
   my $sth = $dbh->prepare($sql);
   # parameters provided by the caller
-  # for example, ('WHERE FieldA=?', '1') 
+  # for example, ('WHERE FieldA=?', '1')
   $sth->execute(@{$where_para_aref});
 
   if ( !$dbh->err() ) {
@@ -2693,7 +2693,7 @@ sub get_csvfile_num_of_col {
   while ($line = <$csv_fh>) {
 
     chomp($line);
-    if ($line =~ /^#/) { 
+    if ($line =~ /^#/) {
 
       next;
     }
@@ -3291,7 +3291,7 @@ sub check_col_def_href {
     }
   }
 
-  return ($err, $err_detail);  
+  return ($err, $err_detail);
 }
 
 # get_paged_id is obsolete. It is replaced by get_paged_filter.
@@ -5933,7 +5933,7 @@ sub parse_filtering {
       $operator         = $2;
       $is_quote_arg_val = 1;
     }
-    elsif ($expression =~ /^(\w+)\s+(IN)\s+\((\s*'[\w|\s|\-|\(|\)|\^|\>|\<|\%|\:|\?|\+|\[|\]|\.|\*|\/|\\|\;|\|]+'\s*,?)+\)$/i) {
+    elsif ($expression =~ /^(\w+)\s+(IN)\s+\((\s*'[\w|\s|\-|\(|\)|\^|\>|\<|\%|\:|\?|\+|\[|\]|\.|\*|\/|\\|\;|\|\=|]+'\s*,?)+\)$/i) {
 
       $field_name       = $1;
       $operator         = $2;
@@ -5951,7 +5951,7 @@ sub parse_filtering {
       $operator         = $2;
       $is_quote_arg_val = 1;
     }
-    elsif ($expression =~ /^(\w+)\s+(NOT IN)\s+\((\s*'[\w|\s|\-|\(|\)|\^|\>|\<|\%|\:|\?|\+|\[|\]|\.|\*|\/|\\|\;|\|]+'\s*,?)+\)$/i) {
+    elsif ($expression =~ /^(\w+)\s+(NOT IN)\s+\((\s*'[\w|\s|\-|\(|\)|\^|\>|\<|\%|\:|\?|\+|\[|\]|\.|\*|\/|\\|\;|\|\=|]+'\s*,?)+\)$/i) {
 
       $field_name       = $1;
       $operator         = $2;
@@ -6276,7 +6276,7 @@ sub parse_filtering {
 
   $sql_exp = join(' AND ', @{$clean_where_exp});
 
-  return ($err, $err_msg, $sql_exp, $where_arg);
+  return ($err, $err_msg, $sql_exp, $where_arg,$field_list_all);
 }
 
 sub generate_factor_sql_v2 {
@@ -6552,7 +6552,7 @@ sub parse_filtering_v2 {
       $operator         = $2;
       $is_quote_arg_val = 1;
     }
-    elsif ($expression =~ /^(\w+)\s+(IN)\s+\((\s*'[\w|\s|\-|\(|\)|\^|\>|\<|\%|\:|\?|\+|\[|\]|\.|\*|\/|\\|\|]+'\s*,?)+\)$/i) {
+    elsif ($expression =~ /^(\w+)\s+(IN)\s+\((\s*'[\w|\s|\-|\(|\)|\^|\>|\<|\%|\:|\?|\+|\[|\]|\.|\*|\/|\\|\|\=|]+'\s*,?)+\)$/i) {
 
       $field_name       = $1;
       $operator         = $2;
@@ -6573,7 +6573,7 @@ sub parse_filtering_v2 {
       $operator         = $2;
       $is_quote_arg_val = 1;
     }
-    elsif ($expression =~ /^(\w+)\s+(NOT IN)\s+\((\s*'[\w|\s|\-|\(|\)|\^|\>|\<|\%|\:|\?|\+|\[|\]|\.|\*|\/|\\|\|]+'\s*,?)+\)$/i) {
+    elsif ($expression =~ /^(\w+)\s+(NOT IN)\s+\((\s*'[\w|\s|\-|\(|\)|\^|\>|\<|\%|\:|\?|\+|\[|\]|\.|\*|\/|\\|\|\=|]+'\s*,?)+\)$/i) {
 
       $field_name       = $1;
       $operator         = $2;
