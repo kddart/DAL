@@ -1,0 +1,17 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Add Item" TargetURL="add/item" Type="BLOCKING" />
+  <Delete TargetURL="delete/item/:ItemId" />
+  <INPUT ParaName="ItemTypeId" SrcValue="xml/add_data_no_vcol/case_00308_add_item_type.xml" />
+  <INPUT ParaName="DateAdded" Value="2017-04-01" />
+  <INPUT ParaName="SpecimenId" SrcValue="xml/add_data_no_vcol/gwas_tcase/case_00581_add_trialunit4gwas226.xml" FinalValURL="get/trialunit/:TrialUnitId" FinalValRetrievalStep="TrialUnit,Specimen,SpecimenId" />
+  <INPUT ParaName="TrialUnitSpecimenId" SrcValue="xml/add_data_no_vcol/gwas_tcase/case_00581_add_trialunit4gwas226.xml" FinalValURL="get/trialunit/:TrialUnitId" FinalValRetrievalStep="TrialUnit,Specimen,TrialUnitSpecimenId" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Match Attr="ParaName" Tag="ReturnId" Value="ItemId" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00308_add_item_type.xml" Order="9" />
+  <Parent CaseFile="xml/add_data_no_vcol/gwas_tcase/case_00581_add_trialunit4gwas226.xml" Order="3" />
+  <ReturnId ParaName="ItemId" Value="6" />
+  
+</TestCase>

@@ -1,0 +1,17 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record_upload" Description="Add Item Group" TargetURL="add/itemgroup" Type="BLOCKING" />
+  <Delete TargetURL="delete/itemgroup/:ItemGroupId" />
+  <INPUT ParaName="ItemGroupName" PrefixVal="ITM__GRP_" Random="1" />
+  <INPUT ParaName="ItemGroupNote" Value="Testing" />
+  <INPUT ParaName="DateAdded" Value="2012-08-08" />
+  <INPUT ParaName="Active" Value="1" />
+  <INPUT ParaName="itemgroupentry" Process="1" SrcFile="xml/add_data_no_vcol/gwas_tcase/itemgroupentry_gwas146.xml" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Match Attr="ParaName" Tag="ReturnId" Value="ItemGroupId" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/gwas_tcase/case_00577_add_gwas_item146.xml" Order="3" />
+  <ReturnId ParaName="ItemGroupId" Value="270" />
+  
+</TestCase>

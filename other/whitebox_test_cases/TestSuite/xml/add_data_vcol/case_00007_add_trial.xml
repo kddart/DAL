@@ -4,6 +4,7 @@
   <INPUT ParaName="SiteId" SrcValue="xml/add_data_vcol/case_00006_add_site.xml" />
   <INPUT ParaName="TrialName" PrefixVal="Trial_" Random="1" />
   <INPUT ParaName="TrialTypeId" SrcValue="xml/add_data_vcol/case_00339_add_trialtype.xml" />
+  <INPUT ParaName="SeasonId" SrcValue="xml/add_data_vcol/case_00004_add_season.xml" />
   <INPUT ParaName="TrialNumber" Value="1" />
   <INPUT ParaName="TrialAcronym" Value="TEST" />
   <INPUT ParaName="DesignTypeId" SrcValue="xml/add_data_vcol/case_00118_add_designtype.xml" />
@@ -26,7 +27,8 @@
   <Parent CaseFile="xml/add_data_vcol/case_00006_add_site.xml" Order="4" />
   <Parent CaseFile="xml/add_data_vcol/case_00339_add_trialtype.xml" Order="5" />
   <Parent CaseFile="xml/add_data_vcol/case_00118_add_designtype.xml" Order="6" />
-  <Parent CaseFile="xml/add_data_vcol/case_01004_add_vcol_trial.xml" Order="7" />
-  
-  
+  <Parent CaseFile="xml/add_data_vcol/case_00004_add_season.xml" Order="8" />
+  <Parent CaseFile="xml/add_data_vcol/case_01004_add_vcol_trial.xml" Order="9" />
+
+
 </TestCase>

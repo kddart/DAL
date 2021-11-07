@@ -188,7 +188,7 @@ sub login {
 
   if ($is_match_return[0] == 1) {
 
-    print "$msg_xml\n";
+    #print "$msg_xml\n";
   }
 
   return (@is_match_return, undef);
@@ -383,9 +383,7 @@ sub is_match {
         }
       }
       elsif (uc($target_data_type) eq 'MULTI') {
-
         if (uc($attr_name) eq 'COUNT') {
-
           my $data_item;
 
           if (ref $data_ref->{$tag_name} eq 'ARRAY') {
@@ -404,7 +402,6 @@ sub is_match {
           my $match_data_err = match_data($match_con, $data_item, $logger);
 
           if ($match_data_err) {
-
             $err = 1;
             $attr_csv .= $attr_name . ',';
           }
@@ -544,7 +541,6 @@ sub get_case_parameter {
       $para_name = $input_href->{'ParaName'};
     }
     else {
-
       if ($input_href->{'Virtual'}) {
 
         if (defined $input_href->{'SrcName'}) {
@@ -602,6 +598,136 @@ sub get_case_parameter {
           die "$case_file: src file for virtual column name missing";
         }
       }
+      #Filtering and standard VCol parameters are treated different. Mostly because VCol Filtering is done by name while normal additions are done by VCol_[VColId]
+      if ($input_href->{'FilteringVirtual'}) {
+
+        if (defined $input_href->{'SrcName'}) {
+
+          my $src_name_case_file = $input_href->{'SrcName'};
+          my $src_name_case_data_ref = undef;
+
+          if (defined $STORAGE->{"${src_name_case_file}_${process_id}"}) {
+
+            $src_name_case_data_ref = $STORAGE->{"${src_name_case_file}_${process_id}"};
+
+            #print(Dumper($src_name_case_data_ref));
+
+            #$para_name = "Factor".$src_name_case_data_ref->{'FactorName'}->[0]->{'Value'};
+            $para_name = "Filtering";
+            my $filtering_value = $input_href->{"Value"};
+            $para_val = "Factor".$src_name_case_data_ref->{'FactorName'}->[0]->{'Value'}."='$filtering_value'";
+
+            $parameter->{$para_name} = $para_val;
+          }
+          else {
+
+            die "No STORAGE data for ${src_name_case_file}_${process_id}";
+          }
+
+          if (defined $input_href->{'SrcNameAttribute'}) {
+
+            my $src_name_attribute = $input_href->{'SrcNameAttribute'};
+
+            if (defined $src_name_case_data_ref->{'ReturnId'}->[0]->{$src_name_attribute}) {
+
+              $para_name = $src_name_case_data_ref->{'ReturnId'}->[0]->{$src_name_attribute};
+            }
+            else {
+
+              $logger->debug("SrcNameAttribute is missing in $src_name_case_file");
+              die "$src_name_case_file missing SrcNameAttribute";
+            }
+          }
+          else {
+
+            my $src_name_prefix = 'VCol_';
+
+            if (defined $input_href->{'PrefixName'}) {
+
+              $src_name_prefix = $input_href->{'PrefixName'};
+            }
+
+            if (defined $src_name_case_data_ref->{'ReturnId'}) {
+
+              my $vcol_id = $src_name_case_data_ref->{'ReturnId'}->[0]->{'Value'};
+              $para_name = "$src_name_prefix" . "$vcol_id";
+            }
+            else {
+
+              $logger->debug("$case_file: virtual column id missing");
+              die "$case_file: virtual column id missing";
+            }
+          }
+        }
+        else {
+
+          $logger->debug("$case_file: src file for virtual column name missing");
+          die "$case_file: src file for virtual column name missing";
+        }
+      }
+      elsif ($input_href->{'Virtual'}) {
+        if (defined $input_href->{'SrcName'}) {
+
+          my $src_name_case_file = $input_href->{'SrcName'};
+          my $src_name_case_data_ref = undef;
+
+          if (defined $STORAGE->{"${src_name_case_file}_${process_id}"}) {
+
+            $src_name_case_data_ref = $STORAGE->{"${src_name_case_file}_${process_id}"};
+
+            #print(Dumper($src_name_case_data_ref));
+
+            $para_name = "Factor".$src_name_case_data_ref->{'FactorName'}->[0]->{'Value'};
+
+            $parameter->{$para_name} = $para_val;
+
+          }
+          else {
+
+            die "No STORAGE data for ${src_name_case_file}_${process_id}";
+          }
+
+          if (defined $input_href->{'SrcNameAttribute'}) {
+
+            my $src_name_attribute = $input_href->{'SrcNameAttribute'};
+
+            if (defined $src_name_case_data_ref->{'ReturnId'}->[0]->{$src_name_attribute}) {
+
+              $para_name = $src_name_case_data_ref->{'ReturnId'}->[0]->{$src_name_attribute};
+            }
+            else {
+
+              $logger->debug("SrcNameAttribute is missing in $src_name_case_file");
+              die "$src_name_case_file missing SrcNameAttribute";
+            }
+          }
+          else {
+
+            my $src_name_prefix = 'VCol_';
+
+            if (defined $input_href->{'PrefixName'}) {
+
+              $src_name_prefix = $input_href->{'PrefixName'};
+            }
+
+            if (defined $src_name_case_data_ref->{'ReturnId'}) {
+
+              my $vcol_id = $src_name_case_data_ref->{'ReturnId'}->[0]->{'Value'};
+              $para_name = "$src_name_prefix" . "$vcol_id";
+            }
+            else {
+
+              $logger->debug("$case_file: virtual column id missing");
+              die "$case_file: virtual column id missing";
+            }
+          }
+        }
+        else {
+
+          $logger->debug("$case_file: src file for virtual column name missing");
+          die "$case_file: src file for virtual column name missing";
+        }
+      }
     }
 
     if (defined $input_href->{'Value'}) {
@@ -609,7 +735,6 @@ sub get_case_parameter {
       $para_val  = $input_href->{'Value'};
     }
     else {
-
       if (defined $input_href->{'SrcValue'}) {
 
         my $src_case_file = $input_href->{'SrcValue'};
@@ -643,6 +768,8 @@ sub get_case_parameter {
 
           $src_case_data_lookup_href->{$src_case_file} = $src_case_data_ref;
         }
+
+
 
         my $src_tag = 'ReturnId';
 
@@ -1183,7 +1310,7 @@ sub standard_request {
 
   if ($is_match_return[0] == 1) {
 
-    print "$msg_content\n";
+    #print "$msg_content\n";
   }
 
   return (@is_match_return, undef, $return_data);
@@ -1266,7 +1393,7 @@ sub logout {
 
   if ($is_match_return[0] == 1) {
 
-    print "$msg_content\n";
+    #print "$msg_content\n";
   }
 
   return (@is_match_return, undef, $return_data);
@@ -1726,7 +1853,7 @@ sub run_test_case {
   my $process_id = $$;
 
   if ( !(-r $case_file) ) {
-
+    print "$case_file cannot be read.";
     die "$case_file cannot be read.";
   }
 
@@ -1920,7 +2047,7 @@ sub run_test_case {
   }
 
   my $elapsed_time = tv_interval($start_time);
-  my $dal_time = undef;
+  my $dal_time = "00:00";
 
   if (defined $return_data->{'StatInfo'}->[0]->{'ServerElapsedTime'}) {
 
@@ -2037,7 +2164,7 @@ sub claim_grp_ownership {
 
   if ($is_match_return[0] == 1) {
 
-    print "$msg_content\n";
+    #print "$msg_content\n";
   }
 
   return (@is_match_return, undef, $return_data);
@@ -2309,8 +2436,8 @@ sub delete_test_record {
 
     my $response = $browser->request($req);
 
-    print "Content: " . $response->content() . "\n";
-    print "Response code: " . $response->code() . "\n";
+    #print "Content: " . $response->content() . "\n";
+    #print "Response code: " . $response->code() . "\n";
 
     if ($response->code() != 200) {
 

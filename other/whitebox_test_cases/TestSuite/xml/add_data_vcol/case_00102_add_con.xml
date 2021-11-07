@@ -7,8 +7,8 @@
   <INPUT ParaName="ContactAcronym" Value="TU" />
   <INPUT ParaName="ContactAddress" Value="1 Wilf Crane Crescent Yarralumla ACT 2600 Australia" />
   <INPUT ParaName="CountryCode" Value="AU" />
-  <INPUT ParaName="ContactTelephone" Value="+61 2 6122 7335" />
-  <INPUT ParaName="ContactMobile" Value="04 12345678" />
+  <INPUT ParaName="ContactTelephone" Value="+61261227335" />
+  <INPUT ParaName="ContactMobile" Value="0412345678" />
   <INPUT ParaName="ContactEMail" Value="admin@kddart.example.com" />
   <INPUT SrcName="xml/add_data_vcol/case_01001_add_vcol_contact.xml" Value="Extra data" Virtual="1" />
   <Match Attr="StatusCode" Value="200" />
@@ -18,6 +18,6 @@
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Order="2" />
   <Parent CaseFile="xml/add_data_vcol/case_01001_add_vcol_contact.xml" Force="1" Order="3" />
   <Parent CaseFile="xml/add_data_vcol/case_00101_add_org.xml" Order="4" />
-  
-  
+
+
 </TestCase>

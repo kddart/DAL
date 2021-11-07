@@ -98,7 +98,7 @@ curl -X POST -H 'Content-type:application/json' --data-binary '{
 
 
 curl -X POST -H 'Content-type:application/json' --data-binary '{
-"add-field": {'stored': 'true', 'name': 'KnownForTraitValue', 'indexed': 'true', 'required': 'false', 'type': 'float', 'multiValued': 'false'}
+"add-field": {'stored': 'true', 'name': 'KnownForTraitValue', 'indexed': 'true', 'required': 'false', 'type': 'text_general', 'multiValued': 'false'}
 }' "${SOLRURL}/solr/db/schema"
 
 
@@ -367,4 +367,3 @@ curl -X POST -H 'Content-type:application/json' --data-binary '{
 curl -X POST -H 'Content-type:application/json' --data-binary '{
 "delete-field": { "name":"id" }
 }' "${SOLRURL}/solr/db/schema"
-

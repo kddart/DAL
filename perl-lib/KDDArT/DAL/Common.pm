@@ -57,7 +57,7 @@ our @EXPORT   = qw($DTD_PATH $RPOSTGRES_UP_FILE $GIS_BUFFER_DISTANCE
                    $GENOTYPE2SPECIMEN_CFG $MULTIMEDIA_STORAGE_PATH $ERR_INFO_AREF
                    $CFG_FILE_PATH $DSN_KDB_READ $DSN_KDB_WRITE $DSN_MDB_READ
                    $DSN_MDB_WRITE $DSN_GIS_READ $DSN_GIS_WRITE $RMYSQL_UP_FILE
-                   $MONETDB_UP_FILE $GENOTYPE2SPECIMEN_CFG $OAUTH2_SITE
+                   $MONETDB_UP_FILE $GENOTYPE2SPECIMEN_CFG $GENOTYPEFACTORFILTERING_CFG $OAUTH2_SITE
                    $OAUTH2_AUTHORIZE_PATH $OAUTH2_CLIENT_ID $OAUTH2_CLIENT_SECRET
                    $OAUTH2_SCOPE $OAUTH2_ACCESS_TOKEN_URL $JSON_SCHEMA_PATH
                    $SOLR_URL $POINT2POLYGON_BUFFER4SITE $POINT2POLYGON_BUFFER4TRIAL
@@ -68,7 +68,7 @@ our @EXPORT   = qw($DTD_PATH $RPOSTGRES_UP_FILE $GIS_BUFFER_DISTANCE
                    read_cookie arrayref2csvfile arrayref2xml reconstruct_server_url
                    read_dispatch_table dispatch_table2xml merge_xml
                    connect_kdb_write record_existence read_cell_value
-                   generate_factor_sql make_empty_xml connect_gis_read connect_gis_write
+                   generate_factor_sql generate_factor_columns_sql make_empty_xml connect_gis_read connect_gis_write
                    geocode check_missing_value check_datatype is_unsigned_int
                    add_dtd read_file xml2arrayref check_permission read_data
                    recurse_arrayref2xml is_within check_integer_value
@@ -85,12 +85,12 @@ our @EXPORT   = qw($DTD_PATH $RPOSTGRES_UP_FILE $GIS_BUFFER_DISTANCE
                    gen_mfactor_sql gen_paged_mkd_sql write_aref2csv write_href2csv check_float_href
                    get_static_field check_datatype_href is_unsigned_int_href get_paged_filter_sql
                    build_seek_index get_file_line csvfh2aref_index_lnl csvfh2aref_index_sline
-                   copy_file filter_csv parse_marker_filtering recurse_read generate_factor_sql_v2
-                   parse_filtering_v2 get_file_block id_existence_bulk table_existence_bulk check_perm_href
+                   copy_file filter_csv parse_marker_filtering recurse_read generate_factor_sql_v2 generate_factor_sql_v3
+                   parse_filtering_v2 test_filtering_factor  get_file_block id_existence_bulk table_existence_bulk check_perm_href
                    filter_csv_aref parse_marker_sorting get_sorting_function check_static_field
                    get_next_value_for check_bool_href check_email_href check_value_href load_config read_cookies
                    record_existence_bulk get_solr_cores get_solr_fields get_solr_entities
-                   validate_trait_db_bulk
+                   validate_trait_db_bulk get_filtering_parts
                  );
 
 our $COOKIE_DOMAIN            = {};
@@ -170,8 +170,8 @@ our $ACCEPT_HEADER_LOOKUP   = { 'application/json' => 'JSON',
 
 our $VALID_CTYPE            = {'xml' => 1, 'json' => 1, 'geojson' => 1};
 
-our $DAL_VERSION            = '2.6.1';
-our $DAL_COPYRIGHT          = 'Copyright (c) 2020, Diversity Arrays Technology, All rights reserved.';
+our $DAL_VERSION            = '2.6.2';
+our $DAL_COPYRIGHT          = 'Copyright (c) 2021, Diversity Arrays Technology, All rights reserved.';
 our $DAL_ABOUT              = 'Data Access Layer';
 
 our $GENO_SPEC_ONE2ONE      = '1-TO-1';
@@ -179,6 +179,8 @@ our $GENO_SPEC_ONE2MANY     = '1-TO-M';
 our $GENO_SPEC_MANY2MANY    = 'M-TO-M';
 
 our $GENOTYPE2SPECIMEN_CFG  = "FROM CFG_FILE";
+
+our $GENOTYPEFACTORFILTERING_CFG = "FROM CFG_FILE";
 
 our $UNIT_POSITION_SPLITTER = "FROM CFG_FILE";
 
@@ -1266,13 +1268,12 @@ sub generate_factor_sql {
 
   my $factor_table = $table_name . 'factor';
 
-  my $sql = "SELECT ${factor_table}.FactorId, FactorName, ";
+  my $sql = "SELECT FactorId, FactorName, ";
   $sql   .= "FactorCaption, FactorDescription, FactorDataType, ";
   $sql   .= 'IF(CanFactorHaveNull=0,1,0) AS Required, ';
   $sql   .= 'FactorValueMaxLength, FactorUnit ';
-  $sql   .= "FROM $factor_table LEFT JOIN factor ";
-  $sql   .= "ON $factor_table.FactorId = factor.FactorId ";
-  $sql   .= "GROUP BY factor.FactorId";
+  $sql   .= "FROM factor ";
+  $sql   .= "Where TableNameOfFactor='$factor_table'";
 
   my $sth = $dbh->prepare($sql);
   $sth->execute();
@@ -1374,13 +1375,448 @@ sub generate_factor_sql {
     }
   }
 
-  $returned_sql   .= "FROM $table_name LEFT JOIN $factor_table ";
+  $returned_sql   .= "FROM $table_name LEFT JOIN  $factor_table ";
   $returned_sql   .= "ON ${table_name}.${id_fieldname} = ${factor_table}.${id_fieldname} ";
   $returned_sql   .= $other_join;
   $returned_sql   .= " GROUP BY ${table_name}.${id_fieldname} ";
 
   return ($err, $trouble_vcol_str, $returned_sql, \@vcol_list);
 }
+
+# this sql generation allows for factor filtering to be possible
+
+sub generate_factor_sql_v2 {
+
+  my $dbh           = $_[0];
+  my $field_list    = $_[1];
+  my $table_name    = $_[2];
+  my $id_fieldname  = $_[3];
+  my $other_join    = $_[4];
+
+  my $field_list_href = {};
+
+  for my $field (@{$field_list}) {
+
+    $field_list_href->{$field} = 1;
+  }
+
+  my $factor_table = $table_name . 'factor';
+
+  #my $sql = "SELECT ${factor_table}.FactorId, FactorName, ";
+  #$sql   .= "FactorCaption, FactorDescription, FactorDataType, ";
+  #$sql   .= 'IF(CanFactorHaveNull=0,1,0) AS Required, ';
+  #$sql   .= 'FactorValueMaxLength, FactorUnit ';
+  #$sql   .= "FROM $factor_table LEFT JOIN factor ";
+  #$sql   .= "ON $factor_table.FactorId = factor.FactorId ";
+  #$sql   .= "GROUP BY factor.FactorId";
+
+  my $sql = "SELECT FactorId, FactorName, ";
+  $sql   .= "FactorCaption, FactorDescription, FactorDataType, ";
+  $sql   .= 'IF(CanFactorHaveNull=0,1,0) AS Required, ';
+  $sql   .= 'FactorValueMaxLength, FactorUnit ';
+  $sql   .= "FROM factor ";
+  $sql   .= "Where TableNameOfFactor='$factor_table'";
+
+  my $sth = $dbh->prepare($sql);
+  $sth->execute();
+
+  my $vcol_field_part = q{};
+  my @vcol_list;
+
+  my @vcol_fieldname_list;;
+
+  my $err = 0;
+  my $trouble_vcol_str = '';
+
+  while (my $row = $sth->fetchrow_hashref() ) {
+
+    my $vcol_id       = $row->{'FactorId'};
+    my $vcol_name     = $row->{'FactorName'};
+    my $vcol_caption  = $row->{'FactorCaption'};
+    my $vcol_datatype = $row->{'FactorDataType'};
+
+    if ($vcol_name =~ /\s+/) {
+
+      $err = 1;
+      $trouble_vcol_str .= "$vcol_name,";
+    }
+
+    my $vcol_unit = q{};
+    if ($row->{'FactorUnit'}) {
+
+      $vcol_unit = qq/"$row->{'FactorUnit'}"/;
+    }
+
+    my $field_name = "Factor${vcol_name}";
+
+    if ($field_list_href->{$field_name} || $field_list_href->{'VCol*'} || $field_list_href->{'*'}) {
+
+      $vcol_field_part .= qq| GROUP_CONCAT(IF(FactorId = $vcol_id, FactorValue, NULL) SEPARATOR '') AS |;
+      $vcol_field_part .= qq| \`${field_name}\`,|;
+
+      push(@vcol_fieldname_list, "subq.\`${field_name}\`");
+      push(@vcol_list, $row);
+    }
+  }
+
+  # remove last character - last "," must not exist
+  chop($vcol_field_part);
+
+  $sth->finish();
+
+  my $select_field_part = q{};
+  for my $field (@{$field_list}) {
+
+    if ($field =~ /Col\*$/) {
+
+      if ($field eq 'SCol*') {
+
+        $select_field_part .= "${table_name}.*,";
+      }
+    }
+    else {
+
+      # When the field name is not a wild card column like specific individual field name.
+      # If the specific field name does not start with Factor. If it does start with
+      # Factor, then virtual colum field selection has been done as part of vcol_field_part.
+
+      if (!($field =~ /Factor/)) {
+
+        if ($field =~ /\./) {
+
+          $select_field_part .= "$field,";
+        }
+        else {
+
+          $select_field_part .= "${table_name}.$field,";
+        }
+      }
+    }
+  }
+  # remove last character - last "," must not exist
+  chop($select_field_part);
+
+  my $returned_sql = '';
+  if (length($select_field_part) > 0) {
+
+    $returned_sql = "SELECT ${select_field_part} ";
+  }
+  else {
+
+    $returned_sql = "SELECT ${table_name}.* ";
+  }
+
+  if (length($vcol_field_part) > 0) {
+
+    $returned_sql .= ", " . join(',', @vcol_fieldname_list) . " FROM ";
+    $returned_sql .= " (SELECT $id_fieldname, $vcol_field_part FROM $factor_table ";
+    $returned_sql .= " GROUP BY $id_fieldname ";
+    $returned_sql .= " FACTORHAVING) AS subq ";
+    $returned_sql .= " LEFT JOIN $table_name ON subq.${id_fieldname} = ${table_name}.${id_fieldname} ";
+    $returned_sql .= " $other_join ";
+  }
+  else {
+
+    $returned_sql .= " FROM $table_name $other_join ";
+  }
+
+  return ($err, $trouble_vcol_str, $returned_sql, \@vcol_list);
+}
+
+# This function deals with performance issues that were identified when large number of entries are needed to be joined with small number of factors.
+
+sub generate_factor_sql_v3 {
+
+  my $dbh           = $_[0];
+  my $field_list    = $_[1];
+  my $table_name    = $_[2];
+  my $id_fieldname  = $_[3];
+  my $other_join    = $_[4];
+
+  my $field_list_href = {};
+
+  for my $field (@{$field_list}) {
+
+    $field_list_href->{$field} = 1;
+  }
+
+  my $factor_table = $table_name . 'factor';
+
+  my $sql = "SELECT FactorId, FactorName, ";
+  $sql   .= "FactorCaption, FactorDescription, FactorDataType, ";
+  $sql   .= 'IF(CanFactorHaveNull=0,1,0) AS Required, ';
+  $sql   .= 'FactorValueMaxLength, FactorUnit ';
+  $sql   .= "FROM factor ";
+  $sql   .= "Where TableNameOfFactor='$factor_table'";
+
+  my $sth = $dbh->prepare($sql);
+  $sth->execute();
+
+  my $vcol_field_part = q{};
+  my @vcol_list;
+
+  my $err = 0;
+  my $trouble_vcol_str = '';
+
+
+  my $factor_table_fields_sql = "";
+
+  while (my $row = $sth->fetchrow_hashref() ) {
+
+    my $vcol_id       = $row->{'FactorId'};
+    my $vcol_name     = $row->{'FactorName'};
+    my $vcol_caption  = $row->{'FactorCaption'};
+    my $vcol_datatype = $row->{'FactorDataType'};
+
+    if ($vcol_name =~ /\s+/) {
+
+      $err = 1;
+      $trouble_vcol_str .= "$vcol_name,";
+    }
+
+    my $vcol_unit = q{};
+    if ($row->{'FactorUnit'}) {
+
+      $vcol_unit = qq/"$row->{'FactorUnit'}"/;
+    }
+
+    my $field_name = "Factor${vcol_name}";
+
+    if ($field_list_href->{$field_name} || $field_list_href->{'VCol*'} || $field_list_href->{'*'}) {
+
+      #$vcol_field_part .= qq| GROUP_CONCAT(IF(FactorId = $vcol_id, FactorValue, NULL) SEPARATOR '') AS |;
+      #$vcol_field_part .= qq| \`${field_name}\`,|;
+
+      $factor_table_fields_sql .= qq| GROUP_CONCAT(IF(FactorId = $vcol_id, FactorValue, NULL) SEPARATOR '') AS |;
+      $factor_table_fields_sql .= qq| \`${field_name}\`,|;
+
+      $vcol_field_part .= qq|$factor_table.$field_name,|;
+
+      push(@vcol_list, $row);
+    }
+  }
+
+  # remove last character - last "," must not exist
+  chop($factor_table_fields_sql);
+  chop($vcol_field_part);
+
+  $sth->finish();
+
+  my $select_field_part = q{};
+  for my $field (@{$field_list}) {
+
+    if ($field =~ /Col\*$/) {
+
+      if ($field eq 'SCol*') {
+
+        $select_field_part .= "${table_name}.*,";
+      }
+    }
+    else {
+
+      # When the field name is not a wild card column like specific individual field name.
+      # If the specific field name does not start with Factor. If it does start with
+      # Factor, then virtual colum field selection has been done as part of vcol_field_part.
+
+      if ($field !~ /Factor/) {
+
+        if ($field =~ /\./) {
+
+          $select_field_part .= "$field,";
+        }
+        else {
+
+          $select_field_part .= "${table_name}.$field,";
+        }
+      }
+    }
+  }
+  # remove last character - last "," must not exist
+  chop($select_field_part);
+
+  my $returned_sql = '';
+
+  my $main_table_sql = "";
+  my $factor_table_sql = "";
+
+  if (length($select_field_part) > 0) {
+
+    if (length($vcol_field_part) > 0) {
+
+      $returned_sql = "SELECT $table_name.*, ${vcol_field_part} ";
+      $factor_table_sql = "SELECT ${id_fieldname}, $factor_table_fields_sql";
+    }
+    else {
+
+      $returned_sql = "SELECT ${select_field_part} ";
+    }
+
+    $main_table_sql = "SELECT DISTINCT $select_field_part";
+  }
+  else {
+
+    if (length($vcol_field_part) > 0) {
+
+      $returned_sql = "SELECT ${vcol_field_part} ";
+      $factor_table_sql = "SELECT ${id_fieldname}, $factor_table_fields_sql";
+    }
+    else {
+
+      $returned_sql = "SELECT * ";
+    }
+
+    $main_table_sql = "SELECT *";
+  }
+
+  $returned_sql   .= "FROM ($main_table_sql FROM ${table_name} WHEREREPLACE GROUP BY ${table_name}.${id_fieldname} $other_join ORDERINGSTRING LIMITSTRING) ";
+  $returned_sql   .= "AS ${table_name} ";
+
+  if (length($vcol_field_part) > 0) {
+    $returned_sql .= "LEFT JOIN ($factor_table_sql FROM $factor_table GROUP BY $id_fieldname) AS $factor_table ";
+    $returned_sql   .= "ON ${table_name}.${id_fieldname} = ${factor_table}.${id_fieldname} ";
+  }
+
+  #$returned_sql   .= $other_join;
+  #$returned_sql   .= " GROUP BY ${table_name}.${id_fieldname} ";
+
+  return ($err, $trouble_vcol_str, $returned_sql, \@vcol_list);
+}
+
+
+
+# a function that focuses on generating the columns required that includes factors
+sub generate_factor_columns_sql {
+
+  my $dbh           = $_[0];
+  my $field_list    = $_[1];
+  my $table_name    = $_[2];
+  my $id_fieldname  = $_[3];
+  my $other_join    = $_[4];
+
+  my $field_list_href = {};
+
+  for my $field (@{$field_list}) {
+
+    $field_list_href->{$field} = 1;
+  }
+
+  my $factor_table = $table_name . 'factor';
+
+  my $sql = "SELECT FactorId, FactorName, ";
+  $sql   .= "FactorCaption, FactorDescription, FactorDataType, ";
+  $sql   .= 'IF(CanFactorHaveNull=0,1,0) AS Required, ';
+  $sql   .= 'FactorValueMaxLength, FactorUnit ';
+  $sql   .= "FROM factor ";
+  $sql   .= "Where TableNameOfFactor='$factor_table'";
+
+  my $sth = $dbh->prepare($sql);
+  $sth->execute();
+
+  my $vcol_field_part = q{};
+  my @vcol_list;
+
+  my $err = 0;
+  my $trouble_vcol_str = '';
+
+  while (my $row = $sth->fetchrow_hashref() ) {
+
+    my $vcol_id       = $row->{'FactorId'};
+    my $vcol_name     = $row->{'FactorName'};
+    my $vcol_caption  = $row->{'FactorCaption'};
+    my $vcol_datatype = $row->{'FactorDataType'};
+
+    if ($vcol_name =~ /\s+/) {
+
+      $err = 1;
+      $trouble_vcol_str .= "$vcol_name,";
+    }
+
+    my $vcol_unit = q{};
+    if ($row->{'FactorUnit'}) {
+
+      $vcol_unit = qq/"$row->{'FactorUnit'}"/;
+    }
+
+    my $field_name = "Factor${vcol_name}";
+
+    if ($field_list_href->{$field_name} || $field_list_href->{'VCol*'} || $field_list_href->{'*'}) {
+
+      $vcol_field_part .= qq| GROUP_CONCAT(IF(FactorId = $vcol_id, FactorValue, NULL) SEPARATOR '') AS |;
+      $vcol_field_part .= qq| \`${field_name}\`,|;
+
+      push(@vcol_list, $row);
+    }
+  }
+
+  # remove last character - last "," must not exist
+  chop($vcol_field_part);
+
+  $sth->finish();
+
+  my $select_field_part = q{};
+  for my $field (@{$field_list}) {
+
+    if ($field =~ /Col\*$/) {
+
+      if ($field eq 'SCol*') {
+
+        $select_field_part .= "${table_name}.*,";
+      }
+    }
+    else {
+
+      # When the field name is not a wild card column like specific individual field name.
+      # If the specific field name does not start with Factor. If it does start with
+      # Factor, then virtual colum field selection has been done as part of vcol_field_part.
+
+      if ($field !~ /Factor/) {
+
+        if ($field =~ /\./) {
+
+          $select_field_part .= "$field,";
+        }
+        else {
+
+          $select_field_part .= "${table_name}.$field,";
+        }
+      }
+    }
+  }
+  # remove last character - last "," must not exist
+  chop($select_field_part);
+
+  my $returned_sql = '';
+  if (length($select_field_part) > 0) {
+
+    if (length($vcol_field_part) > 0) {
+
+      $returned_sql = "SELECT ${select_field_part}, ${vcol_field_part} ";
+    }
+    else {
+
+      $returned_sql = "SELECT ${select_field_part} ";
+    }
+  }
+  else {
+
+    if (length($vcol_field_part) > 0) {
+
+      $returned_sql = "SELECT ${vcol_field_part} ";
+    }
+    else {
+
+      $returned_sql = "SELECT * ";
+    }
+  }
+
+  $returned_sql   .= "FROM (SELECT * FROM $table_name limit 1) as $table_name LEFT JOIN $factor_table  ";
+  $returned_sql   .= "ON ${table_name}.${id_fieldname} = ${factor_table}.${id_fieldname} ";
+  $returned_sql   .= $other_join;
+  $returned_sql   .= " GROUP BY ${table_name}.${id_fieldname} ";
+
+  return ($err, $trouble_vcol_str, $returned_sql, \@vcol_list);
+}
+
 
 sub generate_mfactor_sql {
 
@@ -5871,131 +6307,7 @@ sub parse_filtering {
     my $field_name       = '';
     my $is_quote_arg_val = 0;
 
-    if ($expression =~ /^(\w+)\s*([=|>|<])\s*[-+]?\d+\.?\d*$/) {
-
-      $field_name       = $1;
-      $operator         = $2;
-    }
-    elsif ($expression =~ /^(\w+)\s*(<>)\s*[-+]?\d+\.?\d*$/) {
-
-      $field_name       = $1;
-      $operator         = $2;
-    }
-    elsif ($expression =~ /^(\w+)\s*([>|<]=)\s*[-+]?\d+\.?\d*$/) {
-
-      $field_name       = $1;
-      $operator         = $2;
-    }
-    # string field using single quote
-    elsif ($expression =~ /^(\w+)\s*(=)\s*'[^']*'$/i) {
-
-      $field_name       = $1;
-      $operator         = $2;
-      $is_quote_arg_val = 1;
-    }
-    # string field using double quote
-    elsif ($expression =~ /^(\w+)\s*(=)\s*"[^"]*"$/i) {
-
-      $field_name       = $1;
-      $operator         = $2;
-      $is_quote_arg_val = 1;
-    }
-    # date time
-    elsif ($expression =~ /^(\w+)\s*([=|>|<])\s*'\d{4}\-\d{2}\-\d{2}( \d{2}\:\d{2}\:\d{2})?'$/) {
-
-      $field_name       = $1;
-      $operator         = $2;
-      $is_quote_arg_val = 1;
-    }
-    # date time
-    elsif ($expression =~ /^(\w+)\s*(<>)\s*'\d{4}\-\d{2}\-\d{2}( \d{2}\:\d{2}\:\d{2})?'$/) {
-
-      $field_name       = $1;
-      $operator         = $2;
-      $is_quote_arg_val = 1;
-    }
-    # date time
-    elsif ($expression =~ /^(\w+)\s*([>|<]=)\s*'\d{4}\-\d{2}\-\d{2}( \d{2}\:\d{2}\:\d{2})?'$/) {
-
-      $field_name       = $1;
-      $operator         = $2;
-      $is_quote_arg_val = 1;
-    }
-    elsif ($expression =~ /^(\w+)\s+(IN)\s+\((\s*\d+\s*,?)+\)$/i) {
-
-      $field_name       = $1;
-      $operator         = $2;
-      $is_quote_arg_val = 1;
-    }
-    elsif ($expression =~ /^(\w+)\s+(IN)\s+\((\s*'\d{4}\-\d{2}\-\d{2}( \d{2}\:\d{2}\:\d{2})?'\s*,?)+\)$/i) {
-
-      $field_name       = $1;
-      $operator         = $2;
-      $is_quote_arg_val = 1;
-    }
-    elsif ($expression =~ /^(\w+)\s+(IN)\s+\((\s*'[\w|\s|\-|\(|\)|\^|\>|\<|\%|\:|\?|\+|\[|\]|\.|\*|\/|\\|\;|\|\=|]+'\s*,?)+\)$/i) {
-
-      $field_name       = $1;
-      $operator         = $2;
-      $is_quote_arg_val = 1;
-    }
-    elsif ($expression =~ /^(\w+)\s+(NOT IN)\s+\((\s*\d+\s*,?)+\)$/i) {
-
-      $field_name       = $1;
-      $operator         = $2;
-      $is_quote_arg_val = 1;
-    }
-    elsif ($expression =~ /^(\w+)\s+(NOT IN)\s+\((\s*'\d{4}\-\d{2}\-\d{2}( \d{2}\:\d{2}\:\d{2})?'\s*,?)+\)$/i) {
-
-      $field_name       = $1;
-      $operator         = $2;
-      $is_quote_arg_val = 1;
-    }
-    elsif ($expression =~ /^(\w+)\s+(NOT IN)\s+\((\s*'[\w|\s|\-|\(|\)|\^|\>|\<|\%|\:|\?|\+|\[|\]|\.|\*|\/|\\|\;|\|\=|]+'\s*,?)+\)$/i) {
-
-      $field_name       = $1;
-      $operator         = $2;
-      $is_quote_arg_val = 1;
-    }
-    elsif ($expression =~ /^(\w+)\s*(<>)\s*'[\w|\s|\-|\(|\)|\^|\>|\<|\%|\:|\?|\+|\[|\]|\.|\*|\/|\\|\;|\|]*'$/i) {
-
-      $field_name       = $1;
-      $operator         = $2;
-      $is_quote_arg_val = 1;
-    }
-    elsif ($expression =~ /^(\w+)\s+(LIKE)\s+'[^']+'$/i) {
-
-      $field_name       = $1;
-      $operator         = $2;
-      $is_quote_arg_val = 1;
-    }
-    elsif ($expression =~ /^(\w+)\s+(NOT LIKE)\s+'[^']+'$/i) {
-
-      $field_name       = $1;
-      $operator         = $2;
-      $is_quote_arg_val = 1;
-    }
-    elsif ($expression =~ /^(\w+)\s+(\-EQ)\s+\((\s*\d+\s*,?)+\)$/i) {
-
-      $field_name       = $1;
-      $operator         = $2;
-    }
-    elsif ($expression =~ /^(\w+)\s+(\-GBCGT)\s+\d+$/i) {
-
-      $field_name       = $1;
-      $operator         = $2;
-    }
-    elsif ($expression =~ /^(\w+)\s+(\-GBCLT)\s+\d+$/i) {
-
-      $field_name       = $1;
-      $operator         = $2;
-    }
-    elsif ($expression =~ /^(\w+)\s+(\-GEOEQ)\s+'.+'/i) {
-
-      $field_name       = $1;
-      $operator         = $2;
-      $is_quote_arg_val = 1;
-    }
+    ($field_name,$operator,$is_quote_arg_val) = get_filtering_parts($expression);
 
     if (length($operator) > 0) {
 
@@ -6077,6 +6389,7 @@ sub parse_filtering {
 
         my $sub_query  = 0;
         my $table_name = '';
+
         if (length($field_name2table_name->{$field_name}) > 0) {
 
           $table_name    = $field_name2table_name->{$field_name};
@@ -6130,11 +6443,9 @@ sub parse_filtering {
             else {
 
               if ($main_tname =~ /\"/) {
-
                 push(@{$where_exp}, qq|${main_tname}."${field_name}" $operator $field_value|);
               }
               else {
-
                 push(@{$where_exp}, "${main_tname}.${field_name} $operator $field_value");
               }
             }
@@ -6279,135 +6590,39 @@ sub parse_filtering {
   return ($err, $err_msg, $sql_exp, $where_arg,$field_list_all);
 }
 
-sub generate_factor_sql_v2 {
+sub test_filtering_factor {
+  my $filtering_csv          = $_[0];
 
-  my $dbh           = $_[0];
-  my $field_list    = $_[1];
-  my $table_name    = $_[2];
-  my $id_fieldname  = $_[3];
-  my $other_join    = $_[4];
+  my @filtering_exp = split(/&/, $filtering_csv);
 
-  my $field_list_href = {};
+  my $factor_present_field = 0;
 
-  for my $field (@{$field_list}) {
+  for my $expression (@filtering_exp) {
 
-    $field_list_href->{$field} = 1;
-  }
+    $expression = trim($expression);
+    if (length($expression) == 0) {
 
-  my $factor_table = $table_name . 'factor';
-
-  my $sql = "SELECT ${factor_table}.FactorId, FactorName, ";
-  $sql   .= "FactorCaption, FactorDescription, FactorDataType, ";
-  $sql   .= 'IF(CanFactorHaveNull=0,1,0) AS Required, ';
-  $sql   .= 'FactorValueMaxLength, FactorUnit ';
-  $sql   .= "FROM $factor_table LEFT JOIN factor ";
-  $sql   .= "ON $factor_table.FactorId = factor.FactorId ";
-  $sql   .= "GROUP BY factor.FactorId";
-
-  my $sth = $dbh->prepare($sql);
-  $sth->execute();
-
-  my $vcol_field_part = q{};
-  my @vcol_list;
-
-  my @vcol_fieldname_list;;
-
-  my $err = 0;
-  my $trouble_vcol_str = '';
-
-  while (my $row = $sth->fetchrow_hashref() ) {
-
-    my $vcol_id       = $row->{'FactorId'};
-    my $vcol_name     = $row->{'FactorName'};
-    my $vcol_caption  = $row->{'FactorCaption'};
-    my $vcol_datatype = $row->{'FactorDataType'};
-
-    if ($vcol_name =~ /\s+/) {
-
-      $err = 1;
-      $trouble_vcol_str .= "$vcol_name,";
+      next;
     }
 
-    my $vcol_unit = q{};
-    if ($row->{'FactorUnit'}) {
+    my $operator         = '';
+    my $field_name       = '';
+    my $is_quote_arg_val = 0;
 
-      $vcol_unit = qq/"$row->{'FactorUnit'}"/;
-    }
+    ($field_name,$operator,$is_quote_arg_val) = get_filtering_parts($expression);
 
-    my $field_name = "Factor${vcol_name}";
-
-    if ($field_list_href->{$field_name} || $field_list_href->{'VCol*'} || $field_list_href->{'*'}) {
-
-      $vcol_field_part .= qq| GROUP_CONCAT(IF(FactorId = $vcol_id, FactorValue, NULL) SEPARATOR '') AS |;
-      $vcol_field_part .= qq| \`${field_name}\`,|;
-
-      push(@vcol_fieldname_list, "subq.\`${field_name}\`");
-      push(@vcol_list, $row);
-    }
-  }
-
-  # remove last character - last "," must not exist
-  chop($vcol_field_part);
-
-  $sth->finish();
-
-  my $select_field_part = q{};
-  for my $field (@{$field_list}) {
-
-    if ($field =~ /Col\*$/) {
-
-      if ($field eq 'SCol*') {
-
-        $select_field_part .= "${table_name}.*,";
+    if (length($operator) > 0) {
+      if ($field_name =~ /Factor/) {
+        $factor_present_field = 1;
       }
     }
     else {
 
-      # When the field name is not a wild card column like specific individual field name.
-      # If the specific field name does not start with Factor. If it does start with
-      # Factor, then virtual colum field selection has been done as part of vcol_field_part.
-
-      if (!($field =~ /Factor/)) {
-
-        if ($field =~ /\./) {
-
-          $select_field_part .= "$field,";
-        }
-        else {
-
-          $select_field_part .= "${table_name}.$field,";
-        }
-      }
     }
   }
-  # remove last character - last "," must not exist
-  chop($select_field_part);
 
-  my $returned_sql = '';
-  if (length($select_field_part) > 0) {
+  return $factor_present_field;
 
-    $returned_sql = "SELECT ${select_field_part} ";
-  }
-  else {
-
-    $returned_sql = "SELECT ${table_name}.* ";
-  }
-
-  if (length($vcol_field_part) > 0) {
-
-    $returned_sql .= ", " . join(',', @vcol_fieldname_list) . " FROM ";
-    $returned_sql .= " (SELECT $id_fieldname, $vcol_field_part FROM $factor_table ";
-    $returned_sql .= " GROUP BY $id_fieldname ";
-    $returned_sql .= " FACTORHAVING) AS subq ";
-    $returned_sql .= " LEFT JOIN $table_name ON subq.${id_fieldname} = ${table_name}.${id_fieldname} ";
-    $returned_sql .= " $other_join ";
-  }
-  else {
-
-    $returned_sql .= " FROM $table_name $other_join ";
-  }
-
-  return ($err, $trouble_vcol_str, $returned_sql, \@vcol_list);
 }
 
 # It can filter on virtual (factor) columns
@@ -6490,143 +6705,7 @@ sub parse_filtering_v2 {
     my $field_name       = '';
     my $is_quote_arg_val = 0;
 
-    if ($expression =~ /^(\w+)\s*([=|>|<])\s*[-+]?\d+\.?\d*$/) {
-
-      $field_name       = $1;
-      $operator         = $2;
-    }
-    elsif ($expression =~ /^(\w+)\s*(<>)\s*[-+]?\d+\.?\d*$/) {
-
-      $field_name       = $1;
-      $operator         = $2;
-    }
-    elsif ($expression =~ /^(\w+)\s*([>|<]=)\s*[-+]?\d+\.?\d*$/) {
-
-      $field_name       = $1;
-      $operator         = $2;
-    }
-    # string field using single quote
-    elsif ($expression =~ /^(\w+)\s*(=)\s*'[^']*'$/i) {
-
-      $field_name       = $1;
-      $operator         = $2;
-      $is_quote_arg_val = 1;
-    }
-    # string field using double quote
-    elsif ($expression =~ /^(\w+)\s*(=)\s*"[^"]*"$/i) {
-
-      $field_name       = $1;
-      $operator         = $2;
-      $is_quote_arg_val = 1;
-    }
-    # date time
-    elsif ($expression =~ /^(\w+)\s*([=|>|<])\s*'\d{4}\-\d{2}\-\d{2}( \d{2}\:\d{2}\:\d{2})?'$/) {
-
-      $field_name       = $1;
-      $operator         = $2;
-      $is_quote_arg_val = 1;
-    }
-    # date time
-    elsif ($expression =~ /^(\w+)\s*(<>)\s*'\d{4}\-\d{2}\-\d{2}( \d{2}\:\d{2}\:\d{2})?'$/) {
-
-      $field_name       = $1;
-      $operator         = $2;
-      $is_quote_arg_val = 1;
-    }
-    # date time
-    elsif ($expression =~ /^(\w+)\s*([>|<]=)\s*'\d{4}\-\d{2}\-\d{2}( \d{2}\:\d{2}\:\d{2})?'$/) {
-
-      $field_name       = $1;
-      $operator         = $2;
-      $is_quote_arg_val = 1;
-    }
-    elsif ($expression =~ /^(\w+)\s+(IN)\s+\((\s*\d+\s*,?)+\)$/i) {
-
-      $field_name       = $1;
-      $operator         = $2;
-      $is_quote_arg_val = 1;
-    }
-    elsif ($expression =~ /^(\w+)\s+(IN)\s+\((\s*'\d{4}\-\d{2}\-\d{2}( \d{2}\:\d{2}\:\d{2})?'\s*,?)+\)$/i) {
-
-      $field_name       = $1;
-      $operator         = $2;
-      $is_quote_arg_val = 1;
-    }
-    elsif ($expression =~ /^(\w+)\s+(IN)\s+\((\s*'[\w|\s|\-|\(|\)|\^|\>|\<|\%|\:|\?|\+|\[|\]|\.|\*|\/|\\|\|\=|]+'\s*,?)+\)$/i) {
-
-      $field_name       = $1;
-      $operator         = $2;
-      $is_quote_arg_val = 1;
-    }
-
-    #
-
-    elsif ($expression =~ /^(\w+)\s+(NOT IN)\s+\((\s*\d+\s*,?)+\)$/i) {
-
-      $field_name       = $1;
-      $operator         = $2;
-      $is_quote_arg_val = 1;
-    }
-    elsif ($expression =~ /^(\w+)\s+(NOT IN)\s+\((\s*'\d{4}\-\d{2}\-\d{2}( \d{2}\:\d{2}\:\d{2})?'\s*,?)+\)$/i) {
-
-      $field_name       = $1;
-      $operator         = $2;
-      $is_quote_arg_val = 1;
-    }
-    elsif ($expression =~ /^(\w+)\s+(NOT IN)\s+\((\s*'[\w|\s|\-|\(|\)|\^|\>|\<|\%|\:|\?|\+|\[|\]|\.|\*|\/|\\|\|\=|]+'\s*,?)+\)$/i) {
-
-      $field_name       = $1;
-      $operator         = $2;
-      $is_quote_arg_val = 1;
-    }
-
-    #
-
-    elsif ($expression =~ /^(\w+)\s*(<>)\s*'[\w|\s|\-|\(|\)|\^|\>|\<|\%|\:|\?|\+|\[|\]|\.|\*|\/|\\|\|]*'$/i) {
-
-      $field_name       = $1;
-      $operator         = $2;
-      $is_quote_arg_val = 1;
-    }
-    elsif ($expression =~ /^(\w+)\s+(LIKE)\s+'[^']+'$/i) {
-
-      $field_name       = $1;
-      $operator         = $2;
-      $is_quote_arg_val = 1;
-    }
-    elsif ($expression =~ /^(\w+)\s+(NOT LIKE)\s+'[^']+'$/i) {
-
-      $field_name       = $1;
-      $operator         = $2;
-      $is_quote_arg_val = 1;
-    }
-    elsif ($expression =~ /^(\w+)\s+(\-EQ)\s+\((\s*\d+\s*,?)+\)$/i) {
-
-      $field_name       = $1;
-      $operator         = $2;
-    }
-    elsif ($expression =~ /^(\w+)\s*(<>)\s*NULL$/) {
-
-      $field_name       = $1;
-      $operator         = $2;
-
-      my $new_field_name = "ISNULL($field_name)";
-
-      $expression =~ s/NULL/1/;
-      $expression =~ s/$field_name/$new_field_name/;
-      $field_name = $new_field_name;
-    }
-    elsif ($expression =~ /^(\w+)\s*(=)\s*NULL$/) {
-
-      $field_name       = $1;
-      $operator         = $2;
-
-      my $new_field_name = "ISNULL($field_name)";
-
-      $expression =~ s/NULL/1/;
-      $expression =~ s/$field_name/$new_field_name/;
-      $field_name = $new_field_name;
-    }
+    ($field_name,$operator,$is_quote_arg_val) = get_filtering_parts($expression);
 
     if (length($operator) > 0) {
 
@@ -7692,5 +7771,159 @@ sub validate_trait_db_bulk {
 
   return ($err, $err_msg, $err_trait_id, $err_val_idx);
 }
+
+sub get_filtering_parts {
+  my $expression = $_[0];
+
+  my $operator         = '';
+  my $field_name       = '';
+  my $is_quote_arg_val = 0;
+
+  if ($expression =~ /^(\w+)\s*([=|>|<])\s*[-+]?\d+\.?\d*$/) {
+
+    $field_name       = $1;
+    $operator         = $2;
+  }
+  elsif ($expression =~ /^(\w+)\s*(<>)\s*[-+]?\d+\.?\d*$/) {
+
+    $field_name       = $1;
+    $operator         = $2;
+  }
+  elsif ($expression =~ /^(\w+)\s*([>|<]=)\s*[-+]?\d+\.?\d*$/) {
+
+    $field_name       = $1;
+    $operator         = $2;
+  }
+  # string field using single quote
+  elsif ($expression =~ /^(\w+)\s*(=)\s*'[^']*'$/i) {
+
+    $field_name       = $1;
+    $operator         = $2;
+    $is_quote_arg_val = 1;
+  }
+  # string field using double quote
+  elsif ($expression =~ /^(\w+)\s*(=)\s*"[^"]*"$/i) {
+
+    $field_name       = $1;
+    $operator         = $2;
+    $is_quote_arg_val = 1;
+  }
+  # date time
+  elsif ($expression =~ /^(\w+)\s*([=|>|<])\s*'\d{4}\-\d{2}\-\d{2}( \d{2}\:\d{2}\:\d{2})?'$/) {
+
+    $field_name       = $1;
+    $operator         = $2;
+    $is_quote_arg_val = 1;
+  }
+  # date time
+  elsif ($expression =~ /^(\w+)\s*(<>)\s*'\d{4}\-\d{2}\-\d{2}( \d{2}\:\d{2}\:\d{2})?'$/) {
+
+    $field_name       = $1;
+    $operator         = $2;
+    $is_quote_arg_val = 1;
+  }
+  # date time
+  elsif ($expression =~ /^(\w+)\s*([>|<]=)\s*'\d{4}\-\d{2}\-\d{2}( \d{2}\:\d{2}\:\d{2})?'$/) {
+
+    $field_name       = $1;
+    $operator         = $2;
+    $is_quote_arg_val = 1;
+  }
+  elsif ($expression =~ /^(\w+)\s+(IN)\s+\((\s*\d+\s*,?)+\)$/i) {
+
+    $field_name       = $1;
+    $operator         = $2;
+    $is_quote_arg_val = 1;
+  }
+  elsif ($expression =~ /^(\w+)\s+(IN)\s+\((\s*'\d{4}\-\d{2}\-\d{2}( \d{2}\:\d{2}\:\d{2})?'\s*,?)+\)$/i) {
+
+    $field_name       = $1;
+    $operator         = $2;
+    $is_quote_arg_val = 1;
+  }
+  elsif ($expression =~ /^(\w+)\s+(IN)\s+\((\s*'[\w|\s|\-|\(|\)|\^|\>|\<|\%|\:|\?|\+|\[|\]|\.|\*|\/|\\|\|\=|]+'\s*,?)+\)$/i) {
+
+    $field_name       = $1;
+    $operator         = $2;
+    $is_quote_arg_val = 1;
+  }
+  #handles special characters without failing
+  elsif ($expression =~ /^(\w+)\s+(IN)\s+\(['|"](.*)\)$/i) {
+
+    $field_name       = $1;
+    $operator         = $2;
+    $is_quote_arg_val = 1;
+  }
+
+  elsif ($expression =~ /^(\w+)\s+(NOT IN)\s+\((\s*\d+\s*,?)+\)$/i) {
+
+    $field_name       = $1;
+    $operator         = $2;
+    $is_quote_arg_val = 1;
+  }
+  elsif ($expression =~ /^(\w+)\s+(NOT IN)\s+\((\s*'\d{4}\-\d{2}\-\d{2}( \d{2}\:\d{2}\:\d{2})?'\s*,?)+\)$/i) {
+
+    $field_name       = $1;
+    $operator         = $2;
+    $is_quote_arg_val = 1;
+  }
+  elsif ($expression =~ /^(\w+)\s+(NOT IN)\s+\((\s*'[\w|\s|\-|\(|\)|\^|\>|\<|\%|\:|\?|\+|\[|\]|\.|\*|\/|\\|\|\=|]+'\s*,?)+\)$/i) {
+
+    $field_name       = $1;
+    $operator         = $2;
+    $is_quote_arg_val = 1;
+  }
+
+  #
+
+  elsif ($expression =~ /^(\w+)\s*(<>)\s*'[\w|\s|\-|\(|\)|\^|\>|\<|\%|\:|\?|\+|\[|\]|\.|\*|\/|\\|\|]*'$/i) {
+
+    $field_name       = $1;
+    $operator         = $2;
+    $is_quote_arg_val = 1;
+  }
+  elsif ($expression =~ /^(\w+)\s+(LIKE)\s+'[^']+'$/i) {
+
+    $field_name       = $1;
+    $operator         = $2;
+    $is_quote_arg_val = 1;
+  }
+  elsif ($expression =~ /^(\w+)\s+(NOT LIKE)\s+'[^']+'$/i) {
+
+    $field_name       = $1;
+    $operator         = $2;
+    $is_quote_arg_val = 1;
+  }
+  elsif ($expression =~ /^(\w+)\s+(\-EQ)\s+\((\s*\d+\s*,?)+\)$/i) {
+
+    $field_name       = $1;
+    $operator         = $2;
+  }
+  elsif ($expression =~ /^(\w+)\s*(<>)\s*NULL$/) {
+
+    $field_name       = $1;
+    $operator         = $2;
+
+    my $new_field_name = "ISNULL($field_name)";
+
+    $expression =~ s/NULL/1/;
+    $expression =~ s/$field_name/$new_field_name/;
+    $field_name = $new_field_name;
+  }
+  elsif ($expression =~ /^(\w+)\s*(=)\s*NULL$/) {
+
+    $field_name       = $1;
+    $operator         = $2;
+
+    my $new_field_name = "ISNULL($field_name)";
+
+    $expression =~ s/NULL/1/;
+    $expression =~ s/$field_name/$new_field_name/;
+    $field_name = $new_field_name;
+  }
+
+  return ($field_name,$operator,$is_quote_arg_val);
+}
+
 
 1;

@@ -1897,6 +1897,7 @@ sub add_trial_unit_runmode {
 
   $dbh_k_write->disconnect();
 
+
   my $dbh_gis_write = connect_gis_write();
 
   $sql  = 'INSERT INTO trialunitloc (trialunitid, trialunitlocation) ';
@@ -1929,6 +1930,7 @@ sub add_trial_unit_runmode {
 
   return $data_for_postrun_href;
 }
+
 
 sub add_trial_unit_bulk_runmode {
 
@@ -4938,7 +4940,9 @@ sub list_trial_advanced_runmode {
 
   push(@{$sql_field_list}, "$perm_str AS UltimatePerm");
 
-  if ($filtering_csv !~ /Factor/) {
+  my $factor_filtering_flag = test_filtering_factor($filtering_csv);
+
+  if (!$factor_filtering_flag) {
 
     ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_sql($dbh, $sql_field_list, 'trial',
                                                                        'TrialId', $other_join);
@@ -6055,7 +6059,12 @@ sub list_trial_unit {
   my $extra_attr_yes  = $_[1];
   my $gis_field_list  = $_[2];
   my $sql             = $_[3];
-  my $where_para_aref = $_[4];
+  my $where_para_aref = [];
+
+  if (defined $_[4]) {
+
+    $where_para_aref   = $_[4];
+  }
 
   my $err = 0;
   my $msg = '';
@@ -6080,6 +6089,9 @@ sub list_trial_unit {
       $field_list_loc_href->{$field} = 1;
     }
   }
+
+  my $group_id = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
 
   my $trial_unit_loc_gis = {};
 
@@ -6193,6 +6205,8 @@ sub list_trial_unit {
       $trialunitloc_sql   .= 'FROM trialunitloc ';
       $trialunitloc_sql   .= $gis_where;
 
+      $self->logger->debug("Trial Unit Location $trialunitloc_sql");
+
       my $sth_gis = $dbh_gis->prepare($trialunitloc_sql);
       $sth_gis->execute();
 
@@ -6298,6 +6312,8 @@ sub list_trial_unit {
 
   return ($err, $msg, \@extra_attr_trial_unit_data);
 }
+
+
 
 sub get_trial_unit_runmode {
 
@@ -6741,7 +6757,6 @@ sub update_trial_unit_runmode {
   }
   $sth->finish();
 
-
   $dbh_k_write->disconnect();
 
   my $info_msg_aref = [{'Message' => "TrialUnit ($trial_unit_id) has been updated successfully."}];
@@ -6752,6 +6767,7 @@ sub update_trial_unit_runmode {
 
   return $data_for_postrun_href;
 }
+
 
 sub update_trial_unit_geography_runmode {
 
@@ -6840,28 +6856,108 @@ sub update_trial_unit_geography_runmode {
     return $data_for_postrun_href;
   }
 
+  #see if trialunitlocation exists for the trialunit
+  my $trialunit_loc_gis = {};
 
-  my $dbh_gis_write = connect_gis_write();
+  my $dbh_gis = connect_gis_read();
 
-  $sql    = 'UPDATE trialunitloc SET  ';
-  $sql   .= 'trialunitlocation=ST_ForceCollection(ST_GeomFromText(?, -1)) ';
-  $sql   .= 'WHERE trialunitid=?';
+  my $gis_where = 'WHERE trialunitid='.$trial_unit_id;
 
-  my $gis_sth = $dbh_gis_write->prepare($sql);
-  $gis_sth->execute($trial_unit_location, $trial_unit_id);
+  my $trialunitloc_sql = 'SELECT trialunitid, ST_AsText(trialunitlocation) AS trialunitlocation ';
+  $trialunitloc_sql   .= 'FROM trialunitloc ';
+  $trialunitloc_sql   .= $gis_where;
 
-  if ($dbh_gis_write->err()) {
+  $self->logger->debug("trialunitloc_sql: $trialunitloc_sql");
 
-    $self->logger->debug("SQL err: " . $dbh_gis_write->errstr());
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+  my $sth_gis = $dbh_gis->prepare($trialunitloc_sql);
+  $sth_gis->execute();
+
+  my $err = 0;
+  my $msg = "";
+
+  if (!$dbh_gis->err()) {
+
+    my $gis_href = $sth_gis->fetchall_hashref('trialunitid');
+
+    if (!$sth_gis->err()) {
+
+      $trialunit_loc_gis = $gis_href;
+    }
+    else {
+
+      $err = 1;
+      $msg = 'Unexpected error';
+      $self->logger->debug('Err: ' . $dbh_gis->errstr());
+    }
+  }
+  else {
+
+    $err = 1;
+    $msg = 'Unexpected error';
+    $self->logger->debug('Err: ' . $dbh_gis->errstr());
+  }
+
+  $dbh_gis->disconnect();
+
+  my $trialunit_loc_gis_count = scalar(keys(%{$trialunit_loc_gis}));
+  $self->logger->debug("GIS trialunit loc count: $trialunit_loc_gis_count");
+
+  if ($err == 1) {
+    $data_for_postrun_href->{'Error'} = $err;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $msg}]};
 
     return $data_for_postrun_href;
   }
 
-  $gis_sth->finish();
+  if ($trialunit_loc_gis_count < 1) {
+    #write new entry
+    my $dbh_gis_write = connect_gis_write();
 
-  $dbh_gis_write->disconnect();
+    my $tu_loc_bulk_sql = 'INSERT INTO trialunitloc (trialunitid, trialunitlocation) VALUES (?, ST_ForceCollection(ST_GeomFromText(?, -1)))' ;
+
+    $self->logger->debug("SQL " .$tu_loc_bulk_sql . " $trial_unit_location and $trial_unit_id");
+
+    my $gis_sth = $dbh_gis_write->prepare($tu_loc_bulk_sql);
+    $gis_sth->execute($trial_unit_id, $trial_unit_location);
+
+    if ($dbh_gis_write->err()) {
+
+      $self->logger->debug("SQL err: " . $dbh_gis_write->errstr());
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    $gis_sth->finish();
+
+    $dbh_gis_write->disconnect();
+  }
+  else {
+    my $dbh_gis_write = connect_gis_write();
+
+    $sql    = 'UPDATE trialunitloc SET  ';
+    $sql   .= 'trialunitlocation=ST_ForceCollection(ST_GeomFromText(?, -1)) ';
+    $sql   .= 'WHERE trialunitid=?';
+
+    $self->logger->debug("SQL " .$sql . " $trial_unit_location and $trial_unit_id");
+
+    my $gis_sth = $dbh_gis_write->prepare($sql);
+    $gis_sth->execute($trial_unit_location, $trial_unit_id);
+
+    if ($dbh_gis_write->err()) {
+
+      $self->logger->debug("SQL err: " . $dbh_gis_write->errstr());
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    $gis_sth->finish();
+
+    $dbh_gis_write->disconnect();
+  }
 
   my $info_msg_aref = [{'Message' => "TrialUnit ($trial_unit_id) geography has been updated successfully."}];
 
@@ -7947,7 +8043,9 @@ sub list_site_advanced_runmode {
     $other_join .= ' LEFT JOIN contact ON site.CurrentSiteManagerId = contact.ContactId ';
   }
 
-  if ($filtering_csv !~ /Factor/) {
+  my $factor_filtering_flag = test_filtering_factor($filtering_csv);
+
+  if (!$factor_filtering_flag) {
 
     ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_sql($dbh, $sql_field_list, 'site',
                                                                        'SiteId', $other_join);
@@ -8559,8 +8657,8 @@ sub list_trial_unit_specimen_advanced_runmode {
 "GroupAdminRequired": 0,
 "SignatureRequired": 0,
 "AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "FILTERING"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Pagination NumOfRecords='103' NumOfPages='103' Page='1' NumPerPage='1' /><RecordMeta TagName='TrialUnitSpecimen' /><TrialUnitSpecimen SpecimenName='Specimen_0435994' Notes='None' remove='remove/trialunitspecimen/109' ItemId='0' TrialUnitId='76' TrialUnitSpecimenId='109' HarvestDate='0000-00-00' UltimatePermission='Read/Write/Link' PlantDate='0000-00-00' HasDied='0' update='update/trialunitspecimen/109' UltimatePerm='7' SpecimenId='477' /></DATA>",
-"SuccessMessageJSON": "{'Pagination' : [{'NumOfRecords' : '103','NumOfPages' : 103,'NumPerPage' : '1','Page' : '1'}],'RecordMeta' : [{'TagName' : 'TrialUnitSpecimen'}],'TrialUnitSpecimen' : [{'SpecimenName' : 'Specimen_0435994','remove' : 'remove/trialunitspecimen/109','Notes' : 'None','ItemId' : '0','TrialUnitId' : '76','TrialUnitSpecimenId' : '109','HarvestDate' : '0000-00-00','UltimatePermission' : 'Read/Write/Link','PlantDate' : '0000-00-00','HasDied' : '0','update' : 'update/trialunitspecimen/109','SpecimenId' : '477','UltimatePerm' : '7'}]}",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Pagination NumOfRecords='103' NumOfPages='103' Page='1' NumPerPage='1' /><RecordMeta TagName='TrialUnitSpecimen' /><TrialUnitSpecimen SpecimenName='Specimen_0435994' Notes='None' remove='remove/trialunitspecimen/109' ItemId='0' TrialUnitId='76' TrialUnitSpecimenId='109' HarvestDate='0000-00-00' UltimatePermission='Read/Write/Link' PlantDate='0000-00-00' HasDied='0' update='update/trialunitspecimen/109' UltimatePerm='7' SpecimenId='477' TrialId='1' /></DATA>",
+"SuccessMessageJSON": "{'Pagination' : [{'NumOfRecords' : '103','NumOfPages' : 103,'NumPerPage' : '1','Page' : '1'}],'RecordMeta' : [{'TagName' : 'TrialUnitSpecimen'}],'TrialUnitSpecimen' : [{'SpecimenName' : 'Specimen_0435994','remove' : 'remove/trialunitspecimen/109','Notes' : 'None','ItemId' : '0','TrialUnitId' : '76','TrialUnitSpecimenId' : '109','HarvestDate' : '0000-00-00','UltimatePermission' : 'Read/Write/Link','PlantDate' : '0000-00-00','HasDied' : '0','update' : 'update/trialunitspecimen/109','SpecimenId' : '477','UltimatePerm' : '7', 'TrialId' : 1 }]}",
 "ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
 "ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
 "URLParameter": [{"ParameterName": "nperpage", "Description": "Number of records in a page for pagination"}, {"ParameterName": "num", "Description": "The page number of the pagination"}],
@@ -8696,6 +8794,7 @@ sub list_trial_unit_specimen_advanced_runmode {
     }
   }
 
+
   $self->logger->debug("Field list all: " . join(',', @field_list_all));
 
   my $final_field_list = \@field_list_all;
@@ -8736,10 +8835,13 @@ sub list_trial_unit_specimen_advanced_runmode {
     push(@{$final_field_list}, 'specimen.SpecimenName');
     $other_join .= ' LEFT JOIN specimen ON trialunitspecimen.SpecimenId = specimen.SpecimenId ';
   }
+  push(@{$final_field_list}, 'trial.TrialId');
+  $other_join .= ' LEFT JOIN trial ON trialunit.TrialId = trial.TrialId ';
 
   $self->logger->debug("Final field list: " . join(', ', @{$final_field_list}));
 
   my $sql_field_list = [];
+
   for my $field_name (@{$final_field_list}) {
 
     my $full_field_name = $field_name;
@@ -8753,15 +8855,18 @@ sub list_trial_unit_specimen_advanced_runmode {
 
   push(@{$sql_field_list}, "$perm_str AS UltimatePerm ");
 
+
+
   my $field_list_str = join(', ', @{$sql_field_list});
 
   $sql  = "SELECT $field_list_str ";
   $sql .= 'FROM trialunitspecimen ';
   $sql .= 'LEFT JOIN trialunit ON trialunitspecimen.TrialUnitId = trialunit.TrialUnitId ';
-  $sql .= 'LEFT JOIN trial ON trialunit.TrialId = trial.TrialId ';
+  #$sql .= 'LEFT JOIN trial ON trialunit.TrialId = trial.TrialId ';
   $sql .= "$other_join ";
 
-  my $validation_func_lookup = { 'TrialUnitId' => sub { return $self->validate_trial_unit_id(@_); } };
+  my $validation_func_lookup = { 'TrialUnitId' => sub { return $self->validate_trial_unit_id(@_); },
+                                  'TrialId' => sub { return $self->validate_trial_id(@_); } };
 
   $self->logger->debug("Final field list: " . join(', ', @{$final_field_list}));
 
@@ -9095,13 +9200,15 @@ sub list_trial_trait {
 
   my $sql = 'SELECT trialtrait.TrialTraitId, trialtrait.TrialId, trialtrait.TraitId, trialtrait.Compulsory, ';
   $sql   .= 'trialtrait.UnitId AS TrialTraitUnitId, ';
-  $sql   .= 'generalunit.UnitName AS TrialTraitUnitName, ';
+  $sql   .= 'gu2.UnitName AS UnitName, ';
+  $sql   .= 'gu1.UnitName AS TrialTraitUnitName, ';
   $sql   .= 'trait.UnitId AS TraitUnitId, ';
   $sql   .= 'TraitGroupTypeId, TraitName, TraitCaption, TraitDescription, TraitDataType, ';
   $sql   .= 'TraitValueMaxLength, IsTraitUsedForAnalysis, TraitValRule, TraitValRuleErrMsg ';
   $sql   .= 'FROM trialtrait ';
   $sql   .= 'LEFT JOIN trait ON trialtrait.TraitId = trait.TraitId ';
-  $sql   .= 'LEFT JOIN generalunit ON trialtrait.UnitId = generalunit.UnitId ';
+  $sql   .= 'LEFT JOIN generalunit gu1 ON trialtrait.UnitId = gu1.UnitId ';
+  $sql   .= 'LEFT JOIN generalunit gu2 ON trait.UnitId = gu2  .UnitId ';
   $sql   .= $where_clause;
 
   my ($ttrait_err, $ttrait_msg, $no_perm_ttrait_data) = read_data($dbh, $sql, \@_);
@@ -9189,8 +9296,8 @@ sub list_trial_trait_runmode {
 "GroupAdminRequired": 0,
 "SignatureRequired": 0,
 "AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><TrialTrait TraitValRule='boolex(x &gt; 0 and x &lt; 500)' TraitDataType='INTEGER' TraitValueMaxLength='20' TraitUnit='2' TrialTraitId='5' delete='trial/1/remove/trait/1' TraitName='Trait_4102474' Compulsory='1' TraitId='1' update='update/trialtrait/5' TrialId='1' /><RecordMeta TagName='TrialTrait' /></DATA>",
-"SuccessMessageJSON": "{'TrialTrait' : [{'TraitValRule' : 'boolex(x > 0 and x < 500)','TraitDataType' : 'INTEGER','TraitValueMaxLength' : '20','TraitUnit' : '2','TrialTraitId' : '5','delete' : 'trial/1/remove/trait/1','TraitName' : 'Trait_4102474','Compulsory' : '1','update' : 'update/trialtrait/5','TraitId' : '1','TrialId' : '1'}],'RecordMeta' : [{'TagName' : 'TrialTrait'}]}",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><TrialTrait UnitName='g' UnitName='Trait_4102474' TrialTraitUnitName='Trait_4102474' TraitValRule='boolex(x &gt; 0 and x &lt; 500)' TraitDataType='INTEGER' TraitValueMaxLength='20' TraitUnit='2' TrialTraitId='5' delete='trial/1/remove/trait/1' TraitName='Trait_4102474' Compulsory='1' TraitId='1' update='update/trialtrait/5' TrialId='1' /><RecordMeta TagName='TrialTrait' /></DATA>",
+"SuccessMessageJSON": "{'TrialTrait' : [{'TraitValRule' : 'boolex(x > 0 and x < 500)','TraitDataType' : 'INTEGER','TraitValueMaxLength' : '20','TraitUnit' : '2','TrialTraitId' : '5','delete' : 'trial/1/remove/trait/1','TraitName' : 'Trait_4102474','TrialTraitName' : 'Trait_4102474','Compulsory' : '1','update' : 'update/trialtrait/5','TraitId' : '1','TrialId' : '1'}],'RecordMeta' : [{'TagName' : 'TrialTrait'}]}",
 "ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
 "ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
 "URLParameter": [{"ParameterName": "id", "Description": "Existing TrialId"}],
@@ -11173,7 +11280,9 @@ sub list_project_advanced_runmode {
     $other_join   .= ' LEFT JOIN contact ON project.ProjectManagerId = contact.ContactId ';
   }
 
-  if ($filtering_csv !~ /Factor/) {
+  my $factor_filtering_flag = test_filtering_factor($filtering_csv);
+
+  if (!$factor_filtering_flag) {
 
     ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_sql($dbh, $final_field_list, 'project',
                                                                        'ProjectId', $other_join);
@@ -15927,7 +16036,8 @@ sub import_crossing_csv_runmode {
       }
     }
 
-    my $UserId             = 'NULL';
+    #my $UserId             = 'NULL';
+    my $UserId = $self->authen->user_id();
 
     if (defined $data_rec->{'UserId'}) {
 
@@ -16423,6 +16533,8 @@ sub list_crossing_advanced_runmode {
     push(@{$sql_field_list}, 'tuspec_male.SpecimenId AS MaleSpecimenId');
     push(@{$sql_field_list}, 'tuspec_male.TrialUnitId AS MaleTrialUnitId');
     push(@{$sql_field_list}, 'tuspec_male.SpecimenNumber AS MaleSpecimenNumber');
+    push(@{$sql_field_list}, 'tuspec_male.HarvestDate AS MaleHarvestDate');
+
     $other_join .= ' LEFT JOIN trialunitspecimen as tuspec_male ON crossing.MaleParentId = tuspec_male.TrialUnitSpecimenId ';
 
     push(@{$sql_field_list}, 'spec_male.SpecimenName AS MaleSpecimenName');
@@ -16434,6 +16546,8 @@ sub list_crossing_advanced_runmode {
     push(@{$sql_field_list}, 'tuspec_female.SpecimenId AS FemaleSpecimenId');
     push(@{$sql_field_list}, 'tuspec_female.TrialUnitId AS FemaleTrialUnitId');
     push(@{$sql_field_list}, 'tuspec_female.SpecimenNumber AS FemaleSpecimenNumber');
+    push(@{$sql_field_list}, 'tuspec_female.HarvestDate AS FemaleHarvestDate');
+
     $other_join .= ' LEFT JOIN trialunitspecimen as tuspec_female ON crossing.FemaleParentId = tuspec_female.TrialUnitSpecimenId ';
 
     push(@{$sql_field_list}, 'spec_female.SpecimenName AS FemaleSpecimenName');
@@ -18105,8 +18219,8 @@ sub get_crossing_runmode {
 "GroupAdminRequired": 0,
 "SignatureRequired": 0,
 "AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Crossing MaleSpecimenName='Specimen_48515891289' CrossingDateTime='' MaleTrialUnitId='59' BreedingMethodId='78' update='update/crossing/10' FemaleSpecimenNumber='2' UserId='0' FemaleSpecimenName='Specimen_48515891289' TrialId='64' UltimatePerm='7' MaleSpecimenId='219' MaleSpecimenNumber='1' CrossingId='10' UltimatePermission='Read/Write/Link' TrialName='Trial_53042000463' FemaleParentId='258' FemaleSpecimenId='219' MaleParentId='257' CrossingNote='' FemaleTrialUnitId='59' BreedingMethodName='BreedMethod_12601099940' /><StatInfo Unit='second' ServerElapsedTime='0.006' /><RecordMeta TagName='Crossing' /></DATA>",
-"SuccessMessageJSON": "{'StatInfo' : [{'Unit' : 'second','ServerElapsedTime' : '0.005'}],'RecordMeta' : [{'TagName' : 'Crossing'}],'Crossing' : [{'UltimatePerm' : '7','TrialId' : '65','UserId' : '0','FemaleSpecimenName' : 'Specimen_55860245756','FemaleSpecimenNumber' : '2','BreedingMethodId' : '79','update' : 'update/crossing/11','MaleTrialUnitId' : '60','CrossingDateTime' : null,'MaleSpecimenName' : 'Specimen_55860245756','BreedingMethodName' : 'BreedMethod_38887886960','FemaleTrialUnitId' : '60','CrossingNote' : null,'FemaleSpecimenId' : '224','MaleParentId' : '265','TrialName' : 'Trial_44094358040','FemaleParentId' : '266','UltimatePermission' : 'Read/Write/Link','MaleSpecimenNumber' : '1','CrossingId' : '11','MaleSpecimenId' : '224'}]}",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Crossing MaleSpecimenName='Specimen_48515891289' CrossingDateTime='' MaleTrialUnitId='59' BreedingMethodId='78' update='update/crossing/10' FemaleSpecimenNumber='2' UserId='0' FemaleSpecimenName='Specimen_48515891289' TrialId='64' UltimatePerm='7' MaleSpecimenId='219' MaleSpecimenNumber='1' CrossingId='10' UltimatePermission='Read/Write/Link' TrialName='Trial_53042000463' FemaleParentId='258' FemaleSpecimenId='219' MaleParentId='257' MaleHarvestDate='2021-03-03' FemaleCrossingDate='2021-03-03' CrossingNote='' FemaleTrialUnitId='59' BreedingMethodName='BreedMethod_12601099940' /><StatInfo Unit='second' ServerElapsedTime='0.006' /><RecordMeta TagName='Crossing' /></DATA>",
+"SuccessMessageJSON": "{'StatInfo' : [{'Unit' : 'second','ServerElapsedTime' : '0.005'}],'RecordMeta' : [{'TagName' : 'Crossing'}],'Crossing' : [{'UltimatePerm' : '7','TrialId' : '65','UserId' : '0','FemaleSpecimenName' : 'Specimen_55860245756','FemaleSpecimenNumber' : '2','BreedingMethodId' : '79','update' : 'update/crossing/11','MaleTrialUnitId' : '60','CrossingDateTime' : null,'MaleSpecimenName' : 'Specimen_55860245756','BreedingMethodName' : 'BreedMethod_38887886960','FemaleTrialUnitId' : '60','CrossingNote' : null,'FemaleSpecimenId' : '224','MaleParentId' : '265','MaleHarvestDate' : '2021-03-03','FemaleHarvestDate' : '2021-03-03','TrialName' : 'Trial_44094358040','FemaleParentId' : '266','UltimatePermission' : 'Read/Write/Link','MaleSpecimenNumber' : '1','CrossingId' : '11','MaleSpecimenId' : '224'}]}",
 "ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Crossing (100) not found.' /></DATA>"}],
 "ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Crossing (100) not found.'}]}"}],
 "URLParameter": [{"ParameterName": "id", "Description": "Existing CrossingId"}],
@@ -18161,6 +18275,8 @@ sub get_crossing_runmode {
   $sql .= 'tuspec_female.SpecimenId AS FemaleSpecimenId, ';
   $sql .= 'tuspec_female.TrialUnitId AS FemaleTrialUnitId, ';
   $sql .= 'tuspec_female.SpecimenNumber AS FemaleSpecimenNumber, ';
+  $sql .= 'tuspec_female.HarvestDate AS FemaleHarvestDate, ';
+  $sql .= 'tuspec_male.HarvestDate AS MaleHarvestDate, ';
   $sql .= 'spec_female.SpecimenName AS FemaleSpecimenName, ';
   $sql .= "$perm_str AS UltimatePerm ";
   $sql .= 'FROM crossing ';

@@ -1,0 +1,31 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Add Genotype" TargetURL="add/genotype" Type="BLOCKING" />
+  <Delete TargetURL="delete/genotype/:GenotypeId" />
+  <INPUT ParaName="GenotypeName" PrefixVal="Geno_" Random="1" />
+  <INPUT ParaName="SelectionHistory" Value="0" />
+  <INPUT ParaName="GenusId" SrcValue="xml/add_data_vcol/case_00105_add_genus.xml" />
+  <INPUT ParaName="SpeciesName" Value="Testing" />
+  <INPUT ParaName="Pedigree" Value="empty" />
+  <INPUT ParaName="GenotypeAcronym" Value="T" />
+  <INPUT ParaName="FemaleParentId" Value="0" />
+  <INPUT ParaName="MaleParentId" Value="0" />
+  <INPUT ParaName="OriginId" Value="0" />
+  <INPUT ParaName="CanPublishGenotype" Value="0" />
+  <INPUT ParaName="FilialGeneration" Value="0" />
+  <INPUT ParaName="GenotypeColor" Value="black" />
+  <INPUT ParaName="GenotypeNote" Value="none" />
+  <INPUT ParaName="AccessGroupId" SrcValue="xml/add_data_vcol/owngroup.xml" />
+  <INPUT ParaName="OwnGroupPerm" Value="7" />
+  <INPUT ParaName="AccessGroupPerm" Value="5" />
+  <INPUT ParaName="OtherPerm" Value="0" />
+  <INPUT SrcName="xml/add_data_vcol/case_01013_add_vcol_geno_standalone.xml" Value="Extra data" Virtual="1" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Match Attr="ParaName" Tag="ReturnId" Value="GenotypeId" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Order="2" />
+  <Parent CaseFile="xml/add_data_vcol/case_00105_add_genus.xml" Order="3" />
+  <Parent CaseFile="xml/add_data_vcol/case_01013_add_vcol_geno_standalone.xml" Order="4" />
+
+
+</TestCase>

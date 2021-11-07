@@ -1,24 +1,47 @@
+Version 2.6.2
+Date: 08/11/2021
+Description: Bug fixing version and minor improvements
+
+Minor:
+
+  + Filtering Genotype by Factors is now enabled through a config option
+
+  + Improved error handling for importing sample measurements. Entire error list from CSV is returned rather than first error encountered.
+
+  + Fixed issue relating to permissions to delete Specimens
+
+  + Fixed issue relating to updating trial unit locations
+
+  + Fixed issue relating to Item "DateAdded" being mistakenly overwritten
+
+  + Fixed issue relating to Specimen pagination count being affected by various Genotype-Specimen relationships
+
+  + Fixed issue relating to Filtering with special characters
+
+  + Updates to returned data for Genotypes in Specimens, Trial Traits and Crossings.
+
 Version 2.6.1
 Date: 22/01/2021
 Description: Bug fixing version
 
-Minor:
+  Minor:
 
-  + Fixed issue regarding that DAL cannot update a trial that has multiple while trial name is not unique in the database.
+    + Fixed issue regarding that DAL cannot update a trial that has multiple while trial name is not unique in the database.
 
-  + Fixed issue regarding updating SiteStartDate and SiteEndDate in Sites
+    + Fixed issue regarding updating SiteStartDate and SiteEndDate in Sites
 
-  + Fixed issue regarding deleting Items with Item Logs
+    + Fixed issue regarding deleting Items with Item Logs
 
-  + Fixed issue regarding deleting Genotypes that are children in GenPedigree
+    + Fixed issue regarding deleting Genotypes that are children in GenPedigree
 
-  + Fixed issue regarding duplicate Extracts being returned from Analysis Groups
+    + Fixed issue regarding duplicate Extracts being returned from Analysis Groups
 
-  + Add interface to delete Crossing
+    + Add interface to delete Crossing
 
-  + Add interface to delete Genotype Alias
+    + Add interface to delete Genotype Alias
 
-  + List Genpedigree includes Names of Genotype and ParentGenotype
+    + List Genpedigree includes Names of Genotype and ParentGenotype
+
 
 
 Version 2.6.0

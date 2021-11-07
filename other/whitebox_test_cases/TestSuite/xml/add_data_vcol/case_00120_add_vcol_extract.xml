@@ -6,12 +6,12 @@
   <INPUT ParaName="FactorDataType" Value="STRING" />
   <INPUT ParaName="CanFactorHaveNull" Value="1" />
   <INPUT ParaName="FactorValueMaxLength" Value="50" />
-  <INPUT ParaName="Public" Value="0" />
+  <INPUT ParaName="Public" Value="1" />
   <Match Attr="StatusCode" Value="200" />
   <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
   <Match Attr="ParaName" Tag="ReturnId" Value="FactorId" />
   <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Force="1" Order="1" />
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
-  
-  
+
+
 </TestCase>

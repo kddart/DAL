@@ -21,10 +21,11 @@
   <INPUT SrcName="xml/add_data_vcol/case_00103_add_vcol_geno.xml" Value="Extra data" Virtual="1" />
   <Match Attr="StatusCode" Value="200" />
   <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Match Attr="ParaName" Tag="ReturnId" Value="GenotypeId" />
   <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Order="2" />
   <Parent CaseFile="xml/add_data_vcol/case_00105_add_genus.xml" Order="3" />
   <Parent CaseFile="xml/add_data_vcol/case_00103_add_vcol_geno.xml" Order="4" />
-  
-  
+
+
 </TestCase>

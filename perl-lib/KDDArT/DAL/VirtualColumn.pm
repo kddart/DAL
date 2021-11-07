@@ -6,9 +6,9 @@
 # Author    : Puthick Hok
 # Created   : 02/06/2010
 # Modified  :
-# Purpose   : 
-#          
-#          
+# Purpose   :
+#
+#
 
 package KDDArT::DAL::VirtualColumn;
 
@@ -143,7 +143,7 @@ sub list_factor_table_runmode {
   # get list of tables in Katmandoo database
   my $sth = $dbh->table_info();
   $sth->execute();
-  
+
   # need to lookup how to list all tables on the Internet
   while (my @row = $sth->fetchrow_array() ) {
 
@@ -171,7 +171,7 @@ sub list_factor_table_runmode {
 
       my $parent_table = $1;
 
-      my $sql = 'SELECT factor.*, '; 
+      my $sql = 'SELECT factor.*, ';
       $sql   .= 'systemgroup.SystemGroupName ';
       $sql   .= 'FROM factor LEFT JOIN systemgroup ON ';
       $sql   .= 'factor.OwnGroupId = systemgroup.SystemGroupId ';
@@ -185,7 +185,7 @@ sub list_factor_table_runmode {
         my $factor_data = $factor_sth->fetchall_arrayref({});
 
         my $ftable_attr = { 'TableName'   => $table_name,
-                            'Parent'      => $parent_table, 
+                            'Parent'      => $parent_table,
         };
 
         if ($gadmin_status eq '1') {
@@ -276,7 +276,7 @@ sub list_factor_table_runmode {
 
             for my $alias (@{$alias_data}) {
 
-              if ( ($gadmin_status eq '1') && 
+              if ( ($gadmin_status eq '1') &&
                    (($group_id eq $vcol_own_group_id) || $is_vcol_public) ) {
 
                 my $alias_id = $alias->{'FactorAliasId'};
@@ -290,7 +290,7 @@ sub list_factor_table_runmode {
             $factor_row->{'Alias'} = $alias_aref;
           }
 
-          if ( ($gadmin_status eq '1') && 
+          if ( ($gadmin_status eq '1') &&
                (($group_id eq $vcol_own_group_id) || $is_vcol_public) ) {
 
             $factor_row->{'update'}     = "update/vcolumn/$factor_id";
@@ -417,14 +417,14 @@ sub list_field_runmode {
 
     my $factor_table = $parent_table . 'factor';
 
-    # genotypemarkermetaX uses the virtual column concept 
+    # genotypemarkermetaX uses the virtual column concept
     # its actual table structure is different.
 
     my $dbh   = connect_kdb_read();
     my $dbh_m = connect_mdb_read();
 
     my $sql = 'SELECT FactorId, FactorName, FactorCaption, ';
-    $sql   .= 'FactorDescription, FactorDataType, ';
+    $sql   .= 'FactorDescription, FactorDataType, Public, ';
     $sql   .= 'IF(CanFactorHaveNull=0,1,0) AS Required, ';
     $sql   .= 'FactorValueMaxLength, FactorUnit ';
     $sql   .= 'FROM factor ';
@@ -794,7 +794,7 @@ sub update_vcolumn_runmode {
 
 
   if (defined $query->param('FactorValidRule')) {
-    
+
     if (length($query->param('FactorValidRule')) > 0) {
 
       $vcol_validation_rule = $query->param('FactorValidRule');
@@ -934,7 +934,7 @@ sub update_vcolumn_runmode {
                                                                 $vcol_maxlen);
 
   if (!$compatible) {
- 
+
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $comp_msg}]};
 
@@ -1029,7 +1029,7 @@ sub check_data_compatibility {
 
     $sth = $dbh->prepare($sql);
     $sth->execute($factor_id);
-    
+
     my $row_aref = [];
     my $regex = '';
     if ($datatype2regex->{uc($datatype)}) {
@@ -1044,7 +1044,7 @@ sub check_data_compatibility {
       $factor_value = $row_aref->[2];
       $record_id    = $row_aref->[0];
       if (length($regex) > 0) {
-        
+
         if ( !($factor_value =~ /$regex/) ) {
 
           $compatible = 0;
@@ -1177,7 +1177,7 @@ sub add_vcolumn_runmode {
   my $self   = $_[0];
 
   my $data_for_postrun_href = {};
-  
+
   my $query  = $self->query();
   my $ftable = lc($self->param('tname'));
 
@@ -1247,7 +1247,7 @@ sub add_vcolumn_runmode {
   my $vcol_validation_rule = '';
 
   if (defined $query->param('FactorValidRule')) {
-    
+
     $vcol_validation_rule = $query->param('FactorValidRule');
   }
 
@@ -2302,7 +2302,7 @@ sub update_general_type_runmode {
 
           my $factor_sth = $dbh_k_write->prepare($sql);
           $factor_sth->execute($factor_value, $type_id, $vcol_id);
-      
+
           if ($dbh_k_write->err()) {
 
             $self->logger->debug('Unexpected error.');
@@ -2318,9 +2318,9 @@ sub update_general_type_runmode {
           $sql .= 'FactorValue=?';
           my $factor_sth = $dbh_k_write->prepare($sql);
           $factor_sth->execute($type_id, $vcol_id, $factor_value);
-          
+
           if ($dbh_k_write->err()) {
-        
+
             $self->logger->debug('Unexpected error.');
             return $self->_set_error('Unexpected Error.');
           }
@@ -2336,9 +2336,9 @@ sub update_general_type_runmode {
 
           my $factor_sth = $dbh_k_write->prepare($sql);
           $factor_sth->execute($type_id, $vcol_id);
-      
+
           if ($dbh_k_write->err()) {
-        
+
             $self->logger->debug('Unexpected error.');
             return $self->_set_error('Unexpected Error.');
           }

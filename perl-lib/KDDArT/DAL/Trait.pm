@@ -6,9 +6,9 @@
 # Author    : Puthick Hok
 # Created   : 02/06/2010
 # Modified  :
-# Purpose   : 
-#          
-#          
+# Purpose   :
+#
+#
 
 package KDDArT::DAL::Trait;
 
@@ -969,7 +969,7 @@ sub import_samplemeasurement_csv_runmode {
 
   my $check_non_trait_field = 1;
   my $validate_trait_value  = 1;
-  $data_for_postrun_href = $self->insert_samplemeasurement_data($dbh_write,
+  $data_for_postrun_href = $self->insert_samplemeasurement_data_v2($dbh_write,
                                                                 $data_aref,
                                                                 $check_non_trait_field,
                                                                 $validate_trait_value
@@ -1257,7 +1257,7 @@ sub list_samplemeasurement_advanced_runmode {
     }
 
     my $count_sql =  "SELECT COUNT(*) ";
-    $count_sql   .=  "FROM samplemeasurement "; 
+    $count_sql   .=  "FROM samplemeasurement ";
     $count_sql   .=  "LEFT JOIN trait ON samplemeasurement.TraitId = trait.TraitId ";
     $count_sql   .=  "$filtering_exp";
 
@@ -1308,7 +1308,7 @@ sub list_samplemeasurement_advanced_runmode {
     $other_join .=  ' LEFT JOIN generatype ON samplemeasurement.SampleTypeId = generaltype.TypeId ';
   }
 
-  $sql    =  "SELECT samplemeasurement.* FROM samplemeasurement ";    
+  $sql    =  "SELECT samplemeasurement.* FROM samplemeasurement ";
   $sql   .=  "LEFT JOIN trait ON trait.TraitId = samplemeasurement.TraitId ";
   $sql   .=  "$other_join ";
   $sql   .=  "$filtering_exp ";
@@ -1346,7 +1346,7 @@ sub list_samplemeasurement_advanced_runmode {
   }
 
   $data_for_postrun_href->{'Error'}   = 0;
-  $data_for_postrun_href->{'Data'}    = {'samplemeasurement'       =>   $sam_data, 
+  $data_for_postrun_href->{'Data'}    = {'samplemeasurement'       =>   $sam_data,
                                          'Pagination'              =>   $pagination_aref,
                                          'RecordMeta'              =>   [{'TagName' => 'samplemeasurement'}],
                                         };
@@ -2169,7 +2169,7 @@ sub add_trait_alias_runmode {
   }
 
   my $trait_alias_name       = $query->param('TraitAliasName');
-  
+
   my $trait_alias_caption    = '';
 
   if (defined $query->param('TraitAliasCaption')) {
@@ -2416,15 +2416,15 @@ sub update_trait_alias_runmode {
   my $trait_perm_sql    = "SELECT $perm_str as UltimatePerm ";
      $trait_perm_sql   .= 'FROM trait ';
      $trait_perm_sql   .= 'WHERE TraitId=?';
-  
+
   my ($read_err, $trait_perm) = read_cell($dbh_write, $trait_perm_sql, [$trait_id]);
-  
+
   if ( ($trait_perm & $READ_WRITE_PERM) != $READ_WRITE_PERM ) {
-    
+
     my $err_msg = "Permission denied: trait ($trait_id).";
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-    
+
     return $data_for_postrun_href;
   }
 
@@ -2514,7 +2514,7 @@ sub list_trait_alias {
 
   my $sth = $dbh->prepare($sql);
   # parameters provided by the caller
-  # for example, ('WHERE FieldA=?', '1') 
+  # for example, ('WHERE FieldA=?', '1')
   $sth->execute(@_);
 
   my $err = 0;
@@ -2548,7 +2548,7 @@ sub list_trait_alias {
   my @extra_attr_trait_alias_data;
 
   for my $row (@{$trait_alias_data}) {
-      
+
     if (($trait_perm & $READ_WRITE_PERM) == $READ_WRITE_PERM) {
 
       my $trait_alias_id = $row->{'TraitAliasId'};
@@ -3487,9 +3487,9 @@ sub list_treatment_advanced_runmode {
     $self->logger->debug("SQL Row count time: $rcount_time");
 
     if ($paged_id_err == 1) {
-    
+
       $self->logger->debug($paged_id_msg);
-    
+
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
@@ -3497,7 +3497,7 @@ sub list_treatment_advanced_runmode {
     }
 
     if ($paged_id_err == 2) {
-      
+
       $page = 0;
     }
 
@@ -3506,7 +3506,7 @@ sub list_treatment_advanced_runmode {
                          'Page'         => $page,
                          'NumPerPage'   => $nb_per_page,
                         }];
-    
+
     $paged_limit_clause = $limit_clause;
   }
 
@@ -5153,7 +5153,7 @@ sub import_datakapture_data_csv_runmode {
 
       my $samplemeasurement_rec = $samplemeasurement_rec_in_row->{$colname};
 
-      if ( (length($samplemeasurement_rec->{'TraitValue'}) == 0) || 
+      if ( (length($samplemeasurement_rec->{'TraitValue'}) == 0) ||
            (length($samplemeasurement_rec->{'TraitId'}) == 0) ) {
 
         next;
@@ -6734,7 +6734,7 @@ sub import_smgroup_data_csv_runmode {
   my $validate_trait_value       = 1;
   my $enforce_single_trial_data  = 1;
 
-  $data_for_postrun_href = $self->insert_samplemeasurement_data($dbh_write,
+  $data_for_postrun_href = $self->insert_samplemeasurement_data_v2($dbh_write,
                                                                 $data_aref,
                                                                 $check_non_trait_field,
                                                                 $validate_trait_value,
@@ -8841,5 +8841,1049 @@ sub logger {
   my $self = shift;
   return $self->{logger};
 }
+
+#version 2 of import sample measurement functions that return all errors in the CSV
+
+#inserting with returning of collective errors
+sub insert_samplemeasurement_data_v2 {
+
+  my $self                = $_[0];
+  my $dbh_write           = $_[1];
+  my $data_aref           = $_[2];
+  my $chk_non_trait_field = $_[3];
+  my $validate_trait      = $_[4];
+
+  my $enforce_single_trial_data = 0;
+
+  if (defined $_[5]) {
+
+    $enforce_single_trial_data = $_[5];
+  }
+
+  my $smgroup_id = 0;
+
+  if (defined $_[6]) {
+
+    $smgroup_id = $_[6];
+  }
+
+  my $global_trial_id = undef;
+
+  if (defined $_[7]) {
+
+    $global_trial_id = $_[7];
+  }
+
+  my $data_for_postrun_href = {};
+
+  my $user_id       = $self->authen->user_id();
+  my $group_id      = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+  my $perm_str      = permission_phrase($group_id, 0, $gadmin_status);
+
+  #full error array with the following format for individual errors
+  # {'Row' => row of error, 'Type' => type of error, 'Message' => 'message', 'ErrorInput' => what input caused error}
+  my $full_error_aref = [];
+
+  if (scalar(@{$data_aref}) == 0) {
+
+    $self->logger->debug("No data provided");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'No data provided.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $bulk_sql = 'INSERT INTO samplemeasurement ';
+  $bulk_sql   .= '(TrialUnitId,SampleTypeId,SMGroupId,TraitId,OperatorId,MeasureDateTime,InstanceNumber,TraitValue,TrialUnitSpecimenId,StateReason) ';
+  $bulk_sql   .= 'VALUES ';
+
+  my $sql;
+  my $sth;
+
+  my $uniq_tunit_href         = {};
+  my $tunit_val_aref          = [];
+  my $tunit_idx_aref          = [];
+
+  my $uniq_sam_type_href      = {};
+  my $sam_type_val_aref       = [];
+  my $sam_type_idx_aref       = [];
+
+  my $uniq_trait_id_href      = {};
+  my $trait_id_val_aref       = [];
+  my $trait_id_idx_aref       = [];
+
+  my $tu_trait_id_val_aref    = [];
+  my $tu_trait_id_idx_aref    = [];
+
+  my $uniq_operator_href      = {};
+  my $operator_val_aref       = [];
+  my $operator_idx_aref       = [];
+
+  my $tu_tu_spec_val_aref     = [];
+  my $tu_tu_spec_idx_aref     = [];
+
+  my $trait_id2val_href       = {};
+  my $trait_id2idx_href       = {};
+
+  my $date_error_flag = 0;
+  my $date_error_aref = [];
+
+  my $row_counter = 1;
+  for my $data_row (@{$data_aref}) {
+    $self->logger->debug("$row_counter:");
+    for my $data_key (keys(%{$data_row})) {
+      $self->logger->debug("$data_key -> " .$data_row->{$data_key});
+    }
+    $self->logger->debug("----");
+
+    my $effective_user_id = $user_id;
+    my $trialunit_id      = $data_row->{'TrialUnitId'};
+    my $samp_type_id      = $data_row->{'SampleTypeId'};
+    my $trait_id          = $data_row->{'TraitId'};
+
+    my $tu_spec_id        = '0';
+
+    $uniq_trait_id_href->{$trait_id}     = 1;
+    $uniq_sam_type_href->{$samp_type_id} = 1;
+
+    #$self->logger->debug("Checking non trait data: $chk_non_trait_field");
+
+    if ($chk_non_trait_field) {
+
+      my ($int_id_err, $int_id_msg) = check_integer_value( { 'TrialUnitId'    => $data_row->{'TrialUnitId'},
+                                                             'SampleTypeId'   => $data_row->{'SampleTypeId'},
+                                                             'TraitId'        => $data_row->{'TraitId'},
+                                                             'InstanceNumber' => $data_row->{'InstanceNumber'},
+                                                           });
+
+      if ($int_id_err) {
+
+        $int_id_msg = "Row ($row_counter): " . $int_id_msg . ' not integer.';
+        #$data_for_postrun_href->{'Error'} = 1;
+        #$data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $int_id_msg}]};
+
+        #return $data_for_postrun_href;
+
+        my $error_obj = {};
+
+        $error_obj->{'Message'} = $int_id_msg;
+        $error_obj->{'Row'} = $row_counter;
+        $error_obj->{'Type'} = 'TrialUnitInteger';
+        $error_obj->{'ErrorInput'} = $int_id_msg;
+
+        push(@{$full_error_aref}, $error_obj);
+      }
+
+      if (length($data_row->{'OperatorId'}) > 0) {
+
+        my $operator_id = $data_row->{'OperatorId'};
+
+        my ($int_err, $int_msg) = check_integer_value( { 'OperatorId' => $operator_id } );
+
+        if ($int_err) {
+
+          $int_msg = "Row ($row_counter): " . $int_msg . ' not an integer.';
+          #$data_for_postrun_href->{'Error'} = 1;
+          #$data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $int_msg}]};
+
+          #return $data_for_postrun_href;
+
+          my $error_obj = {};
+
+          $error_obj->{'Message'} = $int_msg;
+          $error_obj->{'Row'} = $row_counter;
+          $error_obj->{'Type'} = 'OperatorInteger';
+          $error_obj->{'ErrorInput'} = $int_id_msg;
+
+          push(@{$full_error_aref}, $error_obj);
+        }
+
+        $uniq_operator_href->{$operator_id} = 1;
+        push(@{$operator_val_aref}, $operator_id);
+        push(@{$operator_idx_aref}, $row_counter);
+
+        $effective_user_id = $operator_id;
+      }
+    }
+
+    $uniq_tunit_href->{$trialunit_id} = 1;
+    push(@{$tunit_val_aref}, $trialunit_id);
+    push(@{$tunit_idx_aref}, $row_counter);
+
+    push(@{$tu_trait_id_val_aref}, [$trialunit_id, $trait_id]);
+    push(@{$tu_trait_id_idx_aref}, $row_counter);
+
+    push(@{$sam_type_val_aref},$samp_type_id);
+    push(@{$sam_type_idx_aref},$row_counter);
+
+    if (length($data_row->{'OperatorId'}) > 0) {
+
+      $effective_user_id = $data_row->{'OperatorId'};
+    }
+
+    if (defined $data_row->{'TrialUnitSpecimenId'}) {
+
+      if (length($data_row->{'TrialUnitSpecimenId'}) > 0) {
+
+        $tu_spec_id = $data_row->{'TrialUnitSpecimenId'};
+
+        push(@{$tu_tu_spec_val_aref}, [$trialunit_id, $tu_spec_id]);
+        push(@{$tu_tu_spec_idx_aref}, $row_counter);
+      }
+    }
+
+    my $trait_val = $data_row->{'TraitValue'};
+    my $db_trait_val = $dbh_write->quote($trait_val);
+
+    if ($validate_trait) {
+
+      if (defined $trait_id2val_href->{$trait_id}) {
+
+        my $val_aref = $trait_id2val_href->{$trait_id};
+        push(@{$val_aref}, $trait_val);
+        $trait_id2val_href->{$trait_id} = $val_aref;
+      }
+      else {
+
+        $trait_id2val_href->{$trait_id} = [$trait_val];
+      }
+
+      if (defined $trait_id2idx_href->{$trait_id}) {
+
+        my $idx_aref = $trait_id2idx_href->{$trait_id};
+        push(@{$idx_aref}, $row_counter);
+        $trait_id2idx_href->{$trait_id} = $idx_aref;
+      }
+      else {
+
+        $trait_id2idx_href->{$trait_id} = [$row_counter];
+      }
+    }
+
+    my $measure_dt   = $data_row->{'MeasureDateTime'};
+
+    # Check measure date/time
+
+    my ($measure_dt_err, $measure_dt_msg) = check_dt_value( {'MeasureDateTime' => $measure_dt} );
+
+    if ($measure_dt_err) {
+
+      my $error_obj = {};
+
+      $error_obj->{'Message'} = $measure_dt_msg;
+      $error_obj->{'Row'} = $row_counter;
+      $error_obj->{'Type'} = 'Date';
+      $error_obj->{'ErrorInput'} = $measure_dt;
+
+      push(@{$full_error_aref}, $error_obj);
+    }
+
+    # End check measure date/time
+
+    my $instance_num = $data_row->{'InstanceNumber'};
+
+    my $state_reason      = 'NULL';
+
+    if (defined $data_row->{'StateReason'}) {
+
+      if (length($data_row->{'StateReason'}) > 0) {
+
+        $state_reason = $dbh_write->quote($data_row->{'StateReason'});
+      }
+    }
+
+    $bulk_sql .= "($trialunit_id,$samp_type_id,$smgroup_id,$trait_id,$effective_user_id,";
+    $bulk_sql .= "'$measure_dt',$instance_num,$db_trait_val,$tu_spec_id,$state_reason),";
+
+    $row_counter += 1;
+  }
+
+  chop($bulk_sql);      # remove excessive comma
+  #
+
+  my @trait_id_list = keys(%{$uniq_trait_id_href});
+
+  if (scalar(@trait_id_list) == 0) {
+
+    $self->logger->debug("List of trait id is empty");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  # Release the memorny
+  $uniq_trait_id_href = {};
+
+  $sql  = "SELECT TraitId, $perm_str AS UltimatePerm ";
+  $sql .= "FROM trait ";
+  $sql .= "WHERE TraitId IN (" . join(',', @trait_id_list) . ')';
+
+  my $trait_lookup = $dbh_write->selectall_hashref($sql, 'TraitId');
+
+  if ($dbh_write->err()) {
+
+    $self->logger->debug("Get trait info failed");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my @tu_id_list = keys(%{$uniq_tunit_href});
+
+  if (scalar(@tu_id_list) == 0) {
+
+    $self->logger->debug("List of trial unit id is empty");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  # Release the memory
+  $uniq_tunit_href = {};
+
+  $sql  = "SELECT trialunit.TrialUnitId, trial.TrialId, $perm_str AS UltimatePerm, ";
+  $sql .= "TraitId, TrialUnitSpecimenId ";
+  $sql .= "FROM trialunit LEFT JOIN trial ON trialunit.TrialId = trial.TrialId ";
+  $sql .= "LEFT JOIN trialunitspecimen ON trialunit.TrialUnitId = trialunitspecimen.TrialUnitId ";
+  $sql .= "LEFT JOIN trialtrait ON trial.TrialId = trialtrait.TrialId ";
+  $sql .= "WHERE trialunit.TrialUnitId IN (" . join(',', @tu_id_list) . ')';
+
+  my $trialunit_info_href = {};
+
+  my ($r_tu_err, $r_tu_msg, $tu_data) = read_data($dbh_write, $sql, []);
+
+  if ($r_tu_err) {
+
+    $self->logger->debug("Get trial unit info failed: $r_tu_msg");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $uniq_trial_href = {};
+
+  foreach my $tu_rec (@{$tu_data}) {
+
+    my $tu_id      = $tu_rec->{'TrialUnitId'};
+    my $trial_id   = $tu_rec->{'TrialId'};
+    my $trial_perm = $tu_rec->{'UltimatePerm'};
+    my $trait_id   = $tu_rec->{'TraitId'};
+    my $tu_spec_id = $tu_rec->{'TrialUnitSpecimenId'};
+
+    $uniq_trial_href->{$trial_id} = 1;
+
+    if (! defined $trialunit_info_href->{$tu_id}) {
+
+      $trialunit_info_href->{$tu_id} = {};
+    }
+
+    $trialunit_info_href->{$tu_id}->{'TrialId'}       = $trial_id;
+    $trialunit_info_href->{$tu_id}->{'Permission'}    = $trial_perm;
+
+    if (! defined $trialunit_info_href->{$tu_id}->{'TraitInfo'}) {
+
+      $trialunit_info_href->{$tu_id}->{'TraitInfo'} = {};
+    }
+
+    $trialunit_info_href->{$tu_id}->{'TraitInfo'}->{$trait_id} = 1;
+
+    if (! defined $trialunit_info_href->{$tu_id}->{'TrialUnitSpecInfo'}) {
+
+      $trialunit_info_href->{$tu_id}->{'TrialUnitSpecInfo'} = {};
+    }
+
+    $trialunit_info_href->{$tu_id}->{'TrialUnitSpecInfo'}->{$tu_spec_id} = 1;
+  }
+
+  if ($enforce_single_trial_data == 1) {
+
+    my @data_trial_list = keys(%{$uniq_trial_href});
+
+    if (scalar(@data_trial_list) > 1) {
+
+      my $err_msg = "Data from more than one trial not allowed.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+    elsif (scalar(@data_trial_list) == 1) {
+
+      if ($data_trial_list[0] != $global_trial_id) {
+
+        my $err_msg = "TrialId derived from upload data and TrialId provided via interface are not the same.";
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+        return $data_for_postrun_href;
+      }
+    }
+  }
+
+  for (my $i = 0; $i < scalar(@{$tunit_val_aref}); $i++) {
+
+    my $tu_id    = $tunit_val_aref->[$i];
+    my $row_num  = $tunit_idx_aref->[$i];
+
+    if (! defined $trialunit_info_href->{$tu_id}) {
+
+      my $err_msg = "Row ($row_num): TrialUnit ($tu_id) does not exist.";
+      #$data_for_postrun_href->{'Error'} = 1;
+      #$data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      #return $data_for_postrun_href;
+
+      my $error_obj = {};
+
+      $error_obj->{'Message'} = $err_msg;
+      $error_obj->{'Row'} = $row_num;
+      $error_obj->{'Type'} = "TrialUnit";
+      #$error_obj->{'Date'} = $measure_dt;
+      $error_obj->{'ErrorInput'} = "TrialUnit ($tu_id)";
+
+      push(@{$full_error_aref}, $error_obj);
+    }
+    else {
+      my $trial_id         = $trialunit_info_href->{$tu_id}->{'TrialId'};
+      my $trial_permission = $trialunit_info_href->{$tu_id}->{'Permission'};
+
+      if ( ($trial_permission & $READ_WRITE_PERM) != $READ_WRITE_PERM ) {
+
+        my $perm_err_msg = "Row ($row_num): Permission denied, Group ($group_id) and Trial ($trial_id).";
+        #$data_for_postrun_href->{'Error'} = 1;
+        #$data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $perm_err_msg}]};
+
+        #return $data_for_postrun_href;
+
+        my $error_obj = {};
+
+        $error_obj->{'Message'} = $perm_err_msg;
+        $error_obj->{'Row'} = $row_num;
+        $error_obj->{'Type'} = "Trial Permission";
+        #$error_obj->{'Date'} = $measure_dt;
+        $error_obj->{'ErrorInput'} = "Group ($group_id) and Trial ($trial_id)";
+
+        push(@{$full_error_aref}, $error_obj);
+      }
+    }
+  }
+
+  for (my $i = 0; $i < scalar(@{$tu_trait_id_val_aref}); $i++) {
+
+    my $row_num   = $tu_trait_id_idx_aref->[$i];
+    my $tu_id     = $tu_trait_id_val_aref->[$i]->[0];
+    my $trait_id  = $tu_trait_id_val_aref->[$i]->[1];
+
+    $self->logger->debug("$row_num: $tu_id, $trait_id");
+    $self->logger->debug(defined $trialunit_info_href->{$tu_id});
+
+    if (defined $trialunit_info_href->{$tu_id}) {
+      if ( ! defined $trait_lookup->{$trait_id} ) {
+
+        my $err_msg = "Row ($row_num): Trait ($trait_id) not found.";
+        #$data_for_postrun_href->{'Error'} = 1;
+        #$data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+        #return $data_for_postrun_href;
+
+        my $error_obj = {};
+
+        $error_obj->{'Message'} = $err_msg;
+        $error_obj->{'Row'} = $row_num;
+        $error_obj->{'Type'} = "Trait";
+        #$error_obj->{'Date'} = $measure_dt;
+        $error_obj->{'ErrorInput'} = "Trait ($trait_id)";
+
+        push(@{$full_error_aref}, $error_obj);
+      }
+      else {
+        my $trait_perm = $trait_lookup->{$trait_id}->{'UltimatePerm'};
+
+        if ( ($trait_perm & $LINK_PERM) != $LINK_PERM ) {
+
+          my $perm_err_msg = "Row ($row_num): Permission denied, Group ($group_id) and Trait ($trait_id).";
+          #$data_for_postrun_href->{'Error'} = 1;
+          #$data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $perm_err_msg}]};
+
+          #return $data_for_postrun_href;
+
+          my $error_obj = {};
+
+          $error_obj->{'Message'} = $perm_err_msg;
+          $error_obj->{'Row'} = $row_num;
+          $error_obj->{'Type'} = "Trait Permission";
+          #$error_obj->{'Date'} = $measure_dt;
+          $error_obj->{'ErrorInput'} = "Group ($group_id) and Trait ($trait_id)";
+
+          push(@{$full_error_aref}, $error_obj);
+        }
+
+        if ( ! defined $trialunit_info_href->{$tu_id}->{'TraitInfo'}->{$trait_id} ) {
+
+          my $trial_id = $trialunit_info_href->{$tu_id}->{'TrialId'};
+
+          my $err_msg = "Row ($row_num): Trait ($trait_id) is not attached to Trial ($trial_id).";
+          #$data_for_postrun_href->{'Error'} = 1;
+          #$data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+          #return $data_for_postrun_href;
+
+          my $error_obj = {};
+
+          $error_obj->{'Message'} = $err_msg;
+          $error_obj->{'Row'} = $row_num;
+          $error_obj->{'Type'} = "Trait Attach";
+          #$error_obj->{'Date'} = $measure_dt;
+          $error_obj->{'ErrorInput'} = "Trait ($trait_id) and Trial ($trial_id)";
+
+          push(@{$full_error_aref}, $error_obj);
+        }
+      }
+    }
+  }
+
+  my @operator_list = keys(%{$uniq_operator_href});
+
+  if (scalar(@operator_list) > 0) {
+
+    $sql = "SELECT UserId FROM systemuser WHERE UserId IN (" . join(',', @operator_list) . ")";
+
+    my $operator_lookup = $dbh_write->selectall_hashref($sql, 'UserId');
+
+    if ($dbh_write->err()) {
+
+      $self->logger->debug("Get operator info failed");
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    for (my $i = 0; $i < scalar(@{$operator_val_aref}); $i++) {
+
+      my $oper_id  = $operator_val_aref->[$i];
+      my $row_num  = $operator_idx_aref->[$i];
+
+      if (! defined $operator_lookup->{$oper_id}) {
+
+        my $err_msg = "Row ($row_num): Operator ($oper_id) does not exist.";
+        #$data_for_postrun_href->{'Error'} = 1;
+        #$data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+        #return $data_for_postrun_href;
+
+        my $error_obj = {};
+
+        $error_obj->{'Message'} = $err_msg;
+        $error_obj->{'Row'} = $row_num;
+        $error_obj->{'Type'} = "Operator";
+        #$error_obj->{'Date'} = $measure_dt;
+        $error_obj->{'ErrorInput'} = "Operator ($oper_id)";
+
+        push(@{$full_error_aref}, $error_obj);
+      }
+    }
+  }
+
+  my @sample_type_list = keys(%{$uniq_sam_type_href});
+
+  if (scalar(@sample_type_list) == 0) {
+
+    $self->logger->debug("List of sample type id is empty");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sql  = "SELECT TypeId FROM generaltype WHERE Class='sample' AND ";
+  $sql .= "TypeId IN (" . join(',', @sample_type_list) . ")";
+
+  my $sample_type_lookup = $dbh_write->selectall_hashref($sql, 'TypeId');
+
+  if ($dbh_write->err()) {
+
+    $self->logger->debug("Get sample type info failed");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  for (my $i = 0; $i < scalar(@{$sam_type_val_aref}); $i++) {
+
+    my $sam_type_id = $sam_type_val_aref->[$i];
+    my $row_num     = $sam_type_idx_aref->[$i];
+
+    if (! defined $sample_type_lookup->{$sam_type_id}) {
+
+      my $err_msg = "Row ($row_num): SampleType ($sam_type_id) does not exist.";
+      #$data_for_postrun_href->{'Error'} = 1;
+      #$data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      #return $data_for_postrun_href;
+
+      my $error_obj = {};
+
+      $error_obj->{'Message'} = $err_msg;
+      $error_obj->{'Row'} = $row_num;
+      $error_obj->{'Type'} = "SampleType";
+      #$error_obj->{'Date'} = $measure_dt;
+      $error_obj->{'ErrorInput'} = "SampleType ($sam_type_id)";
+
+      push(@{$full_error_aref}, $error_obj);
+    }
+  }
+
+  my $tus_mismatch_flag = 0;
+  my $tus_mismatch_list = [];
+
+  for (my $i = 0; $i < scalar(@{$tu_tu_spec_val_aref}); $i++) {
+
+    my $tu_id      = $tu_tu_spec_val_aref->[$i]->[0];
+    my $tu_spec_id = $tu_tu_spec_val_aref->[$i]->[1];
+    my $row_num    = $tu_tu_spec_idx_aref->[$i];
+
+    my $tu_spec_href = $trialunit_info_href->{$tu_id}->{'TrialUnitSpecInfo'};
+
+    if (! defined $tu_spec_href->{$tu_spec_id}) {
+
+        my $err_msg = "Row ($row_num): TrialUnit ($tu_id) and TrialUnitSpecimen ($tu_spec_id) not compatible.";
+
+        my $error_obj = {};
+
+        $error_obj->{'Message'} = $err_msg;
+        $error_obj->{'Row'} = $row_num;
+        $error_obj->{'Type'} = "TrialUnitSpecimen Mismatch";
+        #$error_obj->{'Date'} = $measure_dt;
+        $error_obj->{'ErrorInput'} = "TrialUnit ($tu_id) and TrialUnitSpecimen ($tu_spec_id)";
+
+        push(@{$full_error_aref}, $error_obj);
+    }
+  }
+
+
+  # Release memory
+  $tu_tu_spec_val_aref = [];
+  $tu_tu_spec_idx_aref = [];
+  $trialunit_info_href = {};
+
+  my $trait_validation_error_aref = [];
+
+  $self->logger->debug("Now trying to validate trait values");
+
+  for my $trait_id2val (keys(%{$trait_id2val_href})) {
+    $self->logger->debug("Trait: $trait_id2val");
+  }
+
+  my ($v_trait_val_err, $invalid_error_message,
+      $v_trait_id_href, $trait_validation_error_aref) = validate_trait_db_bulk_v2($dbh_write, $trait_id2val_href,$self);
+
+  $self->logger->debug("Validation Error: $v_trait_val_err");
+  $self->logger->debug("Validation Error: $invalid_error_message");
+  $self->logger->debug("Number of Validation Error: " . scalar(@{$trait_validation_error_aref}));
+
+  if ($v_trait_val_err) {
+
+    foreach my $invalid_obj (@{$trait_validation_error_aref}) {
+
+      my $v_trait_id = $invalid_obj->{'Trait'};
+      my $v_trait_idx = $invalid_obj->{'Index'};
+      my $v_trait_val_msg = $invalid_obj->{'Message'};
+      my $v_trait_val = $invalid_obj->{'Value'};
+
+      $self->logger->debug("Validation error on TraitId: $v_trait_id - index: $v_trait_idx");
+      my $row_num = $trait_id2idx_href->{$v_trait_id}->[$v_trait_idx];
+      my $err_msg = "Row ($row_num): $v_trait_val_msg";
+
+      my $error_obj = {};
+
+      $error_obj->{'Message'} = $err_msg;
+      $error_obj->{'Row'} = $row_num;
+      $error_obj->{'Type'} = "Validation";
+      #$error_obj->{'Date'} = $measure_dt;
+      $error_obj->{'ErrorInput'} = "$v_trait_val (Trait $v_trait_id)";
+
+      push(@{$full_error_aref}, $error_obj);
+    }
+
+    #$data_for_postrun_href->{'Error'} = 1;
+    #$data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    #return $data_for_postrun_href;
+  }
+
+  if (scalar(@{$full_error_aref}) > 0) {
+    my $err_msg = 'Issues with CSV identified.';
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg,'ErrorList' => $full_error_aref}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $self->logger->debug("Bulk SQL: $bulk_sql");
+
+  my $nrows_inserted = $dbh_write->do($bulk_sql);
+
+  if ($dbh_write->err()) {
+
+    $self->logger->debug("Db err code: " . $dbh_write->err());
+
+    if ($dbh_write->err() == 1062) {
+
+      my $err_str = $dbh_write->errstr();
+
+      $err_str =~ /Duplicate entry '(.+)'/;
+      my $err_msg = "Duplicate Entry: $1";
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+    else {
+
+      $self->logger->debug('Error code: ' . $dbh_write->err());
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  my $info_msg = "$nrows_inserted records of samplemeasurement have been inserted successfully.";
+  my $info_msg_aref = [{'Message' => $info_msg}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'      => $info_msg_aref};
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+
+#this function returns a list of invalid values based on their trialunit and trialunitspecimenid
+sub validate_trait_db_bulk_v2 {
+
+  my $dbh                = $_[0];
+  my $trait_id2val_href  = $_[1];
+  my $self  = $_[2];
+
+  my @trait_id_list = keys(%{$trait_id2val_href});
+
+  my $err          = 0;
+  my $err_msg      = '';
+  my $err_trait_id = -1;
+  my $err_val_idx  = -1;
+
+  #full error array with the following format for individual errors
+  # {'Row' => row of error, 'Type' => type of error, 'Message' => 'message', 'ErrorInput' => what input caused error}
+  my $full_list_invalid = [];
+
+  #list of trait that have errors
+  my $full_err_trait_href = {};
+
+  if (scalar(@trait_id_list) == 0) {
+
+    $err = 1;
+    $err_msg = 'No trait';
+
+    return ($err, $err_msg, $full_err_trait_href, $full_list_invalid);
+  }
+
+  my $sql = '';
+  $sql   .= 'SELECT TraitId, TraitValRule, TraitValRuleErrMsg ';
+  $sql   .= 'FROM trait ';
+  $sql   .= 'WHERE TraitId IN (' . join(',', @trait_id_list) . ')';
+
+  my ($r_trait_err, $r_trait_msg, $validation_data) = read_data($dbh, $sql, []);
+
+  if ($r_trait_err) {
+
+    $err = 1;
+    $err_msg = 'Read trait validation rule failed: ' . $r_trait_msg;
+
+    return ($err, $err_msg, $full_err_trait_href, $full_list_invalid);
+  }
+
+  if (scalar(@{$validation_data}) != scalar(@trait_id_list)) {
+
+    $err = 1;
+    $err_msg = 'Some validation rules are missing. ';
+
+    #return ($err, $err_msg, $full_err_trait_href, $full_list_invalid);
+  }
+
+  my $trait_id2validation_href = {};
+
+  foreach my $valid_rec (@{$validation_data}) {
+
+    my $trait_id = $valid_rec->{'TraitId'};
+    my $val_rule = $valid_rec->{'TraitValRule'};
+    my $val_msg  = $valid_rec->{'TraitValRuleErrMsg'};
+
+    $trait_id2validation_href->{$trait_id} = [$val_rule, $val_msg];
+  }
+
+  my $operator_lookup = { 'AND'     => '&&',
+                          'OR'      => '||',
+                          '[^<>!]=' => '==',
+  };
+
+  foreach my $trait_id (@trait_id_list) {
+    if (defined $trait_id2validation_href->{$trait_id}) {
+      my $validation_rule     = $trait_id2validation_href->{$trait_id}->[0];
+      my $validation_err_msg  = $trait_id2validation_href->{$trait_id}->[1];
+
+      my $value_aref      = $trait_id2val_href->{$trait_id};
+
+      for (my $i = 0; $i < scalar(@{$value_aref}); $i++) {
+
+        my $trait_value = $value_aref->[$i];
+
+        if ($validation_rule =~ /(\w+)\((.*)\)/) {
+
+          my $validation_rule_prefix = $1;
+          my $validation_rule_body   = $2;
+
+          if (uc($validation_rule_prefix) eq 'REGEX') {
+
+            if (!($trait_value =~ /$validation_rule_body/)) {
+
+              $err          = 1;
+              $err_msg      = $validation_err_msg;
+              $err_trait_id = $trait_id;
+              $err_val_idx  = $i;
+            }
+          }
+          elsif (uc($validation_rule_prefix) eq 'BOOLEX') {
+
+            if ($validation_rule_body !~ /x/) {
+
+              $err           = 1;
+              $err_msg       = 'No variable x in boolean expression.';
+              $err_trait_id  = $trait_id;
+              $err_val_idx   = $i;
+            }
+            elsif ( ($validation_rule_body =~ /\&/) ||
+                    ($validation_rule_body =~ /\|/) ) {
+
+              $err           = 1;
+              $err_msg       = 'Contain forbidden characters';
+              $err_trait_id  = $trait_id;
+              $err_val_idx   = $i;
+            }
+            elsif ( $validation_rule_body =~ /\d+\.?\d*\s*,/) {
+
+              $err           = 1;
+              $err_msg       = 'Contain a comma - invalid boolean expression';
+              $err_trait_id  = $trait_id;
+              $err_val_idx   = $i;
+            }
+            else {
+
+              if ($trait_value =~ /^[-+]?\d+\.?\d*$/) {
+
+                $validation_rule_body =~ s/x/ $trait_value /ig;
+              }
+              else {
+
+                $validation_rule_body =~ s/x/ '$trait_value' /ig;
+              }
+
+              for my $operator (keys(%{$operator_lookup})) {
+
+                my $perl_operator = $operator_lookup->{$operator};
+                $validation_rule_body =~ s/$operator/$perl_operator/g;
+              }
+
+              my $test_condition;
+
+              eval(q{$test_condition = } . qq{($validation_rule_body) ? 1 : 0;});
+
+              if($@) {
+
+                $err           = 1;
+                $err_msg       = "Invalid boolean trait value validation expression ($validation_rule_body).";
+                $err_trait_id  = $trait_id;
+                $err_val_idx   = $i;
+              }
+              else {
+
+                if ($test_condition == 0) {
+
+                  $err          = 1;
+                  $err_msg      = $validation_err_msg;
+                  $err_trait_id = $trait_id;
+                  $err_val_idx  = $i;
+                }
+                else {
+
+                  $err          = 0;
+                  $err_msg      = '';
+                  $err_trait_id = -1;
+                  $err_val_idx  = -1;
+                }
+              }
+            }
+          }
+          elsif (uc($validation_rule_prefix) eq 'CHOICE') {
+
+            if ($validation_rule_body =~ /^\[.*\]$/) {
+
+              $err          = 1;
+              $err_msg      = 'Invalid choice expression containing [].';
+              $err_trait_id = $trait_id;
+              $err_val_idx  = $i;
+            }
+            else {
+
+              my @choice_list = split(/\|/, $validation_rule_body);
+
+              $err          = 1;
+              $err_msg      = $validation_err_msg;
+              $err_trait_id = $trait_id;
+              $err_val_idx  = $i;
+
+              foreach my $choice (@choice_list) {
+
+                if (lc("$choice") eq lc("$trait_value")) {
+
+                  $err          = 0;
+                  $err_msg      = '';
+                  $err_trait_id = -1;
+                  $err_val_idx  = -1;
+                  last;
+                }
+              }
+            }
+          }
+          elsif ( (uc($validation_rule_prefix) eq 'DATE_RANGE') ) {
+
+            if ($trait_value !~ /^\d{4}\-\d{2}\-\d{2}( \d{2}\:\d{2}\:\d{2})?$/) {
+
+              $err     = 1;
+              $err_msg = 'Invalid date';
+            }
+          }
+          elsif ( (uc($validation_rule_prefix) eq 'RANGE')   ||
+                  (uc($validation_rule_prefix) eq 'LERANGE') ||
+                  (uc($validation_rule_prefix) eq 'RERANGE') ||
+                  (uc($validation_rule_prefix) eq 'BERANGE') ) {
+
+            if ($validation_rule_body !~ /^[-+]?\d+\.?\d*\s*\.\.\s*[-+]?\d+\.?\d*$/) {
+
+              $err          = 1;
+              $err_msg      = 'Invalid range expression';
+              $err_trait_id = $trait_id;
+              $err_val_idx  = $i;
+            }
+            else {
+
+              $err          = 1;
+              $err_msg      = $validation_err_msg;
+              $err_trait_id = $trait_id;
+              $err_val_idx  = $i;
+
+              if ($trait_value =~ /^[-+]?\d+\.?\d*$/) {
+
+                my ($left_val, $right_val) = split(/\s*\.\.\s*/, $validation_rule_body);
+
+                if (uc($validation_rule_prefix) eq 'RANGE') {
+
+                  if ($trait_value >= $left_val && $trait_value <= $right_val) {
+
+                    $err          = 0;
+                    $err_msg      = '';
+                    $err_trait_id = -1;
+                    $err_val_idx  = -1;
+                  }
+                }
+                elsif (uc($validation_rule_prefix) eq 'LERANGE') {
+
+                  if ($trait_value > $left_val && $trait_value <= $right_val) {
+
+                    $err          = 0;
+                    $err_msg      = '';
+                    $err_trait_id = -1;
+                    $err_val_idx  = -1;
+                  }
+                }
+                elsif (uc($validation_rule_prefix) eq 'RERANGE') {
+
+                  if ($trait_value >= $left_val && $trait_value < $right_val) {
+
+                    $err          = 0;
+                    $err_msg      = '';
+                    $err_trait_id = -1;
+                    $err_val_idx  = -1;
+                  }
+                }
+                elsif (uc($validation_rule_prefix) eq 'BERANGE') {
+
+                  if ($trait_value > $left_val && $trait_value < $right_val) {
+
+                    $err          = 0;
+                    $err_msg      = '';
+                    $err_trait_id = -1;
+                    $err_val_idx  = -1;
+                  }
+                }
+              }
+              else {
+
+                $err          = 1;
+                $err_msg      = "Trait value ($trait_value) not a valid number";
+                $err_trait_id = $trait_id;
+                $err_val_idx  = $i;
+              }
+            }
+          }
+          else {
+
+            $err          = 1;
+            $err_msg      = 'Unknown trait value validation rule.';
+            $err_trait_id = $trait_id;
+            $err_val_idx  = $i;
+          }
+        }
+        else {
+
+          $err          = 1;
+          $err_msg      = "Unknown validation rule.";
+          $err_trait_id = $trait_id;
+          $err_val_idx  = $i;
+        }
+
+        if ($err) {
+          my $error_obj = {};
+
+          $error_obj->{'Message'} = $err_msg;
+          $error_obj->{'Index'} = $err_val_idx;
+          #$error_obj->{'Type'} = "Validation";
+          #$error_obj->{'Date'} = $measure_dt;
+          $error_obj->{'Trait'} = $trait_id;
+          $error_obj->{'Value'} = $trait_value;
+
+          push(@{$full_list_invalid},$error_obj);
+          $full_err_trait_href->{$err_trait_id} = 1;
+          #return ($err, $err_msg, $err_trait_id, $err_val_idx);
+
+        }
+      }
+    }
+  }
+
+  my $final_err = scalar(@{$full_list_invalid}) > 0;
+
+  return ($final_err, $err_msg, $full_err_trait_href, $full_list_invalid);
+}
+
 
 1;

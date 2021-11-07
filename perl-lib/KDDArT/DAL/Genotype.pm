@@ -766,14 +766,16 @@ sub list_genotype {
 
   my $dbh = connect_kdb_read();
 
+  $self->logger->debug("GENO_SQL: $sql");
+
   ($err, $msg, $data_aref) = read_data($dbh, $sql, $where_para_aref);
 
   if ($err) {
 
-    return ($err, $msg, []);
+    return ($err, "$msg", []);
   }
 
-  #$self->logger->debug("Number of records: " . scalar(@{$data_aref}));
+  $self->logger->debug("Number of records: " . scalar(@{$data_aref}));
 
   my $gadmin_status = $self->authen->gadmin_status();
 
@@ -795,6 +797,8 @@ sub list_genotype {
     my $not_used_id_href  = {};
 
     for my $row (@{$data_aref}) {
+
+      my $genotype_id = $row->{'GenotypeId'};
 
       push(@{$geno_id_aref}, $row->{'GenotypeId'});
 
@@ -833,9 +837,11 @@ sub list_genotype {
 
     if (scalar(@{$geno_id_aref}) > 0) {
 
-      my $geno_alias_sql = 'SELECT GenotypeId, GenotypeAliasId, GenotypeAliasName, GenotypeAliasType, ';
-      $geno_alias_sql   .= 'GenotypeAliasStatus, GenotypeAliasLang ';
+      #include genotype alias as part of genotype response
+      my $geno_alias_sql = 'SELECT genotypealias.GenotypeId, genotypealias.GenotypeAliasId, genotypealias.GenotypeAliasName, generaltype.TypeName, genotypealias.GenotypeAliasType, ';
+      $geno_alias_sql   .= 'genotypealias.GenotypeAliasStatus, genotypealias.GenotypeAliasLang ';
       $geno_alias_sql   .= 'FROM genotypealias ';
+      $geno_alias_sql   .= 'LEFT JOIN generaltype on genotypealias.GenotypeAliasType = generaltype.TypeId  ';
       $geno_alias_sql   .= 'WHERE GenotypeId IN (' . join(',', @{$geno_id_aref}) . ')';
 
       $self->logger->debug("GENO_ALIAS_SQL: $geno_alias_sql");
@@ -844,7 +850,7 @@ sub list_genotype {
 
       if ($geno_alias_err) {
 
-        return ($geno_alias_err, $geno_alias_msg, []);
+        return ($geno_alias_err, "$geno_alias_msg", []);
       }
 
       for my $row (@{$geno_alias_data}) {
@@ -969,6 +975,7 @@ sub list_genotype {
 
   return ($err, $msg, $extra_attr_geno_data);
 }
+
 
 sub get_genotype_runmode {
 
@@ -1689,6 +1696,8 @@ sub list_specimen {
   my $bmethod_id_href     = {};
   my $spec_id_aref        = [];
 
+  my $genotype_factor_lookup = {};
+
   my $chk_id_err        = 0;
   my $chk_id_msg        = '';
   my $used_id_href      = {};
@@ -1721,14 +1730,19 @@ sub list_specimen {
     if (scalar(@{$spec_id_aref}) > 0) {
 
       my $geno_specimen_sql = 'SELECT genotypespecimen.SpecimenId, genotype.GenotypeId, ';
-      $geno_specimen_sql   .= 'genotype.GenotypeName, genotypespecimen.GenotypeSpecimenType ';
+      $geno_specimen_sql   .= 'genotype.GenotypeName, genotypespecimen.GenotypeSpecimenType, genotype.GenusId, genus.GenusName ';
       $geno_specimen_sql   .= 'FROM genotype LEFT JOIN genotypespecimen ON ';
       $geno_specimen_sql   .= 'genotype.GenotypeId = genotypespecimen.GenotypeId ';
+      $geno_specimen_sql   .= 'LEFT JOIN genus ON ';
+      $geno_specimen_sql   .= 'genotype.GenusId = genus.GenusId ';
+      #$geno_specimen_sql   .= 'LEFT JOIN genotypefactor ON ';
+      #$geno_specimen_sql   .= 'genotype.GenotypeId = genotypefactor.GenotypeId ';
       $geno_specimen_sql   .= 'WHERE genotypespecimen.SpecimenId IN (' . join(',', @{$spec_id_aref}) . ')';
 
       $self->logger->debug("GENO_SPECIMEN_SQL: $geno_specimen_sql");
 
       my ($geno_specimen_err, $geno_specimen_msg, $geno_specimen_data) = read_data($dbh, $geno_specimen_sql, []);
+
 
       if ($geno_specimen_err) {
 
@@ -1752,6 +1766,40 @@ sub list_specimen {
           $geno_spec_lookup->{$spec_id} = [$geno_spec_row];
         }
       }
+
+      my $get_genotype_factor_sql = 'SELECT genotypespecimen.GenotypeId, genotypefactor.FactorValue, factor.FactorName, genotypefactor.FactorId ';
+      $get_genotype_factor_sql   .= 'FROM genotypefactor LEFT JOIN factor ON ';
+      $get_genotype_factor_sql   .= 'genotypefactor.FactorId = factor.FactorId ';
+      $get_genotype_factor_sql   .= 'LEFT JOIN genotypespecimen ON ';
+      $get_genotype_factor_sql   .= 'genotypespecimen.GenotypeId = genotypefactor.GenotypeId ';
+      $get_genotype_factor_sql   .= 'WHERE genotypespecimen.SpecimenId IN (' . join(',', @{$spec_id_aref}) . ')';
+
+      $self->logger->debug("Genotype Factor SQL: $get_genotype_factor_sql");
+
+      my ($geno_factor_err, $geno_factor_msg, $geno_factor_data) = read_data($dbh, $get_genotype_factor_sql, []);
+      #my $geno_factor_data = [];
+      #my $geno_factor_err = 0;
+      #my $geno_factor_msg = "";
+
+
+      if ($geno_factor_err) {
+
+        return ($geno_factor_err, $geno_factor_msg, []);
+      }
+      else {
+        for my $factorrow (@{$geno_factor_data}) {
+
+          my $genotype_id = $factorrow->{'GenotypeId'};
+
+          if (!defined $genotype_factor_lookup->{$genotype_id}) {
+            $genotype_factor_lookup->{$genotype_id} = [];
+          }
+
+          push(@{$genotype_factor_lookup->{$genotype_id}}, $factorrow);
+
+        }
+      }
+
 
       my $parent_sql = "SELECT pedigree.SpecimenId, ParentSpecimenId, ParentType, SelectionReason, ";
       $parent_sql   .= "generaltype.TypeName as ParentTypeName ";
@@ -1838,6 +1886,7 @@ sub list_specimen {
     }
   }
 
+
   for my $specimen_row (@{$data_aref}) {
 
     my $specimen_id = $specimen_row->{'SpecimenId'};
@@ -1863,18 +1912,40 @@ sub list_specimen {
 
             my $geno_id = $geno_info->{'GenotypeId'};
 
+            if (defined $genotype_factor_lookup->{$geno_id}) {
+              my $factor_aref = $genotype_factor_lookup->{$geno_id};
+
+              #$geno_info->{'Factor'} = $factor_aref;
+              for my $factor_info (@{$factor_aref}) {
+                my $factor_name = "Factor" . $factor_info->{"FactorName"};
+
+                if (! defined $geno_info->{$factor_name}) {
+                  $geno_info->{$factor_name} = $factor_info->{"FactorValue"};
+                }
+                else {
+                  $geno_info->{$factor_name} = '';
+                }
+
+              }
+            }
+
             if ($gadmin_status eq '1') {
 
               $geno_info->{'removeGenotype'} = "specimen/${specimen_id}/remove/genotype/$geno_id";
             }
             push(@{$genotype_aref}, $geno_info);
           }
+
+
+
           $specimen_row->{'Genotype'} = $genotype_aref;
         }
         else {
 
           $specimen_row->{'Genotype'} = $geno_specimen_data;
         }
+
+
       }
     }
 
@@ -1896,17 +1967,32 @@ sub list_specimen {
         $specimen_row->{'Keyword'} = $keyword_lookup->{$specimen_id};
       }
 
+      my $own_grp_id   = $specimen_row->{'OwnGroupId'};
+      my $acc_grp_id   = $specimen_row->{'AccessGroupId'};
+      my $own_perm     = $specimen_row->{'OwnGroupPerm'};
+      my $acc_perm     = $specimen_row->{'AccessGroupPerm'};
+      my $oth_perm     = $specimen_row->{'OtherPerm'};
+      my $ulti_perm    = $specimen_row->{'UltimatePerm'};
+
       if ($gadmin_status eq '1') {
 
-        $specimen_row->{'update'}      = "update/specimen/$specimen_id";
+        #$self->logger->debug("GenoId: $geno_id, GroupId: $group_id, UltiPerm: $ulti_perm, WritePerm: $WRITE_PERM");
+        $specimen_row->{'update'}   = "update/specimen/$specimen_id";
         $specimen_row->{'addGenotype'} = "specimen/${specimen_id}/add/genotype";
 
-        if ( $not_used_id_href->{$specimen_id} ) {
+
+        if ($own_grp_id == $group_id) {
+          #This following conditional will be able to hide the delete function in the API call if Specimen is used elsewhere
+          #if ( $not_used_id_href->{$specimen_id} ) {
+          #  $specimen_row->{'delete'}   = "delete/specimen/$specimen_id";
+          #}
 
           $specimen_row->{'delete'}   = "delete/specimen/$specimen_id";
         }
       }
     }
+
+
 
     push(@extra_attr_specimen_data, $specimen_row);
   }
@@ -1930,8 +2016,8 @@ sub list_specimen_advanced_runmode {
 "GroupAdminRequired": 0,
 "SignatureRequired": 0,
 "AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "FILTERING"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Pagination NumOfRecords='6411788' NumOfPages='3205894' Page='1' NumPerPage='2' /><Specimen Pedigree='Unknown' SpecimenName='Import_specimen2_9039730' BreedingMethodName='BreedMethod_9461929' BreedingMethodId='61' SpecimenBarcode='SPEC5004923' FilialGeneration='0' IsActive='1' SelectionHistory='Unknown' delete='delete/specimen/7247271' addGenotype='specimen/7247271/add/genotype' update='update/specimen/7247271' SpecimenId='7247271'><Genotype removeGenotype='specimen/7247271/remove/genotype/7247924' GenotypeName='Geno_9981601' GenotypeId='7247924' /></Specimen><Specimen Pedigree='Unknown' SpecimenName='Import_specimen1_9039730' BreedingMethodName='BreedMethod_9461929' BreedingMethodId='61' SpecimenBarcode='SPEC5465477' FilialGeneration='0' IsActive='1' SelectionHistory='Unknown' delete='delete/specimen/7247270' addGenotype='specimen/7247270/add/genotype' update='update/specimen/7247270' SpecimenId='7247270'><Genotype removeGenotype='specimen/7247270/remove/genotype/7247923' GenotypeName='Geno_0912290' GenotypeId='7247923' /></Specimen><RecordMeta TagName='Specimen' /></DATA>",
-"SuccessMessageJSON": "{ 'Pagination' : [{ 'NumOfRecords' : '6411788', 'NumOfPages' : 3205894, 'NumPerPage' : '2', 'Page' : '1'} ], 'Specimen' : [{ 'SpecimenName' : 'Import_specimen2_9039730', 'Pedigree' : 'Unknown', 'BreedingMethodName' : 'BreedMethod_9461929', 'BreedingMethodId' : '61', 'SpecimenBarcode' : 'SPEC5004923', 'IsActive' : '1', 'FilialGeneration' : '0', 'SelectionHistory' : 'Unknown', 'delete' : 'delete/specimen/7247271', 'Genotype' : [{ 'removeGenotype' : 'specimen/7247271/remove/genotype/7247924', 'GenotypeId' : '7247924', 'GenotypeName' : 'Geno_9981601'} ], 'addGenotype' : 'specimen/7247271/add/genotype', 'update' : 'update/specimen/7247271', 'SpecimenId' : '7247271'},{ 'SpecimenName' : 'Import_specimen1_9039730', 'Pedigree' : 'Unknown', 'BreedingMethodName' : 'BreedMethod_9461929', 'BreedingMethodId' : '61', 'SpecimenBarcode' : 'SPEC5465477', 'IsActive' : '1', 'FilialGeneration' : '0', 'SelectionHistory' : 'Unknown', 'delete' : 'delete/specimen/7247270', 'Genotype' : [{ 'removeGenotype' : 'specimen/7247270/remove/genotype/7247923', 'GenotypeId' : '7247923', 'GenotypeName' : 'Geno_0912290'} ], 'addGenotype' : 'specimen/7247270/add/genotype', 'update' : 'update/specimen/7247270', 'SpecimenId' : '7247270'} ], 'VCol' : [], 'RecordMeta' : [{ 'TagName' : 'Specimen'} ]}",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Pagination NumOfRecords='6411788' NumOfPages='3205894' Page='1' NumPerPage='2' /><Specimen Pedigree='Unknown' SpecimenName='Import_specimen2_9039730' BreedingMethodName='BreedMethod_9461929' BreedingMethodId='61' SpecimenBarcode='SPEC5004923' FilialGeneration='0' IsActive='1' SelectionHistory='Unknown' delete='delete/specimen/7247271' addGenotype='specimen/7247271/add/genotype' update='update/specimen/7247271' SpecimenId='7247271'><Genotype removeGenotype='specimen/7247271/remove/genotype/7247924' GenotypeName='Geno_9981601' GenotypeId='7247924' GenusName='Wheat' GenusId='1' /></Specimen><Specimen Pedigree='Unknown' SpecimenName='Import_specimen1_9039730' BreedingMethodName='BreedMethod_9461929' BreedingMethodId='61' SpecimenBarcode='SPEC5465477' FilialGeneration='0' IsActive='1' SelectionHistory='Unknown' delete='delete/specimen/7247270' addGenotype='specimen/7247270/add/genotype' update='update/specimen/7247270' SpecimenId='7247270'><Genotype removeGenotype='specimen/7247270/remove/genotype/7247923' GenotypeName='Geno_0912290' GenotypeId='7247923' /></Specimen><RecordMeta TagName='Specimen' /></DATA>",
+"SuccessMessageJSON": "{ 'Pagination' : [{ 'NumOfRecords' : '6411788', 'NumOfPages' : 3205894, 'NumPerPage' : '2', 'Page' : '1'} ], 'Specimen' : [{ 'SpecimenName' : 'Import_specimen2_9039730', 'Pedigree' : 'Unknown', 'BreedingMethodName' : 'BreedMethod_9461929', 'BreedingMethodId' : '61', 'SpecimenBarcode' : 'SPEC5004923', 'IsActive' : '1', 'FilialGeneration' : '0', 'SelectionHistory' : 'Unknown', 'delete' : 'delete/specimen/7247271', 'Genotype' : [{ 'removeGenotype' : 'specimen/7247271/remove/genotype/7247924', 'GenotypeId' : '7247924', 'GenotypeName' : 'Geno_9981601', 'GenusId': 1, 'GenusName': 'Wheat'} ], 'addGenotype' : 'specimen/7247271/add/genotype', 'update' : 'update/specimen/7247271', 'SpecimenId' : '7247271'},{ 'SpecimenName' : 'Import_specimen1_9039730', 'Pedigree' : 'Unknown', 'BreedingMethodName' : 'BreedMethod_9461929', 'BreedingMethodId' : '61', 'SpecimenBarcode' : 'SPEC5465477', 'IsActive' : '1', 'FilialGeneration' : '0', 'SelectionHistory' : 'Unknown', 'delete' : 'delete/specimen/7247270', 'Genotype' : [{ 'removeGenotype' : 'specimen/7247270/remove/genotype/7247923', 'GenotypeId' : '7247923', 'GenotypeName' : 'Geno_0912290'} ], 'addGenotype' : 'specimen/7247270/add/genotype', 'update' : 'update/specimen/7247270', 'SpecimenId' : '7247270'} ], 'VCol' : [], 'RecordMeta' : [{ 'TagName' : 'Specimen'} ]}",
 "ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
 "ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
 "URLParameter": [{"ParameterName": "nperpage", "Description": "Number of records in a page for pagination"}, {"ParameterName": "num", "Description": "The page number of the pagination"}],
@@ -2018,7 +2104,7 @@ sub list_specimen_advanced_runmode {
   my $field_list = ['specimen.*', 'VCol*'];
   my $pre_data_other_join = '';
 
-  my ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_sql($dbh, $field_list, 'specimen',
+  my ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_columns_sql($dbh, $field_list, 'specimen',
                                                                         'SpecimenId', '');
 
   if ($vcol_err) {
@@ -2052,6 +2138,7 @@ sub list_specimen_advanced_runmode {
   if (scalar(@{$sample_data_aref}) == 1) {
 
     @field_list_all = keys(%{$sample_data_aref->[0]});
+    #@field_list_all = ("BreedingMethodId","AccessGroupPerm", "SpecimenBarcode","AccessGroupId","IsActive","FilialGeneration","OwnGroupPerm","OtherPerm","SelectionHistory","SpecimenId", "Pedigree", "SpecimenName", "SpecimenNote", "OwnGroupId");
   }
   else {
 
@@ -2075,7 +2162,7 @@ sub list_specimen_advanced_runmode {
     }
   }
 
-  $self->logger->debug("Field list all: " . join(',', @field_list_all));
+  $self->logger->debug("Field list: " . join(',', @field_list_all));
 
   my $final_field_list = \@field_list_all;
 
@@ -2102,9 +2189,11 @@ sub list_specimen_advanced_runmode {
 
   my $other_join = ' ';
 
-  ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_sql($dbh, $final_field_list, 'specimen',
+  #change back to generate_factor_sql for normal use
+  ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_sql_v3($dbh, $final_field_list, 'specimen',
                                                                      'SpecimenId', $other_join);
 
+  #change this back to if ($vcol_err) { if you want normal use
   if ($vcol_err) {
 
     my $err_msg = "Problem with virtual column ($trouble_vcol) containing space.";
@@ -2119,6 +2208,7 @@ sub list_specimen_advanced_runmode {
     push(@{$final_field_list}, 'GenotypeId');
     $other_join    = ' LEFT JOIN genotypespecimen ON specimen.SpecimenId = genotypespecimen.SpecimenId ';
     $other_join   .= ' LEFT JOIN genotype ON genotypespecimen.GenotypeId = genotype.GenotypeId ';
+    $other_join   .= ' LEFT JOIN genotypefactor ON genotypespecimen.GenotypeId = genotypefactor.GenotypeId ';
   }
 
   my $field_name2table_name  = { 'GenotypeId' => 'genotypespecimen' };
@@ -2171,7 +2261,7 @@ sub list_specimen_advanced_runmode {
 
     my $count_sql = "SELECT COUNT(*) ";
     $count_sql   .= "FROM specimen ";
-    $count_sql   .= "$other_join ";
+    #$count_sql   .= "$other_join ";
     $count_sql   .= "$filtering_exp";
 
     $self->logger->debug("COUNT SQL: $count_sql");
@@ -2212,7 +2302,7 @@ sub list_specimen_advanced_runmode {
   $dbh->disconnect();
 
   $sql  =~ s/SELECT/SELECT DISTINCT /;
-  $sql  =~ s/GROUP BY/ $filtering_exp GROUP BY /;
+  $sql  =~ s/WHEREREPLACE GROUP BY/ $filtering_exp GROUP BY /;
 
   my ($sort_err, $sort_msg, $sort_sql) = parse_sorting($sorting, $final_field_list);
 
@@ -2224,20 +2314,24 @@ sub list_specimen_advanced_runmode {
     return $data_for_postrun_href;
   }
 
+  my $final_sort_sql = "";
+
   if (length($sort_sql) > 0) {
 
-    $sql .= " ORDER BY $sort_sql ";
+    $final_sort_sql .= " ORDER BY $sort_sql ";
   }
   else {
 
-    $sql .= ' ORDER BY specimen.SpecimenId DESC';
+    $final_sort_sql .= ' ORDER BY specimen.SpecimenId DESC';
   }
 
-  $sql .= " $paged_limit_clause ";
+  $sql =~ s/ORDERINGSTRING/$final_sort_sql/;
+  $sql =~ s/LIMITSTRING/$paged_limit_clause/;
 
   $self->logger->debug("SQL with VCol: $sql");
 
   # Genotype permission is checked in list_specimen
+
   my ($read_specimen_err, $read_specimen_msg, $specimen_data) = $self->list_specimen(1, 1, $sql, $where_arg);
 
   if ($read_specimen_err) {
@@ -6847,6 +6941,7 @@ sub list_genotype_advanced_runmode {
   my $pagination  = 0;
   my $nb_per_page = -1;
   my $page        = -1;
+  my $debug_sfield = [];
 
   $self->logger->debug("Base dir: $main::kddart_base_dir");
 
@@ -6878,7 +6973,6 @@ sub list_genotype_advanced_runmode {
     if ($filtering_csv =~ /GenusId=(.*)&?/) {
 
       if ( "$genus_id" ne "$1" ) {
-
         my $err_msg = 'Duplicate filtering condition for GenusId.';
         $data_for_postrun_href->{'Error'} = 1;
         $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
@@ -6887,20 +6981,15 @@ sub list_genotype_advanced_runmode {
       }
     }
     else {
-
       if (length($filtering_csv) > 0) {
-
         if ($filtering_csv =~ /&$/) {
-
           $filtering_csv .= "GenusId=$genus_id";
         }
         else {
-
           $filtering_csv .= "&GenusId=$genus_id";
         }
       }
       else {
-
         $filtering_csv .= "GenusId=$genus_id";
       }
     }
@@ -6911,7 +7000,6 @@ sub list_genotype_advanced_runmode {
   my $sorting = '';
 
   if (defined $query->param('Sorting')) {
-
     $sorting = $query->param('Sorting');
   }
 
@@ -6920,10 +7008,13 @@ sub list_genotype_advanced_runmode {
   my $perm_str = permission_phrase($group_id, 0, $gadmin_status, 'genotype');
 
   my $dbh = connect_kdb_read();
-  my $field_list = ['genotype.*', 'VCol*'];
+  my $field_list = ['*', 'VCol*'];
+  my $pre_data_other_join = '';
 
-  my ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_sql($dbh, $field_list, 'genotype',
+  my ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_columns_sql($dbh, $field_list, 'genotype',
                                                                         'GenotypeId', '');
+
+  $self->logger->debug("SQL with VCol: $sql");
 
   if ($vcol_err) {
 
@@ -6938,22 +7029,18 @@ sub list_genotype_advanced_runmode {
 
   $self->logger->debug("SQL with VCol: $sql");
 
-  my $samplerecord_start_time = [gettimeofday()];
+  my ($sam_genotype_err, $sam_genotype_msg, $sam_genotype_data) = $self->list_genotype(0, $sql);
 
-  my ($sam_geno_err, $sam_geno_msg, $sam_geno_data) = $self->list_genotype(0, $sql);
+  if ($sam_genotype_err) {
 
-  my $samplerecord_elapsed = tv_interval($samplerecord_start_time);
-
-  if ($sam_geno_err) {
-
-    $self->logger->debug($sam_geno_msg);
+    $self->logger->debug($sam_genotype_msg);
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
     return $data_for_postrun_href;
   }
 
-  my $sample_data_aref = $sam_geno_data;
+  my $sample_data_aref = $sam_genotype_data;
 
   my @field_list_all;
 
@@ -6963,16 +7050,14 @@ sub list_genotype_advanced_runmode {
   }
   else {
 
+    $self->logger->debug("It reaches here");
     my ($sfield_err, $sfield_msg, $sfield_data, $pkey_data) = get_static_field($dbh, 'genotype');
+    #$debug_sfield = $sfield_data;
 
     if ($sfield_err) {
 
       $self->logger->debug("Get static field failed: $sfield_msg");
-
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-      return $data_for_postrun_href;
+      return $self->_set_error();
     }
 
     for my $sfield_rec (@{$sfield_data}) {
@@ -6986,7 +7071,12 @@ sub list_genotype_advanced_runmode {
     }
   }
 
-  my $final_field_list = \@field_list_all;
+
+
+  $self->logger->debug("Field list all: " . join(',', @field_list_all));
+
+  my $final_field_list     = \@field_list_all;
+  my $sql_field_list       = [];
 
   if (length($field_list_csv) > 0) {
 
@@ -7008,15 +7098,30 @@ sub list_genotype_advanced_runmode {
 
       push(@{$final_field_list}, 'GenusId');
     }
+
+    $sql_field_list       = [];
+
+    for my $fd_name (@{$final_field_list}) {
+      push(@{$sql_field_list}, $fd_name);
+    }
+  }
+  else {
+    for my $fd_name (@{$final_field_list}) {
+      push(@{$sql_field_list}, $fd_name);
+    }
   }
 
-  my $field_lookup = {};
-  for my $fd_name (@{$final_field_list}) {
+  my $sql_field_lookup = {};
 
-    $field_lookup->{$fd_name} = 1;
+  for my $fd_name (@{$sql_field_list}) {
+
+    $sql_field_lookup->{$fd_name} = 1;
   }
 
   my $other_join = '';
+  #$other_join   .= ' LEFT JOIN genus ON genotype.GenusId = genus.GenusId ';
+  #$other_join   .= ' LEFT JOIN genpedigree ON genotype.GenotypeId = genpedigree.GenotypeId ';
+  #$other_join   .= ' LEFT JOIN genotypealias ON genotype.GenotypeId = genotypealias.GenotypeId ';
 
   my $compulsory_perm_fields = ['OwnGroupId',
                                 'AccessGroupId',
@@ -7027,16 +7132,28 @@ sub list_genotype_advanced_runmode {
 
   for my $com_fd_name (@{$compulsory_perm_fields}) {
 
-    if (length($field_lookup->{$com_fd_name}) == 0) {
+    if (length($sql_field_lookup->{$com_fd_name}) == 0) {
 
-      push(@{$final_field_list}, $com_fd_name);
+      push(@{$sql_field_list}, $com_fd_name);
     }
   }
 
-  push(@{$final_field_list}, "$perm_str AS UltimatePerm");
+  push(@{$sql_field_list}, "$perm_str AS UltimatePerm");
 
-  ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_sql($dbh, $final_field_list, 'genotype',
-                                                                     'GenotypeId', $other_join);
+  my @filtering_exp = split(/&/, $filtering_csv);
+
+  my $seen_expression_lookup = {};
+
+  my $factor_filtering_flag = test_filtering_factor($filtering_csv);
+
+  if (!$factor_filtering_flag) {
+    ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_sql_v3($dbh, $sql_field_list, 'genotype',
+                                                                       'GenotypeId', $other_join);
+  }
+  else {
+    ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_sql_v2($dbh, $sql_field_list, 'genotype',
+                                                                          'GenotypeId', $other_join);
+  }
 
   if ($vcol_err) {
 
@@ -7047,23 +7164,42 @@ sub list_genotype_advanced_runmode {
     return $data_for_postrun_href;
   }
 
-  my ($filter_err, $filter_msg, $filter_phrase, $where_arg) = parse_filtering('GenotypeId',
+  my ($filter_err, $filter_msg,
+      $filter_phrase, $where_arg,
+      $having_phrase, $count_filter_phrase,
+      $nb_filter_factor);
+
+  if ($GENOTYPEFACTORFILTERING_CFG == 1) {
+    ($filter_err, $filter_msg,
+        $filter_phrase, $where_arg,
+        $having_phrase, $count_filter_phrase,
+        $nb_filter_factor) = parse_filtering_v2('GenotypeId',
+                                                'genotype',
+                                                $filtering_csv,
+                                                $final_field_list,
+                                                $vcol_list,
+                                                );
+
+  }
+  else {
+    ($filter_err, $filter_msg, $filter_phrase, $where_arg) = parse_filtering('GenotypeId',
                                                                               'genotype',
                                                                               $filtering_csv,
                                                                               $final_field_list);
+  }
 
   $self->logger->debug("Filter phrase: $filter_phrase");
+  $self->logger->debug("Where argument: " . join(',', @{$where_arg}));
 
   if ($filter_err) {
 
     $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $filter_msg}]};
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => "$filter_msg", "VCol" => $vcol_list}]};
 
     return $data_for_postrun_href;
   }
 
   my $filter_where_phrase = '';
-
   if (length($filter_phrase) > 0) {
 
     $filter_where_phrase = " AND $filter_phrase ";
@@ -7071,9 +7207,19 @@ sub list_genotype_advanced_runmode {
 
   my $filtering_exp = " WHERE (($perm_str) & $READ_PERM) = $READ_PERM $filter_where_phrase ";
 
+  if (length($having_phrase) > 0) {
+
+    $sql =~ s/FACTORHAVING/ HAVING $having_phrase/;
+
+    $sql  =~ s/WHEREREPLACE GROUP BY/ $filtering_exp GROUP BY /;
+  }
+  else {
+
+    $sql  =~ s/WHEREREPLACE GROUP BY/ $filtering_exp GROUP BY /;
+  }
+
   my $pagination_aref    = [];
   my $paged_limit_clause = '';
-  my $paged_limit_elapsed;
 
   if ($pagination) {
 
@@ -7090,20 +7236,51 @@ sub list_genotype_advanced_runmode {
       return $data_for_postrun_href;
     }
 
-    $self->logger->debug("Filtering expression: $filtering_exp");
-
-    my $paged_limit_start_time = [gettimeofday()];
-
     my ($pg_id_err, $pg_id_msg, $nb_records,
-        $nb_pages, $limit_clause, $rcount_time) = get_paged_filter($dbh,
-                                                                   $nb_per_page,
-                                                                   $page,
-                                                                   'genotype',
-                                                                   'GenotypeId',
-                                                                   $filtering_exp,
-                                                                   $where_arg);
+        $nb_pages, $limit_clause, $rcount_time);
 
-    $paged_limit_elapsed = tv_interval($paged_limit_start_time);
+    if (length($having_phrase) == 0) {
+
+      $self->logger->debug("COUNT NB RECORD: NO FACTOR IN FILTERING");
+
+      my $sql_pag = "";
+
+
+
+      ($pg_id_err, $pg_id_msg, $nb_records,
+       $nb_pages, $limit_clause, $rcount_time,$sql_pag) = get_paged_filter($dbh,
+                                                                  $nb_per_page,
+                                                                  $page,
+                                                                  'genotype',
+                                                                  'GenotypeId',
+                                                                  $filtering_exp,
+                                                                  $where_arg);
+    }
+    else {
+
+      $self->logger->debug("COUNT NB RECORD: FACTOR IN FILTERING");
+
+      my $count_sql = "SELECT COUNT(genotype.GenotypeId) ";
+      $count_sql   .= "FROM genotype INNER JOIN ";
+      $count_sql   .= " (SELECT GenotypeId, COUNT(GenotypeId) ";
+      $count_sql   .= " FROM genotypefactor WHERE $count_filter_phrase ";
+      $count_sql   .= " GROUP BY GenotypeId HAVING COUNT(GenotypeId)=$nb_filter_factor) AS subq ";
+      $count_sql   .= "ON genotype.GenotypeId = subq.GenotypeId ";
+      $count_sql   .= "$filtering_exp";
+
+
+
+      $self->logger->debug("COUNT SQL: $count_sql");
+
+      ($pg_id_err, $pg_id_msg, $nb_records,
+       $nb_pages, $limit_clause, $rcount_time) = get_paged_filter_sql($dbh,
+                                                                      $nb_per_page,
+                                                                      $page,
+                                                                      $count_sql,
+                                                                      $where_arg);
+
+      $self->logger->debug("COUNT WITH Factor TIME: $rcount_time");
+    }
 
     $self->logger->debug("SQL Row count time: $rcount_time");
 
@@ -7112,7 +7289,7 @@ sub list_genotype_advanced_runmode {
       $self->logger->debug($pg_id_msg);
 
       $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => "$pg_id_msg"}]};
 
       return $data_for_postrun_href;
     }
@@ -7126,6 +7303,7 @@ sub list_genotype_advanced_runmode {
                          'NumOfPages'   => $nb_pages,
                          'Page'         => $page,
                          'NumPerPage'   => $nb_per_page,
+
                         }];
 
     $paged_limit_clause = $limit_clause;
@@ -7133,9 +7311,7 @@ sub list_genotype_advanced_runmode {
 
   $dbh->disconnect();
 
-  $sql  =~ s/GROUP BY/ $filtering_exp GROUP BY /;
-
-  my ($sort_err, $sort_msg, $sort_sql) = parse_sorting($sorting, $final_field_list);
+  my ($sort_err, $sort_msg, $sort_sql) = parse_sorting($sorting, $sql_field_list);
 
   if ($sort_err) {
 
@@ -7145,52 +7321,64 @@ sub list_genotype_advanced_runmode {
     return $data_for_postrun_href;
   }
 
+  my $final_sort_sql = "";
+
   if (length($sort_sql) > 0) {
 
-    $sql .= " ORDER BY $sort_sql ";
+    $final_sort_sql .= " ORDER BY $sort_sql ";
+
   }
   else {
-
-    $sql .= ' ORDER BY genotype.GenotypeId DESC';
+    $final_sort_sql .= ' ORDER BY genotype.GenotypeId DESC';
   }
 
-  $sql .= " $paged_limit_clause ";
+  $sql =~ s/ORDERINGSTRING/$final_sort_sql/;
+
+  if ($pagination == 0) {
+    if (defined $self->param('nperpage')) {
+      $nb_per_page = $self->param('nperpage');
+
+      $sql =~ s/LIMITSTRING/LIMIT  $nb_per_page/;
+    }
+    else {
+      $sql =~ s/LIMITSTRING/LIMIT 50/;
+    }
+  }
+  else {
+    $sql =~ s/LIMITSTRING/$paged_limit_clause/;
+  }
 
   $self->logger->debug("SQL with VCol: $sql");
-  $self->logger->debug("Where arg: " . join(',', @{$where_arg}));
 
-  my $data_start_time = [gettimeofday()];
+  $self->logger->debug('Where arg: ' . join(',', @{$where_arg}));
 
   # where_arg here in the list function because of the filtering
-  my ($read_geno_err, $read_geno_msg, $geno_data) = $self->list_genotype(1, $sql, $where_arg);
 
-  my $data_elapsed = tv_interval($data_start_time);
+  my ($read_genotype_err, $read_genotype_msg, $genotype_data) = $self->list_genotype(1,
+                                                                         $sql,
+                                                                         $where_arg);
 
-  if ($read_geno_err) {
+  if ($read_genotype_err) {
 
-    $self->logger->debug($read_geno_msg);
+    $self->logger->debug($read_genotype_msg);
     $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $read_genotype_msg, 'Limit' => $pagination }]};
 
     return $data_for_postrun_href;
   }
 
   $data_for_postrun_href->{'Error'}     = 0;
-  $data_for_postrun_href->{'Data'}      = {'Genotype'   => $geno_data,
-                                           'VCol'       => $vcol_list,
-                                           'Pagination' => $pagination_aref,
-                                           'RecordMeta' => [{'TagName' => 'Genotype'}],
-  };
-
-  my $runmode_elapsed = tv_interval($runmode_start_time);
-
-  $self->logger->debug("Sample record time: $samplerecord_elapsed");
-  $self->logger->debug("Pagination limit time: $paged_limit_elapsed");
-  $self->logger->debug("Data time: $data_elapsed");
-  $self->logger->debug("Runmode time: $runmode_elapsed");
+  $data_for_postrun_href->{'Data'}  = {'Genotype'   => $genotype_data,
+                                       'VCol'       => $vcol_list,
+                                       'Pagination' => $pagination_aref,
+                                       'RecordMeta' => [{'TagName' => 'Genotype'}],
+                                     };
 
   return $data_for_postrun_href;
 }
+
+
+
 
 sub add_specimen2specimen_group_runmode {
 
@@ -7604,6 +7792,10 @@ sub del_specimen_runmode {
   my $data_for_postrun_href = {};
 
   my $dbh_k_read = connect_kdb_read();
+
+  my $group_id = $self->authen->group_id();
+
+  my $specimen_owner_id = read_cell_value($dbh_k_read, 'specimen', 'OwnGroupId', 'SpecimenId', $specimen_id);
 
   my $specimen_exist = record_existence($dbh_k_read, 'specimen', 'SpecimenId', $specimen_id);
 
@@ -13546,7 +13738,7 @@ sub list_gen_pedigree_advanced_runmode {
     my $err_msg = $filter_msg;
 
     $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg, 'Debug'=>$debug_array}]};
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg }]};
 
     return $data_for_postrun_href;
   }

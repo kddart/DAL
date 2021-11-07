@@ -1,0 +1,17 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record_upload" Description="Import Marker Map Position" TargetURL="markermap/:MarkerMapId/import/mapposition/csv" Type="BLOCKING" />
+  <INPUT ParaName="MarkerMapId" SrcValue="xml/add_data_no_vcol/gwas_tcase/case_00587_add_markermap4gwas.xml" />
+  <INPUT ParaName="AnalysisGroupIdValue" SrcValue="xml/add_data_no_vcol/gwas_tcase/case_00584_add_analysisgroup_gwas.xml" />
+  <INPUT ParaName="Forced" Value="1" />
+  <INPUT ParaName="MarkerName" Value="0" />
+  <INPUT ParaName="ContigName" Value="1" />
+  <INPUT ParaName="ContigPosition" Value="2" />
+  <INPUT ParaName="uploadfile" SrcFile="xml/add_data_no_vcol/gwas_tcase/markermap_position_gwas.csv" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successful)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/gwas_tcase/case_00585_import_marker_data_gwas.xml" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/gwas_tcase/case_00587_add_markermap4gwas.xml" Order="4" />
+  
+</TestCase>

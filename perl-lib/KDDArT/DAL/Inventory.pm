@@ -3406,7 +3406,7 @@ sub update_item_runmode {
   }
 
   my $read_item_sql   =   'SELECT TrialUnitSpecimenId, ItemSourceId, ContainerTypeId, ScaleId, ItemBarcode, ';
-  $read_item_sql     .=   'StorageId, UnitId, ItemStateId, Amount, LastMeasuredUserId, ItemOperation, ItemNote  ';
+  $read_item_sql     .=   'StorageId, UnitId, ItemStateId, Amount, LastMeasuredUserId, ItemOperation, ItemNote, DateAdded  ';
   $read_item_sql     .=   'FROM item WHERE ItemId=? ';
 
   my ($r_df_val_err, $r_df_val_msg, $item_df_val_data) = read_data($dbh_k_write, $read_item_sql, [$item_id]);
@@ -3432,6 +3432,7 @@ sub update_item_runmode {
   my $item_operation              =   undef;
   my $item_note                   =   undef;
   my $item_barcode                =   undef;
+  my $item_date_added             =   undef;
 
   my $nb_df_val_rec    =  scalar(@{$item_df_val_data});
 
@@ -3456,6 +3457,7 @@ sub update_item_runmode {
   $item_barcode                =   $item_df_val_data->[0]->{'ItemBarcode'};
   $item_amount                 =   $item_df_val_data->[0]->{'Amount'};
   $item_measure_by_user        =   $item_df_val_data->[0]->{'LastMeasuredUserId'};
+  $item_date_added             =   $item_df_val_data->[0]->{'DateAdded'};
 
   if (length($item_barcode) == 0) {
 
@@ -3631,7 +3633,27 @@ sub update_item_runmode {
     }
   }
 
-  my $item_added_date      = $cur_dt;
+  #use database as default value
+  my $item_added_date      = $item_date_added;
+
+  if (defined $query->param('DateAdded')) {
+
+    if (length($query->param('DateAdded')) > 0) {
+
+      $item_added_date = $query->param('DateAdded');
+
+      my ( $mdt_err, $mdt_href ) = check_dt_href( { 'DateAdded' => $item_added_date } );
+
+      if ($mdt_err) {
+
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [$mdt_href]};
+
+        return $data_for_postrun_href;
+      }
+    }
+  }
+
   my $item_added_by_user   = $self->authen->user_id();
 
   if (defined $trial_unit_spec_id) {
@@ -8027,7 +8049,7 @@ sub import_itemgroup_xml_runmode {
   my $sql_bulk;
 
   $sql_bulk  = 'INSERT INTO item(UnitId,TrialUnitSpecimenId,ItemSourceId,ContainerTypeId,SpecimenId,ScaleId,StorageId,';
-  $sql_bulk .= 'ItemTypeId,ItemStateId,ItemBarcode,Amount,DateAdded,AddedByUserId,ItemNote) VALUES';
+  $sql_bulk .= 'ItemTypeId,ItemStateId,ItemBarcode,Amount,DateAdded,AddedByUserId,ItemNote,LastUpdateTimeStamp) VALUES';
 
   my @item_sql_rec_list;
 
@@ -8156,7 +8178,7 @@ sub import_itemgroup_xml_runmode {
       my $item_sql_rec_str = qq|(${item_unit_id},${tu_spec_id},${item_source_id},|;
       $item_sql_rec_str   .= qq|${container_type_id},${specimen_id},${scale_id},${storage_id},|;
       $item_sql_rec_str   .= qq|${item_type_id},${item_state_id},${item_barcode},|;
-      $item_sql_rec_str   .= qq|${amount},${date_added},${added_by_user_id},${item_note})|;
+      $item_sql_rec_str   .= qq|${amount},${date_added},${added_by_user_id},${item_note},${date_added})|;
 
       $self->logger->debug("SQL REC: $item_sql_rec_str");
 
