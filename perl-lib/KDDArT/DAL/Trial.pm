@@ -58,7 +58,7 @@ sub setup {
                                            'update_trial_unit',
                                            'update_trial_unit_geography',
                                            'add_trial_unit_specimen',
-                                           'remove_trial_unit_specimen',
+                                           'delete_trial_unit_specimen',
                                            'update_trial_unit_specimen',
                                            'del_designtype_gadmin',
                                            'del_site_gadmin',
@@ -98,7 +98,7 @@ sub setup {
                                                 'update_trial',
                                                 'update_trial_unit',
                                                 'add_trial_unit_specimen',
-                                                'remove_trial_unit_specimen',
+                                                'delete_trial_unit_specimen',
                                                 'update_trial_unit_specimen',
                                                 'del_designtype_gadmin',
                                                 'del_site_gadmin',
@@ -129,9 +129,7 @@ sub setup {
                                                 'update_crossing',
       );
 
-  __PACKAGE__->authen->check_gadmin_runmodes('add_site_gadmin',
-                                             'add_designtype_gadmin',
-                                             'update_site_gadmin',
+  __PACKAGE__->authen->check_gadmin_runmodes('add_designtype_gadmin',
                                              'update_site_geography_gadmin',
                                              'update_designtype_gadmin',
                                              'del_designtype_gadmin',
@@ -175,7 +173,7 @@ sub setup {
     'update_trial_unit'                      => 'update_trial_unit_runmode',
     'update_trial_unit_geography'            => 'update_trial_unit_geography_runmode',
     'add_trial_unit_specimen'                => 'add_trial_unit_specimen_runmode',
-    'remove_trial_unit_specimen'             => 'remove_trial_unit_specimen_runmode',
+    'delete_trial_unit_specimen'             => 'delete_trial_unit_specimen_runmode',
     'update_trial_unit_specimen'             => 'update_trial_unit_specimen_runmode',
     'list_trial_unit_advanced'               => 'list_trial_unit_advanced_runmode',
     'list_trial_unit_specimen_advanced'      => 'list_trial_unit_specimen_advanced_runmode',
@@ -765,6 +763,33 @@ sub add_trial_runmode {
   my $other_perm          = $query->param('OtherPerm');
 
   my $trial_layout        = undef;
+
+  if ($ALLOWDUPLICATETRIALNAME_CFG != 1) {
+
+    my $filtertrialname_sql = "SELECT * FROM trial WHERE TrialName=?";
+
+    my ($filtertrialname_err, $filtertrialname_msg, $filtertrialname_data) = read_data($dbh_read, $filtertrialname_sql, [$trial_name]);
+
+    if ($filtertrialname_err) {
+
+      return ($filtertrialname_err, "$filtertrialname_msg", []);
+    }
+
+    for my $row (@{$filtertrialname_data}) {
+
+      my $filtertrialname = $row->{'TrialName'};
+
+      if ($filtertrialname eq $trial_name) {
+
+          my $err_msg = "Duplicate ($trial_name) cannot be used.";
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'TrialName' => $err_msg}]};
+
+          return $data_for_postrun_href;
+      }
+    }
+
+  }
 
   if (defined $query->param('TrialLayout')) {
 
@@ -7371,11 +7396,11 @@ sub add_trial_unit_specimen_runmode {
   return $data_for_postrun_href;
 }
 
-sub remove_trial_unit_specimen_runmode {
+sub delete_trial_unit_specimen_runmode {
 
-=pod remove_trial_unit_specimen_HELP_START
+=pod delete_trial_unit_specimen_HELP_START
 {
-"OperationName": "Remove trial unit specimen",
+"OperationName": "Delete trial unit specimen",
 "Description": "Delete association between trial unit and specimen specified by trialunitsepcimen id.",
 "AuthRequired": 1,
 "GroupRequired": 1,
@@ -9199,7 +9224,7 @@ sub list_trial_trait {
   my $dbh = connect_kdb_read();
 
   my $sql = 'SELECT trialtrait.TrialTraitId, trialtrait.TrialId, trialtrait.TraitId, trialtrait.Compulsory, ';
-  $sql   .= 'trialtrait.UnitId AS TrialTraitUnitId, ';
+  $sql   .= 'trialtrait.UnitId AS TrialTraitUnitId, trait.TraitLevel,';
   $sql   .= 'gu2.UnitName AS UnitName, ';
   $sql   .= 'gu1.UnitName AS TrialTraitUnitName, ';
   $sql   .= 'trait.UnitId AS TraitUnitId, ';
@@ -9261,6 +9286,69 @@ sub list_trial_trait {
     return ($err, $msg, []);
   }
 
+  my $unique_trait_id_href = {};
+
+  for my $row (@{$trial_trait_data}) {
+    my $trait_id = $row->{'TraitId'};
+
+    $self->logger->debug("Trait Id: $trait_id");
+
+    if (!defined $unique_trait_id_href->{$trait_id}) {
+      $unique_trait_id_href->{$trait_id} = 1;
+    }
+  }
+
+
+
+  my $trait_alias_lookup = {};
+
+  my $trait_alias_sql = 'SELECT traitalias.TraitId, traitalias.TraitAliasId, traitalias.TraitAliasName, traitalias.TraitAliasCaption, traitalias.TraitAliasDescription, ';
+  $trait_alias_sql   .= 'traitalias.TraitLang ';
+  $trait_alias_sql   .= 'FROM traitalias ';
+  $trait_alias_sql   .= 'LEFT JOIN trait ON traitalias.TraitId = trait.TraitId ';
+  $trait_alias_sql   .= 'WHERE traitalias.TraitId IN (' . join(',', keys(%{$unique_trait_id_href})) . ')';
+
+  $self->logger->debug("Trial Trait SQL: $trait_alias_sql");
+
+  my $trait_alias_data_final = [];
+
+  if (scalar(@{$trial_trait_data})) {
+    my ($trait_alias_err, $trait_alias_msg, $trait_alias_data) = read_data($dbh, $trait_alias_sql, []);
+
+    if ($trait_alias_err) {
+
+      return ($trait_alias_err, "$trait_alias_msg", []);
+    }
+
+    $trait_alias_data_final = $trait_alias_data;
+  }
+  else {
+    $trait_alias_data_final = [];
+  }
+
+
+  for my $row (@{$trait_alias_data_final}) {
+
+    my $trait_id = $row->{'TraitId'};
+
+    if (defined $trait_alias_lookup->{$trait_id}) {
+
+      my $trait_alias_aref = $trait_alias_lookup->{$trait_id};
+
+      delete($row->{'TraitId'});
+
+      push(@{$trait_alias_aref}, $row);
+
+      $trait_alias_lookup->{$trait_id} = $trait_alias_aref;
+    }
+    else {
+
+      delete($row->{'TraitId'});
+
+      $trait_alias_lookup->{$trait_id} = [$row];
+    }
+  }
+
   my $extra_attr_trial_trait_data = [];
 
   for my $row (@{$trial_trait_data}) {
@@ -9274,6 +9362,24 @@ sub list_trial_trait {
         my $trait_id       = $row->{'TraitId'};
         $row->{'update'}   = "update/trialtrait/$trial_trait_id";
         $row->{'delete'}   = "trial/$trial_id/remove/trait/$trait_id";
+
+        if (defined $trait_alias_lookup->{$trait_id}) {
+
+          my $trait_alias_aref = [];
+
+          my $trait_alias_data = $trait_alias_lookup->{$trait_id};
+
+          for my $trait_alias_info (@{$trait_alias_data}) {
+
+            my $trait_alias_id = $trait_alias_info->{'TraitAliasId'};
+
+            $trait_alias_info->{'removeAlias'} = "remove/traitalias/$trait_alias_id";
+
+            push(@{$trait_alias_aref}, $trait_alias_info);
+          }
+
+          $row->{'TraitAlias'} = $trait_alias_aref;
+        }
       }
     }
 
@@ -10442,31 +10548,41 @@ sub add_project_runmode {
   my $project_sdate         = undef;
   if ($query->param('ProjectStartDate')) {
 
-    $project_sdate         = $query->param('ProjectStartDate');
-    my ($sdate_err, $sdate_href) = check_dt_href( {'ProjectStartDate' => $project_sdate} );
+    if (length($query->param('ProjectStartDate')) > 0) {
 
-    if ($sdate_err) {
+      $project_sdate         = $query->param('ProjectStartDate');
+      my ($sdate_err, $sdate_href) = check_dt_href( {'ProjectStartDate' => $project_sdate} );
 
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [$sdate_href]};
+      if ($sdate_err) {
 
-      return $data_for_postrun_href;
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [$sdate_href]};
+
+        return $data_for_postrun_href;
+      }
+
     }
+
   }
 
   my $project_edate         = undef;
   if ($query->param('ProjectEndDate')) {
 
-    $project_edate         = $query->param('ProjectEndDate');
-    my ($edate_err, $edate_href) = check_dt_href( {'ProjectEndDate' => $project_edate} );
+    if (length($query->param('ProjectEndDate')) > 0) {
 
-    if ($edate_err) {
+      $project_edate         = $query->param('ProjectEndDate');
+      my ($edate_err, $edate_href) = check_dt_href( {'ProjectEndDate' => $project_edate} );
 
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [$edate_href]};
+      if ($edate_err) {
 
-      return $data_for_postrun_href;
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [$edate_href]};
+
+        return $data_for_postrun_href;
+      }
+
     }
+
   }
 
   my $project_note   = undef;
@@ -10739,7 +10855,7 @@ sub update_project_runmode {
      return $data_for_postrun_href;
   }
 
-  $project_sdate      =  $proj_df_val_data->[0]->{'ProjectStart'};
+  $project_sdate      =  $proj_df_val_data->[0]->{'ProjectStartDate'};
   $project_edate      =  $proj_df_val_data->[0]->{'ProjectEndDate'};
   $project_status     =  $proj_df_val_data->[0]->{'ProjectStatus'};
   $project_note       =  $proj_df_val_data->[0]->{'ProjectNote'};
@@ -15277,8 +15393,8 @@ sub list_trialunit_keyword_advanced_runmode {
 "GroupAdminRequired": 0,
 "SignatureRequired": 0,
 "AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "FILTERING"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Pagination NumOfRecords='2' NumOfPages='2' Page='1' NumPerPage='1' /><RecordMeta TagName='TrialUnitKeyword' /><TrialUnitKeyword TrialUnitKeywordId='6' KeywordId='24' remove='remove/trialunitkeyword/6' UltimatePermission='Read/Write/Link' KeywordName='Keyword_6508061' TrialUnitId='41' UltimatePerm='7' /></DATA>",
-"SuccessMessageJSON": "{'Pagination' : [{'NumOfRecords' : '2', 'NumOfPages' : 2, 'NumPerPage' : '1', 'Page' : '1'}], 'RecordMeta' : [{'TagName' : 'TrialUnitKeyword'}], 'TrialUnitKeyword' : [{'TrialUnitKeywordId' : '6', 'remove' : 'remove/trialunitkeyword/6', 'KeywordId' : '24', 'UltimatePermission' : 'Read/Write/Link', 'KeywordName' : 'Keyword_6508061', 'TrialUnitId' : '41', 'UltimatePerm' : '7'}]}",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Pagination NumOfRecords='2' NumOfPages='2' Page='1' NumPerPage='1' /><RecordMeta TagName='TrialUnitKeyword' /><TrialUnitKeyword TrialId='1' TrialUnitKeywordId='6' KeywordId='24' remove='remove/trialunitkeyword/6' UltimatePermission='Read/Write/Link' KeywordName='Keyword_6508061' TrialUnitId='41' UltimatePerm='7' /></DATA>",
+"SuccessMessageJSON": "{'Pagination' : [{'NumOfRecords' : '2', 'NumOfPages' : 2, 'NumPerPage' : '1', 'Page' : '1'}], 'RecordMeta' : [{'TagName' : 'TrialUnitKeyword'}], 'TrialUnitKeyword' : [{'TrialUnitKeywordId' : '6', 'TrialId': 1,'remove' : 'remove/trialunitkeyword/6', 'KeywordId' : '24', 'UltimatePermission' : 'Read/Write/Link', 'KeywordName' : 'Keyword_6508061', 'TrialUnitId' : '41', 'UltimatePerm' : '7'}]}",
 "ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
 "ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
 "URLParameter": [{"ParameterName": "nperpage", "Description": "Number of records in a page for pagination"}, {"ParameterName": "num", "Description": "The page number of the pagination"},{"ParameterName": "id", "Description": "Existing TrialUnitId"}],
@@ -15468,6 +15584,7 @@ sub list_trialunit_keyword_advanced_runmode {
 
     push(@{$sql_field_list}, $full_field_name);
   }
+
 
   push(@{$sql_field_list}, "$perm_str AS UltimatePerm ");
 

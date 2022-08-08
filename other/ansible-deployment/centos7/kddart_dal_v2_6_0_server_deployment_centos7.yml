@@ -8,25 +8,30 @@
 #
 
 # Install Postgres - after first adding required repo:
-- name: Add postgresql repo for Centos or RedHat
-  shell: "[[ `rpm -qa | grep 'pgdg'` ]] || rpm -ivh http://yum.postgresql.org/9.5/redhat/rhel-7-x86_64/pgdg-centos95-9.5-3.noarch.rpm"
-  when: ansible_distribution == 'CentOS' or ansible_distribution == 'RedHat'
+# If this step fails, please check with https://www.postgresql.org/download/linux/redhat/ for correct URL
 
-- name: Add postgresql repo for SL7
-  shell: >
-    [[ `rpm -qa | grep 'pgdg-sl95-9.5-3'` ]] ||
-      rpm -ivh https://download.postgresql.org/pub/repos/yum/9.5/redhat/rhel-7-x86_64/pgdg-sl95-9.5-3.noarch.rpm
-  when: ansible_distribution == 'Scientific'
+- name: Add postgresql repo for Centos, Scientific, or RedHat
+  yum: state=installed pkg={{item}}
+  with_items:
+      - http://download.postgresql.org/pub/repos/yum/reporpms/EL-7-x86_64/pgdg-redhat-repo-latest.noarch.rpm
+
+#- name: Add postgresql repo for Centos or RedHat
+#  shell: "[[ `rpm -qa | grep 'pgdg'` ]] || rpm -ivh http://yum.postgresql.org/9.5/redhat/rhel-7-x86_64/pgdg-centos95-9.5-3.noarch.rpm"
+#  when: ansible_distribution == 'CentOS' or ansible_distribution == 'RedHat'
+
+#- name: Add postgresql repo for SL7
+#  shell: >
+#    [[ `rpm -qa | grep 'pgdg-sl95-9.5-3'` ]] ||
+#      rpm -ivh https://download.postgresql.org/pub/repos/yum/9.5/redhat/rhel-7-x86_64/pgdg-sl95-9.5-3.noarch.rpm
+#  when: ansible_distribution == 'Scientific'
 
 
 - name: Install Postgres
   yum: state=installed pkg={{ item }}
   with_items:
-    - postgresql95
-    - postgresql95-server
-    - postgresql95-libs
-    - postgresql95-contrib
-    - postgresql95-devel
+    - postgresql10
+    - postgresql10-server
+    - postgresql10-libs
 
 - name: Install ele-release package
   shell: "[[ `rpm -qa | grep 'epel-release'` ]] || yum -y install epel-release"
@@ -37,8 +42,8 @@
 - name: Install PostGIS
   yum: state=installed pkg={{ item }}
   with_items:
-    - postgis24_95
-    - postgis24_95-client
+    - postgis24_10
+    - postgis24_10-client
 
 - name: Install supporting binaries
   yum: state=present pkg={{ item }}
@@ -168,6 +173,7 @@
     make install;
     rm -rf /tmp/CGI-Application-Plugin-Authentication-0.20
 
+
 - name: Install XML::Checker manually
   shell: >
     cd /tmp;
@@ -200,20 +206,20 @@
     [[ `pidof /usr/bin/monetdbd` -gt 1 ]] || /usr/bin/monetdbd start /var/lib/monetdb/dbfarm;
 
 - name: Initialize Postgres
-  shell: "[[ -e /var/lib/pgsql/9.5/data/pg_hba.conf ]] || /usr/pgsql-9.5/bin/postgresql95-setup initdb"
+  shell: "[[ -e /var/lib/pgsql/10/data/pg_hba.conf ]] || /usr/pgsql-10/bin/postgresql-10-setup initdb"
 
-- service: name=postgresql-9.5 state=started
+- service: name=postgresql-10 state=started
 
 - name: Configure PostgreSQL access permission settings
   shell: >
-    mv /var/lib/pgsql/9.5/data/pg_hba.conf /var/lib/pgsql/9.5/data/pg_hba_conf`date +'%Y%m%d'`;
-    echo 'local   all             all                                   trust' > /var/lib/pgsql/9.5/data/pg_hba.conf;
-    echo 'host    all             all             127.0.0.1/32          trust' >> /var/lib/pgsql/9.5/data/pg_hba.conf;
-    echo 'host    all             all             ::1/128               trust' >> /var/lib/pgsql/9.5/data/pg_hba.conf;
-    echo 'host    kddart_gis_enviro_{{ dal_db_version }}  all           {{ ip_network }}        password' >> /var/lib/pgsql/9.5/data/pg_hba.conf;
-    echo 'host    kddart_gis_enviro_{{ dal_db_version }}  all           127.0.0.1/24            password' >> /var/lib/pgsql/9.5/data/pg_hba.conf;
+    mv /var/lib/pgsql/10/data/pg_hba.conf /var/lib/pgsql/10/data/pg_hba_conf`date +'%Y%m%d'`;
+    echo 'local   all             all                                   trust' > /var/lib/pgsql/10/data/pg_hba.conf;
+    echo 'host    all             all             127.0.0.1/32          trust' >> /var/lib/pgsql/10/data/pg_hba.conf;
+    echo 'host    all             all             ::1/128               trust' >> /var/lib/pgsql/10/data/pg_hba.conf;
+    echo 'host    kddart_gis_enviro_{{ dal_db_version }}  all           {{ ip_network }}        password' >> /var/lib/pgsql/10/data/pg_hba.conf;
+    echo 'host    kddart_gis_enviro_{{ dal_db_version }}  all           127.0.0.1/24            password' >> /var/lib/pgsql/10/data/pg_hba.conf;
 
-- service: name=postgresql-9.5 state=restarted
+- service: name=postgresql-10 state=restarted
 
 - name: Append Marker SQL group_concat definition
   shell: echo 'CREATE AGGREGATE group_concat(t text) RETURNS text external name "kddart"."group_concat";' >> {{ local_dir }}/other/db_files/kddart_marker_dal_{{ dal_version }}.sql
@@ -338,7 +344,7 @@
   shell: systemctl enable mysqld
 
 - name: Enable PostgreSQL
-  shell: systemctl enable postgresql-9.5
+  shell: systemctl enable postgresql-10
 
 - name: Stop firewall
   shell: "[[ ! `systemctl list-unit-files | grep 'enabled' | grep 'firewalld'` ]] || systemctl stop firewalld"
@@ -346,7 +352,7 @@
 - name: Disable firewall
   shell: "[[ ! `systemctl list-unit-files | grep 'enabled' | grep 'firewalld'` ]] || systemctl disable firewalld"
 
-- name: Diable selinux
+- name: Disable selinux
   shell: "[[ ! -e /etc/selinux/config ]] || sed -i 's|SELINUX=.*|SELINUX=disabled|' /etc/selinux/config"
   register: selinux_config
 
@@ -367,7 +373,7 @@
   shell: systemctl restart mysqld
 
 - name: Restart postgresql
-  shell: systemctl restart postgresql-9.5
+  shell: systemctl restart postgresql-10
 
 - name: Restart apache
   shell: systemctl restart httpd

@@ -6,7 +6,7 @@
 # Author    : Puthick Hok
 # Created   : 19/04/2012
 # Modified  :
-# Purpose   :
+# Purpose   :import_itemgroup_xml_runmode
 #
 #
 
@@ -100,10 +100,10 @@ sub setup {
                                                 'update_conversionrule_gadmin',
                                                 'update_item_bulk_gadmin',
       );
-  __PACKAGE__->authen->check_gadmin_runmodes('add_storage_gadmin',
-                                             'update_storage_gadmin',
+  __PACKAGE__->authen->check_gadmin_runmodes(#'add_storage_gadmin',
+                                             #'update_storage_gadmin',
                                              'del_storage_gadmin',
-                                             'update_item_gadmin',
+                                             #'update_item_gadmin',
                                              'del_item_gadmin',
                                              'add_itemparent_gadmin',
                                              'del_itemparent_gadmin',
@@ -112,14 +112,14 @@ sub setup {
                                              'add_item_to_group_gadmin',
                                              'remove_item_from_group_gadmin',
                                              'import_itemgroup_xml_gadmin',
-                                             'import_item_csv_gadmin',
+                                             #'import_item_csv_gadmin',
                                              'update_generalunit_gadmin',
                                              'del_generalunit_gadmin',
                                              'add_generalunit_gadmin',
                                              'add_conversionrule_gadmin',
                                              'del_conversionrule_gadmin',
                                              'update_conversionrule_gadmin',
-                                             'update_item_bulk_gadmin',
+                                             #'update_item_bulk_gadmin',
       );
   __PACKAGE__->authen->check_sign_upload_runmodes('add_itemgroup_gadmin',
                                                   'import_item_csv_gadmin',
@@ -4723,16 +4723,33 @@ sub list_storage {
   $sth->finish();
 
   my $extra_attr_storage_data = [];
+  my $storage_children_lookup = {};
 
   if ($extra_attr_yes) {
 
     my $gadmin_status = $self->authen->gadmin_status();
 
     my $storage_id_aref = [];
-
     for my $row (@{$storage_data}) {
 
       push(@{$storage_id_aref}, $row->{'StorageId'});
+
+      my $storage_parentid =  $row->{'StorageParentId'};
+      my $storage_id = $row->{'StorageId'};
+
+      if (defined $storage_parentid) {
+
+        if (!defined $storage_children_lookup->{$storage_parentid}) {
+           $storage_children_lookup->{$storage_parentid}->{'StorageChildren'} = [];
+        }
+
+        my $new_child = {};
+        $new_child->{'StorageId'} = $row->{'StorageId'};
+        $new_child->{'StorageLocation'} = $row->{'StorageLocation'};
+        $new_child->{'StorageBarcode'} = $row->{'StorageBarcode'};
+
+        push(@{$storage_children_lookup->{$storage_parentid}->{'StorageChildren'}}, $new_child);
+      }
     }
 
     my $chk_id_err        = 0;
@@ -4759,9 +4776,9 @@ sub list_storage {
 
     for my $row (@{$storage_data}) {
 
-      if ($gadmin_status eq '1') {
+      my $storage_id = $row->{'StorageId'};
 
-        my $storage_id = $row->{'StorageId'};
+      if ($gadmin_status eq '1') {
         $row->{'update'} = "update/storage/$storage_id";
 
         if ( $not_used_id_href->{$storage_id}  ) {
@@ -4769,6 +4786,9 @@ sub list_storage {
           $row->{'delete'}   = "delete/storage/$storage_id";
         }
       }
+
+      $row->{'StorageChildren'} = $storage_children_lookup->{$storage_id}->{'StorageChildren'};
+
       push(@{$extra_attr_storage_data}, $row);
     }
   }
@@ -4793,8 +4813,8 @@ sub list_storage_runmode {
 "GroupAdminRequired": 0,
 "SignatureRequired": 0,
 "AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><RecordMeta TagName='Storage' /><Storage StorageParentId='0' StorageDetails='Testing' StorageId='16' StorageBarcode='S_3304968' StorageNote='' StorageLocation='Non existing' delete='delete/storage/16' update='update/storage/16' /></DATA>",
-"SuccessMessageJSON": "{'RecordMeta' : [{'TagName' : 'Storage'}], 'Storage' : [{'StorageParentId' : '0', 'StorageDetails' : 'Testing', 'StorageId' : '16', 'delete' : 'delete/storage/16', 'StorageBarcode' : 'S_3304968', 'update' : 'update/storage/16', 'StorageLocation' : 'Non existing', 'StorageNote' : ''}]}",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><RecordMeta TagName='Storage' /><Storage StorageParentId='0' StorageDetails='Testing' StorageId='16' StorageBarcode='S_3304968' StorageNote='' StorageLocation='Non existing' delete='delete/storage/16' update='update/storage/16'><StorageChildren StorageId='310' StorageBarcode='2_00_1533112918_9' StorageLocation='Testing Child 1'/><StorageChildren StorageId='309' StorageBarcode='2_00_1533112918_8' StorageLocation='Testing Child 2'/></Storage></DATA>",
+"SuccessMessageJSON": "{'RecordMeta' : [{'TagName' : 'Storage'}], 'Storage' : [{'StorageParentId' : '0', 'StorageDetails' : 'Testing', 'StorageId' : '16', 'delete' : 'delete/storage/16', 'StorageBarcode' : 'S_3304968', 'update' : 'update/storage/16', 'StorageLocation' : 'Non existing', 'StorageNote' : '','StorageChildren' : [{'StorageId' : '26','StorageBarcode' : '2_00_1533112918_9','StorageLocation' : 'Testing Child 1'},{'StorageId' : '25',      'StorageBarcode' : '2_00_1533112918_8','StorageLocation' : 'Testing Child 2'}]}]}",
 "ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
 "ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
 "HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database field name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases."}],
@@ -7133,6 +7153,9 @@ sub import_itemgroup_xml_runmode {
   my $uniq_itm_type_id_href       = {};
   my $uniq_itm_state_id_href      = {};
   my $uniq_itm_barcode_href       = {};
+  #to use existing items for itemgroups
+  #my $item_id_list = [];
+  my $uniq_item_href = {};
 
   my $i = 0;
   for my $item_group (@{$item_group_data}) {
@@ -7278,6 +7301,8 @@ sub import_itemgroup_xml_runmode {
 
     my $item_data = [];
 
+
+
     if (ref $item_group->{'Item'} eq 'HASH') {
 
       $item_data = [$item_group->{'Item'}];
@@ -7292,113 +7317,136 @@ sub import_itemgroup_xml_runmode {
     my $j = 0;
     for my $item (@{$item_data}) {
 
-      my $specimen_id      = $item->{'SpecimenId'};
-      my $item_barcode     = $item->{'ItemBarcode'};
-      my $item_type_id     = $item->{'ItemTypeId'};
+      my $item_id = -1;
 
-      my ($missing_spec_id_err, $missing_spec_id_msg) = check_missing_value( {'SpecimenId'  => $specimen_id,
-                                                                              'ItemTypeId'  => $item_type_id,
-                                                                             } );
+      if (defined $item->{'Itemid'}) {
+        if (length($item->{'Itemid'}) > 0) {
+          $item_id = $item->{'Itemid'};
 
-      if ($missing_spec_id_err) {
 
-        my $err_msg = $missing_spec_id_msg . ' missing.';
-
-        $data_for_postrun_href->{'Error'} = 1;
-        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-        return $data_for_postrun_href;
+        }
       }
 
-      $uniq_spec_id_href->{$specimen_id} = [$i, $j];
+      if ($item_id != -1) {
 
-      if (length($item_barcode) > 0) {
+        if (!defined $uniq_item_href->{$item_id}) {
+          #push(@{$item_id_list},$item_id);
 
-        if (defined $uniq_itm_barcode_href->{qq|'$item_barcode'|}) {
+          $uniq_item_href->{$item_id} = 1;
+        }
 
-          my $err_msg = "ItemBarcode ($item_barcode): duplicate";
+
+      }
+      else {
+        my $specimen_id      = $item->{'SpecimenId'};
+        my $item_barcode     = $item->{'ItemBarcode'};
+        my $item_type_id     = $item->{'ItemTypeId'};
+
+        my ($missing_spec_id_err, $missing_spec_id_msg) = check_missing_value( {'SpecimenId'  => $specimen_id,
+                                                                                'ItemTypeId'  => $item_type_id,
+                                                                               } );
+
+        if ($missing_spec_id_err) {
+
+          my $err_msg = $missing_spec_id_msg . ' missing.';
 
           $data_for_postrun_href->{'Error'} = 1;
           $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
           return $data_for_postrun_href;
         }
-        else {
 
-          $uniq_itm_barcode_href->{qq|'$item_barcode'|} = [$i, $j];
+        $uniq_spec_id_href->{$specimen_id} = [$i, $j];
+
+        if (length($item_barcode) > 0) {
+
+          if (defined $uniq_itm_barcode_href->{qq|'$item_barcode'|}) {
+
+            my $err_msg = "ItemBarcode ($item_barcode): duplicate";
+
+            $data_for_postrun_href->{'Error'} = 1;
+            $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+            return $data_for_postrun_href;
+          }
+          else {
+
+            $uniq_itm_barcode_href->{qq|'$item_barcode'|} = [$i, $j];
+          }
         }
-      }
 
-      $uniq_itm_type_id_href->{$item_type_id} = [$i, $j];
+        $uniq_itm_type_id_href->{$item_type_id} = [$i, $j];
 
-      if (defined($item->{'ItemStateId'})) {
+        if (defined($item->{'ItemStateId'})) {
 
-        $item_state_id = $item->{'ItemStateId'};
-      }
-
-      if (length($item_state_id) > 0) {
-
-        $uniq_itm_state_id_href->{$item_state_id} = [$i, $j];
-      }
-
-      if (defined($item->{'UnitId'})) {
-
-        if (length($item->{'UnitId'}) > 0) {
-
-          $item_unit_id = $item->{'UnitId'};
+          $item_state_id = $item->{'ItemStateId'};
         }
-      }
 
-      if (length($item_unit_id) > 0) {
+        if (length($item_state_id) > 0) {
 
-        $uniq_unit_id_href->{$item_unit_id} = [$i, $j];
-      }
-
-      if (defined($item->{'StorageId'})) {
-
-        $storage_id = $item->{'StorageId'};
-      }
-
-      if (length($storage_id) > 0) {
-
-        $uniq_storage_id_href->{$storage_id} = [$i, $j];
-      }
-
-      my $tu_spec_id = '';
-
-      if (defined($item->{'TrialUnitSpecimenId'})) {
-
-        $tu_spec_id = $item->{'TrialUnitSpecimenId'};
-      }
-
-      if (length($tu_spec_id) > 0) {
-
-        $uniq_tu_spec_id_href->{$tu_spec_id} = [$i, $j];
-      }
-
-      my $amount = '';
-
-      if (defined($item->{'Amount'})) {
-
-        $amount = $item->{'Amount'};
-      }
-
-      if (length($amount) > 0) {
-
-        my ($ck_float_err, $ck_float_msg) = check_float_value({'Amount' => $amount});
-
-        if ($ck_float_err) {
-
-          my $err_msg = $ck_float_msg . ' not number.';
-
-          $data_for_postrun_href->{'Error'} = 1;
-          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-          return $data_for_postrun_href;
+          $uniq_itm_state_id_href->{$item_state_id} = [$i, $j];
         }
+
+        if (defined($item->{'UnitId'})) {
+
+          if (length($item->{'UnitId'}) > 0) {
+
+            $item_unit_id = $item->{'UnitId'};
+          }
+        }
+
+        if (length($item_unit_id) > 0) {
+
+          $uniq_unit_id_href->{$item_unit_id} = [$i, $j];
+        }
+
+        if (defined($item->{'StorageId'})) {
+
+          $storage_id = $item->{'StorageId'};
+        }
+
+        if (length($storage_id) > 0) {
+
+          $uniq_storage_id_href->{$storage_id} = [$i, $j];
+        }
+
+        my $tu_spec_id = '';
+
+        if (defined($item->{'TrialUnitSpecimenId'})) {
+
+          $tu_spec_id = $item->{'TrialUnitSpecimenId'};
+        }
+
+        if (length($tu_spec_id) > 0) {
+
+          $uniq_tu_spec_id_href->{$tu_spec_id} = [$i, $j];
+        }
+
+        my $amount = '';
+
+        if (defined($item->{'Amount'})) {
+
+          $amount = $item->{'Amount'};
+        }
+
+        if (length($amount) > 0) {
+
+          my ($ck_float_err, $ck_float_msg) = check_float_value({'Amount' => $amount});
+
+          if ($ck_float_err) {
+
+            my $err_msg = $ck_float_msg . ' not number.';
+
+            $data_for_postrun_href->{'Error'} = 1;
+            $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+            return $data_for_postrun_href;
+          }
+        }
+
+        $j += 1;
       }
 
-      $j += 1;
     }
 
     $i += 1;
@@ -7406,6 +7454,59 @@ sub import_itemgroup_xml_runmode {
 
   my $sql;
   my $sth;
+
+  my @uniq_item_id_list = keys(%{$uniq_item_href});
+
+  if (scalar(@uniq_item_id_list) > 0) {
+
+    $sql  = 'SELECT ItemId FROM item WHERE ItemId ';
+    $sql .= 'IN (' . join(',', @uniq_item_id_list) . ')';
+
+    $sth = $dbh_read->prepare($sql);
+    $sth->execute();
+
+    if ($dbh_read->err()) {
+
+      $self->logger->debug("Read ItemGrouName failed");
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my $db_item_id_href = $sth->fetchall_hashref('ItemId');
+
+    if ($sth->err()) {
+
+      $self->logger->debug("Fetch ItemGrouName failed");
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my @missing_item_id_list;
+
+    foreach my $item_id (@uniq_item_id_list) {
+
+      if (! defined $db_item_id_href->{qq|'$item_id'|} ) {
+
+        push(@missing_item_id_list, $item_id);
+      }
+    }
+
+    if (scalar(@missing_item_id_list) > 0) {
+
+      my $err_msg = "ItemId (";
+      $err_msg   .= join(',', @missing_item_id_list) . ') not found.';
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+  }
 
   my @uniq_itm_grp_name_list = keys(%{$uniq_itm_grp_name_href});
 
@@ -8053,6 +8154,8 @@ sub import_itemgroup_xml_runmode {
 
   my @item_sql_rec_list;
 
+  my $num_new_items = 0;
+
   for (my $j = 0; $j < scalar(@{$item_group_data}); $j++) {
 
     my $item_group = $item_group_data->[$j];
@@ -8072,117 +8175,123 @@ sub import_itemgroup_xml_runmode {
 
       my $item = $item_data->[$i];
 
-      my $specimen_id        = $item->{'SpecimenId'};
-      my $item_type_id       = $item->{'ItemTypeId'};
+      if (! defined $item->{'ItemId'}) {
+        my $specimen_id        = $item->{'SpecimenId'};
+        my $item_type_id       = $item->{'ItemTypeId'};
 
-      my $item_source_id     = 'NULL';
+        my $item_source_id     = 'NULL';
 
-      if (length($item_group->{'ItemSourceId'}) > 0) {
+        if (length($item_group->{'ItemSourceId'}) > 0) {
 
-        $item_source_id     = $item_group->{'ItemSourceId'};
+          $item_source_id     = $item_group->{'ItemSourceId'};
+        }
+
+        my $container_type_id  = 'NULL';
+
+        if (length($item_group->{'ContainerTypeId'}) > 0) {
+
+          $container_type_id  = $item_group->{'ContainerTypeId'};
+        }
+
+        my $scale_id           = 'NULL';
+
+        if (length($item_group->{'ScaleId'}) > 0) {
+
+          $scale_id           = $item_group->{'ScaleId'};
+        }
+
+        my $storage_id         = 'NULL';
+
+        if (length($item_group->{'StorageId'}) > 0) {
+
+          $storage_id         = $item_group->{'StorageId'};
+        }
+
+        if (length($item->{'StorageId'}) > 0) {
+
+          $storage_id = $item->{'StorageId'};
+        }
+
+        my $item_unit_id       = 'NULL';
+
+        if (length($item_group->{'UnitId'}) > 0) {
+
+          $item_unit_id       = $item_group->{'UnitId'};
+        }
+
+        if (length($item->{'UnitId'}) > 0) {
+
+          $item_unit_id = $item->{'UnitId'};
+        }
+
+        my $item_state_id      = 'NULL';
+
+        if (length($item_group->{'ItemStateId'}) > 0) {
+
+          $item_state_id      = $item_group->{'ItemStateId'};
+        }
+
+        if (length($item->{'ItemStateId'}) > 0) {
+
+          $item_state_id = $item->{'ItemStateId'};
+        }
+
+        my $tu_spec_id          = 'NULL';
+
+        if (length($item_group->{'TrialUnitSpecimenId'}) > 0) {
+
+          $tu_spec_id = $item_group->{'TrialUnitSpecimenId'};
+        }
+
+        if (length($item->{'TrialUnitSpecimenId'}) > 0) {
+
+          $tu_spec_id = $item->{'TrialUnitSpecimenId'};
+        }
+
+        my $item_barcode       = $dal_tmp_itm_barcode_prefix . "${j}_${i}";
+
+        if (length($item->{'ItemBarcode'}) > 0) {
+
+          $item_barcode = $item->{'ItemBarcode'};
+          $item->{'RemoveBarcode'} = 0;
+        }
+        else {
+
+          $item->{'RemoveBarcode'} = 1;
+          $item->{'ItemBarcode'}   = $item_barcode;
+        }
+
+        $item_barcode = $dbh_write->quote($item_barcode);
+
+        my $amount             = 'NULL';
+
+        if (length($item->{'Amount'}) > 0) {
+
+          $amount             = $item->{'Amount'};
+        }
+
+        my $date_added         = $dbh_write->quote($cur_dt);
+        my $added_by_user_id   = $user_id;
+        my $item_note          = 'NULL';
+
+        if (length($item->{'ItemNote'}) > 0) {
+
+          $item_note          = $dbh_write->quote($item->{'ItemNote'});
+        }
+
+        my $item_sql_rec_str = qq|(${item_unit_id},${tu_spec_id},${item_source_id},|;
+        $item_sql_rec_str   .= qq|${container_type_id},${specimen_id},${scale_id},${storage_id},|;
+        $item_sql_rec_str   .= qq|${item_type_id},${item_state_id},${item_barcode},|;
+        $item_sql_rec_str   .= qq|${amount},${date_added},${added_by_user_id},${item_note},${date_added})|;
+
+        $self->logger->debug("SQL REC: $item_sql_rec_str");
+
+        $num_new_items++;
+
+        push(@item_sql_rec_list, $item_sql_rec_str);
+
+
       }
-
-      my $container_type_id  = 'NULL';
-
-      if (length($item_group->{'ContainerTypeId'}) > 0) {
-
-        $container_type_id  = $item_group->{'ContainerTypeId'};
-      }
-
-      my $scale_id           = 'NULL';
-
-      if (length($item_group->{'ScaleId'}) > 0) {
-
-        $scale_id           = $item_group->{'ScaleId'};
-      }
-
-      my $storage_id         = 'NULL';
-
-      if (length($item_group->{'StorageId'}) > 0) {
-
-        $storage_id         = $item_group->{'StorageId'};
-      }
-
-      if (length($item->{'StorageId'}) > 0) {
-
-        $storage_id = $item->{'StorageId'};
-      }
-
-      my $item_unit_id       = 'NULL';
-
-      if (length($item_group->{'UnitId'}) > 0) {
-
-        $item_unit_id       = $item_group->{'UnitId'};
-      }
-
-      if (length($item->{'UnitId'}) > 0) {
-
-        $item_unit_id = $item->{'UnitId'};
-      }
-
-      my $item_state_id      = 'NULL';
-
-      if (length($item_group->{'ItemStateId'}) > 0) {
-
-        $item_state_id      = $item_group->{'ItemStateId'};
-      }
-
-      if (length($item->{'ItemStateId'}) > 0) {
-
-        $item_state_id = $item->{'ItemStateId'};
-      }
-
-      my $tu_spec_id          = 'NULL';
-
-      if (length($item_group->{'TrialUnitSpecimenId'}) > 0) {
-
-        $tu_spec_id = $item_group->{'TrialUnitSpecimenId'};
-      }
-
-      if (length($item->{'TrialUnitSpecimenId'}) > 0) {
-
-        $tu_spec_id = $item->{'TrialUnitSpecimenId'};
-      }
-
-      my $item_barcode       = $dal_tmp_itm_barcode_prefix . "${j}_${i}";
-
-      if (length($item->{'ItemBarcode'}) > 0) {
-
-        $item_barcode = $item->{'ItemBarcode'};
-        $item->{'RemoveBarcode'} = 0;
-      }
-      else {
-
-        $item->{'RemoveBarcode'} = 1;
-        $item->{'ItemBarcode'}   = $item_barcode;
-      }
-
-      $item_barcode = $dbh_write->quote($item_barcode);
-
-      my $amount             = 'NULL';
-
-      if (length($item->{'Amount'}) > 0) {
-
-        $amount             = $item->{'Amount'};
-      }
-
-      my $date_added         = $dbh_write->quote($cur_dt);
-      my $added_by_user_id   = $user_id;
-      my $item_note          = 'NULL';
-
-      if (length($item->{'ItemNote'}) > 0) {
-
-        $item_note          = $dbh_write->quote($item->{'ItemNote'});
-      }
-
-      my $item_sql_rec_str = qq|(${item_unit_id},${tu_spec_id},${item_source_id},|;
-      $item_sql_rec_str   .= qq|${container_type_id},${specimen_id},${scale_id},${storage_id},|;
-      $item_sql_rec_str   .= qq|${item_type_id},${item_state_id},${item_barcode},|;
-      $item_sql_rec_str   .= qq|${amount},${date_added},${added_by_user_id},${item_note},${date_added})|;
-
-      $self->logger->debug("SQL REC: $item_sql_rec_str");
-
-      push(@item_sql_rec_list, $item_sql_rec_str);
 
       $item_data->[$i] = $item;
     }
@@ -8296,17 +8405,19 @@ sub import_itemgroup_xml_runmode {
 
       my $item_barcode = $item->{'ItemBarcode'};
 
-      if (!(defined $barcode2id_href->{$item_barcode})) {
+      if (! $item->{'ItemId'}) {
+        if (!(defined $barcode2id_href->{$item_barcode})) {
 
-        $self->logger->debug("Barcode ($item_barcode) to id not found");
-        $data_for_postrun_href->{'Error'} = 1;
-        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+          $self->logger->debug("Barcode ($item_barcode) to id not found");
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
-        return $data_for_postrun_href;
+          return $data_for_postrun_href;
+        }
+
+        my $item_id = $barcode2id_href->{$item_barcode}->{'ItemId'};
+        $item->{'ItemId'} = $item_id;
       }
-
-      my $item_id = $barcode2id_href->{$item_barcode}->{'ItemId'};
-      $item->{'ItemId'} = $item_id;
 
       $item_data->[$i] = $item;
     }
@@ -8648,6 +8759,7 @@ sub import_itemgroup_xml_runmode {
 
   return $data_for_postrun_href;
 }
+
 
 sub add_item_log_runmode {
 
@@ -9862,6 +9974,25 @@ sub update_item_bulk_runmode {
         }
       }
     }
+
+    if (defined $data_rec->{'DateAdded'}) {
+
+      if (length($data_rec->{'DateAdded'}) > 0) {
+
+        my $dateadded_dt = $data_rec->{'DateAdded'};
+
+        my ($dateadded_dt_err, $dateadded_dt_ms) = check_dt_value( {'DateAdded' => $dateadded_dt} );
+
+        if ($dateadded_dt_err) {
+
+          my $err_msg = "DateAdded ($dateadded_dt) for ItemId ($item_id): unknown date format.";
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+          return $data_for_postrun_href;
+        }
+      }
+    }
   }
 
   my @item_id_list = keys(%{$uniq_item_id_href});
@@ -9981,9 +10112,13 @@ sub update_item_bulk_runmode {
   my $group_id  = $self->authen->group_id();
   my $gadmin_status = $self->authen->gadmin_status();
 
-  my ($is_spec_ok, $trouble_spec_id_aref) = check_permission($dbh_write, 'specimen', 'SpecimenId',
-                                                             \@item_specimen_id_list, $group_id,
-                                                             $gadmin_status, $READ_WRITE_PERM);
+
+  my $is_spec_ok = 1;
+  my $trouble_spec_id_aref = [];
+
+  #my ($is_spec_ok, $trouble_spec_id_aref) = check_permission($dbh_write, 'specimen', 'SpecimenId',
+  #                                                             \@item_specimen_id_list, $group_id,
+  #                                                             $gadmin_status, $READ_WRITE_PERM);
 
   if (!$is_spec_ok) {
 
@@ -10055,9 +10190,9 @@ sub update_item_bulk_runmode {
 
   #
 
-  ($is_spec_ok, $trouble_spec_id_aref) = check_permission($dbh_write, 'specimen', 'SpecimenId',
-                                                          \@updated_spec_id_list, $group_id,
-                                                          $gadmin_status, $READ_WRITE_PERM);
+  #($is_spec_ok, $trouble_spec_id_aref) = check_permission($dbh_write, 'specimen', 'SpecimenId',
+  #                                                        \@updated_spec_id_list, $group_id,
+  #                                                        $gadmin_status, $READ_WRITE_PERM);
 
   if (!$is_spec_ok) {
 
@@ -10438,6 +10573,12 @@ sub update_item_bulk_runmode {
   my $cur_dt = DateTime->now( time_zone => $TIMEZONE );
   $cur_dt = DateTime::Format::MySQL->format_datetime($cur_dt);
 
+  #handling vcol
+
+  # Get the virtual col from the factor table
+  my $vcol_data              = $self->_get_item_factor();
+
+
   for my $data_rec (@{$data_aref}) {
 
     my $item_id           = $data_rec->{'ItemId'};
@@ -10683,6 +10824,25 @@ sub update_item_bulk_runmode {
       }
     }
 
+    my $dateadded_dt = $item_lookup->{$item_id}->{'DateAdded'};
+
+    if (length($dateadded_dt) == 0) {
+
+      $dateadded_dt = undef;
+    }
+
+    if (defined $data_rec->{'DateAdded'}) {
+
+      if (length($data_rec->{'DateAdded'}) > 0) {
+
+        $dateadded_dt = $data_rec->{'DateAdded'};
+      }
+      else {
+
+        $dateadded_dt = undef;
+      }
+    }
+
     $sql  = 'UPDATE item SET ';
     $sql .= 'UnitId=?, ';
     $sql .= 'TrialUnitSpecimenId=?, ';
@@ -10699,6 +10859,7 @@ sub update_item_bulk_runmode {
     $sql .= 'LastMeasuredUserId=?, ';
     $sql .= 'ItemOperation=?, ';
     $sql .= 'ItemNote=?, ';
+    $sql .= 'DateAdded=?, ';
     $sql .= 'LastUpdateTimeStamp=? ';
     $sql .= 'WHERE ItemId=? AND LastUpdateTimeStamp=?';
 
@@ -10706,7 +10867,7 @@ sub update_item_bulk_runmode {
     $sth->execute($unit_id, $tu_spec_id, $item_source_id, $con_type_id,
                   $spec_id, $scale_id, $storage_id, $item_type_id, $item_state_id,
                   $item_barcode, $amount, $last_ms_dt, $last_measured_user_id,
-                  $item_oper, $item_note, $cur_dt, $item_id, $last_up_ts
+                  $item_oper, $item_note,$dateadded_dt,$cur_dt, $item_id, $last_up_ts
                  );
 
     my $status_href = { 'ItemId'     => $item_id,
@@ -10742,6 +10903,58 @@ sub update_item_bulk_runmode {
     }
 
     $sth->finish();
+
+    #handle vcol here:
+    my $vcol_param_data_compul = {};
+    my $vcol_param_data        = {};
+    my $vcol_len_info          = {};
+    my $vcol_param_data_maxlen = {};
+
+    for my $vcol_id ( keys( %{$vcol_data} ) ) {
+
+      my $vcol_param_name = "VCol_${vcol_id}";
+      my $vcol_value      = $data_rec->{$vcol_param_name};
+      if ( $vcol_data->{$vcol_id}->{'CanFactorHaveNull'} != 1 ) {
+
+        $vcol_param_data_compul->{$vcol_param_name} = $vcol_value;
+      }
+      $vcol_param_data->{$vcol_param_name} = $vcol_value;
+      $vcol_len_info->{$vcol_param_name}          = $vcol_data->{$vcol_id}->{'FactorValueMaxLength'};
+      $vcol_param_data_maxlen->{$vcol_param_name} = $vcol_value;
+    }
+
+    # Validate virtual column for factor
+    my ( $vcol_missing_err, $vcol_missing_msg ) = check_missing_value($vcol_param_data_compul);
+
+    if ($vcol_missing_err) {
+
+      $vcol_missing_msg = $vcol_missing_msg . ' missing';
+      return $self->_set_error($vcol_missing_msg);
+    }
+
+    my ( $vcol_maxlen_err, $vcol_maxlen_msg ) = check_maxlen( $vcol_param_data_maxlen, $vcol_len_info );
+
+    if ($vcol_maxlen_err) {
+
+      $vcol_maxlen_msg = $vcol_maxlen_msg . ' longer than maximum length.';
+      #return $self->_set_error($vcol_maxlen_msg);
+    }
+
+    my $dbh_k_write = connect_kdb_write();
+
+    my ($up_vcol_err, $up_vcol_err_msg) = update_vcol_data($dbh_k_write, $vcol_data, $vcol_param_data,
+                                                           'itemfactor', 'ItemId', $item_id);
+
+    if ($up_vcol_err) {
+
+      $self->logger->debug($up_vcol_err_msg);
+      return $self->_set_error('Unexpected error.');
+    }
+
+    $sth->finish();
+    $dbh_k_write->disconnect();
+
+
   }
 
   $dbh_write->disconnect();
@@ -10769,6 +10982,9 @@ sub update_item_bulk_runmode {
 
   return $data_for_postrun_href;
 }
+
+
+
 
 ######################################################################
 # Utility functions

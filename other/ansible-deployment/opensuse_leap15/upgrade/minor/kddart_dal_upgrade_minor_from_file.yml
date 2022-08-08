@@ -2,14 +2,10 @@
 # DAL upgrade script for CentOS 7
 # Copyright (c) 2018, Diversity Arrays Technology, All rights reserved.
 #
-# Author: Puthick Hok
-# Date: 16/03/2018
+# Author: George Xiyue Huang
+# Date: 25/01/2021
 # Usage: ansible-playbook kddart_dal_upgrade_v2_4_0_to_v2_5_0_centos7_from_file.yml
-# Description: By running the usage command, ansible will install and configure DAL
-#              according the instructions in kddart_dal_upgrade_v2_4_0_to_v2_5_0_centos7.yml.
-#              This script can be run by root or a root super user which can do sudo without password.
-#              For more information about how to read and write an ansible playbook,
-#              please refer to ansible documentation on the web.
+# Description: By running the usage command, ansible will simply copy the code base
 #
 
 - hosts: kddartserver
@@ -20,19 +16,14 @@
       prompt: "Enter the source tar.gz file of KDDart wih either relative or full path."
       private: no
 
-    - name: "mysqlrootpass"
-      prompt: "Enter MySQL root password."
-      private: yes
-
   vars:
-    dal_version: v2.6.0
+    dal_version: v2.6.1
     dal_db_version: v2_6_0
     src_file: /root/KDDArT-DAL-{{ dal_version }}.tar.gz
-    old_dal_db_version: v2_5_0
+    old_dal_db_version: v2_6_0
     local_dir: /root/KDDArT-DAL-{{ dal_version }}
     backup_dir: /root/dal_upgrade_db_backup
-    apache_base_dir: /var/www
-    solr_home: /var/solr
+    apache_base_dir: /srv/www
     force_tasks: True
 
   tasks:
@@ -50,5 +41,5 @@
         tar --no-same-owner -zxvf {{ src_file }} --strip 1;
         fi;
 
-    - import_tasks: ./kddart_dal_upgrade_v2_5_0_to_v2_6_0_centos7.yml
+    - import_tasks: ./kddart_dal_upgrade_v2_6_2.yml
       static: yes

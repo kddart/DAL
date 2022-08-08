@@ -6,9 +6,9 @@
 # Author    : Puthick Hok
 # Created   : 02/06/2010
 # Modified  :
-# Purpose   : 
-#          
-#          
+# Purpose   :
+#
+#
 
 package KDDArT::DAL::Contact;
 
@@ -52,7 +52,7 @@ sub setup {
                                            'del_contact_gadmin',
       );
   __PACKAGE__->authen->count_session_request_runmodes(':all');
-  
+
   __PACKAGE__->authen->check_signature_runmodes('update_organisation_gadmin',
                                                 'add_contact_gadmin',
                                                 'add_organisation_gadmin',
@@ -315,7 +315,7 @@ sub list_organisation_advanced_runmode {
 
     $filtering_exp = " WHERE $filter_phrase ";
   }
-  
+
   if (length($having_phrase) > 0) {
 
     $sql =~ s/FACTORHAVING/ HAVING $having_phrase/;
@@ -349,7 +349,7 @@ sub list_organisation_advanced_runmode {
     $self->logger->debug("Filtering expression: $filtering_exp");
 
     my $paged_limit_start_time = [gettimeofday()];
-   
+
     my ($pg_id_err, $pg_id_msg, $nb_records,
         $nb_pages, $limit_clause, $rcount_time);
 
@@ -395,9 +395,9 @@ sub list_organisation_advanced_runmode {
     $self->logger->debug("SQL Row count time: $rcount_time");
 
     if ($pg_id_err == 1) {
-    
+
       $self->logger->debug($pg_id_msg);
-    
+
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
@@ -405,7 +405,7 @@ sub list_organisation_advanced_runmode {
     }
 
     if ($pg_id_err == 2) {
-      
+
       $page = 0;
     }
 
@@ -445,8 +445,8 @@ sub list_organisation_advanced_runmode {
   $self->logger->debug("Where arg: " . join(',', @{$where_arg}));
 
   my $data_start_time = [gettimeofday()];
-  
-  # where_arg here in the list function because of the filtering 
+
+  # where_arg here in the list function because of the filtering
   my ($read_org_err, $read_org_msg, $org_data) = $self->list_organisation(1, $sql, $where_arg);
 
   my $data_elapsed = tv_interval($data_start_time);
@@ -588,10 +588,10 @@ sub get_organisation_runmode {
     $data_for_postrun_href->{'Data'}        = {'Error' => [{'Message' => "Organisation ($org_id) not found."}]};
 
     return $data_for_postrun_href;
-  } 
+  }
 
   my $field_list = ['organisation.*', 'VCol*'];
-  
+
   my $other_join = '';
 
   my ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_sql($dbh, $field_list, 'organisation',
@@ -606,9 +606,9 @@ sub get_organisation_runmode {
 
     return $data_for_postrun_href;
   }
-  
+
   $sql  =~ s/GROUP BY/ WHERE organisation.OrganisationId=? GROUP BY /;
-  
+
   $self->logger->debug("SQL with VCol: $sql");
 
   my ($read_org_err, $read_org_msg, $org_data) = $self->list_organisation(1, $sql, [$org_id]);
@@ -718,7 +718,7 @@ sub update_organisation_runmode {
   my ($vcol_maxlen_err, $vcol_maxlen_href) = check_maxlen_href($vcol_param_data_maxlen, $vcol_len_info);
 
   if ($vcol_maxlen_err) {
-    
+
     $data_for_postrun_href->{'Error'}       = 1;
     $data_for_postrun_href->{'Data'}        = {'Error' => [$vcol_maxlen_href]};
 
@@ -792,18 +792,18 @@ sub update_organisation_runmode {
           $sql  = 'UPDATE organisationfactor SET ';
           $sql .= 'FactorValue=? ';
           $sql .= 'WHERE OrganisationId=? AND FactorId=?';
-      
+
           my $factor_sth = $dbh->prepare($sql);
           $factor_sth->execute($factor_value, $org_id, $vcol_id);
-      
+
           if ($dbh->err()) {
-        
+
             $data_for_postrun_href->{'Error'} = 1;
             $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
             return $data_for_postrun_href;
           }
-    
+
           $factor_sth->finish();
         }
         else {
@@ -812,18 +812,18 @@ sub update_organisation_runmode {
           $sql .= 'OrganisationId=?, ';
           $sql .= 'FactorId=?, ';
           $sql .= 'FactorValue=?';
-      
+
           my $factor_sth = $dbh->prepare($sql);
           $factor_sth->execute($org_id, $vcol_id, $factor_value);
-      
+
           if ($dbh->err()) {
-        
+
             $data_for_postrun_href->{'Error'} = 1;
             $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
             return $data_for_postrun_href;
           }
-    
+
           $factor_sth->finish();
         }
       }
@@ -836,9 +836,9 @@ sub update_organisation_runmode {
 
           my $factor_sth = $dbh->prepare($sql);
           $factor_sth->execute($org_id, $vcol_id);
-      
+
           if ($dbh->err()) {
-        
+
             $data_for_postrun_href->{'Error'} = 1;
             $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
@@ -1321,7 +1321,7 @@ sub list_contact {
       if (!$dbh_gis->err()) {
 
         my $gis_href = $sth_gis->fetchall_hashref('contactid');
-    
+
         if (!$sth_gis->err()) {
 
           $contact_gis = $gis_href;
@@ -1381,7 +1381,7 @@ sub list_contact {
 
       return ($err, $msg, \@extra_attr_contact_data);
     }
-  
+
     for my $row (@{$data_aref}) {
 
       my $contact_id = $row->{'ContactId'};
@@ -1417,7 +1417,7 @@ sub list_contact {
         if ( $not_used_id_href->{$contact_id} ) {
 
           $row->{'delete'}   = "delete/contact/$contact_id";
-        }   
+        }
       }
       push(@extra_attr_contact_data, $row);
     }
@@ -1824,21 +1824,21 @@ sub add_organisation_runmode {
       $sql .= 'FactorValue=?';
       my $factor_sth = $dbh_k_write->prepare($sql);
       $factor_sth->execute($org_id, $vcol_id, $factor_value);
-      
+
       if ($dbh_k_write->err()) {
-        
+
         $data_for_postrun_href->{'Error'} = 1;
         $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
         return $data_for_postrun_href;
       }
-    
+
       $factor_sth->finish();
     }
   }
 
   $dbh_k_write->disconnect();
-  
+
   my $info_msg_aref  = [{'Message' => "Organisation ($org_id) has been added successfully."}];
   my $return_id_aref = [{'Value' => "$org_id", 'ParaName' => 'OrganisationId'}];
 
@@ -1919,7 +1919,7 @@ sub del_organisation_runmode {
 
   $sth = $dbh_write->prepare($sql);
   $sth->execute($org_id);
-  
+
   if ($dbh_write->err()) {
 
     $data_for_postrun_href->{'Error'} = 1;
@@ -2163,7 +2163,7 @@ sub update_contact_runmode {
   my $fname           = $query->param('ContactFirstName');
   my $lname           = $query->param('ContactLastName');
   my $org_id          = $query->param('OrganisationId');
- 
+
   my $read_contact_sql      =  'SELECT ContactAcronym, ContactAddress, ContactTelephone, ContactMobile, ContactEmail ';
      $read_contact_sql     .=  'FROM contact WHERE ContactId=? ';
 
@@ -2212,13 +2212,13 @@ sub update_contact_runmode {
 
     $address = $query->param('ContactAddress');
   }
-  
+
 
   if (defined $query->param('ContactTelephone')) {
 
     $telephone = $query->param('ContactTelephone');
   }
-  
+
 
   if (defined $query->param('ContactMobile')) {
 

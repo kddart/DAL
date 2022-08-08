@@ -647,8 +647,12 @@ CGI::Application::Dispatch->dispatch(
     'trialunit/:id/add/specimen'                        => { app => 'KDDArT::DAL::Trial',
                                                              rm  => 'add_trial_unit_specimen' },
 
+    'delete/trialunitspecimen/:id'                      => { app => 'KDDArT::DAL::Trial',
+                                                             rm  => 'delete_trial_unit_specimen' },
+
     'remove/trialunitspecimen/:id'                      => { app => 'KDDArT::DAL::Trial',
-                                                             rm  => 'remove_trial_unit_specimen' },
+                                                             rm  => 'delete_trial_unit_specimen' },
+
 
     'update/trialunitspecimen/:id'                      => { app => 'KDDArT::DAL::Trial',
                                                              rm  => 'update_trial_unit_specimen' },
@@ -755,6 +759,9 @@ CGI::Application::Dispatch->dispatch(
     'update/extract/:id'                                => { app => 'KDDArT::DAL::Extract',
                                                              rm  => 'update_extract_gadmin' },
 
+    'analysisgroup/:id/add/extract'                     => { app => 'KDDArT::DAL::Extract',
+                                                             rm  => 'add_extract_analgroup' },
+
     'analysisgroup/:id/import/markerdata/csv'           => { app => 'KDDArT::DAL::Marker',
                                                              rm  => 'import_markerdata_dart' },
 
@@ -773,7 +780,7 @@ CGI::Application::Dispatch->dispatch(
     'dataset/:dsid/list/markermetafield'                => { app => 'KDDArT::DAL::Marker',
                                                              rm  => 'list_marker_meta_field' },
 
-    'analysisgroup/:analid/list/extract'                => { app => 'KDDArT::DAL::Extract',
+    'analysisgroup/:analid/list/extract'                    => { app => 'KDDArT::DAL::Extract',
                                                              rm  => 'list_extract_advanced' },
 
     'list/extract/:nperpage/page/:num'                  => { app => 'KDDArT::DAL::Extract',

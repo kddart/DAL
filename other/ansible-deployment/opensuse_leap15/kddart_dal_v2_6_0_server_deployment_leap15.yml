@@ -25,13 +25,17 @@
     - name: "local_tar_gz_file"
       prompt: "Enter the source tar.gz file of KDDart wih either relative or full path."
       private: no
-  
+
     - name: "dbpass"
       prompt: "Password for kddart_dal user"
       private: yes
 
     - name: "ip_network"
       prompt: "Enter IP network of the target machine, eg. 192.168.78.0/24"
+      private: no
+
+    - name: "dal_address_name"
+      prompt: "Enter address of the target machine"
       private: no
 
   vars:
@@ -77,18 +81,38 @@
     - name: Obtain OS version
       shell: grep 'VERSION=' /etc/os-release | sed 's|VERSION=||' | sed 's|"||g'
       register: os_version
-    
-    - name: Add zypper repo from Geo 
+
+    - name: Add zypper repo from Geo
       shell: >
         if [ ! `zypper lr | grep 'Geo'` ]; then
         zypper ar --no-gpgcheck http://download.opensuse.org/repositories/Application:/Geo/openSUSE_Leap_{{ os_version.stdout }} Geo;
         fi;
 
-    - name: Add zypper repo for Perl-dev 
+    - name: Add zypper repo for Perl-dev
       shell: >
         if [ ! `zypper lr | grep 'Perl-Dev'` ]; then
         zypper ar --no-gpgcheck https://download.opensuse.org/repositories/devel:/languages:/perl/openSUSE_Leap_{{ os_version.stdout }} Perl-Dev;
         fi;
+
+    - name: Remove package - libressl-devel
+      zypper: pkg=libressl-devel state=absent
+
+    - name: Install supporting binaries - libopenssl-devel
+      zypper: pkg=libopenssl-devel state=present
+
+    - name: Install prerequisite for PostGIS - libpq5
+      raw: zypper --non-interactive --no-gpg-checks install https://download.opensuse.org/repositories/server:/database:/postgresql/openSUSE_Leap_15.2/x86_64/libpq5-14.2-lp152.27.1.x86_64.rpm
+
+    - name: Install prerequisite for PostGIS - postgresql14
+      raw: zypper --non-interactive --no-gpg-checks install https://download.opensuse.org/repositories/server:/database:/postgresql/openSUSE_Leap_15.2/x86_64/postgresql14-14.2-lp152.27.1.x86_64.rpm
+
+    - name: Install prerequisite for PostGIS - postgresql14-server
+      raw: zypper --non-interactive --no-gpg-checks install https://download.opensuse.org/repositories/server:/database:/postgresql/openSUSE_Leap_15.2/x86_64/postgresql14-server-14.2-lp152.27.1.x86_64.rpm
+
+    - name: Install supporting binaries - postgresql14-postgis
+      community.general.zypper:
+        name: postgresql14-postgis
+        state: present
 
     - name: Install supporting binaries
       zypper: pkg={{item}} state=present disable_gpg_check=yes
@@ -117,8 +141,6 @@
         - postgresql-server
         - postgresql-init
         - postgresql-contrib
-        - postgresql96-postgis
-        - postgresql10-postgis
         - shapelib
         - libshp-devel
         - pcre
@@ -126,7 +148,6 @@
         - libxml2
         - libxml2-devel
         - java-1_8_0-openjdk
-        - libopenssl-devel
         - pcre-devel
         - libxml2-devel
         - acl
@@ -149,7 +170,7 @@
 
     - name: Untar and decompress KDDart source
       shell: >
-        if [ -d {{ local_dir }} ]; then 
+        if [ -d {{ local_dir }} ]; then
         cd {{ local_dir }};
         tar -zxvf {{ src_file }} --strip 1;
         fi;
@@ -213,8 +234,8 @@
         - Apache::Solr
         - MCE
         - MCE::Shared
-       
-    - name: Install Geo::Shapelib manually 
+
+    - name: Install Geo::Shapelib manually
       shell: >
         cd /tmp;
         curl -L https://cpan.metacpan.org/authors/id/A/AJ/AJOLMA/Geo-Shapelib-0.22.tar.gz | tar zx;
@@ -281,11 +302,6 @@
 
     - service: name=mysql state=started
 
-    - name: Disable sql_mode
-      shell: >
-        echo "set global sql_mode='NO_ENGINE_SUBSTITUTION'" | mysql -u root;
-        [[ `grep 'sql_mode' /etc/my.cnf` ]] && sed -i 's|sql_mode=.*|sql_mode=NO_ENGINE_SUBSTITUTION|' /etc/my.cnf;
-
     - service: name=postgresql state=restarted
 
     - service: name=mysql state=restarted
@@ -301,7 +317,7 @@
       shell: "[[ `grep '{{ dal_address_name }}' /etc/hosts` ]] || echo \"`ip route get 1 | awk '{print $NF;exit}'`  {{ dal_address_name }}\" >> /etc/hosts"
 
     - name: Copy apache configuration
-      shell: "[[ -f /etc/apache2/vhosts.d/http-kddart.example.com.conf ]] || cp {{local_dir}}/other/http-kddart.example.com.conf /etc/apache2/vhosts.d"
+      shell: "[[ -f /etc/apache2/vhosts.d/http-{{ dal_address_name }}.conf ]] || cp {{local_dir}}/other/http-kddart.example.com.conf /etc/apache2/vhosts.d/http-{{ dal_address_name }}.conf"
 
     - name: Create directories
       file: path={{ item }} state=directory owner=wwwrun group=www mode=0755
@@ -455,7 +471,7 @@
         insertafter: "<config>"
         content: |
             <lib dir="${solr.install.dir}/dist/" regex="solr-dataimporthandler-.*\.jar" />
-            <lib dir="${solr.install.dir:../../../..}/contrib/dataimporthandler-extras/lib/" regex=".*\.jar" /> 
+            <lib dir="${solr.install.dir:../../../..}/contrib/dataimporthandler-extras/lib/" regex=".*\.jar" />
             <requestHandler name="/dataimport" class="org.apache.solr.handler.dataimport.DataImportHandler">
               <lst name="defaults">
                <str name="config">db-data-config.xml</str>
@@ -469,7 +485,7 @@
         insertafter: "<config>"
         content: |
             <lib dir="${solr.install.dir}/dist/" regex="solr-dataimporthandler-.*\.jar" />
-            <lib dir="${solr.install.dir:../../../..}/contrib/dataimporthandler-extras/lib/" regex=".*\.jar" /> 
+            <lib dir="${solr.install.dir:../../../..}/contrib/dataimporthandler-extras/lib/" regex=".*\.jar" />
             <requestHandler name="/dataimport" class="org.apache.solr.handler.dataimport.DataImportHandler">
               <lst name="defaults">
                 <str name="config">monetdb-data-config.xml</str>
@@ -506,7 +522,7 @@
     - name: Restart solr
       shell: /etc/init.d/solr restart
 
-    - name: Reindex Solr Cron job 
+    - name: Reindex Solr Cron job
       cron:
         minute: "*/15"
         job: "/usr/bin/perl -w {{ local_dir }}/other/solr/reindex_solr.pl --dalbaseurl 'http://{{ dal_address_name }}/dal' --workingdir '/tmp' --username 'admin' --password 'kddartadmin' --kddartgroup 0 --solrhost 'http://localhost' --solrport '8983' --solrcorecsv 'dal,db,monetdb' > /root/reindex_solr.log 2>&1"

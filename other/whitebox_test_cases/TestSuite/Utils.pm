@@ -1831,11 +1831,13 @@ sub add_record {
     }
   }
 
+  #print $msg_content;
+
   my @is_match_return = is_match($response, $output_format, $match, $logger);
 
   if ($is_match_return[0] == 1) {
 
-    print "$msg_content\n";
+    #print "$msg_content\n";
   }
 
   return (@is_match_return, $return_id_href, $return_data);

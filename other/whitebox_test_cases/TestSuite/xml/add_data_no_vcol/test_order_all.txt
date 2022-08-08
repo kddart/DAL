@@ -355,4 +355,6 @@ xml/add_data_no_vcol/case_00571_add_trial_with_point.xml
 xml/add_data_no_vcol/case_00572_update_trial_with_point.xml
 xml/add_data_no_vcol/case_00573_add_site_with_point.xml
 xml/add_data_no_vcol/case_00623_delete_season.xml
+xml/add_data_no_vcol/case_10205_update_item_nodateaadded.xml
+xml/add_data_no_vcol/case_10206_update_item_bulk_dateadded.xml
 xml/login_testuser/case_00205_logout.xml

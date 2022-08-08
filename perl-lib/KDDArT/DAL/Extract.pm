@@ -55,6 +55,7 @@ sub setup {
                                            'add_analysisgroup',
                                            'update_analysisgroup',
                                            'add_plate_n_extract_gadmin',
+                                           'add_extract_analgroup',
                                            'import_plate_n_extract_gadmin',
                                            'del_analysisgroup_gadmin',
       );
@@ -72,8 +73,10 @@ sub setup {
                                              'del_plate_gadmin',
                                              'add_extract_gadmin',
                                              'update_extract_gadmin',
+                                             'add_extract_analgroup',
                                              'del_extract_gadmin',
                                              'add_plate_n_extract_gadmin',
+                                             'add_extract_analgroup',
                                              'add_plate_gadmin',
                                              'import_plate_n_extract_gadmin',
                                              'del_analysisgroup_gadmin',
@@ -103,6 +106,7 @@ sub setup {
     'list_dataset'                  => 'list_dataset_runmode',
     'import_plate_n_extract_gadmin' => 'import_plate_n_extract_runmode',
     'del_analysisgroup_gadmin'      => 'del_analysisgroup_runmode',
+    'add_extract_analgroup'         => 'add_extract_analgroup_runmode'
       );
 
   my $logger = get_logger();
@@ -301,7 +305,10 @@ sub list_plate_advanced_runmode {
   my ($filter_err, $filter_msg, $filter_phrase, $where_arg) = parse_filtering('"PlateId"',
                                                                               '"plate"',
                                                                               $filtering_csv,
-                                                                              $final_field_list);
+                                                                              $final_field_list,
+                                                                              {},
+                                                                              {},
+                                                                              1);
 
   $self->logger->debug("Filter phrase: $filter_phrase");
 
@@ -1691,6 +1698,7 @@ sub list_extract_advanced_runmode {
     }
   }
 
+
   $self->logger->debug("Field list all: " . join(',', @field_list_all));
 
   my $final_field_list     = \@field_list_all;
@@ -1724,6 +1732,11 @@ sub list_extract_advanced_runmode {
   if (defined $sel_field_lookup->{'PlateId'}) {
 
     push(@{$final_field_list}, '"plate"."PlateName"');
+  }
+
+
+  if ($anal_id_provided) {
+    push(@{$final_field_list},'"analgroupextract"."AnalGroupExtractId"');
   }
 
   ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_mfactor_sql($dbh_m, $dbh_k,
@@ -7256,6 +7269,177 @@ sub del_analysisgroup_runmode {
 
   return $data_for_postrun_href;
 }
+
+sub add_extract_analgroup_runmode {
+
+=pod add_extract_analgroup_HELP_START
+{
+"OperationName": "Add extract to Analysis Group",
+"Description": "Add an existing extract to Analysis Group.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"KDDArTModule": "marker",
+"KDDArTTable": "analgroupextract",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><ReturnId Value='21' ParaName='ExtractId' /><Info Message='Extract (21) has been added to Analysis Group 1 successfully' /></DATA>",
+"SuccessMessageJSON": "{'ReturnId' : [{'Value' : '22','ParaName' : 'ExtractId'}],'Info' : [{'Message' : 'Extract (21) has been added to Analysis Group 1 successfully'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error GenotypeId='Genotype (460) not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'ExtractId' : 'Extract (21) not found.'}]}"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self            = shift;
+  my $AnalysisGroupId = $self->param('id');
+  my $query           = $self->query();
+
+  my $data_for_postrun_href    =  {};
+
+   # Generic required static field checking
+
+  my $dbh_read = connect_mdb_read();
+
+  my $skip_field = {'OwnGroupId'      => 1,
+                    'AccessGroupId'   => 1,
+                    'OwnGroupPerm'    => 1,
+                    'AccessGroupPerm' => 1,
+                    'OtherPerm'       => 1,
+                   };
+
+  my $field_name_translation = {};
+
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'analgroupextract', $skip_field,
+                                                                                $field_name_translation,
+                                                                               );
+  if ($chk_sfield_err) {
+
+     $self->logger->debug($chk_sfield_msg);
+
+     return $for_postrun_href;
+  }
+
+  $dbh_read->disconnect();
+  # Finish generic required static field checking
+
+  my $ExtractId                 = $query->param('ExtractId');
+  my $AccessGroupId             = $query->param('AccessGroupId');
+
+  my $dbh_k_read = connect_kdb_read();
+  my $dbh_m_read = connect_mdb_read();
+
+
+  my $chk_start_time = [gettimeofday()];
+
+  my $analgroup_exist = record_existence($dbh_m_read, 'analysisgroup', 'AnalysisGroupId', $AnalysisGroupId);
+
+  if (!$analgroup_exist) {
+
+    my $err_msg = "Analysis Group ($AnalysisGroupId) not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $chk_elapsed = tv_interval($chk_start_time);
+
+  #check that supplied access group exists
+  my $access_grp_existence = record_existence($dbh_k_read, 'systemgroup', 'SystemGroupId', $AccessGroupId);
+
+  if (!$access_grp_existence) {
+
+     my $err_msg = "AccessGroup ($AccessGroupId) does not exist.";
+
+     $data_for_postrun_href->{'Error'} = 1;
+     $data_for_postrun_href->{'Data'}  = {'Error' => [{'AccessGroupId' => $err_msg}]};
+
+     return $data_for_postrun_href;
+  }
+
+  if (defined $ExtractId) {
+
+    if (!record_existence($dbh_m_read, 'extract', 'ExtractId', $ExtractId)) {
+
+      my $err_msg = "Extract ($ExtractId) not found.";
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'ExtractId' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+  else {
+     my $err_msg = "Extract missing.";
+     $data_for_postrun_href->{'Error'} = 1;
+     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+     return $data_for_postrun_href;
+  }
+
+  #check if ExtractId is present in AnalysisGroup
+
+  my $count_sql  = 'SELECT Count(*) FROM "analgroupextract" WHERE "ExtractId"=? AND "AnalysisGroupId"=?';
+
+  $self->logger->debug("Found $count_sql");
+
+  my ($read_err, $count) = read_cell($dbh_m_read, $count_sql, [$ExtractId, $AnalysisGroupId]);
+
+  $self->logger->debug("Found $count_sql: $count");
+
+  if ($count > 0) {
+    my $err_msg = "Extract ($ExtractId) already part of Analysis Group ($AnalysisGroupId).";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh_k_read->disconnect();
+  $dbh_m_read->disconnect();
+
+  my $dbh_m_write = connect_mdb_write();
+
+  my ($next_val_err, $next_val_msg, $AnalGroupExtractId) = get_next_value_for($dbh_m_write, 'analgroupextract', 'AnalGroupExtractId');
+
+  #add to analysis group extract table
+  my $sql    = 'INSERT INTO "analgroupextract"(';
+  $sql   .= '"ExtractId", ';
+  $sql   .= '"AnalysisGroupId") ';
+  $sql   .= 'VALUES (?, ?)';
+
+
+  my $sth = $dbh_m_write->prepare($sql);
+     $sth->execute(
+                $ExtractId,
+                $AnalysisGroupId,
+     );
+
+  if ($dbh_m_write->err()) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sth->finish();
+
+  $dbh_m_write->disconnect();
+
+  my $info_msg_aref = [{'Message' => "Extract ($ExtractId) added to Analysis Group ($AnalysisGroupId) successfully."}];
+  my $return_id_aref = [{'Value' => "$AnalGroupExtractId", 'ParaName' => 'AnalGroupExtractId'}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info' => $info_msg_aref,
+                                           'ReturnId' => $return_id_aref,
+  };
+
+  return $data_for_postrun_href;
+}
+
 
 sub get_extract_dtd_file {
 

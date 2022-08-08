@@ -62,7 +62,7 @@ our @EXPORT   = qw($DTD_PATH $RPOSTGRES_UP_FILE $GIS_BUFFER_DISTANCE
                    $OAUTH2_SCOPE $OAUTH2_ACCESS_TOKEN_URL $JSON_SCHEMA_PATH
                    $SOLR_URL $POINT2POLYGON_BUFFER4SITE $POINT2POLYGON_BUFFER4TRIAL
                    $MAX_RECURSIVE_ANCESTOR_LEVEL $MAX_RECURSIVE_DESCENDANT_LEVEL
-                   $WHO_CAN_CREATE_GENOTYPE $NURSERY_TYPE_LIST_CSV
+                   $WHO_CAN_CREATE_GENOTYPE $NURSERY_TYPE_LIST_CSV $ALLOWDUPLICATETRIALNAME_CFG $RESTRICTEDFACTORNAME_CFG
                    trim ltrim rtrim read_uname_pass connect_kdb_read
                    execute_sql read_cell permission_phrase
                    read_cookie arrayref2csvfile arrayref2xml reconstruct_server_url
@@ -170,8 +170,8 @@ our $ACCEPT_HEADER_LOOKUP   = { 'application/json' => 'JSON',
 
 our $VALID_CTYPE            = {'xml' => 1, 'json' => 1, 'geojson' => 1};
 
-our $DAL_VERSION            = '2.6.2';
-our $DAL_COPYRIGHT          = 'Copyright (c) 2021, Diversity Arrays Technology, All rights reserved.';
+our $DAL_VERSION            = '2.6.3';
+our $DAL_COPYRIGHT          = 'Copyright (c) 2022, Diversity Arrays Technology, All rights reserved.';
 our $DAL_ABOUT              = 'Data Access Layer';
 
 our $GENO_SPEC_ONE2ONE      = '1-TO-1';
@@ -183,6 +183,10 @@ our $GENOTYPE2SPECIMEN_CFG  = "FROM CFG_FILE";
 our $GENOTYPEFACTORFILTERING_CFG = "FROM CFG_FILE";
 
 our $UNIT_POSITION_SPLITTER = "FROM CFG_FILE";
+
+our $ALLOWDUPLICATETRIALNAME_CFG = "FROM CFG_FILE";
+
+our $RESTRICTEDFACTORNAME_CFG  = "FROM CFG_FILE";
 
 our $MAX_RECURSIVE_ANCESTOR_LEVEL     = "FROM CFG_FILE";
 our $MAX_RECURSIVE_DESCENDANT_LEVEL   = "FROM CFG_FILE";
@@ -6242,6 +6246,8 @@ sub parse_filtering {
   my $filtering_csv          = $_[2];
   my $field_list_all         = $_[3];
 
+  my $monetdb_flag           = 0;
+
   my $validation_func_lookup = {};
 
   if (defined $_[4]) {
@@ -6254,6 +6260,11 @@ sub parse_filtering {
   if (defined $_[5]) {
 
     $field_name2table_name = $_[5];
+  }
+
+  if (defined $_[6]) {
+
+    $monetdb_flag = $_[6];
   }
 
   my $err     = 0;
@@ -6307,7 +6318,7 @@ sub parse_filtering {
     my $field_name       = '';
     my $is_quote_arg_val = 0;
 
-    ($field_name,$operator,$is_quote_arg_val) = get_filtering_parts($expression);
+    ($field_name,$operator,$is_quote_arg_val) = get_filtering_parts($expression,$monetdb_flag);
 
     if (length($operator) > 0) {
 
@@ -7775,6 +7786,12 @@ sub validate_trait_db_bulk {
 sub get_filtering_parts {
   my $expression = $_[0];
 
+  my $monetdb_flag = 0;
+
+  if (defined $_[1]) {
+    $monetdb_flag = $_[1];
+  }
+
   my $operator         = '';
   my $field_name       = '';
   my $is_quote_arg_val = 0;
@@ -7921,9 +7938,15 @@ sub get_filtering_parts {
     $expression =~ s/$field_name/$new_field_name/;
     $field_name = $new_field_name;
   }
+  #only for monetdb filtering practices
+  elsif (($expression =~ /^(\w+)\s+(ILIKE)\s+'[^']+'$/i) && $monetdb_flag == 1) {
+
+    $field_name       = $1;
+    $operator         = $2;
+    $is_quote_arg_val = 1;
+  }
 
   return ($field_name,$operator,$is_quote_arg_val);
 }
-
 
 1;

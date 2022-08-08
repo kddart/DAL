@@ -6,9 +6,9 @@
 # Author    : Puthick Hok
 # Created   : 02/06/2010
 # Modified  :
-# Purpose   : 
-#          
-#          
+# Purpose   :
+#
+#
 
 package KDDArT::DAL::Authentication;
 
@@ -614,7 +614,7 @@ sub get_login_status_runmode {
                'UserName'             => "$user_name",
                'GroupName'            => "$group_name",
                'WriteToken'           => "$writetoken",
-               'GroupAdminStatus'     => "$group_admin_status",
+               'GroupAdminStatus'     => "$group_admin_status"
               };
 
   my $msg_aref = [$msg_href];

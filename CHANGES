@@ -1,3 +1,37 @@
+Version 2.6.3
+Date: 01/08/2022
+Description: Bug fixing version and minor improvements
+
+Minor:
+
+  + Fixed issue #9025 relating to PlateName filtering being case senesitive
+
+  + Fixed issue #9136 relating to "DateAdded" being overwritten in item bulk update
+
+  + Fixed issue #7410 allowing TraitName to be included in genotype/_id/list/trait
+
+  + Fixed issue #8089 allowing "Public" to be returned in list/factors
+
+  + Fixed issue #8743 allowing SpecimenNote to be included in import/specimen
+
+  + Fixed issue #8851 allowing ItemFactors to be included in item bulk update
+
+  + Fixed issue #9008 allowing existing items to be added in Item Groups
+
+  + Fixed issue #9039 allowed Trial Unit Specimens to be filtered by Specimen Name and Trial Id
+
+  + Fixed issue #6650 that includes Trial Id in list/trialunitspecimen
+
+  + Added feature #8681 that deletes Specimen Keywords when deleting Specimen
+
+  + Added feature #3025 to allow children storage to be listed in list/storage
+
+  + Added feature #5168 to allow new extracts to be added to existing Analysis Groups.
+
+  + Added feature #5540 to list all trait aliases in trial/_trialid/list/trait
+
+  + delete/trialunitspecimen/:id has been added with the intention to replace remove/trialunitspecimen/:id in future versions.
+
 Version 2.6.2
 Date: 08/11/2021
 Description: Bug fixing version and minor improvements
@@ -8,15 +42,15 @@ Minor:
 
   + Improved error handling for importing sample measurements. Entire error list from CSV is returned rather than first error encountered.
 
-  + Fixed issue relating to permissions to delete Specimens
+  + Fixed issue #8346 relating to permissions to delete Specimens
 
-  + Fixed issue relating to updating trial unit locations
+  + Fixed issue #8430 relating to updating trial unit locations
 
-  + Fixed issue relating to Item "DateAdded" being mistakenly overwritten
+  + Fixed issue #8527 relating to Item "DateAdded" being mistakenly overwritten
 
-  + Fixed issue relating to Specimen pagination count being affected by various Genotype-Specimen relationships
+  + Fixed issue #8559 relating to Specimen pagination count being affected by various Genotype-Specimen relationships
 
-  + Fixed issue relating to Filtering with special characters
+  + Fixed issue #8369 relating to Filtering with special characters
 
   + Updates to returned data for Genotypes in Specimens, Trial Traits and Crossings.
 
@@ -24,24 +58,23 @@ Version 2.6.1
 Date: 22/01/2021
 Description: Bug fixing version
 
-  Minor:
+Minor:
 
-    + Fixed issue regarding that DAL cannot update a trial that has multiple while trial name is not unique in the database.
+  + Fixed issue #7008 regarding the issue that dal cannot update a trial that has multiple while trial name is not unique in the database.
 
-    + Fixed issue regarding updating SiteStartDate and SiteEndDate in Sites
+  + Fixed issue #7652 regarding updating SiteStartDate and SiteEndDate in Sites
 
-    + Fixed issue regarding deleting Items with Item Logs
+  + Fixed issue #7612 regarding deleting Items with Item Logs
 
-    + Fixed issue regarding deleting Genotypes that are children in GenPedigree
+  + Fixed issue #7595 regarding deleting Genotypes that are children in GenPedigree
 
-    + Fixed issue regarding duplicate Extracts being returned from Analysis Groups
+  + Fixed issue $6885 regarding duplicate Extracts being returned from Analysis Groups
 
-    + Add interface to delete Crossing
+  + Delete crossing interface is available.
 
-    + Add interface to delete Genotype Alias
+  + Delete genotype alias interface is available.
 
-    + List Genpedigree includes Names of Genotype and ParentGenotype
-
+  + List Genpedigree includes Names of Genotype and ParentGenotype
 
 
 Version 2.6.0

@@ -6610,6 +6610,8 @@ sub export_markermap_position_runmode {
   return $data_for_postrun_href;
 }
 
+
+
 sub logger {
 
   my $self = shift;

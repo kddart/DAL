@@ -5049,8 +5049,8 @@ sub list_genotype_trait_runmode {
 "GroupAdminRequired": 0,
 "SignatureRequired": 0,
 "AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><RecordMeta TagName='GenotypeTrait' /><GenotypeTrait GenotypeTraitId='4' TraitValue='40' GenotypeId='442' delete='genotype/442/remove/trait/1' TraitId='1' update='update/genotypetrait/4' /></DATA>",
-"SuccessMessageJSON": "{ 'RecordMeta' : [ {  'TagName' : 'GenotypeTrait' } ], 'GenotypeTrait' : [ {  'GenotypeTraitId' : '4',  'TraitValue' : '40',  'delete' : 'genotype/442/remove/trait/1',  'GenotypeId' : '442',  'update' : 'update/genotypetrait/4',  'TraitId' : '1' } ]}",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><RecordMeta TagName='GenotypeTrait' /><GenotypeTrait GenotypeTraitId='4' TraitValue='40' GenotypeId='442' delete='genotype/442/remove/trait/1' TraitId='1' 'TraitName': 'Yield' update='update/genotypetrait/4' /></DATA>",
+"SuccessMessageJSON": "{ 'RecordMeta' : [ {  'TagName' : 'GenotypeTrait' } ], 'GenotypeTrait' : [ {  'GenotypeTraitId' : '4',  'TraitName' : 'Yield','TraitValue' : '40',  'delete' : 'genotype/442/remove/trait/1',  'GenotypeId' : '442',  'update' : 'update/genotypetrait/4',  'TraitId' : '1' } ]}",
 "ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Genotype (4426) not found.' /></DATA>"}],
 "ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Genotype (4426) not found.'}]}"}],
 "URLParameter": [{"ParameterName": "id", "Description": "GenotypeId"}],
@@ -7900,6 +7900,22 @@ sub del_specimen_runmode {
 
   $sth->finish();
 
+  $sql = 'DELETE FROM specimenkeyword WHERE SpecimenId=?';
+  $sth = $dbh_k_write->prepare($sql);
+
+  $sth->execute($specimen_id);
+
+  if ($dbh_k_write->err()) {
+
+    $self->logger->debug("Delete specimen keyword failed");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sth->finish();
+
   $sql = 'DELETE FROM specimen WHERE SpecimenId=?';
   $sth = $dbh_k_write->prepare($sql);
 
@@ -9193,7 +9209,7 @@ sub import_specimen_csv_runmode {
 "RequiredUpload": 1,
 "UploadFileFormat": "CSV",
 "UploadFileParameterName": "uploadfile",
-"HTTPParameter": [{"Required": 1, "Name": "SpecimenName", "Description": "The column number for SpecimenName column in the upload CSV file"}, {"Required": 1, "Name": "BreedingMethodId", "Description": "The column number for BreedingMethodId column in the upload CSV file"}, {"Required": 0, "Name": "SpecimenBarcode", "Description": "The column number for SpecimenBarcode column in the upload CSV file"}, {"Required": 0, "Name": "IsActive", "Description": "The column number for IsActive column in the upload CSV file"}, {"Required": 0, "Name": "Pedigree", "Description": "The column number for Pedigree column in the upload CSV file"}, {"Required": 0, "Name": "SelectionHistory", "Description": "The column number for SelectionHistory column in the upload CSV file"}, {"Required": 0, "Name": "FilialGeneration", "Description": "The column number for FilialGeneration column in the upload CSV file"}, {"Required": 1, "Name": "GenotypeId", "Description": "The column number for GenotypeId column in the upload CSV file"}, {"Required": 0, "Name": "GenotypeId1", "Description": "The column number for GenotypeId1 (2nd genotype) column in the upload CSV file"}, {"Required": 0, "Name": "GenotypeId2", "Description": "The column number for GenotypeId2 (3rd genotype) column in the upload CSV file"}, {"Required": 0, "Name": "GenotypeId3", "Description": "The column number for GenotypeId3 (4th genotype) column in the upload CSV file"}, {"Required": 0, "Name": "GenotypeId4", "Description": "The column number for GenotypeId4 (5th genotype) column in the upload CSV file"} ],
+"HTTPParameter": [{"Required": 1, "Name": "SpecimenName", "Description": "The column number for SpecimenName column in the upload CSV file"},{"Required": 1, "Name": "SpecimenNote", "Description": "The column number for SpecimenNote column in the upload CSV file"}, {"Required": 1, "Name": "BreedingMethodId", "Description": "The column number for BreedingMethodId column in the upload CSV file"}, {"Required": 0, "Name": "SpecimenBarcode", "Description": "The column number for SpecimenBarcode column in the upload CSV file"}, {"Required": 0, "Name": "IsActive", "Description": "The column number for IsActive column in the upload CSV file"}, {"Required": 0, "Name": "Pedigree", "Description": "The column number for Pedigree column in the upload CSV file"}, {"Required": 0, "Name": "SelectionHistory", "Description": "The column number for SelectionHistory column in the upload CSV file"}, {"Required": 0, "Name": "FilialGeneration", "Description": "The column number for FilialGeneration column in the upload CSV file"}, {"Required": 1, "Name": "GenotypeId", "Description": "The column number for GenotypeId column in the upload CSV file"}, {"Required": 0, "Name": "GenotypeId1", "Description": "The column number for GenotypeId1 (2nd genotype) column in the upload CSV file"}, {"Required": 0, "Name": "GenotypeId2", "Description": "The column number for GenotypeId2 (3rd genotype) column in the upload CSV file"}, {"Required": 0, "Name": "GenotypeId3", "Description": "The column number for GenotypeId3 (4th genotype) column in the upload CSV file"}, {"Required": 0, "Name": "GenotypeId4", "Description": "The column number for GenotypeId4 (5th genotype) column in the upload CSV file"} ],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
@@ -9255,6 +9271,13 @@ sub import_specimen_csv_runmode {
     my $FilialGeneration_col = $query->param('FilialGeneration');
     $chk_col_def_data->{'FilialGeneration'} = $FilialGeneration_col;
     $matched_col->{$FilialGeneration_col}   = 'FilialGeneration';
+  }
+
+  if (defined $query->param('SpecimenNote')) {
+
+    my $SpecimenNote_col = $query->param('SpecimenNote');
+    $chk_col_def_data->{'SpecimenNote'} = $SpecimenNote_col;
+    $matched_col->{$SpecimenNote_col}   = 'SpecimenNote';
   }
 
   my $geno_info_provided = 0;
@@ -9801,7 +9824,7 @@ sub import_specimen_csv_runmode {
 
     my $bulk_sql = 'INSERT INTO specimen ';
     $bulk_sql   .= '(SpecimenName,BreedingMethodId,SpecimenBarcode,IsActive,Pedigree,';
-    $bulk_sql   .= 'SelectionHistory,FilialGeneration,OwnGroupId,OwnGroupPerm,AccessGroupId,';
+    $bulk_sql   .= 'SelectionHistory,FilialGeneration,SpecimenNote,OwnGroupId,OwnGroupPerm,AccessGroupId,';
     $bulk_sql   .= 'AccessGroupPerm,OtherPerm) ';
     $bulk_sql   .= 'VALUES ';
 
@@ -9825,6 +9848,7 @@ sub import_specimen_csv_runmode {
         $specimen_barcode = 'NULL';
       }
 
+
       my $is_active = 1;
 
       if (defined $data_row->{'IsActive'}) {
@@ -9844,6 +9868,13 @@ sub import_specimen_csv_runmode {
       if (defined $data_row->{'SelectionHistory'}) {
 
         $selection_history = $dbh_write->quote($data_row->{'SelectionHistory'});
+      }
+
+      my $specimen_note = $dbh_write->quote(q{});
+
+      if (defined $data_row->{'SpecimenNote'}) {
+
+        $specimen_note = $dbh_write->quote($data_row->{'SpecimenNote'});
       }
 
       my $filial_generation = 0;
@@ -9895,7 +9926,7 @@ sub import_specimen_csv_runmode {
       my $oth_perm      = $inherit_perm_info_lookup->{$inherit_geno_id}->{'OtherPerm'};
 
       $bulk_sql .= "($specimen_name,$breeding_method_id,$specimen_barcode,$is_active,$pedigree,";
-      $bulk_sql .= "$selection_history,$filial_generation,$own_grp_id,$own_grp_perm,$acc_grp_id,$acc_grp_perm,";
+      $bulk_sql .= "$selection_history,$filial_generation,$specimen_note,$own_grp_id,$own_grp_perm,$acc_grp_id,$acc_grp_perm,";
       $bulk_sql .= "$oth_perm),";
 
       $j += 1;

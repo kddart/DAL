@@ -2748,6 +2748,8 @@ sub add_multimedia_runmode {
 
   my $data_for_postrun_href = {};
 
+  $self->logger->debug("adding multimedia...\n");
+
   my $upload_file   = $query->param('uploadfile');
   my $content_type  = $query->uploadInfo($upload_file)->{'Content-Type'};
 

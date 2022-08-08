@@ -120,8 +120,8 @@ sub list_factor_table_runmode {
 "GroupAdminRequired": 0,
 "SignatureRequired": 0,
 "AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><FactorTable addVcol='factortable/genotypefactor/add/vcolumn' TableName='genotypefactor' Parent='genotype'></FactorTable><FactorTable addVcol='factortable/generaltypefactor/add/vcolumn' TableName='generaltypefactor' Parent='generaltype'></FactorTable><FactorTable addVcol='factortable/projectfactor/add/vcolumn' TableName='projectfactor' Parent='project'></FactorTable></DATA>",
-"SuccessMessageJSON": "{'FactorTable' : [{'addVcol' : 'factortable/genotypefactor/add/vcolumn', 'TableName' : 'genotypefactor', 'VirtualColumn' : [], 'Parent' : 'genotype'},{'addVcol' : 'factortable/generaltypefactor/add/vcolumn', 'TableName' : 'generaltypefactor', 'VirtualColumn' : [], 'Parent' : 'generaltype'},{'addVcol' : 'factortable/projectfactor/add/vcolumn', 'TableName' : 'projectfactor', 'VirtualColumn' : [], 'Parent' : 'project'}], 'RecordMeta' : [{'TagName' : 'FactorTable'}]}",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><FactorTable addVcol='factortable/genotypefactor/add/vcolumn' TableName='genotypefactor' Parent='genotype'><VirtualColumn Public='0' SystemGroupName='admin' CanFactorHaveNull='1' FactorValidRule='' FactorId='34' FactorDescription='' FactorDataType='STRING' FactorValidRuleErrMsg='' FactorCaption='GenoFactor1' update='update/vcolumn/34' FactorValueMaxLength='1000' FactorUnit='' FactorName='GenoFactor1' OwnGroupId='0' TableNameOfFactor='genotypefactor'/></FactorTable><FactorTable addVcol='factortable/generaltypefactor/add/vcolumn' TableName='generaltypefactor' Parent='generaltype'><VirtualColumn Public='0' SystemGroupName='admin' CanFactorHaveNull='1' FactorValidRule='' FactorId='35' FactorDescription='' FactorDataType='STRING' FactorValidRuleErrMsg='' FactorCaption='GTFactor1' update='update/vcolumn/35' FactorValueMaxLength='1000' FactorUnit='' FactorName='GTFactor1' OwnGroupId='0' TableNameOfFactor='generaltypefactor'/></FactorTable><FactorTable addVcol='factortable/projectfactor/add/vcolumn' TableName='projectfactor' Parent='project'><VirtualColumn Public='0' SystemGroupName='admin' CanFactorHaveNull='1' FactorValidRule='' FactorId='36' FactorDescription='' FactorDataType='STRING' FactorValidRuleErrMsg='' FactorCaption='ProjectFactor1' update='update/vcolumn/36' FactorValueMaxLength='1000' FactorUnit='' FactorName='ProjectFactor1' OwnGroupId='0' TableNameOfFactor='projectfactor'/></FactorTable></DATA>",
+"SuccessMessageJSON": "{'FactorTable' : [{'addVcol' : 'factortable/genotypefactor/add/vcolumn', 'TableName' : 'genotypefactor', 'VirtualColumn' : [{               'SystemGroupName' : 'admin','Public' : '0','FactorValidRule' : '','CanFactorHaveNull' : '1','FactorDescription' : '','FactorId' : '34','FactorDataType' : 'STRING','FactorCaption' : 'GenoFactor1','FactorValidRuleErrMsg' : '','FactorUnit' : '','FactorValueMaxLength' : '1000','FactorName' : 'GenoFactor1',       'OwnGroupId' : '0','TableNameOfFactor' : 'genotypefactor','update' : 'update/vcolumn/34'}], 'Parent' : 'genotype'},{'addVcol' : 'factortable/generaltypefactor/add/vcolumn', 'TableName' : 'generaltypefactor', 'VirtualColumn' : [{               'SystemGroupName' : 'admin','Public' : '0','FactorValidRule' : '','CanFactorHaveNull' : '1','FactorDescription' : '','FactorId' : '35','FactorDataType' : 'STRING','FactorCaption' : 'GTFactor1','FactorValidRuleErrMsg' : '','FactorUnit' : '','FactorValueMaxLength' : '1000','FactorName' : 'GTFactor1',       'OwnGroupId' : '0','TableNameOfFactor' : 'generaltypefactor','update' : 'update/vcolumn/35'}], 'Parent' : 'generaltype'},{'addVcol' : 'factortable/projectfactor/add/vcolumn', 'TableName' : 'projectfactor', 'VirtualColumn' : [{ 'SystemGroupName' : 'admin','Public' : '0','FactorValidRule' : '','CanFactorHaveNull' : '1','FactorDescription' : '','FactorId' : '36','FactorDataType' : 'STRING','FactorCaption' : 'ProjectFactor1','FactorValidRuleErrMsg' : '','FactorUnit' : '','FactorValueMaxLength' : '1000','FactorName' : 'ProjectFactor1',       'OwnGroupId' : '0','TableNameOfFactor' : 'projectfactor','update' : 'update/vcolumn/36'}], 'Parent' : 'project'}], 'RecordMeta' : [{'TagName' : 'FactorTable'}]}",
 "ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
 "ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
@@ -1214,6 +1214,25 @@ sub add_vcolumn_runmode {
 
   my $vcol_name         = $query->param('FactorName');
 
+  #check vcol name from a list of forbidden names to avoid breaking
+
+  if (length($RESTRICTEDFACTORNAME_CFG) > 0) {
+    my @restricted_names = split(/\//, $RESTRICTEDFACTORNAME_CFG);
+
+    my $vcol_nowhite = $vcol_name;
+    $vcol_nowhite =~ s/\s+//g;
+
+    foreach my $name (@restricted_names) {
+      if ($name eq $vcol_nowhite) {
+        my $err_msg = "VirtualColumn ($vcol_name) cannot be used.";
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'FactorName' => $err_msg}]};
+
+        return $data_for_postrun_href;
+      }
+    }
+  }
+
   my $vcol_caption      = '';
 
   if (defined $query->param('FactorCaption')) {
@@ -1370,6 +1389,7 @@ sub add_vcolumn_runmode {
 
   return $data_for_postrun_href;
 }
+
 
 sub get_dtd_runmode {
 
