@@ -35,7 +35,8 @@ use Log::Log4perl qw(get_logger :levels);
 use XML::Checker::Parser;
 use Crypt::Random qw( makerandom );
 use Time::HiRes qw( tv_interval gettimeofday );
-
+use DateTime;
+use DateTime::Format::Pg;
 
 sub setup {
 
@@ -221,6 +222,10 @@ sub setup {
     'get_crossing'                           => 'get_crossing_runmode',
     'add_crossing'                           => 'add_crossing_runmode',
     'update_crossing'                        => 'update_crossing_runmode',
+    'add_trialunit_treatment'                => 'add_trialunit_treatment_runmode',
+    'get_trialunit_treatment'                => 'get_trialunit_treatment_runmode',
+    'remove_trialunit_treatment'             => 'remove_trialunit_treatment_runmode',
+    'update_trialunit_treatment'             => 'update_trialunit_treatment_runmode',
     );
 
   my $logger = get_logger();
@@ -500,20 +505,20 @@ sub add_site_runmode {
 
       my $st_buffer_val = $POINT2POLYGON_BUFFER4SITE->{$ENV{DOCUMENT_ROOT}};
 
-      $sql  = "INSERT INTO siteloc (siteid, sitelocation) ";
-      $sql .= "VALUES (?, ST_Multi(ST_Buffer(ST_GeomFromText(?, -1), $st_buffer_val, 1)))";
+      $sql  = "INSERT INTO siteloc (siteid, sitelocation, sitelocdt, currentloc) ";
+      $sql .= "VALUES (?, ST_Multi(ST_Buffer(ST_GeomFromText(?, -1), $st_buffer_val, 1)), ?, ?)";
     }
     else {
 
-      $sql  = 'INSERT INTO siteloc (siteid, sitelocation) ';
-      $sql .= 'VALUES (?, ST_Multi(ST_GeomFromText(?, -1)))';
+      $sql  = 'INSERT INTO siteloc (siteid, sitelocation, sitelocdt, currentloc) ';
+      $sql .= 'VALUES (?, ST_Multi(ST_GeomFromText(?, -1)), ?, ?)';
     }
 
     $self->logger->debug("SQL: $sql");
     $self->logger->debug("SiteId: $site_id");
 
     my $gis_sth = $dbh_gis_write->prepare($sql);
-    $gis_sth->execute($site_id, $site_location);
+    $gis_sth->execute($site_id, $site_location, DateTime::Format::Pg->parse_datetime(DateTime->now()), 0);
 
     if ($dbh_gis_write->err()) {
 
@@ -1132,20 +1137,21 @@ sub add_trial_runmode {
 
       my $st_buffer_val = $POINT2POLYGON_BUFFER4TRIAL->{$ENV{DOCUMENT_ROOT}};
 
-      $sql  = "INSERT INTO trialloc (trialid, triallocation) ";
-      $sql .= "VALUES (?, ST_Multi(ST_Buffer(ST_GeomFromText(?, -1), $st_buffer_val, 1)))";
+      $sql  = "INSERT INTO trialloc (trialid, triallocation, triallocdt, currentloc) ";
+      $sql .= "VALUES (?, ST_Multi(ST_Buffer(ST_GeomFromText(?, -1), $st_buffer_val, 1)), ?, ?)";
     }
     else {
 
-      $sql  = 'INSERT INTO trialloc (trialid, triallocation) ';
-      $sql .= 'VALUES (?, ST_Multi(ST_GeomFromText(?, -1)))';
+      $sql  = 'INSERT INTO trialloc (trialid, triallocation, triallocdt, currentloc) ';
+      $sql .= 'VALUES (?, ST_Multi(ST_GeomFromText(?, -1)), ?, ?)';
     }
 
     $self->logger->debug("SQL: $sql");
     $self->logger->debug("TrialId: $trial_id");
+    $self->logger->debug("Current time: " . DateTime::Format::Pg->parse_datetime(DateTime->now()));
 
     my $gis_sth = $dbh_gis_write->prepare($sql);
-    $gis_sth->execute($trial_id, $trial_location);
+    $gis_sth->execute($trial_id, $trial_location, DateTime::Format::Pg->parse_datetime(DateTime->now()), 0);
 
     if ($dbh_gis_write->err()) {
 
@@ -1433,22 +1439,22 @@ sub add_trial_unit_runmode {
 
   my $dbh_k_write = connect_kdb_write();
 
-  my $treatment_id        = 0;
+  # my $treatment_id        = 0;
 
-  if (length($query->param('TreatmentId')) > 0) {
+  # if (length($query->param('TreatmentId')) > 0) {
 
-    $treatment_id = $query->param('TreatmentId');
-    my $treatment_existence = record_existence($dbh_k_write, 'treatment', 'TreatmentId', $treatment_id);
+  #   $treatment_id = $query->param('TreatmentId');
+  #   my $treatment_existence = record_existence($dbh_k_write, 'treatment', 'TreatmentId', $treatment_id);
 
-    if (!$treatment_existence) {
+  #   if (!$treatment_existence) {
 
-      my $err_msg = "Treatment ($treatment_id) does not exist.";
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'TreatmentId' => $err_msg}]};
+  #     my $err_msg = "Treatment ($treatment_id) does not exist.";
+  #     $data_for_postrun_href->{'Error'} = 1;
+  #     $data_for_postrun_href->{'Data'}  = {'Error' => [{'TreatmentId' => $err_msg}]};
 
-      return $data_for_postrun_href;
-    }
-  }
+  #     return $data_for_postrun_href;
+  #   }
+  # }
 
   my $trial_existence = record_existence($dbh_k_write, 'trial', 'TrialId', $trial_id);
 
@@ -1824,7 +1830,7 @@ sub add_trial_unit_runmode {
   $sql    = 'INSERT INTO trialunit SET ';
   $sql   .= 'TrialId=?, ';
   $sql   .= 'SampleSupplierId=?, ';
-  $sql   .= 'TreatmentId=?, ';
+  # $sql   .= 'TreatmentId=?, ';
   $sql   .= 'ReplicateNumber=?, ';
   $sql   .= 'TrialUnitBarcode=?, ';
   $sql   .= 'TrialUnitNote=?, ';
@@ -1832,10 +1838,13 @@ sub add_trial_unit_runmode {
   $sql   .= join(',', @dimension_sql_list);
 
   my $sth = $dbh_k_write->prepare($sql);
-  $sth->execute($trial_id, $sample_supplier_id, $treatment_id,
+  # $sth->execute($trial_id, $sample_supplier_id, $treatment_id,
+  #               $replicate_number, $barcode, $trial_unit_comment, $src_trial_unit_id,
+  #               @dimension_val_list
+  #     );
+  $sth->execute($trial_id, $sample_supplier_id,
                 $replicate_number, $barcode, $trial_unit_comment, $src_trial_unit_id,
-                @dimension_val_list
-      );
+                @dimension_val_list);
 
   if ($dbh_k_write->err()) {
 
@@ -1922,14 +1931,13 @@ sub add_trial_unit_runmode {
 
   $dbh_k_write->disconnect();
 
-
   my $dbh_gis_write = connect_gis_write();
 
-  $sql  = 'INSERT INTO trialunitloc (trialunitid, trialunitlocation) ';
-  $sql .= "VALUES (?, ST_ForceCollection(ST_GeomFromText(?, -1)))";
+  $sql  = 'INSERT INTO trialunitloc (trialunitid, trialunitlocation, trialunitlocdt, currentloc) ';
+  $sql .= "VALUES (?, ST_ForceCollection(ST_GeomFromText(?, -1)), ?, ?)";
 
   my $gis_sth = $dbh_gis_write->prepare($sql);
-  $gis_sth->execute($trial_unit_id, $trialunitlocation);
+  $gis_sth->execute($trial_unit_id, $trialunitlocation, DateTime::Format::Pg->parse_datetime(DateTime->now()), 0);
 
   if ($dbh_gis_write->err()) {
 
@@ -2034,316 +2042,265 @@ sub add_trial_unit_bulk_runmode {
     return $data_for_postrun_href;
   }
 
-  my $dbh_k_write   = connect_kdb_write();
+  # Issue9468
+  # my $dbh_k_write   = connect_kdb_write();
+  my $dbh_k_write   = connect_kdb_write(1);
   my $dbh_gis_write = connect_gis_write();
 
-  my $trial_existence = record_existence($dbh_k_write, 'trial', 'TrialId', $trial_id);
+  eval {
+    my $trial_existence = record_existence($dbh_k_write, 'trial', 'TrialId', $trial_id);
 
-  if (!$trial_existence) {
+    if (!$trial_existence) {
 
-    my $err_msg = "Trial ($trial_id) does not exist.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+      my $err_msg = "Trial ($trial_id) does not exist.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
-    return $data_for_postrun_href;
-  }
-
-  my $sql = 'SELECT Dimension FROM trialdimension WHERE TrialId=?';
-
-  my ($r_di_err, $r_di_msg, $dimension_aref) = read_data($dbh_k_write, $sql, [$trial_id]);
-
-  if ($r_di_err) {
-
-    $self->logger->debug("Read trial dimension failed: $r_di_msg");
-    my $err_msg = "Unexpected Error.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-    return $data_for_postrun_href;
-  }
-
-  if (scalar(@{$dimension_aref}) == 0) {
-
-    my $err_msg = "Trial ($trial_id): no dimension defined.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-    return $data_for_postrun_href;
-  }
-
-  my @dimension_list;
-  my $dimension_href = {};
-
-  for my $dimension_rec (@{$dimension_aref}) {
-
-    my $dimension_name = $dimension_rec->{'Dimension'};
-
-    $dimension_href->{$dimension_name} = 1;
-    push(@dimension_list, $dimension_name);
-  }
-
-  my ($get_scol_err, $get_scol_msg, $scol_data, $pkey_data) = get_static_field($dbh_k_write, 'trialunit');
-
-  if ($get_scol_err) {
-
-    $self->logger->debug("Get static field info failed: $get_scol_msg");
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
-
-    return $data_for_postrun_href;
-  }
-
-  my $group_id  = $self->authen->group_id();
-  my $gadmin_status = $self->authen->gadmin_status();
-
-  my ($is_trial_ok, $trouble_trial_id_aref) = check_permission($dbh_k_write, 'trial', 'TrialId',
-                                                               [$trial_id], $group_id, $gadmin_status,
-                                                               $READ_WRITE_PERM);
-
-  if (!$is_trial_ok) {
-
-    my $trouble_trial_id = $trouble_trial_id_aref->[0];
-
-    my $err_msg = "Permission denied: Group ($group_id) and Trial ($trouble_trial_id).";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-    return $data_for_postrun_href;
-  }
-
-  my $trialunit_info_xml  = read_file($trialunit_info_xml_file);
-  my $trialunit_info_aref = xml2arrayref($trialunit_info_xml, 'trialunit');
-
-  my $uniq_unitposition  = {};
-  my $uniq_barcode       = {};
-
-  my $uniq_entry_id_href = {};
-  my $uniq_coord_href    = {};
-
-  for my $trialunit (@{$trialunit_info_aref}) {
-
-    my $colsize_info          = {};
-    my $chk_maxlen_field_href = {};
-
-    for my $static_field (@{$scol_data}) {
-
-      my $field_name  = $static_field->{'Name'};
-      my $field_dtype = $static_field->{'DataType'};
-
-      if (lc($field_dtype) eq 'varchar') {
-
-        $colsize_info->{$field_name}           = $static_field->{'ColSize'};
-        $chk_maxlen_field_href->{$field_name}  = $trialunit->{$field_name};
-      }
+      return 1;
     }
 
-    my ($maxlen_err, $maxlen_msg) = check_maxlen($chk_maxlen_field_href, $colsize_info);
+    my $sql = 'SELECT Dimension FROM trialdimension WHERE TrialId=?';
 
-    if ($maxlen_err) {
+    my ($r_di_err, $r_di_msg, $dimension_aref) = read_data($dbh_k_write, $sql, [$trial_id]);
 
-      $maxlen_msg .= 'longer than its maximum length';
+    if ($r_di_err) {
 
-      $data_for_postrun_href->{'Error'}       = 1;
-      $data_for_postrun_href->{'Data'}        = {'Error' => [{'Message' => $maxlen_msg}]};
+      $self->logger->debug("Read trial dimension failed: $r_di_msg");
+      my $err_msg = "Unexpected Error.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
-      return $data_for_postrun_href;
+      return 1;
     }
 
-    my $replicate_number    = $trialunit->{'ReplicateNumber'};
+    if (scalar(@{$dimension_aref}) == 0) {
 
-    my $trial_unit_comment  = '';
+      my $err_msg = "Trial ($trial_id): no dimension defined.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
-    if (length($trialunit->{'TrialUnitNote'}) > 0) {
-
-      $trial_unit_comment = $trialunit->{'TrialUnitNote'};
+      return 1;
     }
 
-    my $sample_supplier_id  = '0';
+    my @dimension_list;
+    my $dimension_href = {};
 
-    if (length($trialunit->{'SampleSupplierId'}) > 0) {
+    for my $dimension_rec (@{$dimension_aref}) {
 
-      $sample_supplier_id = $trialunit->{'SampleSupplierId'};
+      my $dimension_name = $dimension_rec->{'Dimension'};
+
+      $dimension_href->{$dimension_name} = 1;
+      push(@dimension_list, $dimension_name);
     }
 
-    my $treatment_id        = undef;
+    my ($get_scol_err, $get_scol_msg, $scol_data, $pkey_data) = get_static_field($dbh_k_write, 'trialunit');
 
-    if (length($trialunit->{'TreatmentId'}) > 0) {
+    if ($get_scol_err) {
 
-      $treatment_id = $trialunit->{'TreatmentId'};
+      $self->logger->debug("Get static field info failed: $get_scol_msg");
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+      return 1;
     }
 
-    if (defined $treatment_id) {
+    my $group_id  = $self->authen->group_id();
+    my $gadmin_status = $self->authen->gadmin_status();
 
-      my $treatment_existence = record_existence($dbh_k_write, 'treatment', 'TreatmentId', $treatment_id);
+    my ($is_trial_ok, $trouble_trial_id_aref) = check_permission($dbh_k_write, 'trial', 'TrialId',
+                                                                [$trial_id], $group_id, $gadmin_status,
+                                                                $READ_WRITE_PERM);
 
-      if (!$treatment_existence) {
+    if (!$is_trial_ok) {
 
-        my $err_msg = "Treatment ($treatment_id) does not exist.";
-        $data_for_postrun_href->{'Error'} = 1;
-        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+      my $trouble_trial_id = $trouble_trial_id_aref->[0];
 
-        return $data_for_postrun_href;
-      }
+      my $err_msg = "Permission denied: Group ($group_id) and Trial ($trouble_trial_id).";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return 1;
     }
 
-    my $src_trial_unit_id = undef;
+    my $trialunit_info_xml  = read_file($trialunit_info_xml_file);
+    my $trialunit_info_aref = xml2arrayref($trialunit_info_xml, 'trialunit');
 
-    if (length($trialunit->{'SourceTrialUnitId'}) > 0) {
+    my $uniq_unitposition  = {};
+    my $uniq_barcode       = {};
 
-      $src_trial_unit_id = $trialunit->{'SourceTrialUnitId'};
-    }
+    my $uniq_entry_id_href = {};
+    my $uniq_coord_href    = {};
 
-    if (defined $src_trial_unit_id) {
+    for my $trialunit (@{$trialunit_info_aref}) {
 
-      if (!record_existence($dbh_k_write, 'trialunit', 'TrialUnitId', $src_trial_unit_id)) {
+      my $colsize_info          = {};
+      my $chk_maxlen_field_href = {};
 
-        my $err_msg = "SourceTrialUnitId ($src_trial_unit_id): not found.";
-        $data_for_postrun_href->{'Error'} = 1;
-        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+      for my $static_field (@{$scol_data}) {
 
-        return $data_for_postrun_href;
-      }
-    }
+        my $field_name  = $static_field->{'Name'};
+        my $field_dtype = $static_field->{'DataType'};
 
-    my $barcode = undef;
+        if (lc($field_dtype) eq 'varchar') {
 
-    if (length($trialunit->{'TrialUnitBarcode'}) > 0) {
-
-      $barcode = $trialunit->{'TrialUnitBarcode'};
-    }
-
-    if ( defined $barcode ) {
-
-      if (record_existence($dbh_k_write, 'trialunit', 'TrialUnitBarcode', $barcode)) {
-
-        my $err_msg = "TrialUnitBarcode ($barcode): already exists.";
-        $data_for_postrun_href->{'Error'} = 1;
-        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-        return $data_for_postrun_href;
-      }
-
-      if (defined $uniq_barcode->{$barcode}) {
-
-        my $err_msg = "TrialUnitBarcode ($barcode): duplicate.";
-        $self->logger->debug("TrialUnitBarcode ($barcode) is duplicate in the XML file.");
-        $data_for_postrun_href->{'Error'} = 1;
-        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-        return $data_for_postrun_href;
-      }
-      else {
-
-        $uniq_barcode->{$barcode} = 1;
-      }
-    }
-
-    if ($force == 0) {
-
-      my $coord_key = '';
-      my @coord_val_list;
-      my @coord_dim_list;
-      my @sql_coord_dim_list;
-
-      foreach my $dim (('X', 'Y', 'Z')) {
-
-        if (defined $dimension_href->{$dim}) {
-
-          if (length($trialunit->{"TrialUnit" . $dim}) == 0) {
-
-            my $err_msg = "TrialUnit${dim} is missing while ${dim} dimension is defined.";
-            $data_for_postrun_href->{'Error'} = 1;
-            $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-            return $data_for_postrun_href;
-          }
-          else {
-
-            my $dim_val = $trialunit->{"TrialUnit" . $dim};
-            $coord_key .= "${dim}${dim_val}";
-
-            push(@coord_val_list, $dim_val);
-            push(@coord_dim_list, $dim);
-            push(@sql_coord_dim_list, "TrialUnit${dim}=?");
-          }
+          $colsize_info->{$field_name}           = $static_field->{'ColSize'};
+          $chk_maxlen_field_href->{$field_name}  = $trialunit->{$field_name};
         }
       }
 
-      if (scalar(@coord_val_list) > 0) {
+      my ($maxlen_err, $maxlen_msg) = check_maxlen($chk_maxlen_field_href, $colsize_info);
 
-        if (defined $uniq_coord_href->{$coord_key}) {
+      if ($maxlen_err) {
 
-          my $err_msg = "Dimension (" . join(',', @coord_dim_list) . ") value (" . join(',', @coord_val_list) . '): ';
-          $err_msg   .= 'duplicate. ';
+        $maxlen_msg .= 'longer than its maximum length';
+
+        $data_for_postrun_href->{'Error'}       = 1;
+        $data_for_postrun_href->{'Data'}        = {'Error' => [{'Message' => $maxlen_msg}]};
+
+        return 1;
+      }
+
+      my $replicate_number    = $trialunit->{'ReplicateNumber'};
+
+      my $trial_unit_comment  = '';
+
+      if (length($trialunit->{'TrialUnitNote'}) > 0) {
+
+        $trial_unit_comment = $trialunit->{'TrialUnitNote'};
+      }
+
+      my $sample_supplier_id  = '0';
+
+      if (length($trialunit->{'SampleSupplierId'}) > 0) {
+
+        $sample_supplier_id = $trialunit->{'SampleSupplierId'};
+      }
+
+      my $treatment_id        = undef;
+
+      if (length($trialunit->{'TreatmentId'}) > 0) {
+
+        $treatment_id = $trialunit->{'TreatmentId'};
+      }
+
+      if (defined $treatment_id) {
+
+        my $treatment_existence = record_existence($dbh_k_write, 'treatment', 'TreatmentId', $treatment_id);
+
+        if (!$treatment_existence) {
+
+          my $err_msg = "Treatment ($treatment_id) does not exist.";
           $data_for_postrun_href->{'Error'} = 1;
           $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
-          return $data_for_postrun_href;
+          return 1;
+        }
+      }
+
+      my $src_trial_unit_id = undef;
+
+      if (length($trialunit->{'SourceTrialUnitId'}) > 0) {
+
+        $src_trial_unit_id = $trialunit->{'SourceTrialUnitId'};
+      }
+
+      if (defined $src_trial_unit_id) {
+
+        if (!record_existence($dbh_k_write, 'trialunit', 'TrialUnitId', $src_trial_unit_id)) {
+
+          my $err_msg = "SourceTrialUnitId ($src_trial_unit_id): not found.";
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+          return 1;
+        }
+      }
+
+      my $barcode = undef;
+
+      if (length($trialunit->{'TrialUnitBarcode'}) > 0) {
+
+        $barcode = $trialunit->{'TrialUnitBarcode'};
+      }
+
+      if ( defined $barcode ) {
+
+        if (record_existence($dbh_k_write, 'trialunit', 'TrialUnitBarcode', $barcode)) {
+
+          my $err_msg = "TrialUnitBarcode ($barcode): already exists.";
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+          return 1;
+        }
+
+        if (defined $uniq_barcode->{$barcode}) {
+
+          my $err_msg = "TrialUnitBarcode ($barcode): duplicate.";
+          $self->logger->debug("TrialUnitBarcode ($barcode) is duplicate in the XML file.");
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+          return 1;
         }
         else {
 
-          $uniq_coord_href->{$coord_key} = 1;
-        }
-
-
-        $sql = 'SELECT TrialUnitId FROM trialunit WHERE TrialId=? AND ' . join(' AND ', @sql_coord_dim_list);
-
-        my ($r_tu_id_err, $db_trialunit_id) = read_cell($dbh_k_write, $sql, [$trial_id, @coord_val_list]);
-
-        if ($r_tu_id_err) {
-
-          my $err_msg = "Unexpected Error.";
-          $data_for_postrun_href->{'Error'} = 1;
-          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-          return $data_for_postrun_href;
-        }
-
-        if (length($db_trialunit_id) > 0) {
-
-          my $err_msg = "Dimension (" . join(',', @coord_dim_list) . ") value (" . join(',', @coord_val_list) . '): ';
-          $err_msg   .= 'already used.';
-          $data_for_postrun_href->{'Error'} = 1;
-          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-          return $data_for_postrun_href;
+          $uniq_barcode->{$barcode} = 1;
         }
       }
-    }
 
-    if (defined $dimension_href->{'EntryId'}) {
+      if ($force == 0) {
 
-      if (length($trialunit->{'TrialUnitEntryId'}) == 0) {
+        my $coord_key = '';
+        my @coord_val_list;
+        my @coord_dim_list;
+        my @sql_coord_dim_list;
 
-        my $err_msg = "TrialUnitEntryId is missing while EntryId is defined.";
-        $data_for_postrun_href->{'Error'} = 1;
-        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+        foreach my $dim (('X', 'Y', 'Z')) {
 
-        return $data_for_postrun_href;
-      }
-      else {
+          if (defined $dimension_href->{$dim}) {
 
-        if ( $force == 0 ) {
+            if (length($trialunit->{"TrialUnit" . $dim}) == 0) {
 
-          my $entry_id = $trialunit->{'TrialUnitEntryId'};
+              my $err_msg = "TrialUnit${dim} is missing while ${dim} dimension is defined.";
+              $data_for_postrun_href->{'Error'} = 1;
+              $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
-          if (defined $uniq_entry_id_href->{$entry_id}) {
+              return 1;
+            }
+            else {
 
-            my $err_msg = "TrialUnitEntryId ($entry_id): duplicate.";
+              my $dim_val = $trialunit->{"TrialUnit" . $dim};
+              $coord_key .= "${dim}${dim_val}";
+
+              push(@coord_val_list, $dim_val);
+              push(@coord_dim_list, $dim);
+              push(@sql_coord_dim_list, "TrialUnit${dim}=?");
+            }
+          }
+        }
+
+        if (scalar(@coord_val_list) > 0) {
+
+          if (defined $uniq_coord_href->{$coord_key}) {
+
+            my $err_msg = "Dimension (" . join(',', @coord_dim_list) . ") value (" . join(',', @coord_val_list) . '): ';
+            $err_msg   .= 'duplicate. ';
             $data_for_postrun_href->{'Error'} = 1;
             $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
-            return $data_for_postrun_href;
+            return 1;
           }
           else {
 
-            $uniq_entry_id_href->{$entry_id} = 1;
+            $uniq_coord_href->{$coord_key} = 1;
           }
 
-          $sql = 'SELECT TrialUnitId FROM trialunit WHERE TrialId=? AND TrialUnitEntryId=?';
 
-          my ($r_tu_id_err, $db_trialunit_id) = read_cell($dbh_k_write, $sql, [$trial_id, $entry_id]);
+          $sql = 'SELECT TrialUnitId FROM trialunit WHERE TrialId=? AND ' . join(' AND ', @sql_coord_dim_list);
+
+          my ($r_tu_id_err, $db_trialunit_id) = read_cell($dbh_k_write, $sql, [$trial_id, @coord_val_list]);
 
           if ($r_tu_id_err) {
 
@@ -2351,656 +2308,755 @@ sub add_trial_unit_bulk_runmode {
             $data_for_postrun_href->{'Error'} = 1;
             $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
-            return $data_for_postrun_href;
+            return 1;
           }
 
           if (length($db_trialunit_id) > 0) {
 
-            my $err_msg = "TrialUnitEntryId ($entry_id) is already used.";
+            my $err_msg = "Dimension (" . join(',', @coord_dim_list) . ") value (" . join(',', @coord_val_list) . '): ';
+            $err_msg   .= 'already used.';
             $data_for_postrun_href->{'Error'} = 1;
             $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
-            return $data_for_postrun_href;
+            return 1;
           }
         }
       }
-    }
 
-    my $unitpos_txt        = '';
-    my $dimension_provided = 0;
-    my @dimension_val_list;
-    my @user_dimension_list;
-    my @sql_dimension_list;
+      if (defined $dimension_href->{'EntryId'}) {
 
-    for my $dimension (@dimension_list) {
+        if (length($trialunit->{'TrialUnitEntryId'}) == 0) {
 
-      if (defined $trialunit->{"TrialUnit${dimension}"}) {
+          my $err_msg = "TrialUnitEntryId is missing while EntryId is defined.";
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
-        if (length($trialunit->{"TrialUnit${dimension}"}) > 0) {
+          return 1;
+        }
+        else {
 
-          $dimension_provided = 1;
+          if ( $force == 0 ) {
 
-          my $dimension_val = $trialunit->{"TrialUnit${dimension}"};
+            my $entry_id = $trialunit->{'TrialUnitEntryId'};
 
-          push(@dimension_val_list, $dimension_val);
-          push(@user_dimension_list, $dimension);
-          push(@sql_dimension_list, "TrialUnit${dimension}=?");
+            if (defined $uniq_entry_id_href->{$entry_id}) {
 
-          $unitpos_txt .= $dimension . lc($dimension_val) . "|";
-
-          if ($dimension ne 'Position') {
-
-            if ( $dimension_val !~ /^\d+$/ ) {
-
-              my $err_msg = "TrialUnit${dimension} ($dimension_val): not a positive integer.";
+              my $err_msg = "TrialUnitEntryId ($entry_id): duplicate.";
               $data_for_postrun_href->{'Error'} = 1;
               $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
-              return $data_for_postrun_href;
+              return 1;
+            }
+            else {
+
+              $uniq_entry_id_href->{$entry_id} = 1;
+            }
+
+            $sql = 'SELECT TrialUnitId FROM trialunit WHERE TrialId=? AND TrialUnitEntryId=?';
+
+            my ($r_tu_id_err, $db_trialunit_id) = read_cell($dbh_k_write, $sql, [$trial_id, $entry_id]);
+
+            if ($r_tu_id_err) {
+
+              my $err_msg = "Unexpected Error.";
+              $data_for_postrun_href->{'Error'} = 1;
+              $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+              return 1;
+            }
+
+            if (length($db_trialunit_id) > 0) {
+
+              my $err_msg = "TrialUnitEntryId ($entry_id) is already used.";
+              $data_for_postrun_href->{'Error'} = 1;
+              $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+              return 1;
             }
           }
         }
       }
-    }
 
-    if ($dimension_provided == 0) {
+      my $unitpos_txt        = '';
+      my $dimension_provided = 0;
+      my @dimension_val_list;
+      my @user_dimension_list;
+      my @sql_dimension_list;
 
-      my $err_msg = "No dimension value provided.";
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+      for my $dimension (@dimension_list) {
 
-      return $data_for_postrun_href;
-    }
+        if (defined $trialunit->{"TrialUnit${dimension}"}) {
 
-    if (defined $uniq_unitposition->{$unitpos_txt}) {
+          if (length($trialunit->{"TrialUnit${dimension}"}) > 0) {
 
-      my $err_msg = "Dimension (" . join(',', @user_dimension_list) . ") value (" . join(',', @dimension_val_list) . '): ';
-      $err_msg   .= 'duplicate.';
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+            $dimension_provided = 1;
 
-      return $data_for_postrun_href;
-    }
-    else {
+            my $dimension_val = $trialunit->{"TrialUnit${dimension}"};
 
-      $uniq_unitposition->{$unitpos_txt} = 1;
-    }
+            push(@dimension_val_list, $dimension_val);
+            push(@user_dimension_list, $dimension);
+            push(@sql_dimension_list, "TrialUnit${dimension}=?");
 
-    $sql = 'SELECT TrialUnitId FROM trialunit WHERE TrialId=? AND ' . join(' AND ', @sql_dimension_list);
+            $unitpos_txt .= $dimension . lc($dimension_val) . "|";
 
-    my ($r_tu_id_err, $db_trialunit_id) = read_cell($dbh_k_write, $sql, [$trial_id, @dimension_val_list]);
+            if ($dimension ne 'Position') {
 
-    if ($r_tu_id_err) {
+              if ( $dimension_val !~ /^\d+$/ ) {
 
-      my $err_msg = "Unexpected Error.";
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+                my $err_msg = "TrialUnit${dimension} ($dimension_val): not a positive integer.";
+                $data_for_postrun_href->{'Error'} = 1;
+                $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
-      return $data_for_postrun_href;
-    }
-
-    if (length($db_trialunit_id) > 0) {
-
-      my $err_msg = "Dimension (" . join(',', @user_dimension_list) . ") value (" . join(',', @dimension_val_list) . '): ';
-      $err_msg   .= 'already used.';
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-      return $data_for_postrun_href;
-    }
-
-    if ( !(defined($trialunit->{'trialunitspecimen'})) ) {
-
-      my $err_msg = "Missing trialunitspecimen.";
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'uploadfile' => $err_msg}]};
-
-      return $data_for_postrun_href;
-    }
-    elsif (ref($trialunit->{'trialunitspecimen'}) eq 'HASH') {
-
-      my $tu_spec_href = $trialunit->{'trialunitspecimen'};
-      my $tu_spec_aref = [];
-      push(@{$tu_spec_aref}, $tu_spec_href);
-      $trialunit->{'trialunitspecimen'} = $tu_spec_aref;
-    }
-
-    my $trialunit_location = '';
-
-    if (length($trialunit->{'trialunitlocation'}) > 0) {
-
-      $trialunit_location = $trialunit->{'trialunitlocation'};
-      my ($is_wkt_err, $wkt_err_href) = is_valid_wkt_href($dbh_gis_write,
-                                                          {'trialunitlocation' => $trialunit_location},
-                                                          'POINT');
-
-      if ($is_wkt_err) {
-
-        $self->logger->debug("Trial unit location: $trialunit_location");
-
-        $data_for_postrun_href->{'Error'} = 1;
-        $data_for_postrun_href->{'Data'}  = {'Error' => [$wkt_err_href]};
-
-        return $data_for_postrun_href;
-      }
-
-      $trialunit_location = $trialunit->{'trialunitlocation'};
-    }
-
-    my $tu_specimen_aref = $trialunit->{'trialunitspecimen'};
-
-    my @geno_id_list;
-
-    my $uniq_spec_href = {};
-
-    for my $trialunitspecimen (@{$tu_specimen_aref}) {
-
-      my $specimen_id = $trialunitspecimen->{'SpecimenId'};
-
-      my $spec_num = 0;
-
-      if (defined $trialunitspecimen->{'SpecimenNumber'}) {
-
-        if (length($trialunitspecimen->{'SpecimenNumber'}) > 0) {
-
-          $spec_num = $trialunitspecimen->{'SpecimenNumber'};
+                return 1;
+              }
+            }
+          }
         }
       }
 
-      if (defined $uniq_spec_href->{"${specimen_id}_${spec_num}"}) {
+      if ($dimension_provided == 0) {
 
-        my $err_msg = "Specimen ($specimen_id, $spec_num): duplicate.";
-
+        my $err_msg = "No dimension value provided.";
         $data_for_postrun_href->{'Error'} = 1;
         $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
-        return $data_for_postrun_href;
+        return $1;
+      }
+
+      if (defined $uniq_unitposition->{$unitpos_txt}) {
+
+        my $err_msg = "Dimension (" . join(',', @user_dimension_list) . ") value (" . join(',', @dimension_val_list) . '): ';
+        $err_msg   .= 'duplicate.';
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+        return 1;
       }
       else {
 
-        $uniq_spec_href->{"${specimen_id}_${spec_num}"} = 1;
+        $uniq_unitposition->{$unitpos_txt} = 1;
       }
 
-      $sql = 'SELECT GenotypeId FROM genotypespecimen WHERE SpecimenId=?';
-      my $sth = $dbh_k_write->prepare($sql);
-      $sth->execute($specimen_id);
-      my $genotype_id_href = $sth->fetchall_hashref('GenotypeId');
-      $sth->finish();
+      $sql = 'SELECT TrialUnitId FROM trialunit WHERE TrialId=? AND ' . join(' AND ', @sql_dimension_list);
 
-      my @geno_id = keys(%{$genotype_id_href});
-      if (scalar(@geno_id) == 0) {
+      my ($r_tu_id_err, $db_trialunit_id) = read_cell($dbh_k_write, $sql, [$trial_id, @dimension_val_list]);
 
-        my $err_msg = "Specimen ($specimen_id) does not exist.";
+      if ($r_tu_id_err) {
+
+        my $err_msg = "Unexpected Error.";
         $data_for_postrun_href->{'Error'} = 1;
         $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
-        return $data_for_postrun_href;
+        return 1;
       }
 
-      my $item_id = undef;
+      if (length($db_trialunit_id) > 0) {
 
-      if (length($trialunitspecimen->{'ItemId'}) > 0) {
+        my $err_msg = "Dimension (" . join(',', @user_dimension_list) . ") value (" . join(',', @dimension_val_list) . '): ';
+        $err_msg   .= 'already used.';
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
-        $item_id = $trialunitspecimen->{'ItemId'};
+        return 1;
       }
 
-      if ( defined $item_id ) {
+      if ( !(defined($trialunit->{'trialunitspecimen'})) ) {
 
-        my $item_existence = record_existence($dbh_k_write, 'item', 'ItemId', $item_id);
+        my $err_msg = "Missing trialunitspecimen.";
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'uploadfile' => $err_msg}]};
 
-        if (!$item_existence) {
+        return 1;
+      }
+      elsif (ref($trialunit->{'trialunitspecimen'}) eq 'HASH') {
 
-          my $err_msg = "Item ($item_id) does not exist.";
+        my $tu_spec_href = $trialunit->{'trialunitspecimen'};
+        my $tu_spec_aref = [];
+        push(@{$tu_spec_aref}, $tu_spec_href);
+        $trialunit->{'trialunitspecimen'} = $tu_spec_aref;
+      }
+
+      my $trialunit_location = '';
+
+      if (length($trialunit->{'trialunitlocation'}) > 0) {
+
+        $trialunit_location = $trialunit->{'trialunitlocation'};
+        my ($is_wkt_err, $wkt_err_href) = is_valid_wkt_href($dbh_gis_write,
+                                                            {'trialunitlocation' => $trialunit_location},
+                                                            'POINT');
+
+        if ($is_wkt_err) {
+
+          $self->logger->debug("Trial unit location: $trialunit_location");
+
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [$wkt_err_href]};
+
+          return 1;
+        }
+
+        $trialunit_location = $trialunit->{'trialunitlocation'};
+      }
+
+      my $tu_specimen_aref = $trialunit->{'trialunitspecimen'};
+
+      my @geno_id_list;
+
+      my $uniq_spec_href = {};
+
+      for my $trialunitspecimen (@{$tu_specimen_aref}) {
+
+        my $specimen_id = $trialunitspecimen->{'SpecimenId'};
+
+        my $spec_num = 0;
+
+        if (defined $trialunitspecimen->{'SpecimenNumber'}) {
+
+          if (length($trialunitspecimen->{'SpecimenNumber'}) > 0) {
+
+            $spec_num = $trialunitspecimen->{'SpecimenNumber'};
+          }
+        }
+
+        if (defined $uniq_spec_href->{"${specimen_id}_${spec_num}"}) {
+
+          my $err_msg = "Specimen ($specimen_id, $spec_num): duplicate.";
+
           $data_for_postrun_href->{'Error'} = 1;
           $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
-          return $data_for_postrun_href;
+          return 1;
         }
-      }
+        else {
 
-      push(@geno_id_list, @geno_id);
-
-      my $plant_date = $trialunitspecimen->{'PlantDate'};
-
-      if (length($plant_date) > 0 && (!($plant_date =~ /\d{4}\-\d{2}\-\d{2}/))) {
-
-        my $err_msg = "PlantDate ($plant_date) is not an acceptable date: yyyy-mm-dd";
-        $data_for_postrun_href->{'Error'} = 1;
-        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-        return $data_for_postrun_href;
-      }
-
-      my $harvest_date = $trialunitspecimen->{'HarvestDate'};
-
-      if (length($harvest_date) > 0 && (!($harvest_date =~ /\d{4}\-\d{2}\-\d{2}/))) {
-
-        my $err_msg = "HarvestDate ($harvest_date) is not an acceptable date: yyyy-mm-dd";
-        $data_for_postrun_href->{'Error'} = 1;
-        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-        return $data_for_postrun_href;
-      }
-
-      my $has_died = $trialunitspecimen->{'HasDied'};
-
-      if (length($has_died) > 0 && (!($has_died =~ /^[0|1]$/))) {
-
-        my $err_msg = "HasDied ($has_died) can be either 1 or 0 only.";
-        $data_for_postrun_href->{'Error'} = 1;
-        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-        return $data_for_postrun_href;
-      }
-    }
-
-    my ($is_geno_ok, $trouble_geno_id_aref) = check_permission($dbh_k_write, 'genotype', 'GenotypeId',
-                                                               \@geno_id_list, $group_id, $gadmin_status,
-                                                               $LINK_PERM);
-
-    if (!$is_geno_ok) {
-
-      my $trouble_geno_id_str = join(',', @{$trouble_geno_id_aref});
-
-      my $perm_err_msg = '';
-      $perm_err_msg   .= "Permission denied: Group ($group_id) and Genotype ($trouble_geno_id_str).";
-
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $perm_err_msg}]};
-
-      return $data_for_postrun_href;
-    }
-  }
-
-  # optimisation starts from here. the optimisation will use TrialUnitBarcode as the key for mapping
-  # the data in memory to the record id inserted into the database after SQL bulk insert. The mapping is
-  # used for trialunitspecimen and triallocation. Since TrialUnitBarcode is not compulsory, DAL will generate
-  # temporary TrialUnitBarcodes if they are not provided in the trialunit data.
-
-  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
-
-  $year = sprintf("%02d", $year % 100);
-  $yday = sprintf("%03d", $yday);
-
-  my $user_id  = sprintf("%02d", $self->authen->user_id());
-
-  my @big_a_z_chars = ("A" .. "Z");
-
-  my $rand3 = $big_a_z_chars[rand(26)] . $big_a_z_chars[rand(26)] . int(rand(10));
-
-  my $dal_tmp_tu_barcode_prefix = qq|TU_${user_id}_${year}${yday}${hour}${min}${sec}_${rand3}_|;
-
-  my @dimension_field_list;
-
-  for my $dimension (@dimension_list) {
-
-    push(@dimension_field_list, "TrialUnit${dimension}");
-  }
-
-  my $bulk_sql = 'INSERT INTO trialunit ';
-  $bulk_sql   .= '(TrialId,TreatmentId,SourceTrialUnitId,ReplicateNumber,TrialUnitBarcode,TrialUnitNote,SampleSupplierID,';
-  $bulk_sql   .= join(',', @dimension_field_list) . ') VALUES ';
-
-  my @tu_sql_rec_list;
-
-  for (my $i = 0; $i < scalar(@{$trialunit_info_aref}); $i++) {
-
-    my $trialunit_rec       = $trialunit_info_aref->[$i];
-
-    my $replicate_number    = $trialunit_rec->{'ReplicateNumber'};
-    my $trial_unit_comment  = $trialunit_rec->{'TrialUnitNote'};
-    my $sample_supplier_id  = $trialunit_rec->{'SampleSupplierId'};
-
-    my $src_trial_unit_id   = 'NULL';
-
-    if (length($trialunit_rec->{'SourceTrialUnitId'}) > 0) {
-
-      $src_trial_unit_id   = $trialunit_rec->{'SourceTrialUnitId'};
-    }
-
-    my $treatment_id        = 'NULL';
-
-    if (length($trialunit_rec->{'TreatmentId'}) > 0) {
-
-      $treatment_id = $trialunit_rec->{'TreatmentId'};
-    }
-
-    my @sql_dimension_list;
-
-    for my $dimension (@dimension_list) {
-
-      if (length($trialunit_rec->{"TrialUnit${dimension}"}) > 0) {
-
-        my $dimension_val = $trialunit_rec->{"TrialUnit${dimension}"};
-
-        if ($dimension_val !~ /^\d+$/) {
-
-          $dimension_val = $dbh_k_write->quote($dimension_val);
+          $uniq_spec_href->{"${specimen_id}_${spec_num}"} = 1;
         }
 
-        push(@sql_dimension_list, $dimension_val);
-      }
-      else {
-
-        push(@sql_dimension_list, 'NULL');
-      }
-    }
-
-    my $tu_barcode = $dal_tmp_tu_barcode_prefix . $i;
-
-    if (length($trialunit_rec->{'TrialUnitBarcode'}) == 0) {
-
-      $trialunit_rec->{'TrialUnitBarcode'} = $tu_barcode;
-      $trialunit_rec->{'RemoveBarcode'}    = 1;
-    }
-    else {
-
-      $tu_barcode = $trialunit_rec->{'TrialUnitBarcode'};
-      $trialunit_rec->{'RemoveBarcode'}    = 0;
-    }
-
-    my $tu_sql_rec_str = qq|(${trial_id},${treatment_id},${src_trial_unit_id},${replicate_number},'${tu_barcode}','${trial_unit_comment}',${sample_supplier_id},|;
-    $tu_sql_rec_str   .= join(',', @sql_dimension_list) . ')';
-
-    $self->logger->debug("Trial Unit Rec SQL: $tu_sql_rec_str");
-
-    push(@tu_sql_rec_list, $tu_sql_rec_str);
-
-    $trialunit_info_aref->[$i] = $trialunit_rec;
-  }
-
-  $bulk_sql .= join(',', @tu_sql_rec_list);
-
-  $sql = 'SELECT TrialUnitId FROM trialunit ORDER BY TrialUnitId DESC LIMIT 1';
-
-  my $r_tu_err;
-  my $tu_id_before;
-  my $tu_id_after;
-
-  ($r_tu_err, $tu_id_before) = read_cell($dbh_k_write, $sql, []);
-
-  if ($r_tu_err) {
-
-    $self->logger->debug("Read TrialUnitId before bulk INSERT failed");
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-    return $data_for_postrun_href;
-  }
-
-  my $before_clause = '1=1';
-
-  if (length($tu_id_before) > 0) {
-
-    $before_clause = " TrialUnitId >= $tu_id_before ";
-  }
-
-  $self->logger->debug("BULK SQL: $bulk_sql");
-
-  my $sth = $dbh_k_write->prepare($bulk_sql);
-  $sth->execute();
-
-  if ($dbh_k_write->err()) {
-
-    $self->logger->debug("Add trialunit in bulk failed");
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-    return $data_for_postrun_href;
-  }
-
-  $sth->finish();
-
-  $sql = 'SELECT TrialUnitId FROM trialunit ORDER BY TrialUnitId DESC LIMIT 1';
-
-  ($r_tu_err, $tu_id_after) = read_cell($dbh_k_write, $sql, []);
-
-  if ($r_tu_err) {
-
-    $self->logger->debug("Read TrialUnitId after bulk INSERT failed");
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-    return $data_for_postrun_href;
-  }
-
-  my $after_clause = '1=1';
-
-  if (length($tu_id_after) > 0) {
-
-    $after_clause = " TrialUnitId <= $tu_id_after ";
-  }
-
-  $sql  = 'SELECT TrialUnitId, TrialUnitBarcode FROM trialunit ';
-  $sql .= "WHERE $before_clause AND $after_clause";
-
-  $self->logger->debug("SQL: $sql");
-
-  $sth = $dbh_k_write->prepare($sql);
-  $sth->execute();
-
-  if ($dbh_k_write->err()) {
-
-    $self->logger->debug("Read TrialUnit in between before and after BULK insert");
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-    return $data_for_postrun_href;
-  }
-
-  my $barcode2id_href = $sth->fetchall_hashref('TrialUnitBarcode');
-
-  if ($sth->err()) {
-
-    $self->logger->debug("Read TrialUnit rec into hash lookup in between before and after BULK insert");
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-    return $data_for_postrun_href;
-  }
-
-  for (my $i = 0; $i < scalar(@{$trialunit_info_aref}); $i++) {
-
-    my $trialunit  = $trialunit_info_aref->[$i];
-    my $tu_barcode = $trialunit->{'TrialUnitBarcode'};
-
-    if (!(defined $barcode2id_href->{$tu_barcode})) {
-
-      $self->logger->debug("Missing TrialUnit barcode lookup");
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-      return $data_for_postrun_href;
-    }
-
-    my $tu_id = $barcode2id_href->{$tu_barcode}->{'TrialUnitId'};
-
-    $self->logger->debug("Barcode: $tu_barcode - ID: $tu_id");
-
-    $trialunit->{'TrialUnitId'} = $tu_id;
-
-    $trialunit_info_aref->[$i] = $trialunit;
-  }
-
-  $bulk_sql  = 'INSERT INTO trialunitspecimen';
-  $bulk_sql .= '(TrialUnitId,SpecimenId,ItemId,PlantDate,HarvestDate,HasDied,Notes,SpecimenNumber,TUSLabel) ';
-  $bulk_sql .= 'VALUES';
-
-  my $tu_loc_bulk_sql = 'INSERT INTO trialunitloc (trialunitid, trialunitlocation) VALUES';
-
-  my @tu_spec_sql_list;
-  my @tu_loc_sql_list;
-
-  foreach my $trialunit (@{$trialunit_info_aref}) {
-
-    my $trialunit_id        = $trialunit->{'TrialUnitId'};
-    my $trialunit_location  = $trialunit->{'trialunitlocation'};
-
-    my $tu_specimen_aref = $trialunit->{'trialunitspecimen'};
-
-    for my $trialunitspecimen (@{$tu_specimen_aref}) {
-
-      my $specimen_id  = $trialunitspecimen->{'SpecimenId'};
-
-      my $spec_num = 0;
-
-      if (defined $trialunitspecimen->{'SpecimenNumber'}) {
-
-        if (length($trialunitspecimen->{'SpecimenNumber'}) > 0) {
-
-          $spec_num = $trialunitspecimen->{'SpecimenNumber'};
+        $sql = 'SELECT GenotypeId FROM genotypespecimen WHERE SpecimenId=?';
+        my $sth = $dbh_k_write->prepare($sql);
+        $sth->execute($specimen_id);
+        my $genotype_id_href = $sth->fetchall_hashref('GenotypeId');
+        $sth->finish();
+
+        my @geno_id = keys(%{$genotype_id_href});
+        if (scalar(@geno_id) == 0) {
+
+          my $err_msg = "Specimen ($specimen_id) does not exist.";
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+          return 1;
         }
-      }
 
-      my $item_id      = 'NULL';
-      my $plant_date   = 'NULL';
-      my $harvest_date = 'NULL';
-      my $has_died     = 'NULL';
-      my $notes        = 'NULL';
-      my $tus_label    = 'NULL';
+        my $item_id = undef;
 
-      if (defined $trialunitspecimen->{'ItemId'}) {
-
-        if ( length($trialunitspecimen->{'ItemId'}) > 0 ) {
+        if (length($trialunitspecimen->{'ItemId'}) > 0) {
 
           $item_id = $trialunitspecimen->{'ItemId'};
         }
-      }
 
-      if (defined $trialunitspecimen->{'PlantDate'}) {
+        if ( defined $item_id ) {
 
-        if ( length($trialunitspecimen->{'PlantDate'}) > 0 ) {
+          my $item_existence = record_existence($dbh_k_write, 'item', 'ItemId', $item_id);
 
-          $plant_date = $dbh_k_write->quote($trialunitspecimen->{'PlantDate'});
+          if (!$item_existence) {
+
+            my $err_msg = "Item ($item_id) does not exist.";
+            $data_for_postrun_href->{'Error'} = 1;
+            $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+            return 1;
+          }
+        }
+
+        push(@geno_id_list, @geno_id);
+
+        my $plant_date = $trialunitspecimen->{'PlantDate'};
+
+        if (length($plant_date) > 0 && (!($plant_date =~ /\d{4}\-\d{2}\-\d{2}/))) {
+
+          my $err_msg = "PlantDate ($plant_date) is not an acceptable date: yyyy-mm-dd";
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+          return 1;
+        }
+
+        my $harvest_date = $trialunitspecimen->{'HarvestDate'};
+
+        if (length($harvest_date) > 0 && (!($harvest_date =~ /\d{4}\-\d{2}\-\d{2}/))) {
+
+          my $err_msg = "HarvestDate ($harvest_date) is not an acceptable date: yyyy-mm-dd";
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+          return 1;
+        }
+
+        my $has_died = $trialunitspecimen->{'HasDied'};
+
+        if (length($has_died) > 0 && (!($has_died =~ /^[0|1]$/))) {
+
+          my $err_msg = "HasDied ($has_died) can be either 1 or 0 only.";
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+          return 1;
         }
       }
 
-      if (defined $trialunitspecimen->{'HarvestDate'}) {
+      my ($is_geno_ok, $trouble_geno_id_aref) = check_permission($dbh_k_write, 'genotype', 'GenotypeId',
+                                                                \@geno_id_list, $group_id, $gadmin_status,
+                                                                $LINK_PERM);
 
-        if ( length($trialunitspecimen->{'HarvestDate'}) > 0 ) {
+      if (!$is_geno_ok) {
 
-          $harvest_date = $dbh_k_write->quote($trialunitspecimen->{'HarvestDate'});
-        }
+        my $trouble_geno_id_str = join(',', @{$trouble_geno_id_aref});
+
+        my $perm_err_msg = '';
+        $perm_err_msg   .= "Permission denied: Group ($group_id) and Genotype ($trouble_geno_id_str).";
+
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $perm_err_msg}]};
+
+        return 1;
       }
-
-      if (defined $trialunitspecimen->{'HasDied'}) {
-
-        if ( length($trialunitspecimen->{'HasDied'}) > 0 ) {
-
-          $has_died = $trialunitspecimen->{'HasDied'};
-        }
-      }
-
-      if (defined $trialunitspecimen->{'Notes'}) {
-
-        if ( length($trialunitspecimen->{'Notes'}) > 0 ) {
-
-          $notes = $dbh_k_write->quote($trialunitspecimen->{'Notes'});
-        }
-      }
-
-      if (defined $trialunitspecimen->{'TUSLabel'}) {
-
-        if ( length($trialunitspecimen->{'TUSLabel'}) > 0 ) {
-
-          $tus_label = $dbh_k_write->quote($trialunitspecimen->{'TUSLabel'});
-        }
-      }
-
-      my $tu_spec_rec_str = qq|(${trialunit_id},${specimen_id},${item_id},${plant_date},${harvest_date},${has_died},${notes},${spec_num},${tus_label})|;
-
-      push(@tu_spec_sql_list, $tu_spec_rec_str);
     }
 
-    if (length($trialunit_location) > 0) {
+    # optimisation starts from here. the optimisation will use TrialUnitBarcode as the key for mapping
+    # the data in memory to the record id inserted into the database after SQL bulk insert. The mapping is
+    # used for trialunitspecimen and triallocation. Since TrialUnitBarcode is not compulsory, DAL will generate
+    # temporary TrialUnitBarcodes if they are not provided in the trialunit data.
 
-      my $tu_loc_sql_str = qq|(${trialunit_id},ST_ForceCollection(ST_GeomFromText('$trialunit_location', -1)))|;
+    my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
 
-      push(@tu_loc_sql_list, $tu_loc_sql_str);
+    $year = sprintf("%02d", $year % 100);
+    $yday = sprintf("%03d", $yday);
+
+    my $user_id  = sprintf("%02d", $self->authen->user_id());
+
+    my @big_a_z_chars = ("A" .. "Z");
+
+    my $rand3 = $big_a_z_chars[rand(26)] . $big_a_z_chars[rand(26)] . int(rand(10));
+
+    my $dal_tmp_tu_barcode_prefix = qq|TU_${user_id}_${year}${yday}${hour}${min}${sec}_${rand3}_|;
+
+    my @dimension_field_list;
+
+    for my $dimension (@dimension_list) {
+
+      push(@dimension_field_list, "TrialUnit${dimension}");
     }
-  }
 
-  if (scalar(@tu_spec_sql_list) > 0) {
+    my $bulk_sql = 'INSERT INTO trialunit ';
+    # Issue9468
+    # $bulk_sql   .= '(TrialId,TreatmentId,SourceTrialUnitId,ReplicateNumber,TrialUnitBarcode,TrialUnitNote,SampleSupplierID,';
+    $bulk_sql   .= '(TrialId,SourceTrialUnitId,ReplicateNumber,TrialUnitBarcode,TrialUnitNote,SampleSupplierID,';
+    $bulk_sql   .= join(',', @dimension_field_list) . ') VALUES ';
 
-    $bulk_sql .= join(',', @tu_spec_sql_list);
+    my @tu_sql_rec_list;
 
-    $sth = $dbh_k_write->prepare($bulk_sql);
+    for (my $i = 0; $i < scalar(@{$trialunit_info_aref}); $i++) {
+
+      my $trialunit_rec       = $trialunit_info_aref->[$i];
+
+      my $replicate_number    = $trialunit_rec->{'ReplicateNumber'};
+      my $trial_unit_comment  = $trialunit_rec->{'TrialUnitNote'};
+      my $sample_supplier_id  = $trialunit_rec->{'SampleSupplierId'};
+
+      my $src_trial_unit_id   = 'NULL';
+
+      if (length($trialunit_rec->{'SourceTrialUnitId'}) > 0) {
+
+        $src_trial_unit_id   = $trialunit_rec->{'SourceTrialUnitId'};
+      }
+
+      my $treatment_id        = 'NULL';
+
+      if (length($trialunit_rec->{'TreatmentId'}) > 0) {
+
+        $treatment_id = $trialunit_rec->{'TreatmentId'};
+      }
+
+      my @sql_dimension_list;
+
+      for my $dimension (@dimension_list) {
+
+        if (length($trialunit_rec->{"TrialUnit${dimension}"}) > 0) {
+
+          my $dimension_val = $trialunit_rec->{"TrialUnit${dimension}"};
+
+          if ($dimension_val !~ /^\d+$/) {
+
+            $dimension_val = $dbh_k_write->quote($dimension_val);
+          }
+
+          push(@sql_dimension_list, $dimension_val);
+        }
+        else {
+
+          push(@sql_dimension_list, 'NULL');
+        }
+      }
+
+      my $tu_barcode = $dal_tmp_tu_barcode_prefix . $i;
+
+      if (length($trialunit_rec->{'TrialUnitBarcode'}) == 0) {
+
+        $trialunit_rec->{'TrialUnitBarcode'} = $tu_barcode;
+        $trialunit_rec->{'RemoveBarcode'}    = 1;
+      }
+      else {
+
+        $tu_barcode = $trialunit_rec->{'TrialUnitBarcode'};
+        $trialunit_rec->{'RemoveBarcode'}    = 0;
+      }
+
+      # Issue9468
+      my $tu_sql_rec_str = qq|(${trial_id},${src_trial_unit_id},${replicate_number},'${tu_barcode}','${trial_unit_comment}',${sample_supplier_id},|;
+      # my $tu_sql_rec_str = qq|(${trial_id},${treatment_id},${src_trial_unit_id},${replicate_number},'${tu_barcode}','${trial_unit_comment}',${sample_supplier_id},|;
+      $tu_sql_rec_str   .= join(',', @sql_dimension_list) . ')';
+
+      $self->logger->debug("Trial Unit Rec SQL: $tu_sql_rec_str");
+
+      push(@tu_sql_rec_list, $tu_sql_rec_str);
+
+      $trialunit_info_aref->[$i] = $trialunit_rec;
+    }
+
+    $bulk_sql .= join(',', @tu_sql_rec_list);
+
+    $sql = 'SELECT TrialUnitId FROM trialunit ORDER BY TrialUnitId DESC LIMIT 1';
+
+    my $r_tu_err;
+    my $tu_id_before;
+    my $tu_id_after;
+
+    ($r_tu_err, $tu_id_before) = read_cell($dbh_k_write, $sql, []);
+
+    if ($r_tu_err) {
+
+      $self->logger->debug("Read TrialUnitId before bulk INSERT failed");
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return 1;
+    }
+
+    my $before_clause = '1=1';
+
+    if (length($tu_id_before) > 0) {
+
+      $before_clause = " TrialUnitId >= $tu_id_before ";
+    }
+
+    $self->logger->debug("BULK SQL: $bulk_sql");
+
+    my $sth = $dbh_k_write->prepare($bulk_sql);
     $sth->execute();
 
     if ($dbh_k_write->err()) {
 
-      $self->logger->debug("INSERT TrialUnitSpecimen BULK failed");
+      $self->logger->debug("Add trialunit in bulk failed");
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
-      return $data_for_postrun_href;
+      return 1;
     }
 
     $sth->finish();
-  }
 
-  if (scalar(@tu_loc_sql_list) > 0) {
+    $sql = 'SELECT TrialUnitId FROM trialunit ORDER BY TrialUnitId DESC LIMIT 1';
 
-    $tu_loc_bulk_sql .= join(',', @tu_loc_sql_list);
+    ($r_tu_err, $tu_id_after) = read_cell($dbh_k_write, $sql, []);
 
-    $self->logger->debug("TU LOC SQL: $tu_loc_bulk_sql");
+    if ($r_tu_err) {
 
-    $sth = $dbh_gis_write->prepare($tu_loc_bulk_sql);
-    $sth->execute();
-
-    if ($dbh_gis_write->err()) {
-
-      $self->logger->debug("INSERT trialunitlocation BULK failed");
+      $self->logger->debug("Read TrialUnitId after bulk INSERT failed");
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
-      return $data_for_postrun_href;
+      return 1;
     }
 
-    $sth->finish();
-  }
+    my $after_clause = '1=1';
 
-  my @remove_tu_bar_tu_id;
+    if (length($tu_id_after) > 0) {
 
-  foreach my $trialunit (@{$trialunit_info_aref}) {
-
-    if ($trialunit->{'RemoveBarcode'} == 1) {
-
-      push(@remove_tu_bar_tu_id, $trialunit->{'TrialUnitId'});
+      $after_clause = " TrialUnitId <= $tu_id_after ";
     }
-  }
 
-  if (scalar(@remove_tu_bar_tu_id) > 0) {
+    $sql  = 'SELECT TrialUnitId, TrialUnitBarcode FROM trialunit ';
+    $sql .= "WHERE $before_clause AND $after_clause";
 
-    $sql = 'UPDATE trialunit SET TrialUnitBarcode=NULL WHERE TrialUnitId IN (' . join(',', @remove_tu_bar_tu_id) . ')';
+    $self->logger->debug("SQL: $sql");
 
     $sth = $dbh_k_write->prepare($sql);
     $sth->execute();
 
     if ($dbh_k_write->err()) {
 
-      $self->logger->debug("Remove DAL temporary TrialUnitBarcode failed");
+      $self->logger->debug("Read TrialUnit in between before and after BULK insert");
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
-      return $data_for_postrun_href;
+      return 1;
     }
 
-    $sth->finish();
-  }
+    my $barcode2id_href = $sth->fetchall_hashref('TrialUnitBarcode');
 
-  $dbh_k_write->disconnect();
-  $dbh_gis_write->disconnect();
+    if ($sth->err()) {
 
-  my $nb_added_trial_unit = scalar(@{$trialunit_info_aref});
-  my $info_msg = "$nb_added_trial_unit TrialUnits for Trial ($trial_id) have been added successfully.";
+      $self->logger->debug("Read TrialUnit rec into hash lookup in between before and after BULK insert");
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
-  my $info_msg_aref  = [{'Message' => $info_msg}];
+      return 1;
+    }
 
-  $data_for_postrun_href->{'Error'}     = 0;
-  $data_for_postrun_href->{'Data'}      = {'Info' => $info_msg_aref };
-  $data_for_postrun_href->{'ExtraData'} = 0;
+    for (my $i = 0; $i < scalar(@{$trialunit_info_aref}); $i++) {
 
+      my $trialunit  = $trialunit_info_aref->[$i];
+      my $tu_barcode = $trialunit->{'TrialUnitBarcode'};
+
+      if (!(defined $barcode2id_href->{$tu_barcode})) {
+
+        $self->logger->debug("Missing TrialUnit barcode lookup");
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+        return 1;
+      }
+
+      my $tu_id = $barcode2id_href->{$tu_barcode}->{'TrialUnitId'};
+
+      $self->logger->debug("Barcode: $tu_barcode - ID: $tu_id");
+
+      $trialunit->{'TrialUnitId'} = $tu_id;
+
+      $trialunit_info_aref->[$i] = $trialunit;
+    }
+
+    $bulk_sql  = 'INSERT INTO trialunitspecimen';
+    $bulk_sql .= '(TrialUnitId,SpecimenId,ItemId,PlantDate,HarvestDate,HasDied,Notes,SpecimenNumber,TUSLabel) ';
+    $bulk_sql .= 'VALUES';
+
+    my $tu_loc_bulk_sql = 'INSERT INTO trialunitloc (trialunitid, trialunitlocation, trialunitlocdt, currentloc) VALUES';
+
+    my @tu_spec_sql_list;
+    my @tu_loc_sql_list;
+
+    my $current_dt_pg = DateTime::Format::Pg->parse_datetime(DateTime->now());
+
+    foreach my $trialunit (@{$trialunit_info_aref}) {
+
+      my $trialunit_id        = $trialunit->{'TrialUnitId'};
+      my $trialunit_location  = $trialunit->{'trialunitlocation'};
+
+      my $tu_specimen_aref = $trialunit->{'trialunitspecimen'};
+
+      for my $trialunitspecimen (@{$tu_specimen_aref}) {
+
+        my $specimen_id  = $trialunitspecimen->{'SpecimenId'};
+
+        my $spec_num = 0;
+
+        if (defined $trialunitspecimen->{'SpecimenNumber'}) {
+
+          if (length($trialunitspecimen->{'SpecimenNumber'}) > 0) {
+
+            $spec_num = $trialunitspecimen->{'SpecimenNumber'};
+          }
+        }
+
+        my $item_id      = 'NULL';
+        my $plant_date   = 'NULL';
+        my $harvest_date = 'NULL';
+        my $has_died     = 'NULL';
+        my $notes        = 'NULL';
+        my $tus_label    = 'NULL';
+
+        if (defined $trialunitspecimen->{'ItemId'}) {
+
+          if ( length($trialunitspecimen->{'ItemId'}) > 0 ) {
+
+            $item_id = $trialunitspecimen->{'ItemId'};
+          }
+        }
+
+        if (defined $trialunitspecimen->{'PlantDate'}) {
+
+          if ( length($trialunitspecimen->{'PlantDate'}) > 0 ) {
+
+            $plant_date = $dbh_k_write->quote($trialunitspecimen->{'PlantDate'});
+          }
+        }
+
+        if (defined $trialunitspecimen->{'HarvestDate'}) {
+
+          if ( length($trialunitspecimen->{'HarvestDate'}) > 0 ) {
+
+            $harvest_date = $dbh_k_write->quote($trialunitspecimen->{'HarvestDate'});
+          }
+        }
+
+        if (defined $trialunitspecimen->{'HasDied'}) {
+
+          if ( length($trialunitspecimen->{'HasDied'}) > 0 ) {
+
+            $has_died = $trialunitspecimen->{'HasDied'};
+          }
+        }
+
+        if (defined $trialunitspecimen->{'Notes'}) {
+
+          if ( length($trialunitspecimen->{'Notes'}) > 0 ) {
+
+            $notes = $dbh_k_write->quote($trialunitspecimen->{'Notes'});
+          }
+        }
+
+        if (defined $trialunitspecimen->{'TUSLabel'}) {
+
+          if ( length($trialunitspecimen->{'TUSLabel'}) > 0 ) {
+
+            $tus_label = $dbh_k_write->quote($trialunitspecimen->{'TUSLabel'});
+          }
+        }
+
+        my $tu_spec_rec_str = qq|(${trialunit_id},${specimen_id},${item_id},${plant_date},${harvest_date},${has_died},${notes},${spec_num},${tus_label})|;
+
+        push(@tu_spec_sql_list, $tu_spec_rec_str);
+      }
+
+      if (length($trialunit_location) > 0) {
+
+        my $tu_loc_sql_str = qq|(${trialunit_id},ST_ForceCollection(ST_GeomFromText('$trialunit_location', -1)), '${current_dt_pg}', 0)|;
+
+        push(@tu_loc_sql_list, $tu_loc_sql_str);
+      }
+    }
+
+    if (scalar(@tu_spec_sql_list) > 0) {
+
+      $bulk_sql .= join(',', @tu_spec_sql_list);
+
+      $sth = $dbh_k_write->prepare($bulk_sql);
+      $sth->execute();
+
+      if ($dbh_k_write->err()) {
+
+        $self->logger->debug("INSERT TrialUnitSpecimen BULK failed");
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+        return 1;
+      }
+
+      $sth->finish();
+    }
+
+    if (scalar(@tu_loc_sql_list) > 0) {
+
+      $tu_loc_bulk_sql .= join(',', @tu_loc_sql_list);
+
+      $self->logger->debug("TU LOC SQL: $tu_loc_bulk_sql");
+
+      $sth = $dbh_gis_write->prepare($tu_loc_bulk_sql);
+      $sth->execute();
+
+      if ($dbh_gis_write->err()) {
+
+        $self->logger->debug("INSERT trialunitlocation BULK failed");
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+        return 1;
+      }
+
+      $sth->finish();
+    }
+
+    my @remove_tu_bar_tu_id;
+
+    foreach my $trialunit (@{$trialunit_info_aref}) {
+
+      if ($trialunit->{'RemoveBarcode'} == 1) {
+
+        push(@remove_tu_bar_tu_id, $trialunit->{'TrialUnitId'});
+      }
+    }
+
+    if (scalar(@remove_tu_bar_tu_id) > 0) {
+
+      $sql = 'UPDATE trialunit SET TrialUnitBarcode=NULL WHERE TrialUnitId IN (' . join(',', @remove_tu_bar_tu_id) . ')';
+
+      $sth = $dbh_k_write->prepare($sql);
+      $sth->execute();
+
+      if ($dbh_k_write->err()) {
+
+        $self->logger->debug("Remove DAL temporary TrialUnitBarcode failed");
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+        return 1;
+      }
+
+      $sth->finish();
+    }
+    
+    # Issue9468
+    $bulk_sql = 'INSERT INTO trialunittreatment';
+    $bulk_sql .= '(TreatmentId, TrialUnitId) ';
+    $bulk_sql .= 'VALUES';
+
+    my @tut_sql_list;
+
+    foreach my $trialunit (@{$trialunit_info_aref}) {
+
+        my $treatment_id = $trialunit->{'TreatmentId'};
+        my $trialunit_id = $trialunit->{'TrialUnitId'};
+
+        if (length($treatment_id) > 0) {
+            my $tut_sql_str = qq|($treatment_id, $trialunit_id)|;
+            push(@tut_sql_list, $tut_sql_str);
+        }
+    }
+
+    if (scalar(@tut_sql_list) > 0) {
+        $bulk_sql .= join(',', @tut_sql_list);
+        $sth = $dbh_k_write->prepare($bulk_sql);
+        $sth->execute();
+        if ($dbh_k_write->err()) {
+            $self->logger->debug("INSERT TrialUnitTreatment BULK failed");
+            $data_for_postrun_href->{'Error'} = 1;
+            $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+            return 1;
+        }
+        $sth->finish();
+    }
+
+    $dbh_k_write->commit;
+
+    my $nb_added_trial_unit = scalar(@{$trialunit_info_aref});
+    my $info_msg = "$nb_added_trial_unit TrialUnits for Trial ($trial_id) have been added successfully.";
+
+    my $info_msg_aref  = [{'Message' => $info_msg}];
+
+    $data_for_postrun_href->{'Error'}     = 0;
+    $data_for_postrun_href->{'Data'}      = {'Info' => $info_msg_aref };
+    $data_for_postrun_href->{'ExtraData'} = 0;
+
+    1;
+  } or do {
+    $self->logger->debug($@);
+    eval {$dbh_k_write->rollback;};
+    $data_for_postrun_href = $self->_set_error();
+  };
+
+  $dbh_k_write->disconnect;
+  $dbh_gis_write->disconnect;
   return $data_for_postrun_href;
 }
 
@@ -3691,16 +3747,16 @@ sub update_site_geography_runmode {
 
       my $st_buffer_val = $POINT2POLYGON_BUFFER4SITE->{$ENV{DOCUMENT_ROOT}};
 
-      $sql  = "INSERT INTO siteloc (siteid, sitelocation) ";
-      $sql .= "VALUES (?, ST_Multi(ST_Buffer(ST_GeomFromText(?, -1), $st_buffer_val, 1)))";
+      $sql  = "INSERT INTO siteloc (siteid, sitelocation, sitelocdt, currentloc) ";
+      $sql .= "VALUES (?, ST_Multi(ST_Buffer(ST_GeomFromText(?, -1), $st_buffer_val, 1)), ?, ?)";
     }
     else {
 
-      $sql  = 'INSERT INTO siteloc (siteid, sitelocation) ';
-      $sql .= 'VALUES (?, ST_Multi(ST_GeomFromText(?, -1)))';
+      $sql  = 'INSERT INTO siteloc (siteid, sitelocation, sitelocdt, currentloc) ';
+      $sql .= 'VALUES (?, ST_Multi(ST_GeomFromText(?, -1)), ?, ?)';
     }
 
-    @sql_arg_list = ($site_id, $site_location);
+    @sql_arg_list = ($site_id, $site_location, DateTime::Format::Pg->parse_datetime(DateTime->now()), 0);
   }
 
   $self->logger->debug("SQL: $sql");
@@ -5822,16 +5878,16 @@ sub update_trial_runmode {
 
         my $st_buffer_val = $POINT2POLYGON_BUFFER4TRIAL->{$ENV{DOCUMENT_ROOT}};
 
-        $trialloc_sql  = "INSERT INTO trialloc (trialid, triallocation) ";
-        $trialloc_sql .= "VALUES (?, ST_Multi(ST_Buffer(ST_GeomFromText(?, -1), $st_buffer_val, 1)))";
+        $trialloc_sql  = "INSERT INTO trialloc (trialid, triallocation, triallocdt, currentloc) ";
+        $trialloc_sql .= "VALUES (?, ST_Multi(ST_Buffer(ST_GeomFromText(?, -1), $st_buffer_val, 1)), ?, ?)";
       }
       else {
 
-        $trialloc_sql  = 'INSERT INTO trialloc (trialid, triallocation) ';
-        $trialloc_sql .= 'VALUES (?, ST_Multi(ST_GeomFromText(?, -1)))';
+        $trialloc_sql  = 'INSERT INTO trialloc (trialid, triallocation, triallocdt, currentloc) ';
+        $trialloc_sql .= 'VALUES (?, ST_Multi(ST_GeomFromText(?, -1)), ?, ?)';
       }
 
-      @sql_arg = ($trial_id, $trial_location);
+      @sql_arg = ($trial_id, $trial_location, DateTime::Format::Pg->parse_datetime(DateTime->now()), 0);
     }
     else {
 
@@ -6018,6 +6074,8 @@ sub update_trial_geography_runmode {
 
   my $postgres_trial_id = read_cell_value($dbh_gis_write, 'trialloc', 'trialid', 'trialid', $trial_id);
 
+  my @sql_arg;
+
   if ($does_actual_update) {
 
     if ($trial_location =~ /^POINT/i) {
@@ -6029,11 +6087,13 @@ sub update_trial_geography_runmode {
         $sql  = "UPDATE trialloc SET ";
         $sql .= "triallocation = ST_Multi(ST_Buffer(ST_GeomFromText(?, -1), $st_buffer_val, 1)) ";
         $sql .= "WHERE trialid=?";
+        @sql_arg = ($trial_location, $trial_id);
       }
       else {
 
-        $sql  = "INSERT INTO trialloc (triallocation, trialid) ";
-        $sql .= "VALUES (ST_Multi(ST_Buffer(ST_GeomFromText(?, -1), $st_buffer_val, 1)), ?)";
+        $sql  = "INSERT INTO trialloc (triallocation, trialid, triallocdt, currentloc) ";
+        $sql .= "VALUES (ST_Multi(ST_Buffer(ST_GeomFromText(?, -1), $st_buffer_val, 1)), ?, ?, ?)";
+        @sql_arg = ($trial_location, $trial_id, DateTime::Format::Pg->parse_datetime(DateTime->now()), 0);
       }
     }
     else {
@@ -6043,16 +6103,18 @@ sub update_trial_geography_runmode {
         $sql  = 'UPDATE trialloc SET ';
         $sql .= 'triallocation = ST_Multi(ST_GeomFromText(?, -1)) ';
         $sql .= 'WHERE trialid=?';
+        @sql_arg = ($trial_location, $trial_id);
       }
       else {
 
-        $sql  = 'INSERT INTO trialloc (triallocation, trialid) ';
-        $sql .= 'VALUES (ST_Multi(ST_GeomFromText(?, -1)), ?)';
+        $sql  = 'INSERT INTO trialloc (triallocation, trialid, triallocdt, currentloc) ';
+        $sql .= 'VALUES (ST_Multi(ST_GeomFromText(?, -1)), ?, ?, ?)';
+        @sql_arg = ($trial_location, $trial_id, DateTime::Format::Pg->parse_datetime(DateTime->now()), 0);
       }
     }
 
     my $gis_sth = $dbh_gis_write->prepare($sql);
-    $gis_sth->execute($trial_location, $trial_id);
+    $gis_sth->execute(@sql_arg);
 
     if ($dbh_gis_write->err()) {
 
@@ -6134,6 +6196,7 @@ sub list_trial_unit {
 
   my $tu_specimen_href = {};
   my $tu_keyword_href  = {};
+  my $tu_treatment_href = {};
 
   if ($extra_attr_yes) {
 
@@ -6213,6 +6276,27 @@ sub list_trial_unit {
 
       ($chk_id_err, $chk_id_msg,
        $used_id_href, $not_used_id_href) = id_existence_bulk($dbh, $chk_table_aref, \@trial_unit_id_list);
+
+      # Issue9468
+      my $tu_treatment_sql = "";
+      $tu_treatment_sql .= "SELECT trialunittreatment.*, treatment.TreatmentText ";
+      $tu_treatment_sql .= "FROM trialunittreatment LEFT JOIN treatment ON ";
+      $tu_treatment_sql .= "trialunittreatment.TreatmentId = treatment.TreatmentId ";
+      $tu_treatment_sql .= 'WHERE TrialUnitId IN (' . join(',', @trial_unit_id_list) . ')';
+      my $tu_tm_data_aref;
+      ($err, $msg, $tu_tm_data_aref) = read_data($dbh, $tu_treatment_sql, []);
+      if ($err) {
+        return ($err, $msg, []);
+      }
+      for my $tu_spec_rec (@{$tu_tm_data_aref}) {
+        my $tu_id = $tu_spec_rec->{'TrialUnitId'};
+        my $treatment_aref = $tu_treatment_href->{$tu_id};
+        if (!defined($treatment_aref)) {
+          $treatment_aref = [];
+          $tu_treatment_href->{$tu_id} = $treatment_aref;
+        }
+        push(@$treatment_aref, $tu_spec_rec);
+      }
     }
   }
 
@@ -6317,6 +6401,11 @@ sub list_trial_unit {
         $row->{'Keyword'} = $keyword_aref;
       }
 
+      if (defined($tu_treatment_href->{$trial_unit_id})) {
+        my $treatment_aref = $tu_treatment_href->{$trial_unit_id};
+        $row->{'Treatment'} = $treatment_aref;
+      }
+
       $row->{'UltimatePermission'} = $perm_lookup->{$permission};
 
       if ( ($permission & $READ_WRITE_PERM) == $READ_WRITE_PERM ) {
@@ -6399,13 +6488,12 @@ sub get_trial_unit_runmode {
 
   my $msg = '';
 
-  $sql    = 'SELECT trialunit.*, treatment.TreatmentText, ';
+  $sql    = 'SELECT trialunit.*, ';
   $sql   .= 'site.SiteName, ';
   $sql   .= "$perm_str AS UltimatePerm ";
   $sql   .= 'FROM trialunit ';
   $sql   .= 'LEFT JOIN trial ON trialunit.TrialId = trial.TrialId ';
   $sql   .= 'LEFT JOIN site ON trial.SiteId = site.SiteId ';
-  $sql   .= 'LEFT JOIN treatment ON trialunit.TreatmentId = treatment.TreatmentId ';
   $sql   .= "WHERE trialunit.TrialUnitId=? AND (($perm_str) & $READ_PERM) = $READ_PERM ";
 
   my ($trial_unit_err, $trial_unit_msg, $trial_unit_data) = $self->list_trial_unit(1, ['LCol*'], $sql, [$trial_unit_id]);
@@ -6482,7 +6570,9 @@ sub update_trial_unit_runmode {
 
   my $dbh_k_write = connect_kdb_write();
 
-  my $read_tr_u_sql    =   'SELECT TrialId, SourceTrialUnitId, SampleSupplierId, TrialUnitNote, TrialUnitBarcode, TreatmentId ';
+  # Issue9468
+  # my $read_tr_u_sql    =   'SELECT TrialId, SourceTrialUnitId, SampleSupplierId, TrialUnitNote, TrialUnitBarcode, TreatmentId ';
+  my $read_tr_u_sql    =   'SELECT TrialId, SourceTrialUnitId, SampleSupplierId, TrialUnitNote, TrialUnitBarcode ';
      $read_tr_u_sql   .=   'FROM trialunit WHERE TrialUnitId=? ';
 
   my ($r_df_val_err, $r_df_val_msg, $trial_u_df_val_data) = read_data($dbh_k_write, $read_tr_u_sql, [$trial_unit_id]);
@@ -6501,7 +6591,8 @@ sub update_trial_unit_runmode {
   my $sample_supplier_id  =  undef;
   my $trial_unit_comment  =  undef;
   my $barcode             =  undef;
-  my $treatment_id        =  undef;
+  # Issue9468
+  # my $treatment_id        =  undef;
 
 
   my $nb_df_val_rec    =  scalar(@{$trial_u_df_val_data});
@@ -6521,7 +6612,7 @@ sub update_trial_unit_runmode {
   $sample_supplier_id  =  $trial_u_df_val_data->[0]->{'SampleSupplierId'};
   $trial_unit_comment  =  $trial_u_df_val_data->[0]->{'TrialUnitNote'};
   $barcode             =  $trial_u_df_val_data->[0]->{'TrialUnitBarcode'};
-  $treatment_id        =  $trial_u_df_val_data->[0]->{'TreatmentId'};
+  # $treatment_id        =  $trial_u_df_val_data->[0]->{'TreatmentId'};
 
 
   if (length($trial_id) == 0) {
@@ -6595,33 +6686,33 @@ sub update_trial_unit_runmode {
   }
 
 
-  if (length($treatment_id) == 0) {
+  # if (length($treatment_id) == 0) {
 
-    $treatment_id = undef;
-  }
+  #   $treatment_id = undef;
+  # }
 
-  if (defined $query->param('TreatmentId')) {
+  # if (defined $query->param('TreatmentId')) {
 
-    if (length($query->param('TreatmentId')) > 0) {
+  #   if (length($query->param('TreatmentId')) > 0) {
 
-      $treatment_id = $query->param('TreatmentId');
-    }
-  }
+  #     $treatment_id = $query->param('TreatmentId');
+  #   }
+  # }
 
 
-  if (defined $treatment_id) {
+  # if (defined $treatment_id) {
 
-    my $treatment_existence = record_existence($dbh_k_write, 'treatment', 'TreatmentId', $treatment_id);
+  #   my $treatment_existence = record_existence($dbh_k_write, 'treatment', 'TreatmentId', $treatment_id);
 
-    if (!$treatment_existence) {
+  #   if (!$treatment_existence) {
 
-      my $err_msg = "Treatment ($treatment_id) does not exist.";
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'TreatmentId' => $err_msg}]};
+  #     my $err_msg = "Treatment ($treatment_id) does not exist.";
+  #     $data_for_postrun_href->{'Error'} = 1;
+  #     $data_for_postrun_href->{'Data'}  = {'Error' => [{'TreatmentId' => $err_msg}]};
 
-      return $data_for_postrun_href;
-    }
-  }
+  #     return $data_for_postrun_href;
+  #   }
+  # }
 
   if ( defined $barcode ) {
 
@@ -6752,13 +6843,16 @@ sub update_trial_unit_runmode {
     return $data_for_postrun_href;
   }
 
-  $self->logger->debug("Parameter list: " . join(',', ($sample_supplier_id, $treatment_id,
-                                                       $replicate_number, $barcode, $trial_unit_comment,
-                                                       $src_trial_unit_id, $trial_unit_id ) ) );
+  # $self->logger->debug("Parameter list: " . join(',', ($sample_supplier_id, $treatment_id,
+  #                                                      $replicate_number, $barcode, $trial_unit_comment,
+  #                                                      $src_trial_unit_id, $trial_unit_id ) ) );
+  $self->logger->debug("Parameter list: " . join(',', ($sample_supplier_id,
+                                                      $replicate_number, $barcode, $trial_unit_comment,
+                                                      $src_trial_unit_id, $trial_unit_id ) ) );
 
   $sql    = 'UPDATE trialunit SET ';
   $sql   .= 'SampleSupplierId=?, ';
-  $sql   .= 'TreatmentId=?, ';
+  # $sql   .= 'TreatmentId=?, ';
   $sql   .= 'ReplicateNumber=?, ';
   $sql   .= 'TrialUnitBarcode=?, ';
   $sql   .= 'TrialUnitNote=?, ';
@@ -6767,7 +6861,7 @@ sub update_trial_unit_runmode {
   $sql   .= ' WHERE TrialUnitId=?';
 
   my $sth = $dbh_k_write->prepare($sql);
-  $sth->execute($sample_supplier_id, $treatment_id, $replicate_number,
+  $sth->execute($sample_supplier_id, $replicate_number,
                 $barcode, $trial_unit_comment, $src_trial_unit_id, @dimension_val_list,
                 $trial_unit_id
                );
@@ -6938,12 +7032,12 @@ sub update_trial_unit_geography_runmode {
     #write new entry
     my $dbh_gis_write = connect_gis_write();
 
-    my $tu_loc_bulk_sql = 'INSERT INTO trialunitloc (trialunitid, trialunitlocation) VALUES (?, ST_ForceCollection(ST_GeomFromText(?, -1)))' ;
+    my $tu_loc_bulk_sql = 'INSERT INTO trialunitloc (trialunitid, trialunitlocation, trialunitlocdt, currentloc) VALUES (?, ST_ForceCollection(ST_GeomFromText(?, -1)), ?, ?)' ;
 
     $self->logger->debug("SQL " .$tu_loc_bulk_sql . " $trial_unit_location and $trial_unit_id");
 
     my $gis_sth = $dbh_gis_write->prepare($tu_loc_bulk_sql);
-    $gis_sth->execute($trial_unit_id, $trial_unit_location);
+    $gis_sth->execute($trial_unit_id, $trial_unit_location, DateTime::Format::Pg->parse_datetime(DateTime->now()), 0);
 
     if ($dbh_gis_write->err()) {
 
@@ -7071,7 +7165,7 @@ sub list_trial_unit_specimen {
 
         if ( $not_used_id_href->{$trial_unit_specimen_id} ) {
 
-          $row->{'remove'} = "remove/trialunitspecimen/$trial_unit_specimen_id";
+          $row->{'remove'} = "delete/trialunitspecimen/$trial_unit_specimen_id";
         }
       }
 
@@ -17058,416 +17152,385 @@ sub update_trial_unit_bulk_runmode {
     return $data_for_postrun_href;
   }
 
-  my $dbh_k_write   = connect_kdb_write();
+  my $dbh_k_write   = connect_kdb_write(1);
   my $dbh_gis_write = connect_gis_write();
 
-  my $trial_existence = record_existence($dbh_k_write, 'trial', 'TrialId', $trial_id);
+  eval {
+    my $trial_existence = record_existence($dbh_k_write, 'trial', 'TrialId', $trial_id);
 
-  if (!$trial_existence) {
+    if (!$trial_existence) {
 
-    my $err_msg = "Trial ($trial_id) does not exist.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+      my $err_msg = "Trial ($trial_id) does not exist.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
-    return $data_for_postrun_href;
-  }
-
-  my $sql = 'SELECT Dimension FROM trialdimension WHERE TrialId=?';
-
-  my ($r_di_err, $r_di_msg, $dimension_aref) = read_data($dbh_k_write, $sql, [$trial_id]);
-
-  if ($r_di_err) {
-
-    $self->logger->debug("Read trial dimension failed: $r_di_msg");
-    my $err_msg = "Unexpected Error.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-    return $data_for_postrun_href;
-  }
-
-  if (scalar(@{$dimension_aref}) == 0) {
-
-    my $err_msg = "Trial ($trial_id): no dimension defined.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-    return $data_for_postrun_href;
-  }
-
-  my @dimension_list;
-  my $dimension_href = {};
-
-  for my $dimension_rec (@{$dimension_aref}) {
-
-    my $dimension_name = $dimension_rec->{'Dimension'};
-
-    $dimension_href->{$dimension_name} = 1;
-    push(@dimension_list, $dimension_name);
-  }
-
-  my ($get_scol_err, $get_scol_msg, $scol_data, $pkey_data) = get_static_field($dbh_k_write, 'trialunit');
-
-  if ($get_scol_err) {
-
-    $self->logger->debug("Get static field info failed: $get_scol_msg");
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
-
-    return $data_for_postrun_href;
-  }
-
-  my $group_id  = $self->authen->group_id();
-  my $gadmin_status = $self->authen->gadmin_status();
-
-  my ($is_trial_ok, $trouble_trial_id_aref) = check_permission($dbh_k_write, 'trial', 'TrialId',
-                                                                 [$trial_id], $group_id, $gadmin_status,
-                                                                 $READ_WRITE_PERM);
-
-  if (!$is_trial_ok) {
-
-    my $trouble_trial_id = $trouble_trial_id_aref->[0];
-
-    my $err_msg = "Permission denied: Group ($group_id) and Trial ($trouble_trial_id).";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-    return $data_for_postrun_href;
-  }
-
-  # Update TULastUpdateTimeStamp
-
-  my $cur_dt = DateTime->now( time_zone => $TIMEZONE );
-  $cur_dt = DateTime::Format::MySQL->format_datetime($cur_dt);
-
-  $sql  = 'UPDATE trial SET ';
-  $sql .= 'TULastUpdateTimeStamp=? ';
-  $sql .= 'WHERE TULastUpdateTimeStamp=? AND TrialId=?';
-
-  my $sth = $dbh_k_write->prepare($sql);
-  $sth->execute($cur_dt ,  $tu_last_update_ts, $trial_id);
-
-  if ( $dbh_k_write->err() ) {
-
-    $self->logger->debug("Update TULastUpdateTimeStamp failed");
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-    return $data_for_postrun_href;
-  }
-
-  my $affected_rows = $sth->rows();
-  $sth->finish();
-
-  if ($affected_rows != 1) {
-
-    $self->logger->debug("Number of affected rows: $affected_rows");
-
-    my $err_msg = "Operation failed due to timestamp mismatched. $tu_last_update_ts vs $cur_dt";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-    return $data_for_postrun_href;
-  }
-
-  $sql  = 'DELETE FROM trialunitspecimen ';
-  $sql .= 'WHERE TrialUnitId IN ';
-  $sql .= '(SELECT TrialUnitId FROM trialunit ';
-  $sql .= 'LEFT JOIN trial on trialunit.TrialId = trial.TrialId ';
-  $sql .= 'WHERE trial.TrialId = ? AND trial.TULastUpdateTimeStamp = ?';
-  $sql .= ')';
-
-  $sth = $dbh_k_write->prepare($sql);
-  $sth->execute( $trial_id, $cur_dt );
-
-  if ( $dbh_k_write->err() ) {
-
-    $self->logger->debug("Delete trialunitspecimen failed");
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-    return $data_for_postrun_href;
-  }
-
-  $affected_rows = $sth->rows();
-  $sth->finish();
-
-  if ($affected_rows < 1) {
-
-    $self->logger->debug("Number of affected rows: $affected_rows");
-
-    my $err_msg = "Operation failed due to timestamp mismatched while deleting trialunitspecimen.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-    return $data_for_postrun_href;
-  }
-
-  $sql  = 'DELETE FROM trialunit ';
-  $sql .= 'WHERE TrialId IN ';
-  $sql .= '(SELECT TrialId FROM trial ';
-  $sql .= 'WHERE TrialId = ? AND TULastUpdateTimeStamp = ?';
-  $sql .= ')';
-
-  $sth = $dbh_k_write->prepare($sql);
-  $sth->execute( $trial_id, $cur_dt );
-
-  if ( $dbh_k_write->err() ) {
-
-    $self->logger->debug("Delete trialunit failed");
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-    return $data_for_postrun_href;
-  }
-
-  $affected_rows = $sth->rows();
-  $sth->finish();
-
-  if ($affected_rows < 1) {
-
-    $self->logger->debug("Number of affected rows: $affected_rows");
-
-    my $err_msg = "Operation failed due to timestamp mismatched while deleting trialunit.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-    return $data_for_postrun_href;
-  }
-
-  my $trialunit_info_xml  = read_file($trialunit_info_xml_file);
-  my $trialunit_info_aref = xml2arrayref($trialunit_info_xml, 'trialunit');
-
-  my $uniq_unitposition  = {};
-  my $uniq_barcode       = {};
-
-  my $uniq_entry_id_href = {};
-  my $uniq_coord_href    = {};
-
-  for my $trialunit (@{$trialunit_info_aref}) {
-
-    my $colsize_info          = {};
-    my $chk_maxlen_field_href = {};
-
-    for my $static_field (@{$scol_data}) {
-
-      my $field_name  = $static_field->{'Name'};
-      my $field_dtype = $static_field->{'DataType'};
-
-      if (lc($field_dtype) eq 'varchar') {
-
-        $colsize_info->{$field_name}           = $static_field->{'ColSize'};
-        $chk_maxlen_field_href->{$field_name}  = $trialunit->{$field_name};
-      }
+      return 1;
     }
 
-    my ($maxlen_err, $maxlen_msg) = check_maxlen($chk_maxlen_field_href, $colsize_info);
+    my $sql = 'SELECT Dimension FROM trialdimension WHERE TrialId=?';
 
-    if ($maxlen_err) {
+    my ($r_di_err, $r_di_msg, $dimension_aref) = read_data($dbh_k_write, $sql, [$trial_id]);
 
-      $maxlen_msg .= 'longer than its maximum length';
+    if ($r_di_err) {
 
-      $data_for_postrun_href->{'Error'}       = 1;
-      $data_for_postrun_href->{'Data'}        = {'Error' => [{'Message' => $maxlen_msg}]};
+      $self->logger->debug("Read trial dimension failed: $r_di_msg");
+      my $err_msg = "Unexpected Error.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
-      return $data_for_postrun_href;
+      return 1;
     }
 
-    my $replicate_number    = $trialunit->{'ReplicateNumber'};
+    if (scalar(@{$dimension_aref}) == 0) {
 
-    my $trial_unit_comment  = '';
+      my $err_msg = "Trial ($trial_id): no dimension defined.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
-    if (length($trialunit->{'TrialUnitNote'}) > 0) {
-
-      $trial_unit_comment = $trialunit->{'TrialUnitNote'};
+      return 1;
     }
 
-    my $sample_supplier_id  = '0';
+    my @dimension_list;
+    my $dimension_href = {};
 
-    if (length($trialunit->{'SampleSupplierId'}) > 0) {
+    for my $dimension_rec (@{$dimension_aref}) {
 
-      $sample_supplier_id = $trialunit->{'SampleSupplierId'};
+      my $dimension_name = $dimension_rec->{'Dimension'};
+
+      $dimension_href->{$dimension_name} = 1;
+      push(@dimension_list, $dimension_name);
     }
 
-    my $treatment_id        = undef;
+    my ($get_scol_err, $get_scol_msg, $scol_data, $pkey_data) = get_static_field($dbh_k_write, 'trialunit');
 
-    if (length($trialunit->{'TreatmentId'}) > 0) {
+    if ($get_scol_err) {
 
-      $treatment_id = $trialunit->{'TreatmentId'};
+      $self->logger->debug("Get static field info failed: $get_scol_msg");
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+      return 1;
     }
 
-    if (defined $treatment_id) {
+    my $group_id  = $self->authen->group_id();
+    my $gadmin_status = $self->authen->gadmin_status();
 
-      my $treatment_existence = record_existence($dbh_k_write, 'treatment', 'TreatmentId', $treatment_id);
+    my ($is_trial_ok, $trouble_trial_id_aref) = check_permission($dbh_k_write, 'trial', 'TrialId',
+                                                                  [$trial_id], $group_id, $gadmin_status,
+                                                                  $READ_WRITE_PERM);
 
-      if (!$treatment_existence) {
+    if (!$is_trial_ok) {
 
-        my $err_msg = "Treatment ($treatment_id) does not exist.";
-        $data_for_postrun_href->{'Error'} = 1;
-        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+      my $trouble_trial_id = $trouble_trial_id_aref->[0];
 
-        return $data_for_postrun_href;
-      }
+      my $err_msg = "Permission denied: Group ($group_id) and Trial ($trouble_trial_id).";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return 1;
     }
 
-    my $src_trial_unit_id = undef;
+    # Update TULastUpdateTimeStamp
 
-    if (length($trialunit->{'SourceTrialUnitId'}) > 0) {
+    my $cur_dt = DateTime->now( time_zone => $TIMEZONE );
+    $cur_dt = DateTime::Format::MySQL->format_datetime($cur_dt);
 
-      $src_trial_unit_id = $trialunit->{'SourceTrialUnitId'};
+    $sql  = 'UPDATE trial SET ';
+    $sql .= 'TULastUpdateTimeStamp=? ';
+    $sql .= 'WHERE TULastUpdateTimeStamp=? AND TrialId=?';
+
+    my $sth = $dbh_k_write->prepare($sql);
+    $sth->execute($cur_dt ,  $tu_last_update_ts, $trial_id);
+
+    if ( $dbh_k_write->err() ) {
+
+      $self->logger->debug("Update TULastUpdateTimeStamp failed");
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return 1;
     }
 
-    if (defined $src_trial_unit_id) {
+    my $affected_rows = $sth->rows();
+    $sth->finish();
 
-      if (!record_existence($dbh_k_write, 'trialunit', 'TrialUnitId', $src_trial_unit_id)) {
+    if ($affected_rows != 1) {
 
-        my $err_msg = "SourceTrialUnitId ($src_trial_unit_id): not found.";
-        $data_for_postrun_href->{'Error'} = 1;
-        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+      $self->logger->debug("Number of affected rows: $affected_rows");
 
-        return $data_for_postrun_href;
-      }
+      my $err_msg = "Operation failed due to timestamp mismatched. $tu_last_update_ts vs $cur_dt";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return 1;
     }
 
-    my $barcode = undef;
+    # Issue9468
+    $sql  = 'DELETE FROM trialunittreatment ';
+    $sql .= 'WHERE TrialUnitId IN ';
+    $sql .= '(SELECT TrialUnitId FROM trialunit ';
+    $sql .= 'LEFT JOIN trial on trialunit.TrialId = trial.TrialId ';
+    $sql .= 'WHERE trial.TrialId = ? AND trial.TULastUpdateTimeStamp = ?';
+    $sql .= ')';
 
-    if (length($trialunit->{'TrialUnitBarcode'}) > 0) {
+    $sth = $dbh_k_write->prepare($sql);
+    $sth->execute( $trial_id, $cur_dt );
 
-      $barcode = $trialunit->{'TrialUnitBarcode'};
+    if ( $dbh_k_write->err() ) {
+
+      $self->logger->debug("Delete trialunittreatment failed");
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return 1;
     }
 
-    if ( defined $barcode ) {
 
-      if (record_existence($dbh_k_write, 'trialunit', 'TrialUnitBarcode', $barcode)) {
 
-        my $err_msg = "TrialUnitBarcode ($barcode): already exists.";
-        $data_for_postrun_href->{'Error'} = 1;
-        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+    $sql  = 'DELETE FROM trialunitspecimen ';
+    $sql .= 'WHERE TrialUnitId IN ';
+    $sql .= '(SELECT TrialUnitId FROM trialunit ';
+    $sql .= 'LEFT JOIN trial on trialunit.TrialId = trial.TrialId ';
+    $sql .= 'WHERE trial.TrialId = ? AND trial.TULastUpdateTimeStamp = ?';
+    $sql .= ')';
 
-        return $data_for_postrun_href;
-      }
+    $sth = $dbh_k_write->prepare($sql);
+    $sth->execute( $trial_id, $cur_dt );
 
-      if (defined $uniq_barcode->{$barcode}) {
+    if ( $dbh_k_write->err() ) {
 
-        my $err_msg = "TrialUnitBarcode ($barcode): duplicate.";
-        $self->logger->debug("TrialUnitBarcode ($barcode) is duplicate in the XML file.");
-        $data_for_postrun_href->{'Error'} = 1;
-        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+      $self->logger->debug("Delete trialunitspecimen failed");
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
-        return $data_for_postrun_href;
-      }
-      else {
-
-        $uniq_barcode->{$barcode} = 1;
-      }
+      return 1;
     }
 
-    if ($force == 0) {
+    $affected_rows = $sth->rows();
+    $sth->finish();
 
-      my $coord_key = '';
-      my @coord_val_list;
-      my @coord_dim_list;
-      my @sql_coord_dim_list;
+    if ($affected_rows < 1) {
 
-      foreach my $dim (('X', 'Y', 'Z')) {
+      $self->logger->debug("Number of affected rows: $affected_rows");
 
-        if (defined $dimension_href->{$dim}) {
+      my $err_msg = "Operation failed due to timestamp mismatched while deleting trialunitspecimen.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
-          if (length($trialunit->{"TrialUnit" . $dim}) == 0) {
+      return 1;
+    }
 
-            my $err_msg = "TrialUnit${dim} is missing while ${dim} dimension is defined.";
-            $data_for_postrun_href->{'Error'} = 1;
-            $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+    $sql  = 'DELETE FROM trialunit ';
+    $sql .= 'WHERE TrialId IN ';
+    $sql .= '(SELECT TrialId FROM trial ';
+    $sql .= 'WHERE TrialId = ? AND TULastUpdateTimeStamp = ?';
+    $sql .= ')';
 
-            return $data_for_postrun_href;
-          }
-          else {
+    $sth = $dbh_k_write->prepare($sql);
+    $sth->execute( $trial_id, $cur_dt );
 
-            my $dim_val = $trialunit->{"TrialUnit" . $dim};
-            $coord_key .= "${dim}${dim_val}";
+    if ( $dbh_k_write->err() ) {
 
-            push(@coord_val_list, $dim_val);
-            push(@coord_dim_list, $dim);
-            push(@sql_coord_dim_list, "TrialUnit${dim}=?");
-          }
+      $self->logger->debug("Delete trialunit failed");
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return 1;
+    }
+
+    $affected_rows = $sth->rows();
+    $sth->finish();
+
+    if ($affected_rows < 1) {
+
+      $self->logger->debug("Number of affected rows: $affected_rows");
+
+      my $err_msg = "Operation failed due to timestamp mismatched while deleting trialunit.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return 1;
+    }
+
+    my $trialunit_info_xml  = read_file($trialunit_info_xml_file);
+    my $trialunit_info_aref = xml2arrayref($trialunit_info_xml, 'trialunit');
+
+    my $uniq_unitposition  = {};
+    my $uniq_barcode       = {};
+
+    my $uniq_entry_id_href = {};
+    my $uniq_coord_href    = {};
+
+    for my $trialunit (@{$trialunit_info_aref}) {
+
+      my $colsize_info          = {};
+      my $chk_maxlen_field_href = {};
+
+      for my $static_field (@{$scol_data}) {
+
+        my $field_name  = $static_field->{'Name'};
+        my $field_dtype = $static_field->{'DataType'};
+
+        if (lc($field_dtype) eq 'varchar') {
+
+          $colsize_info->{$field_name}           = $static_field->{'ColSize'};
+          $chk_maxlen_field_href->{$field_name}  = $trialunit->{$field_name};
         }
       }
 
-      if (scalar(@coord_val_list) > 0) {
+      my ($maxlen_err, $maxlen_msg) = check_maxlen($chk_maxlen_field_href, $colsize_info);
 
-        if (defined $uniq_coord_href->{$coord_key}) {
+      if ($maxlen_err) {
 
-          my $err_msg = "Dimension (" . join(',', @coord_dim_list) . ") value (" . join(',', @coord_val_list) . '): ';
-          $err_msg   .= 'duplicate.';
+        $maxlen_msg .= 'longer than its maximum length';
+
+        $data_for_postrun_href->{'Error'}       = 1;
+        $data_for_postrun_href->{'Data'}        = {'Error' => [{'Message' => $maxlen_msg}]};
+
+        return 1;
+      }
+
+      my $replicate_number    = $trialunit->{'ReplicateNumber'};
+
+      my $trial_unit_comment  = '';
+
+      if (length($trialunit->{'TrialUnitNote'}) > 0) {
+
+        $trial_unit_comment = $trialunit->{'TrialUnitNote'};
+      }
+
+      my $sample_supplier_id  = '0';
+
+      if (length($trialunit->{'SampleSupplierId'}) > 0) {
+
+        $sample_supplier_id = $trialunit->{'SampleSupplierId'};
+      }
+
+      my $treatment_id        = undef;
+
+      if (length($trialunit->{'TreatmentId'}) > 0) {
+
+        $treatment_id = $trialunit->{'TreatmentId'};
+      }
+
+      if (defined $treatment_id) {
+
+        my $treatment_existence = record_existence($dbh_k_write, 'treatment', 'TreatmentId', $treatment_id);
+
+        if (!$treatment_existence) {
+
+          my $err_msg = "Treatment ($treatment_id) does not exist.";
           $data_for_postrun_href->{'Error'} = 1;
           $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
-          return $data_for_postrun_href;
+          return 1;
+        }
+      }
+
+      my $src_trial_unit_id = undef;
+
+      if (length($trialunit->{'SourceTrialUnitId'}) > 0) {
+
+        $src_trial_unit_id = $trialunit->{'SourceTrialUnitId'};
+      }
+
+      if (defined $src_trial_unit_id) {
+
+        if (!record_existence($dbh_k_write, 'trialunit', 'TrialUnitId', $src_trial_unit_id)) {
+
+          my $err_msg = "SourceTrialUnitId ($src_trial_unit_id): not found.";
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+          return 1;
+        }
+      }
+
+      my $barcode = undef;
+
+      if (length($trialunit->{'TrialUnitBarcode'}) > 0) {
+
+        $barcode = $trialunit->{'TrialUnitBarcode'};
+      }
+
+      if ( defined $barcode ) {
+
+        if (record_existence($dbh_k_write, 'trialunit', 'TrialUnitBarcode', $barcode)) {
+
+          my $err_msg = "TrialUnitBarcode ($barcode): already exists.";
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+          return 1;
+        }
+
+        if (defined $uniq_barcode->{$barcode}) {
+
+          my $err_msg = "TrialUnitBarcode ($barcode): duplicate.";
+          $self->logger->debug("TrialUnitBarcode ($barcode) is duplicate in the XML file.");
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+          return 1;
         }
         else {
 
-          $uniq_coord_href->{$coord_key} = 1;
-        }
-
-
-        $sql = 'SELECT TrialUnitId FROM trialunit WHERE TrialId=? AND ' . join(' AND ', @sql_coord_dim_list);
-
-        my ($r_tu_id_err, $db_trialunit_id) = read_cell($dbh_k_write, $sql, [$trial_id, @coord_val_list]);
-
-        if ($r_tu_id_err) {
-
-          my $err_msg = "Unexpected Error.";
-          $data_for_postrun_href->{'Error'} = 1;
-          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-          return $data_for_postrun_href;
-        }
-
-        if (length($db_trialunit_id) > 0) {
-
-          my $err_msg = "Dimension (" . join(',', @coord_dim_list) . ") value (" . join(',', @coord_val_list) . '): ';
-          $err_msg   .= 'already used.';
-          $data_for_postrun_href->{'Error'} = 1;
-          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-          return $data_for_postrun_href;
+          $uniq_barcode->{$barcode} = 1;
         }
       }
-    }
 
-    if (defined $dimension_href->{'EntryId'}) {
+      if ($force == 0) {
 
-      if (length($trialunit->{'TrialUnitEntryId'}) == 0) {
+        my $coord_key = '';
+        my @coord_val_list;
+        my @coord_dim_list;
+        my @sql_coord_dim_list;
 
-        my $err_msg = "TrialUnitEntryId is missing while EntryId is defined.";
-        $data_for_postrun_href->{'Error'} = 1;
-        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+        foreach my $dim (('X', 'Y', 'Z')) {
 
-        return $data_for_postrun_href;
-      }
-      else {
+          if (defined $dimension_href->{$dim}) {
 
-        if ( $force == 0 ) {
+            if (length($trialunit->{"TrialUnit" . $dim}) == 0) {
 
-          my $entry_id = $trialunit->{'TrialUnitEntryId'};
+              my $err_msg = "TrialUnit${dim} is missing while ${dim} dimension is defined.";
+              $data_for_postrun_href->{'Error'} = 1;
+              $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
-          if (defined $uniq_entry_id_href->{$entry_id}) {
+              return 1;
+            }
+            else {
 
-            my $err_msg = "TrialUnitEntryId ($entry_id): duplicate.";
+              my $dim_val = $trialunit->{"TrialUnit" . $dim};
+              $coord_key .= "${dim}${dim_val}";
+
+              push(@coord_val_list, $dim_val);
+              push(@coord_dim_list, $dim);
+              push(@sql_coord_dim_list, "TrialUnit${dim}=?");
+            }
+          }
+        }
+
+        if (scalar(@coord_val_list) > 0) {
+
+          if (defined $uniq_coord_href->{$coord_key}) {
+
+            my $err_msg = "Dimension (" . join(',', @coord_dim_list) . ") value (" . join(',', @coord_val_list) . '): ';
+            $err_msg   .= 'duplicate.';
             $data_for_postrun_href->{'Error'} = 1;
             $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
-            return $data_for_postrun_href;
+            return 1;
           }
           else {
 
-            $uniq_entry_id_href->{$entry_id} = 1;
+            $uniq_coord_href->{$coord_key} = 1;
           }
 
-          $sql = 'SELECT TrialUnitId FROM trialunit WHERE TrialId=? AND TrialUnitEntryId=?';
 
-          my ($r_tu_id_err, $db_trialunit_id) = read_cell($dbh_k_write, $sql, [$trial_id, $entry_id]);
+          $sql = 'SELECT TrialUnitId FROM trialunit WHERE TrialId=? AND ' . join(' AND ', @sql_coord_dim_list);
+
+          my ($r_tu_id_err, $db_trialunit_id) = read_cell($dbh_k_write, $sql, [$trial_id, @coord_val_list]);
 
           if ($r_tu_id_err) {
 
@@ -17475,656 +17538,754 @@ sub update_trial_unit_bulk_runmode {
             $data_for_postrun_href->{'Error'} = 1;
             $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
-            return $data_for_postrun_href;
+            return 1;
           }
 
           if (length($db_trialunit_id) > 0) {
 
-            my $err_msg = "TrialUnitEntryId ($entry_id) is already used.";
+            my $err_msg = "Dimension (" . join(',', @coord_dim_list) . ") value (" . join(',', @coord_val_list) . '): ';
+            $err_msg   .= 'already used.';
             $data_for_postrun_href->{'Error'} = 1;
             $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
-            return $data_for_postrun_href;
+            return 1;
           }
         }
       }
-    }
 
-    my $unitpos_txt        = '';
-    my $dimension_provided = 0;
-    my @dimension_val_list;
-    my @user_dimension_list;
-    my @sql_dimension_list;
+      if (defined $dimension_href->{'EntryId'}) {
 
-    for my $dimension (@dimension_list) {
+        if (length($trialunit->{'TrialUnitEntryId'}) == 0) {
 
-      if (defined $trialunit->{"TrialUnit${dimension}"}) {
+          my $err_msg = "TrialUnitEntryId is missing while EntryId is defined.";
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
-        if (length($trialunit->{"TrialUnit${dimension}"}) > 0) {
+          return 1;
+        }
+        else {
 
-          $dimension_provided = 1;
+          if ( $force == 0 ) {
 
-          my $dimension_val = $trialunit->{"TrialUnit${dimension}"};
+            my $entry_id = $trialunit->{'TrialUnitEntryId'};
 
-          push(@dimension_val_list, $dimension_val);
-          push(@user_dimension_list, $dimension);
-          push(@sql_dimension_list, "TrialUnit${dimension}=?");
+            if (defined $uniq_entry_id_href->{$entry_id}) {
 
-          $unitpos_txt .= $dimension . lc($dimension_val) . "|";
-
-          if ($dimension ne 'Position') {
-
-            if ( $dimension_val !~ /^\d+$/ ) {
-
-              my $err_msg = "TrialUnit${dimension} ($dimension_val): not a positive integer.";
+              my $err_msg = "TrialUnitEntryId ($entry_id): duplicate.";
               $data_for_postrun_href->{'Error'} = 1;
               $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
-              return $data_for_postrun_href;
+              return 1;
+            }
+            else {
+
+              $uniq_entry_id_href->{$entry_id} = 1;
+            }
+
+            $sql = 'SELECT TrialUnitId FROM trialunit WHERE TrialId=? AND TrialUnitEntryId=?';
+
+            my ($r_tu_id_err, $db_trialunit_id) = read_cell($dbh_k_write, $sql, [$trial_id, $entry_id]);
+
+            if ($r_tu_id_err) {
+
+              my $err_msg = "Unexpected Error.";
+              $data_for_postrun_href->{'Error'} = 1;
+              $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+              return 1;
+            }
+
+            if (length($db_trialunit_id) > 0) {
+
+              my $err_msg = "TrialUnitEntryId ($entry_id) is already used.";
+              $data_for_postrun_href->{'Error'} = 1;
+              $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+              return 1;
             }
           }
         }
       }
-    }
 
-    if ($dimension_provided == 0) {
+      my $unitpos_txt        = '';
+      my $dimension_provided = 0;
+      my @dimension_val_list;
+      my @user_dimension_list;
+      my @sql_dimension_list;
 
-      my $err_msg = "No dimension value provided.";
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+      for my $dimension (@dimension_list) {
 
-      return $data_for_postrun_href;
-    }
+        if (defined $trialunit->{"TrialUnit${dimension}"}) {
 
-    if (defined $uniq_unitposition->{$unitpos_txt}) {
+          if (length($trialunit->{"TrialUnit${dimension}"}) > 0) {
 
-      my $err_msg = "Dimension (" . join(',', @user_dimension_list) . ") value (" . join(',', @dimension_val_list) . '): ';
-      $err_msg   .= 'duplicate.';
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+            $dimension_provided = 1;
 
-      return $data_for_postrun_href;
-    }
-    else {
+            my $dimension_val = $trialunit->{"TrialUnit${dimension}"};
 
-      $uniq_unitposition->{$unitpos_txt} = 1;
-    }
+            push(@dimension_val_list, $dimension_val);
+            push(@user_dimension_list, $dimension);
+            push(@sql_dimension_list, "TrialUnit${dimension}=?");
 
-    $sql = 'SELECT TrialUnitId FROM trialunit WHERE TrialId=? AND ' . join(' AND ', @sql_dimension_list);
+            $unitpos_txt .= $dimension . lc($dimension_val) . "|";
 
-    my ($r_tu_id_err, $db_trialunit_id) = read_cell($dbh_k_write, $sql, [$trial_id, @dimension_val_list]);
+            if ($dimension ne 'Position') {
 
-    if ($r_tu_id_err) {
+              if ( $dimension_val !~ /^\d+$/ ) {
 
-      my $err_msg = "Unexpected Error.";
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+                my $err_msg = "TrialUnit${dimension} ($dimension_val): not a positive integer.";
+                $data_for_postrun_href->{'Error'} = 1;
+                $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
-      return $data_for_postrun_href;
-    }
-
-    if (length($db_trialunit_id) > 0) {
-
-      my $err_msg = "Dimension (" . join(',', @user_dimension_list) . ") value (" . join(',', @dimension_val_list) . '): ';
-      $err_msg   .= 'already used.';
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-      return $data_for_postrun_href;
-    }
-
-    if ( !(defined($trialunit->{'trialunitspecimen'})) ) {
-
-      my $err_msg = "Missing trialunitspecimen.";
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'uploadfile' => $err_msg}]};
-
-      return $data_for_postrun_href;
-    }
-    elsif (ref($trialunit->{'trialunitspecimen'}) eq 'HASH') {
-
-      my $tu_spec_href = $trialunit->{'trialunitspecimen'};
-      my $tu_spec_aref = [];
-      push(@{$tu_spec_aref}, $tu_spec_href);
-      $trialunit->{'trialunitspecimen'} = $tu_spec_aref;
-    }
-
-    my $trialunit_location = '';
-
-    if (length($trialunit->{'trialunitlocation'}) > 0) {
-
-      $trialunit_location = $trialunit->{'trialunitlocation'};
-      my ($is_wkt_err, $wkt_err_href) = is_valid_wkt_href($dbh_gis_write,
-                                                          {'trialunitlocation' => $trialunit_location},
-                                                          'POINT');
-
-      if ($is_wkt_err) {
-
-        $self->logger->debug("Trial unit location: $trialunit_location");
-
-        $data_for_postrun_href->{'Error'} = 1;
-        $data_for_postrun_href->{'Data'}  = {'Error' => [$wkt_err_href]};
-
-        return $data_for_postrun_href;
-      }
-
-      $trialunit_location = $trialunit->{'trialunitlocation'};
-    }
-
-    my $tu_specimen_aref = $trialunit->{'trialunitspecimen'};
-
-    my @geno_id_list;
-
-    my $uniq_spec_href = {};
-
-    for my $trialunitspecimen (@{$tu_specimen_aref}) {
-
-      my $specimen_id = $trialunitspecimen->{'SpecimenId'};
-
-      my $spec_num = 0;
-
-      if (defined $trialunitspecimen->{'SpecimenNumber'}) {
-
-        if (length($trialunitspecimen->{'SpecimenNumber'}) > 0) {
-
-          $spec_num = $trialunitspecimen->{'SpecimenNumber'};
+                return 1;
+              }
+            }
+          }
         }
       }
 
-      if (defined $uniq_spec_href->{"${specimen_id}_${spec_num}"}) {
+      if ($dimension_provided == 0) {
 
-        my $err_msg = "Specimen ($specimen_id, $spec_num): duplicate.";
-
+        my $err_msg = "No dimension value provided.";
         $data_for_postrun_href->{'Error'} = 1;
         $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
-        return $data_for_postrun_href;
+        return 1;
+      }
+
+      if (defined $uniq_unitposition->{$unitpos_txt}) {
+
+        my $err_msg = "Dimension (" . join(',', @user_dimension_list) . ") value (" . join(',', @dimension_val_list) . '): ';
+        $err_msg   .= 'duplicate.';
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+        return 1;
       }
       else {
 
-        $uniq_spec_href->{"${specimen_id}_${spec_num}"} = 1;
+        $uniq_unitposition->{$unitpos_txt} = 1;
       }
 
-      $sql = 'SELECT GenotypeId FROM genotypespecimen WHERE SpecimenId=?';
-      my $sth = $dbh_k_write->prepare($sql);
-      $sth->execute($specimen_id);
-      my $genotype_id_href = $sth->fetchall_hashref('GenotypeId');
-      $sth->finish();
+      $sql = 'SELECT TrialUnitId FROM trialunit WHERE TrialId=? AND ' . join(' AND ', @sql_dimension_list);
 
-      my @geno_id = keys(%{$genotype_id_href});
-      if (scalar(@geno_id) == 0) {
+      my ($r_tu_id_err, $db_trialunit_id) = read_cell($dbh_k_write, $sql, [$trial_id, @dimension_val_list]);
 
-        my $err_msg = "Specimen ($specimen_id) does not exist.";
+      if ($r_tu_id_err) {
+
+        my $err_msg = "Unexpected Error.";
         $data_for_postrun_href->{'Error'} = 1;
         $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
-        return $data_for_postrun_href;
+        return 1;
       }
 
-      my $item_id = undef;
+      if (length($db_trialunit_id) > 0) {
 
-      if (length($trialunitspecimen->{'ItemId'}) > 0) {
+        my $err_msg = "Dimension (" . join(',', @user_dimension_list) . ") value (" . join(',', @dimension_val_list) . '): ';
+        $err_msg   .= 'already used.';
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
-        $item_id = $trialunitspecimen->{'ItemId'};
+        return 1;
       }
 
-      if ( defined $item_id ) {
+      if ( !(defined($trialunit->{'trialunitspecimen'})) ) {
 
-        my $item_existence = record_existence($dbh_k_write, 'item', 'ItemId', $item_id);
+        my $err_msg = "Missing trialunitspecimen.";
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'uploadfile' => $err_msg}]};
 
-        if (!$item_existence) {
+        return 1;
+      }
+      elsif (ref($trialunit->{'trialunitspecimen'}) eq 'HASH') {
 
-          my $err_msg = "Item ($item_id) does not exist.";
+        my $tu_spec_href = $trialunit->{'trialunitspecimen'};
+        my $tu_spec_aref = [];
+        push(@{$tu_spec_aref}, $tu_spec_href);
+        $trialunit->{'trialunitspecimen'} = $tu_spec_aref;
+      }
+
+      my $trialunit_location = '';
+
+      if (length($trialunit->{'trialunitlocation'}) > 0) {
+
+        $trialunit_location = $trialunit->{'trialunitlocation'};
+        my ($is_wkt_err, $wkt_err_href) = is_valid_wkt_href($dbh_gis_write,
+                                                            {'trialunitlocation' => $trialunit_location},
+                                                            'POINT');
+
+        if ($is_wkt_err) {
+
+          $self->logger->debug("Trial unit location: $trialunit_location");
+
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [$wkt_err_href]};
+
+          return 1;
+        }
+
+        $trialunit_location = $trialunit->{'trialunitlocation'};
+      }
+
+      my $tu_specimen_aref = $trialunit->{'trialunitspecimen'};
+
+      my @geno_id_list;
+
+      my $uniq_spec_href = {};
+
+      for my $trialunitspecimen (@{$tu_specimen_aref}) {
+
+        my $specimen_id = $trialunitspecimen->{'SpecimenId'};
+
+        my $spec_num = 0;
+
+        if (defined $trialunitspecimen->{'SpecimenNumber'}) {
+
+          if (length($trialunitspecimen->{'SpecimenNumber'}) > 0) {
+
+            $spec_num = $trialunitspecimen->{'SpecimenNumber'};
+          }
+        }
+
+        if (defined $uniq_spec_href->{"${specimen_id}_${spec_num}"}) {
+
+          my $err_msg = "Specimen ($specimen_id, $spec_num): duplicate.";
+
           $data_for_postrun_href->{'Error'} = 1;
           $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
-          return $data_for_postrun_href;
+          return 1;
         }
-      }
+        else {
 
-      push(@geno_id_list, @geno_id);
-
-      my $plant_date = $trialunitspecimen->{'PlantDate'};
-
-      if (length($plant_date) > 0 && (!($plant_date =~ /\d{4}\-\d{2}\-\d{2}/))) {
-
-        my $err_msg = "PlantDate ($plant_date) is not an acceptable date: yyyy-mm-dd";
-        $data_for_postrun_href->{'Error'} = 1;
-        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-        return $data_for_postrun_href;
-      }
-
-      my $harvest_date = $trialunitspecimen->{'HarvestDate'};
-
-      if (length($harvest_date) > 0 && (!($harvest_date =~ /\d{4}\-\d{2}\-\d{2}/))) {
-
-        my $err_msg = "HarvestDate ($harvest_date) is not an acceptable date: yyyy-mm-dd";
-        $data_for_postrun_href->{'Error'} = 1;
-        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-        return $data_for_postrun_href;
-      }
-
-      my $has_died = $trialunitspecimen->{'HasDied'};
-
-      if (length($has_died) > 0 && (!($has_died =~ /^[0|1]$/))) {
-
-        my $err_msg = "HasDied ($has_died) can be either 1 or 0 only.";
-        $data_for_postrun_href->{'Error'} = 1;
-        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-        return $data_for_postrun_href;
-      }
-    }
-
-    my ($is_geno_ok, $trouble_geno_id_aref) = check_permission($dbh_k_write, 'genotype', 'GenotypeId',
-                                                               \@geno_id_list, $group_id, $gadmin_status,
-                                                               $LINK_PERM);
-
-    if (!$is_geno_ok) {
-
-      my $trouble_geno_id_str = join(',', @{$trouble_geno_id_aref});
-
-      my $perm_err_msg = '';
-      $perm_err_msg   .= "Permission denied: Group ($group_id) and Genotype ($trouble_geno_id_str).";
-
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $perm_err_msg}]};
-
-      return $data_for_postrun_href;
-    }
-  }
-
-  # optimisation starts from here. the optimisation will use TrialUnitBarcode as the key for mapping
-  # the data in memory to the record id inserted into the database after SQL bulk insert. The mapping is
-  # used for trialunitspecimen and triallocation. Since TrialUnitBarcode is not compulsory, DAL will generate
-  # temporary TrialUnitBarcodes if they are not provided in the trialunit data.
-
-  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
-
-  $year = sprintf("%02d", $year % 100);
-  $yday = sprintf("%03d", $yday);
-
-  my $user_id  = sprintf("%02d", $self->authen->user_id());
-
-  my @big_a_z_chars = ("A" .. "Z");
-
-  my $rand3 = $big_a_z_chars[rand(26)] . $big_a_z_chars[rand(26)] . int(rand(10));
-
-  my $dal_tmp_tu_barcode_prefix = qq|TU_${user_id}_${year}${yday}${hour}${min}${sec}_${rand3}_|;
-
-  my @dimension_field_list;
-
-  for my $dimension (@dimension_list) {
-
-    push(@dimension_field_list, "TrialUnit${dimension}");
-  }
-
-  my $bulk_sql = 'INSERT INTO trialunit ';
-  $bulk_sql   .= '(TrialId,TreatmentId,SourceTrialUnitId,ReplicateNumber,TrialUnitBarcode,TrialUnitNote,SampleSupplierID,';
-  $bulk_sql   .= join(',', @dimension_field_list) . ') VALUES ';
-
-  my @tu_sql_rec_list;
-
-  for (my $i = 0; $i < scalar(@{$trialunit_info_aref}); $i++) {
-
-    my $trialunit_rec       = $trialunit_info_aref->[$i];
-
-    my $replicate_number    = $trialunit_rec->{'ReplicateNumber'};
-    my $trial_unit_comment  = $trialunit_rec->{'TrialUnitNote'};
-    my $sample_supplier_id  = $trialunit_rec->{'SampleSupplierId'};
-
-    my $src_trial_unit_id   = 'NULL';
-
-    if (length($trialunit_rec->{'SourceTrialUnitId'}) > 0) {
-
-      $src_trial_unit_id   = $trialunit_rec->{'SourceTrialUnitId'};
-    }
-
-    my $treatment_id        = 'NULL';
-
-    if (length($trialunit_rec->{'TreatmentId'}) > 0) {
-
-      $treatment_id = $trialunit_rec->{'TreatmentId'};
-    }
-
-    my @sql_dimension_list;
-
-    for my $dimension (@dimension_list) {
-
-      if (length($trialunit_rec->{"TrialUnit${dimension}"}) > 0) {
-
-        my $dimension_val = $trialunit_rec->{"TrialUnit${dimension}"};
-
-        if ($dimension_val !~ /^\d+$/) {
-
-          $dimension_val = $dbh_k_write->quote($dimension_val);
+          $uniq_spec_href->{"${specimen_id}_${spec_num}"} = 1;
         }
 
-        push(@sql_dimension_list, $dimension_val);
-      }
-      else {
-
-        push(@sql_dimension_list, 'NULL');
-      }
-    }
-
-    my $tu_barcode = $dal_tmp_tu_barcode_prefix . $i;
-
-    if (length($trialunit_rec->{'TrialUnitBarcode'}) == 0) {
-
-      $trialunit_rec->{'TrialUnitBarcode'} = $tu_barcode;
-      $trialunit_rec->{'RemoveBarcode'}    = 1;
-    }
-    else {
-
-      $tu_barcode = $trialunit_rec->{'TrialUnitBarcode'};
-      $trialunit_rec->{'RemoveBarcode'}    = 0;
-    }
-
-    my $tu_sql_rec_str = qq|(${trial_id},${treatment_id},${src_trial_unit_id},${replicate_number},'${tu_barcode}','${trial_unit_comment}',${sample_supplier_id},|;
-    $tu_sql_rec_str   .= join(',', @sql_dimension_list) . ')';
-
-    $self->logger->debug("Trial Unit Rec SQL: $tu_sql_rec_str");
-
-    push(@tu_sql_rec_list, $tu_sql_rec_str);
-
-    $trialunit_info_aref->[$i] = $trialunit_rec;
-  }
-
-  $bulk_sql .= join(',', @tu_sql_rec_list);
-
-  $sql = 'SELECT TrialUnitId FROM trialunit ORDER BY TrialUnitId DESC LIMIT 1';
-
-  my $r_tu_err;
-  my $tu_id_before;
-  my $tu_id_after;
-
-  ($r_tu_err, $tu_id_before) = read_cell($dbh_k_write, $sql, []);
-
-  if ($r_tu_err) {
-
-    $self->logger->debug("Read TrialUnitId before bulk INSERT failed");
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-    return $data_for_postrun_href;
-  }
-
-  my $before_clause = '1=1';
-
-  if (length($tu_id_before) > 0) {
-
-    $before_clause = " TrialUnitId >= $tu_id_before ";
-  }
-
-  $self->logger->debug("BULK SQL: $bulk_sql");
-
-  $sth = $dbh_k_write->prepare($bulk_sql);
-  $sth->execute();
-
-  if ($dbh_k_write->err()) {
-
-    $self->logger->debug("Add trialunit in bulk failed");
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-    return $data_for_postrun_href;
-  }
-
-  $sth->finish();
-
-  $sql = 'SELECT TrialUnitId FROM trialunit ORDER BY TrialUnitId DESC LIMIT 1';
-
-  ($r_tu_err, $tu_id_after) = read_cell($dbh_k_write, $sql, []);
-
-  if ($r_tu_err) {
-
-    $self->logger->debug("Read TrialUnitId after bulk INSERT failed");
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-    return $data_for_postrun_href;
-  }
-
-  my $after_clause = '1=1';
-
-  if (length($tu_id_after) > 0) {
-
-    $after_clause = " TrialUnitId <= $tu_id_after ";
-  }
-
-  $sql  = 'SELECT TrialUnitId, TrialUnitBarcode FROM trialunit ';
-  $sql .= "WHERE $before_clause AND $after_clause";
-
-  $self->logger->debug("SQL: $sql");
-
-  $sth = $dbh_k_write->prepare($sql);
-  $sth->execute();
-
-  if ($dbh_k_write->err()) {
-
-    $self->logger->debug("Read TrialUnit in between before and after BULK insert");
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-    return $data_for_postrun_href;
-  }
-
-  my $barcode2id_href = $sth->fetchall_hashref('TrialUnitBarcode');
-
-  if ($sth->err()) {
-
-    $self->logger->debug("Read TrialUnit rec into hash lookup in between before and after BULK insert");
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-    return $data_for_postrun_href;
-  }
-
-  for (my $i = 0; $i < scalar(@{$trialunit_info_aref}); $i++) {
-
-    my $trialunit  = $trialunit_info_aref->[$i];
-    my $tu_barcode = $trialunit->{'TrialUnitBarcode'};
-
-    if (!(defined $barcode2id_href->{$tu_barcode})) {
-
-      $self->logger->debug("Missing TrialUnit barcode lookup");
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-      return $data_for_postrun_href;
-    }
-
-    my $tu_id = $barcode2id_href->{$tu_barcode}->{'TrialUnitId'};
-
-    $self->logger->debug("Barcode: $tu_barcode - ID: $tu_id");
-
-    $trialunit->{'TrialUnitId'} = $tu_id;
-
-    $trialunit_info_aref->[$i] = $trialunit;
-  }
-
-  $bulk_sql  = 'INSERT INTO trialunitspecimen';
-  $bulk_sql .= '(TrialUnitId,SpecimenId,ItemId,PlantDate,HarvestDate,HasDied,Notes,SpecimenNumber,TUSLabel) ';
-  $bulk_sql .= 'VALUES';
-
-  my $tu_loc_bulk_sql = 'INSERT INTO trialunitloc (trialunitid, trialunitlocation) VALUES';
-
-  my @tu_spec_sql_list;
-  my @tu_loc_sql_list;
-
-  foreach my $trialunit (@{$trialunit_info_aref}) {
-
-    my $trialunit_id        = $trialunit->{'TrialUnitId'};
-    my $trialunit_location  = $trialunit->{'trialunitlocation'};
-
-    my $tu_specimen_aref = $trialunit->{'trialunitspecimen'};
-
-    for my $trialunitspecimen (@{$tu_specimen_aref}) {
-
-      my $specimen_id  = $trialunitspecimen->{'SpecimenId'};
-
-      my $spec_num = 0;
-
-      if (defined $trialunitspecimen->{'SpecimenNumber'}) {
-
-        if (length($trialunitspecimen->{'SpecimenNumber'}) > 0) {
-
-          $spec_num = $trialunitspecimen->{'SpecimenNumber'};
+        $sql = 'SELECT GenotypeId FROM genotypespecimen WHERE SpecimenId=?';
+        my $sth = $dbh_k_write->prepare($sql);
+        $sth->execute($specimen_id);
+        my $genotype_id_href = $sth->fetchall_hashref('GenotypeId');
+        $sth->finish();
+
+        my @geno_id = keys(%{$genotype_id_href});
+        if (scalar(@geno_id) == 0) {
+
+          my $err_msg = "Specimen ($specimen_id) does not exist.";
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+          return 1;
         }
-      }
 
-      my $item_id      = 'NULL';
-      my $plant_date   = 'NULL';
-      my $harvest_date = 'NULL';
-      my $has_died     = 'NULL';
-      my $notes        = 'NULL';
-      my $tus_label    = 'NULL';
+        my $item_id = undef;
 
-      if (defined $trialunitspecimen->{'ItemId'}) {
-
-        if ( length($trialunitspecimen->{'ItemId'}) > 0 ) {
+        if (length($trialunitspecimen->{'ItemId'}) > 0) {
 
           $item_id = $trialunitspecimen->{'ItemId'};
         }
-      }
 
-      if (defined $trialunitspecimen->{'PlantDate'}) {
+        if ( defined $item_id ) {
 
-        if ( length($trialunitspecimen->{'PlantDate'}) > 0 ) {
+          my $item_existence = record_existence($dbh_k_write, 'item', 'ItemId', $item_id);
 
-          $plant_date = $dbh_k_write->quote($trialunitspecimen->{'PlantDate'});
+          if (!$item_existence) {
+
+            my $err_msg = "Item ($item_id) does not exist.";
+            $data_for_postrun_href->{'Error'} = 1;
+            $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+            return 1;
+          }
+        }
+
+        push(@geno_id_list, @geno_id);
+
+        my $plant_date = $trialunitspecimen->{'PlantDate'};
+
+        if (length($plant_date) > 0 && (!($plant_date =~ /\d{4}\-\d{2}\-\d{2}/))) {
+
+          my $err_msg = "PlantDate ($plant_date) is not an acceptable date: yyyy-mm-dd";
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+          return 1;
+        }
+
+        my $harvest_date = $trialunitspecimen->{'HarvestDate'};
+
+        if (length($harvest_date) > 0 && (!($harvest_date =~ /\d{4}\-\d{2}\-\d{2}/))) {
+
+          my $err_msg = "HarvestDate ($harvest_date) is not an acceptable date: yyyy-mm-dd";
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+          return 1;
+        }
+
+        my $has_died = $trialunitspecimen->{'HasDied'};
+
+        if (length($has_died) > 0 && (!($has_died =~ /^[0|1]$/))) {
+
+          my $err_msg = "HasDied ($has_died) can be either 1 or 0 only.";
+          $data_for_postrun_href->{'Error'} = 1;
+          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+          return 1;
         }
       }
 
-      if (defined $trialunitspecimen->{'HarvestDate'}) {
+      my ($is_geno_ok, $trouble_geno_id_aref) = check_permission($dbh_k_write, 'genotype', 'GenotypeId',
+                                                                \@geno_id_list, $group_id, $gadmin_status,
+                                                                $LINK_PERM);
 
-        if ( length($trialunitspecimen->{'HarvestDate'}) > 0 ) {
+      if (!$is_geno_ok) {
 
-          $harvest_date = $dbh_k_write->quote($trialunitspecimen->{'HarvestDate'});
-        }
+        my $trouble_geno_id_str = join(',', @{$trouble_geno_id_aref});
+
+        my $perm_err_msg = '';
+        $perm_err_msg   .= "Permission denied: Group ($group_id) and Genotype ($trouble_geno_id_str).";
+
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $perm_err_msg}]};
+
+        return 1;
       }
-
-      if (defined $trialunitspecimen->{'HasDied'}) {
-
-        if ( length($trialunitspecimen->{'HasDied'}) > 0 ) {
-
-          $has_died = $trialunitspecimen->{'HasDied'};
-        }
-      }
-
-      if (defined $trialunitspecimen->{'Notes'}) {
-
-        if ( length($trialunitspecimen->{'Notes'}) > 0 ) {
-
-          $notes = $dbh_k_write->quote($trialunitspecimen->{'Notes'});
-        }
-      }
-
-      if (defined $trialunitspecimen->{'TUSLabel'}) {
-
-        if ( length($trialunitspecimen->{'TUSLabel'}) > 0 ) {
-
-          $tus_label = $dbh_k_write->quote($trialunitspecimen->{'TUSLabel'});
-        }
-      }
-
-      my $tu_spec_rec_str = qq|(${trialunit_id},${specimen_id},${item_id},${plant_date},${harvest_date},${has_died},${notes},${spec_num},${tus_label})|;
-
-      push(@tu_spec_sql_list, $tu_spec_rec_str);
     }
 
-    if (length($trialunit_location) > 0) {
+    # optimisation starts from here. the optimisation will use TrialUnitBarcode as the key for mapping
+    # the data in memory to the record id inserted into the database after SQL bulk insert. The mapping is
+    # used for trialunitspecimen and triallocation. Since TrialUnitBarcode is not compulsory, DAL will generate
+    # temporary TrialUnitBarcodes if they are not provided in the trialunit data.
 
-      my $tu_loc_sql_str = qq|(${trialunit_id},ST_ForceCollection(ST_GeomFromText('$trialunit_location', -1)))|;
+    my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
 
-      push(@tu_loc_sql_list, $tu_loc_sql_str);
+    $year = sprintf("%02d", $year % 100);
+    $yday = sprintf("%03d", $yday);
+
+    my $user_id  = sprintf("%02d", $self->authen->user_id());
+
+    my @big_a_z_chars = ("A" .. "Z");
+
+    my $rand3 = $big_a_z_chars[rand(26)] . $big_a_z_chars[rand(26)] . int(rand(10));
+
+    my $dal_tmp_tu_barcode_prefix = qq|TU_${user_id}_${year}${yday}${hour}${min}${sec}_${rand3}_|;
+
+    my @dimension_field_list;
+
+    for my $dimension (@dimension_list) {
+
+      push(@dimension_field_list, "TrialUnit${dimension}");
     }
-  }
 
-  if (scalar(@tu_spec_sql_list) > 0) {
+    my $bulk_sql = 'INSERT INTO trialunit ';
+    # $bulk_sql   .= '(TrialId,TreatmentId,SourceTrialUnitId,ReplicateNumber,TrialUnitBarcode,TrialUnitNote,SampleSupplierID,';
+    $bulk_sql   .= '(TrialId,SourceTrialUnitId,ReplicateNumber,TrialUnitBarcode,TrialUnitNote,SampleSupplierID,';
+    $bulk_sql   .= join(',', @dimension_field_list) . ') VALUES ';
 
-    $bulk_sql .= join(',', @tu_spec_sql_list);
+    my @tu_sql_rec_list;
+
+    for (my $i = 0; $i < scalar(@{$trialunit_info_aref}); $i++) {
+
+      my $trialunit_rec       = $trialunit_info_aref->[$i];
+
+      my $replicate_number    = $trialunit_rec->{'ReplicateNumber'};
+      my $trial_unit_comment  = $trialunit_rec->{'TrialUnitNote'};
+      my $sample_supplier_id  = $trialunit_rec->{'SampleSupplierId'};
+
+      my $src_trial_unit_id   = 'NULL';
+
+      if (length($trialunit_rec->{'SourceTrialUnitId'}) > 0) {
+
+        $src_trial_unit_id   = $trialunit_rec->{'SourceTrialUnitId'};
+      }
+
+      my $treatment_id        = 'NULL';
+
+      if (length($trialunit_rec->{'TreatmentId'}) > 0) {
+
+        $treatment_id = $trialunit_rec->{'TreatmentId'};
+      }
+
+      my @sql_dimension_list;
+
+      for my $dimension (@dimension_list) {
+
+        if (length($trialunit_rec->{"TrialUnit${dimension}"}) > 0) {
+
+          my $dimension_val = $trialunit_rec->{"TrialUnit${dimension}"};
+
+          if ($dimension_val !~ /^\d+$/) {
+
+            $dimension_val = $dbh_k_write->quote($dimension_val);
+          }
+
+          push(@sql_dimension_list, $dimension_val);
+        }
+        else {
+
+          push(@sql_dimension_list, 'NULL');
+        }
+      }
+
+      my $tu_barcode = $dal_tmp_tu_barcode_prefix . $i;
+
+      if (length($trialunit_rec->{'TrialUnitBarcode'}) == 0) {
+
+        $trialunit_rec->{'TrialUnitBarcode'} = $tu_barcode;
+        $trialunit_rec->{'RemoveBarcode'}    = 1;
+      }
+      else {
+
+        $tu_barcode = $trialunit_rec->{'TrialUnitBarcode'};
+        $trialunit_rec->{'RemoveBarcode'}    = 0;
+      }
+
+      # Issue9468
+      # my $tu_sql_rec_str = qq|(${trial_id},${treatment_id},${src_trial_unit_id},${replicate_number},'${tu_barcode}','${trial_unit_comment}',${sample_supplier_id},|;
+      my $tu_sql_rec_str = qq|(${trial_id},${src_trial_unit_id},${replicate_number},'${tu_barcode}','${trial_unit_comment}',${sample_supplier_id},|;
+      $tu_sql_rec_str   .= join(',', @sql_dimension_list) . ')';
+
+      $self->logger->debug("Trial Unit Rec SQL: $tu_sql_rec_str");
+
+      push(@tu_sql_rec_list, $tu_sql_rec_str);
+
+      $trialunit_info_aref->[$i] = $trialunit_rec;
+    }
+
+    $bulk_sql .= join(',', @tu_sql_rec_list);
+
+    $sql = 'SELECT TrialUnitId FROM trialunit ORDER BY TrialUnitId DESC LIMIT 1';
+
+    my $r_tu_err;
+    my $tu_id_before;
+    my $tu_id_after;
+
+    ($r_tu_err, $tu_id_before) = read_cell($dbh_k_write, $sql, []);
+
+    if ($r_tu_err) {
+
+      $self->logger->debug("Read TrialUnitId before bulk INSERT failed");
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return 1;
+    }
+
+    my $before_clause = '1=1';
+
+    if (length($tu_id_before) > 0) {
+
+      $before_clause = " TrialUnitId >= $tu_id_before ";
+    }
+
+    $self->logger->debug("BULK SQL: $bulk_sql");
 
     $sth = $dbh_k_write->prepare($bulk_sql);
     $sth->execute();
 
     if ($dbh_k_write->err()) {
 
-      $self->logger->debug("INSERT TrialUnitSpecimen BULK failed");
+      $self->logger->debug("Add trialunit in bulk failed");
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
-      return $data_for_postrun_href;
+      return 1;
     }
 
     $sth->finish();
-  }
 
-  if (scalar(@tu_loc_sql_list) > 0) {
+    $sql = 'SELECT TrialUnitId FROM trialunit ORDER BY TrialUnitId DESC LIMIT 1';
 
-    $tu_loc_bulk_sql .= join(',', @tu_loc_sql_list);
+    ($r_tu_err, $tu_id_after) = read_cell($dbh_k_write, $sql, []);
 
-    $self->logger->debug("TU LOC SQL: $tu_loc_bulk_sql");
+    if ($r_tu_err) {
 
-    $sth = $dbh_gis_write->prepare($tu_loc_bulk_sql);
-    $sth->execute();
-
-    if ($dbh_gis_write->err()) {
-
-      $self->logger->debug("INSERT trialunitlocation BULK failed");
+      $self->logger->debug("Read TrialUnitId after bulk INSERT failed");
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
-      return $data_for_postrun_href;
+      return 1;
     }
 
-    $sth->finish();
-  }
+    my $after_clause = '1=1';
 
-  my @remove_tu_bar_tu_id;
+    if (length($tu_id_after) > 0) {
 
-  foreach my $trialunit (@{$trialunit_info_aref}) {
-
-    if ($trialunit->{'RemoveBarcode'} == 1) {
-
-      push(@remove_tu_bar_tu_id, $trialunit->{'TrialUnitId'});
+      $after_clause = " TrialUnitId <= $tu_id_after ";
     }
-  }
 
-  if (scalar(@remove_tu_bar_tu_id) > 0) {
+    $sql  = 'SELECT TrialUnitId, TrialUnitBarcode FROM trialunit ';
+    $sql .= "WHERE $before_clause AND $after_clause";
 
-    $sql = 'UPDATE trialunit SET TrialUnitBarcode=NULL WHERE TrialUnitId IN (' . join(',', @remove_tu_bar_tu_id) . ')';
+    $self->logger->debug("SQL: $sql");
 
     $sth = $dbh_k_write->prepare($sql);
     $sth->execute();
 
     if ($dbh_k_write->err()) {
 
-      $self->logger->debug("Remove DAL temporary TrialUnitBarcode failed");
+      $self->logger->debug("Read TrialUnit in between before and after BULK insert");
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
-      return $data_for_postrun_href;
+      return 1;
     }
 
-    $sth->finish();
-  }
+    my $barcode2id_href = $sth->fetchall_hashref('TrialUnitBarcode');
 
-  $dbh_k_write->disconnect();
-  $dbh_gis_write->disconnect();
+    if ($sth->err()) {
 
-  my $nb_added_trial_unit = scalar(@{$trialunit_info_aref});
-  my $info_msg = "$nb_added_trial_unit TrialUnits for Trial ($trial_id) have been updated successfully.";
+      $self->logger->debug("Read TrialUnit rec into hash lookup in between before and after BULK insert");
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
-  my $info_msg_aref  = [{'Message' => $info_msg}];
+      return 1;
+    }
 
-  $data_for_postrun_href->{'Error'}     = 0;
-  $data_for_postrun_href->{'Data'}      = {'Info' => $info_msg_aref };
-  $data_for_postrun_href->{'ExtraData'} = 0;
+    for (my $i = 0; $i < scalar(@{$trialunit_info_aref}); $i++) {
 
+      my $trialunit  = $trialunit_info_aref->[$i];
+      my $tu_barcode = $trialunit->{'TrialUnitBarcode'};
+
+      if (!(defined $barcode2id_href->{$tu_barcode})) {
+
+        $self->logger->debug("Missing TrialUnit barcode lookup");
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+        return 1;
+      }
+
+      my $tu_id = $barcode2id_href->{$tu_barcode}->{'TrialUnitId'};
+
+      $self->logger->debug("Barcode: $tu_barcode - ID: $tu_id");
+
+      $trialunit->{'TrialUnitId'} = $tu_id;
+
+      $trialunit_info_aref->[$i] = $trialunit;
+    }
+
+    $bulk_sql  = 'INSERT INTO trialunitspecimen';
+    $bulk_sql .= '(TrialUnitId,SpecimenId,ItemId,PlantDate,HarvestDate,HasDied,Notes,SpecimenNumber,TUSLabel) ';
+    $bulk_sql .= 'VALUES';
+
+    my $tu_loc_bulk_sql = 'INSERT INTO trialunitloc (trialunitid, trialunitlocation, trialunitlocdt, currentloc) VALUES';
+
+    my @tu_spec_sql_list;
+    my @tu_loc_sql_list;
+
+    my $current_dt_pg = DateTime::Format::Pg->parse_datetime(DateTime->now());
+
+    foreach my $trialunit (@{$trialunit_info_aref}) {
+
+      my $trialunit_id        = $trialunit->{'TrialUnitId'};
+      my $trialunit_location  = $trialunit->{'trialunitlocation'};
+
+      my $tu_specimen_aref = $trialunit->{'trialunitspecimen'};
+
+      for my $trialunitspecimen (@{$tu_specimen_aref}) {
+
+        my $specimen_id  = $trialunitspecimen->{'SpecimenId'};
+
+        my $spec_num = 0;
+
+        if (defined $trialunitspecimen->{'SpecimenNumber'}) {
+
+          if (length($trialunitspecimen->{'SpecimenNumber'}) > 0) {
+
+            $spec_num = $trialunitspecimen->{'SpecimenNumber'};
+          }
+        }
+
+        my $item_id      = 'NULL';
+        my $plant_date   = 'NULL';
+        my $harvest_date = 'NULL';
+        my $has_died     = 'NULL';
+        my $notes        = 'NULL';
+        my $tus_label    = 'NULL';
+
+        if (defined $trialunitspecimen->{'ItemId'}) {
+
+          if ( length($trialunitspecimen->{'ItemId'}) > 0 ) {
+
+            $item_id = $trialunitspecimen->{'ItemId'};
+          }
+        }
+
+        if (defined $trialunitspecimen->{'PlantDate'}) {
+
+          if ( length($trialunitspecimen->{'PlantDate'}) > 0 ) {
+
+            $plant_date = $dbh_k_write->quote($trialunitspecimen->{'PlantDate'});
+          }
+        }
+
+        if (defined $trialunitspecimen->{'HarvestDate'}) {
+
+          if ( length($trialunitspecimen->{'HarvestDate'}) > 0 ) {
+
+            $harvest_date = $dbh_k_write->quote($trialunitspecimen->{'HarvestDate'});
+          }
+        }
+
+        if (defined $trialunitspecimen->{'HasDied'}) {
+
+          if ( length($trialunitspecimen->{'HasDied'}) > 0 ) {
+
+            $has_died = $trialunitspecimen->{'HasDied'};
+          }
+        }
+
+        if (defined $trialunitspecimen->{'Notes'}) {
+
+          if ( length($trialunitspecimen->{'Notes'}) > 0 ) {
+
+            $notes = $dbh_k_write->quote($trialunitspecimen->{'Notes'});
+          }
+        }
+
+        if (defined $trialunitspecimen->{'TUSLabel'}) {
+
+          if ( length($trialunitspecimen->{'TUSLabel'}) > 0 ) {
+
+            $tus_label = $dbh_k_write->quote($trialunitspecimen->{'TUSLabel'});
+          }
+        }
+
+        my $tu_spec_rec_str = qq|(${trialunit_id},${specimen_id},${item_id},${plant_date},${harvest_date},${has_died},${notes},${spec_num},${tus_label})|;
+
+        push(@tu_spec_sql_list, $tu_spec_rec_str);
+      }
+
+      if (length($trialunit_location) > 0) {
+
+        my $tu_loc_sql_str = qq|(${trialunit_id},ST_ForceCollection(ST_GeomFromText('$trialunit_location', -1)), '${current_dt_pg}', 0)|;
+
+        push(@tu_loc_sql_list, $tu_loc_sql_str);
+      }
+    }
+
+    if (scalar(@tu_spec_sql_list) > 0) {
+
+      $bulk_sql .= join(',', @tu_spec_sql_list);
+
+      $sth = $dbh_k_write->prepare($bulk_sql);
+      $sth->execute();
+
+      if ($dbh_k_write->err()) {
+
+        $self->logger->debug("INSERT TrialUnitSpecimen BULK failed");
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+        return 1;
+      }
+
+      $sth->finish();
+    }
+
+    if (scalar(@tu_loc_sql_list) > 0) {
+
+      $tu_loc_bulk_sql .= join(',', @tu_loc_sql_list);
+
+      $self->logger->debug("TU LOC SQL: $tu_loc_bulk_sql");
+
+      $sth = $dbh_gis_write->prepare($tu_loc_bulk_sql);
+      $sth->execute();
+
+      if ($dbh_gis_write->err()) {
+
+        $self->logger->debug("INSERT trialunitlocation BULK failed");
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+        return 1;
+      }
+
+      $sth->finish();
+    }
+
+    my @remove_tu_bar_tu_id;
+
+    foreach my $trialunit (@{$trialunit_info_aref}) {
+
+      if ($trialunit->{'RemoveBarcode'} == 1) {
+
+        push(@remove_tu_bar_tu_id, $trialunit->{'TrialUnitId'});
+      }
+    }
+
+    if (scalar(@remove_tu_bar_tu_id) > 0) {
+
+      $sql = 'UPDATE trialunit SET TrialUnitBarcode=NULL WHERE TrialUnitId IN (' . join(',', @remove_tu_bar_tu_id) . ')';
+
+      $sth = $dbh_k_write->prepare($sql);
+      $sth->execute();
+
+      if ($dbh_k_write->err()) {
+
+        $self->logger->debug("Remove DAL temporary TrialUnitBarcode failed");
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+        return 1;
+      }
+
+      $sth->finish();
+    }
+
+    # Issue9468
+    $bulk_sql = 'INSERT INTO trialunittreatment';
+    $bulk_sql .= '(TreatmentId, TrialUnitId) ';
+    $bulk_sql .= 'VALUES';
+
+    my @tut_sql_list;
+
+    foreach my $trialunit (@{$trialunit_info_aref}) {
+
+        my $treatment_id = $trialunit->{'TreatmentId'};
+        my $trialunit_id = $trialunit->{'TrialUnitId'};
+
+        if (length($treatment_id) > 0) {
+            my $tut_sql_str = qq|($treatment_id, $trialunit_id)|;
+            push(@tut_sql_list, $tut_sql_str);
+        }
+    }
+
+    if (scalar(@tut_sql_list) > 0) {
+        $bulk_sql .= join(',', @tut_sql_list);
+        $sth = $dbh_k_write->prepare($bulk_sql);
+        $sth->execute();
+        if ($dbh_k_write->err()) {
+            $self->logger->debug("INSERT TrialUnitTreatment BULK failed");
+            $data_for_postrun_href->{'Error'} = 1;
+            $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+            return 1;
+        }
+        $sth->finish();
+    }
+
+    $dbh_k_write->commit;
+
+    my $nb_added_trial_unit = scalar(@{$trialunit_info_aref});
+    my $info_msg = "$nb_added_trial_unit TrialUnits for Trial ($trial_id) have been updated successfully.";
+
+    my $info_msg_aref  = [{'Message' => $info_msg}];
+
+    $data_for_postrun_href->{'Error'}     = 0;
+    $data_for_postrun_href->{'Data'}      = {'Info' => $info_msg_aref };
+    $data_for_postrun_href->{'ExtraData'} = 0;
+
+    1;
+  } or do {
+    $self->logger->debug($@);
+    eval {$dbh_k_write->rollback;};
+    $data_for_postrun_href = $self->_set_error();
+  };
+
+  $dbh_k_write->disconnect;
+  $dbh_gis_write->disconnect;
   return $data_for_postrun_href;
 }
 
@@ -18665,6 +18826,444 @@ sub update_crossing_runmode {
   return $data_for_postrun_href;
 }
 
+sub add_trialunit_treatment_runmode {
+
+=pod add_trialunit_treatment_HELP_START
+{
+"OperationName": "Add treatment to trial unit",
+"Description": "Add a treatment to a trialunit",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"KDDArTModule": "main",
+"KDDArTTable": "trialunittreatment",
+"SkippedField": ["TrialUnitId"],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><ReturnId Value='103' ParaName='TrialUnitTreatmentId' /><Info Message='TrialUnitTreatmentId (103) has been added successfully.' /></DATA>",
+"SuccessMessageJSON": "{'ReturnId' : [{'Value' : '104','ParaName' : 'TrialUnitTreatmentId'}],'Info' : [{'Message' : 'TrialUnitTreatment (104) has been added successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='TrialUnitId (123): not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'TrialUnitId (123): not found.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing TrialUnitId"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self            = shift;
+  my $trialunit_id    = $self->param('id');
+  my $query           = $self->query();
+  my $treatment_id    = $query->param('TreatmentId');
+  my $treatment_dt    = $query->param('TreatmentDateTime');
+  my $treatment_note  = $query->param('TrialUnitTreatmentNote');
+
+  my ($int_err, $int_err_msg) = check_integer_value({
+                                                      'TrialUnitId' => $trialunit_id, 
+                                                      'TreatmentId' => $treatment_id
+                                                    });
+  if ($int_err) {
+      $int_err_msg .= ' not integer.';
+      return $self->_set_error($int_err_msg);
+  }
+
+  my $data_for_postrun_href;
+
+  my $dbh_write = connect_kdb_write(1);
+  eval {
+    
+    my $trialunit_existence = record_existence($dbh_write, 'trialunit', 'TrialUnitId', $trialunit_id);
+    if (!$trialunit_existence) {
+      my $errmsg = "TrialUnit ($trialunit_id) does not exist.";
+      $data_for_postrun_href = $self->_set_error($errmsg);
+      return 1;
+    }
+
+    my $treatment_existence = record_existence($dbh_write, 'treatment', 'TreatmentId', $treatment_id);
+    if (!$treatment_existence) {
+      my $errmsg = "Treatment ($treatment_id) does not exist.";
+      $data_for_postrun_href = $self->_set_error($errmsg);
+      return 1;
+    }
+
+    if (length($treatment_dt)) {
+      my ($date_err, $date_href) = check_dt_href({'TreatmentDateTime' => $treatment_dt});
+      if ($date_err) {
+        $data_for_postrun_href = {};
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [$date_href]};
+        return 1;
+      }
+    }
+
+    my $sql = "";
+    $sql .= "INSERT INTO trialunittreatment (TreatmentId, TrialUnitId, TreatmentDateTime, TrialUnitTreatmentNote) ";
+    $sql .= "VALUES (?, ?, ?, ?)";
+    my $sth = $dbh_write->prepare($sql);
+    $sth->execute($treatment_id, $trialunit_id, $treatment_dt, $treatment_note);
+
+    my $trialunit_treatment_id = $dbh_write->last_insert_id(undef, undef, 'trialunittreatment', 'TrialUnitTreatmentId');
+
+    $dbh_write->commit;
+
+    my $info_msg_aref  = [{'Message' => "TrialUnitTreatment ($trialunit_treatment_id) has been added successfully."}];
+    my $return_id_aref = [{'Value' => "$trialunit_treatment_id", 'ParaName' => 'TrialUnitTreatmentId'}];
+
+    $data_for_postrun_href->{'Error'}     = 0;
+    $data_for_postrun_href->{'Data'}      = {'Info'     => $info_msg_aref,
+                                            'ReturnId' => $return_id_aref,
+    };
+    $data_for_postrun_href->{'ExtraData'} = 0;
+
+    1;
+  } or do {
+    $self->logger->debug($@);
+    eval {$dbh_write->rollback;};
+    $data_for_postrun_href = $self->_set_error();
+  };
+
+  $dbh_write->disconnect;
+  return $data_for_postrun_href;
+}
+
+
+sub get_trialunit_treatment_runmode {
+
+=pod get_trialunit_treatment_HELP_START
+{
+"OperationName": "Get trial unit treatment",
+"Description": "Get detailed information about association between trial unit and treatment specified by trialunittreatment id.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><RecordMeta TagName='TrialUnitTreatment' /><TrialUnitTreatment TreatmentName='Treatment4TrialUnit_8074320' Notes='none' ItemId='' TrialUnitId='2' TrialUnitTreatmentId='7' TreatmentId='6' /></DATA>",
+"SuccessMessageJSON": "{'RecordMeta' : [{'TagName' : 'TrialUnitTreatment'}],'TrialUnitTreatment' : [{'TreatmentText' : 'Treatment4TrialUnit_8074320','TrialUnitId' : '2','TrialUnitTreatmentId' : '7','TreatmentId' : '6'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='TrialUnitTreatmentId (3) not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'TrialUnitTreatmentId (3) not found.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing TrialUnitTreatmentId"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self       = $_[0];
+  my $tu_treatment_id = $self->param('id');
+
+  my $data_for_postrun_href = {};
+
+  my $dbh = connect_kdb_read();
+
+  my $tu_treatment_sql = "SELECT DISTINCT trialunit.TrialId ";
+  $tu_treatment_sql   .= "FROM trialunittreatment LEFT JOIN trialunit ";
+  $tu_treatment_sql   .= "ON trialunittreatment.TrialUnitId = trialunit.TrialUnitId ";
+  $tu_treatment_sql   .= "WHERE TrialUnitTreatmentId=?";
+
+  my ($r_trialunit_id_err, $trialunit_id) = read_cell($dbh, $tu_treatment_sql, [$tu_treatment_id]);
+
+  if ($r_trialunit_id_err) {
+
+    $self->logger->debug("Read trial id failed");
+    my $err_msg = "Unexpected Error.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (length($trialunit_id) == 0) {
+
+    my $err_msg = "TrialUnitTreatmentId ($tu_treatment_id) not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $group_id = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+  my $perm_str = permission_phrase($group_id, 0, $gadmin_status, 'trial');
+
+  my $sql      = "SELECT $perm_str AS UltimatePermission ";
+  $sql        .= 'FROM trial ';
+  $sql        .= 'WHERE TrialId=?';
+
+  my ($read_err, $permission) = read_cell($dbh, $sql, [$trialunit_id]);
+  $dbh->disconnect();
+
+  if ( ($permission & $READ_PERM) != $READ_PERM ) {
+
+    my $err_msg = "Trial ($trialunit_id): permission denied.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sql  = "SELECT trialunittreatment.*, treatment.TreatmentText ";
+  $sql .= "FROM trialunittreatment LEFT JOIN treatment ON trialunittreatment.TreatmentId = treatment.TreatmentId ";
+  $sql .= "WHERE trialunittreatment.TrialUnitTreatmentId=?";
+
+  $self->logger->debug($sql);
+
+  my ($read_tut_err, $read_tut_msg, $tut_data) = $self->list_trial_unit_treatment(1, $sql, [$tu_treatment_id]);
+
+  if ($read_tut_err) {
+
+    $self->logger->debug($read_tut_msg);
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $data_for_postrun_href->{'Error'} = 0;
+  $data_for_postrun_href->{'Data'}  = {'TrialUnitTreatment'  => $tut_data,
+                                       'RecordMeta'         => [{'TagName' => 'TrialUnitTreatment'}],
+  };
+
+  return $data_for_postrun_href;
+}
+
+sub list_trial_unit_treatment {
+
+  my $self              = $_[0];
+  my $extra_attr_yes    = $_[1];
+  my $sql               = $_[2];
+  my $where_para_aref   = $_[3];
+
+  my $err = 0;
+  my $msg = '';
+
+  my $data_aref = [];
+
+  my $dbh = connect_kdb_read();
+
+  ($err, $msg, $data_aref) = read_data($dbh, $sql, $where_para_aref);
+
+  if ($err) {
+
+    return ($err, $msg, []);
+  }
+
+  $dbh->disconnect();
+
+  my $extra_attr_tunit_treatment_data = [];
+
+  if ($extra_attr_yes) {
+
+    my $perm_lookup  = {'0' => 'None',
+                        '1' => 'Link',
+                        '2' => 'Write',
+                        '3' => 'Write/Link',
+                        '4' => 'Read',
+                        '5' => 'Read/Link',
+                        '6' => 'Read/Write',
+                        '7' => 'Read/Write/Link',
+    };
+
+    my $tu_treatment_id_aref = [];
+
+    for my $row (@{$data_aref}) {
+
+      push(@{$tu_treatment_id_aref}, $row->{'TrialUnitTreatmentId'});
+    }
+
+    my $chk_id_err        = 0;
+    my $chk_id_msg        = '';
+    my $used_id_href      = {};
+    my $not_used_id_href  = {};
+
+    if (scalar(@{$tu_treatment_id_aref}) > 0) {
+
+      my $chk_table_aref = [{'TableName' => 'trialunittreatment', 'FieldName' => 'TrialUnitTreatmentId'}];
+
+      ($chk_id_err, $chk_id_msg,
+       $used_id_href, $not_used_id_href) = id_existence_bulk($dbh, $chk_table_aref, $tu_treatment_id_aref);
+
+      if ($chk_id_err) {
+
+        $self->logger->debug("Check id existence error: $chk_id_msg");
+        $err = 1;
+        $msg = $chk_id_msg;
+
+        return ($err, $msg, []);
+      }
+    }
+
+    for my $row (@{$data_aref}) {
+
+      my $trial_unit_treatment_id   = $row->{'TrialUnitTreatmentId'};
+      my $permission               = $row->{'UltimatePerm'};
+      $row->{'UltimatePermission'} = $perm_lookup->{$permission};
+
+      if ( ($permission & $READ_WRITE_PERM) == $READ_WRITE_PERM ) {
+
+        $row->{'update'} = "update/trialunittreatment/$trial_unit_treatment_id";
+
+        if ( $not_used_id_href->{$trial_unit_treatment_id} ) {
+
+          $row->{'remove'} = "delete/trialunittreatment/$trial_unit_treatment_id";
+        }
+      }
+
+      push(@{$extra_attr_tunit_treatment_data}, $row);
+    }
+  }
+  else {
+
+    $extra_attr_tunit_treatment_data = $data_aref;
+  }
+
+  return ($err, $msg, $extra_attr_tunit_treatment_data);
+}
+
+sub remove_trialunit_treatment_runmode {
+
+=pod remove_trialunit_treatment_HELP_START
+{
+"OperationName": "Delete trial unit treatment",
+"Description": "Delete association between trial unit and treatment specified by trialunittreatment id.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='TrialUnitTreatment (103) has been removed successfully.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'TrialUnitTreatment (104) has been removed successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='TrialUnitTreatment (103) not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'TrialUnitTreatment (103) not found.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing TrialUnitTreatment"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+  my $self            = shift;
+  my $trialunit_t_id  = $self->param('id');
+
+  my ($int_err, $int_err_msg) = check_integer_value({
+                                                      'TrialUnitTreatmentId' => $trialunit_t_id, 
+                                                    });
+  if ($int_err) {
+      $int_err_msg .= ' not integer.';
+      return $self->_set_error($int_err_msg);
+  }
+
+  my $data_for_postrun_href;
+
+  my $dbh_write = connect_kdb_write();
+  eval {
+    my $trialunit_t_existence = record_existence($dbh_write, 'trialunittreatment', 'TrialUnitTreatmentId', $trialunit_t_id);
+    if (!$trialunit_t_existence) {
+      my $errmsg = "TrialUnitTreatmentId ($trialunit_t_id) does not exist.";
+      $data_for_postrun_href = $self->_set_error($errmsg);
+      return 1;
+    }
+
+    my $sql = "";
+    $sql .= 'DELETE FROM trialunittreatment ';
+    $sql .= 'WHERE TrialUnitTreatmentId=?';
+    my $sth = $dbh_write->prepare($sql);
+    $sth->execute($trialunit_t_id);
+    if ($dbh_write->err()) {
+      $data_for_postrun_href = $self->_set_error();
+      return 1;
+    }
+
+    $data_for_postrun_href = {};
+    my $info_msg_aref = [{'Message' => "TrialUnitTreatment ($trialunit_t_id) has been removed successfully."}];
+    $data_for_postrun_href->{'Error'}     = 0;
+    $data_for_postrun_href->{'Data'}      = {'Info' => $info_msg_aref};
+    $data_for_postrun_href->{'ExtraData'} = 0;
+  };
+
+  $dbh_write->disconnect;
+  return $data_for_postrun_href;
+}
+
+sub update_trialunit_treatment_runmode {
+
+=pod update_trialunit_treatment_HELP_START
+{
+"OperationName": "Update trial unit treatment",
+"Description": "Update information about association between trial unit and treatment specified by trialunittreatment id.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"KDDArTModule": "main",
+"KDDArTTable": "trialunittreatment",
+"SkippedField": ["TrialUnitId", "TreatmentId"],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='TrialUnitTreatment (109) has been updated successfully.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'TrialUnitTreatment (109) has been updated successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='TrialUnitTreatment (103) not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'TrialUnitTreatment (103) not found.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing TrialUnitTreatmentId"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+  my $self            = shift;
+  my $trialunit_t_id  = $self->param('id');
+  my $query           = $self->query();
+  my $treatment_dt    = $query->param('TreatmentDateTime');
+  my $treatment_note  = $query->param('TrialUnitTreatmentNote');
+
+  my ($int_err, $int_err_msg) = check_integer_value({
+                                                      'TrialUnitTreatmentId' => $trialunit_t_id, 
+                                                    });
+  if ($int_err) {
+      $int_err_msg .= ' not integer.';
+      return $self->_set_error($int_err_msg);
+  }
+
+  my $data_for_postrun_href;
+
+  my $dbh_write = connect_kdb_write(1);
+  eval {
+    my $trialunit_t_existence = record_existence($dbh_write, 'trialunittreatment', 'TrialUnitTreatmentId', $trialunit_t_id);
+    if (!$trialunit_t_existence) {
+      my $errmsg = "TrialUnitTreatmentId ($trialunit_t_id) does not exist.";
+      $data_for_postrun_href = $self->_set_error($errmsg);
+      return 1;
+    }
+
+    if (length($treatment_dt)) {
+      my ($date_err, $date_href) = check_dt_href({'TreatmentDateTime' => $treatment_dt});
+      if ($date_err) {
+        $data_for_postrun_href = {};
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [$date_href]};
+        return 1;
+      }
+    }
+
+    my $sql = "";
+    $sql .= 'UPDATE trialunittreatment SET ';
+    $sql .= 'TreatmentDateTime=?, ';
+    $sql .= 'TrialUnitTreatmentNote=? ';
+    $sql .= 'WHERE TrialUnitTreatmentId=?';
+    my $sth = $dbh_write->prepare($sql);
+    $sth->execute($treatment_dt, $treatment_note, $trialunit_t_id);
+
+    $dbh_write->commit;
+
+    $data_for_postrun_href = {};
+    my $info_msg_aref  = [{'Message' => "TrialUnitTreatment ($trialunit_t_id) has been updated successfully."}];
+    $data_for_postrun_href->{'Error'}     = 0;
+    $data_for_postrun_href->{'Data'}      = {'Info'     => $info_msg_aref};
+    $data_for_postrun_href->{'ExtraData'} = 0;
+
+    1;
+
+  } or do {
+    $self->logger->debug($@);
+    eval {$dbh_write->rollback;};
+    $data_for_postrun_href = $self->_set_error();
+  };
+
+  $dbh_write->disconnect;
+  return $data_for_postrun_href;
+}
+
+
 sub get_siteloc_dtd_file {
 
   my $dtd_path = $ENV{DOCUMENT_ROOT} . '/' . $DTD_PATH;
@@ -18721,6 +19320,5 @@ sub _set_error {
     'Data'  => { 'Error' => [ { 'Message' => $error_message || 'Unexpected error.' } ] }
   };
 }
-
 
 1;

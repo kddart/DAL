@@ -1,3 +1,6 @@
+xml/add_data_no_vcol/case_10212_add_trialunittreatment.xml
+xml/add_data_no_vcol/case_10213_update_trialunittreatment.xml
+xml/add_data_no_vcol/case_10214_delete_trialunittreatment.xml
 xml/add_data_no_vcol/case_00345_add_layer.xml
 xml/add_data_no_vcol/case_00351_map_dev_para_tem.xml
 xml/add_data_no_vcol/case_00352_map_dev_para_hum.xml
@@ -357,4 +360,9 @@ xml/add_data_no_vcol/case_00573_add_site_with_point.xml
 xml/add_data_no_vcol/case_00623_delete_season.xml
 xml/add_data_no_vcol/case_10205_update_item_nodateaadded.xml
 xml/add_data_no_vcol/case_10206_update_item_bulk_dateadded.xml
+xml/add_data_no_vcol/case_10207_add_layer_layertiles.xml
+xml/add_data_no_vcol/case_10208_add_tileset.xml
+xml/add_data_no_vcol/case_10209_get_tileset.xml
+xml/add_data_no_vcol/case_10210_update_tileset.xml
+xml/add_data_no_vcol/case_10211_delete_layer_layertiles.xml
 xml/login_testuser/case_00205_logout.xml

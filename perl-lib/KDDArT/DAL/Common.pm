@@ -50,7 +50,7 @@ our @EXPORT   = qw($DTD_PATH $RPOSTGRES_UP_FILE $GIS_BUFFER_DISTANCE
                    $CGI_INDEX_SCRIPT $LINK_PERM $READ_PERM $WRITE_PERM
                    $READ_LINK_PERM $READ_WRITE_PERM $ALL_PERM $VALID_CTYPE
                    $GIS_ENFORCE_GEO_WITHIN $TMP_DATA_PATH $SESSION_STORAGE_PATH
-                   $TIMEZONE $ACCEPT_HEADER_LOOKUP $COOKIE_DOMAIN
+                   $TIMEZONE $ACCEPT_HEADER_LOOKUP $COOKIE_DOMAIN $MAP_TILES_PATH $TILES_PATH $TILES_PUBLIC_PATH
                    $DAL_VERSION $DAL_ABOUT $DAL_COPYRIGHT $NB_RECORD_BULK_INSERT
                    $UNIT_POSITION_SPLITTER $M2M_RELATION
                    $GENO_SPEC_ONE2ONE $GENO_SPEC_ONE2MANY $GENO_SPEC_MANY2MANY
@@ -139,6 +139,12 @@ our $SESSION_STORAGE_PATH     = "FROM CFG_FILE";
 
 our $CFG_FILE_PATH            = "$main::kddart_base_dir/secure/kddart_dal.cfg";
 
+our $MAP_TILES_PATH           = "FROM CFG_FILE";
+
+our $TILES_PATH               = "FROM CFG_FILE";
+
+our $TILES_PUBLIC_PATH        = "FROM CFG_FILE";
+
 our $NB_RECORD_BULK_INSERT    = 3000;
 
 our $GIS_BUFFER_DISTANCE;
@@ -170,7 +176,7 @@ our $ACCEPT_HEADER_LOOKUP   = { 'application/json' => 'JSON',
 
 our $VALID_CTYPE            = {'xml' => 1, 'json' => 1, 'geojson' => 1};
 
-our $DAL_VERSION            = '2.6.3';
+our $DAL_VERSION            = '2.7.0';
 our $DAL_COPYRIGHT          = 'Copyright (c) 2022, Diversity Arrays Technology, All rights reserved.';
 our $DAL_ABOUT              = 'Data Access Layer';
 

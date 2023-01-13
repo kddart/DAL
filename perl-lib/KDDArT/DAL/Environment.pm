@@ -38,12 +38,19 @@ use Time::HiRes qw( tv_interval gettimeofday );
 use Digest::MD5 qw(md5 md5_hex md5_base64);
 use DateTime;
 use Crypt::Random qw( makerandom );
-use DateTime;
 use DateTime::Format::Pg;
 use JSON::Validator;
 use JSON::XS qw(decode_json);
 use Text::CSV;
-
+use File::Basename;
+use File::Spec::Functions qw(catfile);
+use File::Temp qw/ tempfile tempdir/;
+use File::Copy::Recursive qw(dircopy);
+use POSIX qw(ceil);
+use List::Util qw(min);
+use MIME::Base64 qw(encode_base64 decode_base64);
+use File::Path;
+use Data::Dumper;
 
 sub setup {
 
@@ -110,6 +117,7 @@ sub setup {
                                                   'log_environment_data',
                                                   'add_layer_attribute_bulk',
                                                   'import_layer_data_csv',
+                                                  'add_tileset',
       );
 
   $self->run_modes(
@@ -144,6 +152,10 @@ sub setup {
     'add_layer_data'                       => 'add_layer_data_runmode',
     'update_layer_data_gadmin'             => 'update_layer_data_runmode',
     'del_layer_data_gadmin'                => 'del_layer_data_runmode',
+    'add_tileset'                          => 'add_tileset_runmode',
+    'get_tileset'                          => 'get_tileset_runmode',
+    'update_tileset'                       => 'update_tileset_runmode',
+    'get_tile'                             => 'get_tile_runmode',
     );
 
   my $logger = get_logger();
@@ -859,7 +871,17 @@ sub add_layer_runmode {
     $self->logger->debug("Layer Id: $layer_id");
 
     # add transfered attributes from the parent layer
-
+    if (uc($layer_type) eq 'LAYERTILES') {
+      
+      my ($add_tileset_err, $add_tileset_msg) = $self->create_tileset($layer_id, $query);
+      
+      if ($add_tileset_err) {
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $add_tileset_msg}]};
+        return $data_for_postrun_href;
+      }
+    }
+    
     if (uc($layer_type) eq '2D' ) {
 
       my ($err_status, $postrun_href) = $self->mk_2d_layer_data_table($dbh_gis_write,
@@ -2312,12 +2334,68 @@ sub list_layer_full_runmode {
 =cut
 
   my $self  = shift;
+  my $query = $self->query();
+  
+  my $filtering_csv = '';
+
+  if (defined $query->param('Filtering')) {
+
+    $filtering_csv = $query->param('Filtering');
+  }
 
   my $data_for_postrun_href = {};
 
   my $group_id = $self->authen->group_id();
   my $gadmin_status = $self->authen->gadmin_status();
   my $perm_str = permission_phrase($group_id, 1, $gadmin_status, 'layer');
+
+  my $dbh = connect_gis_read();
+
+  my ($sfield_err, $sfield_msg, $sfield_data, $pkey_data) = get_static_field($dbh, 'layer');
+
+  if ($sfield_err) {
+
+    $self->logger->debug("Get static field failed: $sfield_msg");
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my @field_list_all;
+
+  for my $sfield_rec (@{$sfield_data}) {
+
+    push(@field_list_all, $sfield_rec->{'Name'});
+  }
+
+  for my $pkey_field (@{$pkey_data}) {
+
+    push(@field_list_all, $pkey_field);
+  }
+
+  my ($filter_err, $filter_msg, $filter_phrase, $where_arg) = parse_filtering('id',
+                                                                              'layer',
+                                                                              $filtering_csv,
+                                                                              \@field_list_all);
+
+  $self->logger->debug("Filter phrase: $filter_phrase");
+
+  if ($filter_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $filter_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $filter_where_phrase = "WHERE (($perm_str) & $READ_PERM) = $READ_PERM ";
+
+  if (length($filter_phrase)) {
+
+    $filter_where_phrase .= " AND $filter_phrase ";
+  }
 
   my $sql = "SELECT layer.id as layerid, ";
   $sql   .= "layer.name as layername, ";
@@ -2341,7 +2419,7 @@ sub list_layer_full_runmode {
   $sql   .= "player.name as parentlayername, ";
   $sql   .= "$perm_str as ultimateperm ";
   $sql   .= "FROM layer LEFT JOIN layer as player ON layer.parent = player.id ";
-  $sql   .= "WHERE (($perm_str) & $READ_PERM) = $READ_PERM ";
+  $sql   .= $filter_where_phrase;
   $sql   .= "ORDER BY layer.id DESC";
 
   my ($read_layer_err, $read_layer_msg, $layer_data_aref) = $self->list_layer(1, 1, $sql);
@@ -5878,11 +5956,21 @@ sub del_layer_runmode {
 
   my @drop_table_list;
 
+  if (uc($layer_type) eq 'LAYERTILES') {
+
+    my ($err, $err_msg) = $self->delete_tileset($layer_id);
+    if ($err) {
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+      return $data_for_postrun_href;
+    }
+  }
+  
   if (uc($layer_type) eq '2D') {
 
     push(@drop_table_list, "layer2d$layer_id");
   }
-  else {
+  else{
 
     push(@drop_table_list, "layer$layer_id");
     push(@drop_table_list, "layer${layer_id}attrib");
@@ -8636,6 +8724,786 @@ sub logger {
 
   my $self = shift;
   return $self->{logger};
+}
+
+sub add_tileset_runmode {
+
+=pod add_tileset_HELP_START
+{
+"OperationName": "Add tileset",
+"Description": "Add a set of tiles to an existing tileset.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"KDDArTModule": "environment",
+"KDDArTTable": "tileset",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='Tileset (123) has been updated successfully.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'Tileset (123) has been updated successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Tileset (123) not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Tileset (123) not found.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing TilesetId"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self        = $_[0];
+  my $tileset_id  = $self->param('id');
+  my $query       = $self->query();
+  my $minzoom     = $query->param('minzoom');
+  my $maxzoom     = $query->param('maxzoom');
+  my $resolution  = $query->param('resolution');
+  my $imagetype   = $query->param('imagetype');
+  my $tilesjson   = $query->param('tilesjson');
+
+  my $uploadfile  = $self->authen->get_upload_file();
+
+  my $description = $query->param('description') // "";
+  my $spectrum    = $query->param('spectrum') // "";
+  my $metadata    = $query->param("metadata") // "";
+  my $source      = $query->param('source') // ""; 
+  my $override    = $query->param('override') // 0;
+
+  my ($missing_err, $missing_href) = check_missing_href({ 
+                                                          'minzoom'     => $minzoom,
+                                                          'maxzoom'     => $maxzoom,
+                                                          'resolution'  => $resolution,
+                                                          'imagetype'   => $imagetype,
+                                                          'tilesjson'   => $tilesjson,
+                                                         });
+  if ($missing_err) {
+    return _set_error([$missing_href]);
+  }
+
+  my ($int_err, $int_msg_href) = check_integer_href({ 'minzoom' => $minzoom, 'maxzoom' => $maxzoom, 'resolution' => $resolution });
+  if ($int_err) {
+    return _set_error([$int_msg_href]);
+  }
+
+  my $temp_tiles_dir = tempdir(CLEANUP=>1); # Create a temporary directory to store all the unzipped files
+  {
+    my ($temp_zip_fh, $temp_zip_fn) = tempfile(SUFFIX=>".tar.gz");
+    my $encoded_content = do {
+      local $/ = undef;
+      open my $fh, "<", $uploadfile or die $!;
+      <$fh>;
+    };
+    print $temp_zip_fh decode_base64($encoded_content);
+    #
+    my $cmd = sprintf("tar xf %s -C %s", $temp_zip_fn, $temp_tiles_dir);
+    my $err = system($cmd);
+    return _set_error("Unexpected error.") if ($err);
+  }
+
+  my $tiles_href;
+  eval {
+    eval {$tiles_href = decode_json($tilesjson); 1;} or do { die "tiles json is not a valid JSON string.\n"; };
+    my @zooms = keys(%$tiles_href);
+    my @sorted = sort { $a <=> $b } @zooms;
+    if ($minzoom != $sorted[0] || $maxzoom != $sorted[scalar(@sorted)-1]) {
+      die "json zoom levels not match.\n";
+    }
+    1;
+  } or do {
+    return _set_error($@);
+  };
+
+  if (!is_tiles_directory_match(read_layer_zooms_coordinates($temp_tiles_dir), $tiles_href)) {
+    return _set_error("tiles json and upload file not match.");
+  }
+
+  if (length($metadata)) {
+    my ($err, $errmsg) = validate_metadata($metadata);
+    if ($err) {
+      return _set_error($errmsg);
+    }
+  }
+
+  eval {
+    decode_json($source) if (length($source));
+    1;
+  } or do {
+    return _set_error("Source is not a valid JSON string.");
+  };
+
+  my $data_for_postrun_href;
+
+  my $dbh_write = connect_gis_write(1);
+  eval {
+    my $tileset;
+    {
+      my $sql = 'SELECT * FROM tileset WHERE id=?';
+      my $sth = $dbh_write->prepare($sql);
+      my $rv = $sth->execute($tileset_id);
+      $tileset = $sth->fetchrow_hashref;
+      if (!$tileset) {
+        $data_for_postrun_href = _set_error("Tileset ($tileset_id) not found.");
+        return 1;
+      }
+    }
+
+    if (!length($spectrum)) {
+      $spectrum = $tileset->{spectrum};
+    }
+
+    if (!length($description)) {
+      $description = $tileset->{description};
+    }
+
+    if (!length($metadata)) {
+      $metadata = $tileset->{metadata};
+    }
+
+    if (!length($source)) {
+      $source = $tileset->{source};
+    }
+
+    my $status = $tileset->{tilestatus};
+    if (lc($status) eq "completed") {
+      if (!$override) {
+        $data_for_postrun_href = _set_error("Tileset ($tileset_id) is already completed.");
+        return 1;
+      }
+      my $sql = "DELETE FROM tiles WHERE tileset=?";
+      my $sth = $dbh_write->prepare($sql);
+      my $rv = $sth->execute($tileset_id);
+    }
+
+    my $tiles_public_path = "";
+    {
+      my $tilespath = catfile($TILES_PATH, $tileset_id);
+      rmtree($tilespath) if (-e $tilespath);
+      mkdir $tilespath;
+      dircopy($temp_tiles_dir, $tilespath);
+      $tiles_public_path = catfile($TILES_PUBLIC_PATH, $tileset_id);
+    }
+
+    {
+      my $values = "";
+      foreach my $zoom (keys(%$tiles_href)) {
+        my $x_2y_href = $tiles_href->{$zoom};
+        foreach my $x_coord (keys(%$x_2y_href)) {
+          my $y_coords = $x_2y_href->{$x_coord};
+          foreach my $y_coord (keys(%$y_coords)) {
+            my $tile_coords_aref = $tiles_href->{$zoom}->{$x_coord}->{$y_coord};
+            my $location = tomultipolygon($tile_coords_aref);
+            $values .= qq|($tileset_id, $location, $x_coord, $y_coord, $zoom),|;
+          }
+        }
+      }
+      chop($values);
+      my $sql = "";
+      $sql .= "INSERT INTO tiles (tileset, geometry, xcoord, ycoord, zoomlevel) VALUES $values";
+      my $sth = $dbh_write->prepare($sql);
+      my $rv = $sth->execute();
+    }
+
+    my $sql = "";
+    $sql   .= 'UPDATE tileset SET ';
+    $sql   .= 'resolution = ?, ';
+    $sql   .= 'minzoom = ?, ';
+    $sql   .= 'maxzoom = ?, ';
+    $sql   .= 'tilepath = ?, ';
+    $sql   .= 'spectrum = ?, ';
+    $sql   .= 'tilestatus = ?, ';
+    $sql   .= 'imagetype = ?, ';
+    $sql   .= 'description = ?, ';
+    $sql   .= 'metadata = ?, ';
+    $sql   .= 'source = ? ';
+    $sql   .= 'WHERE id=?';
+    my $sth = $dbh_write->prepare($sql);
+    my $rv = $sth->execute($resolution, $minzoom, $maxzoom, $tiles_public_path, $spectrum, "completed", $imagetype, $description, $metadata, $source, $tileset_id);
+    $dbh_write->commit;
+
+    $data_for_postrun_href = {};
+    my $info_msg_aref = [{'Message' => "Tileset ($tileset_id) has been updated successfully."}];
+    $data_for_postrun_href->{'Error'}     = 0;
+    $data_for_postrun_href->{'Data'}      = {'Info' => $info_msg_aref};
+    $data_for_postrun_href->{'ExtraData'} = 0;
+
+    1;
+  } or do {
+    $self->logger->debug($@);
+    eval {$dbh_write->rollback};
+    $data_for_postrun_href = _set_error("Unexpected error.");
+  };
+
+  $dbh_write->disconnect;
+  return $data_for_postrun_href;
+}
+
+sub get_tileset_runmode {
+  
+=pod get_tileset_HELP_START
+{
+"OperationName": "Get tileset",
+"Description": "Return detailed information about a tileset in the system specified by tileset id.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Tileset id='123' geometry='POLYGON((30.2994731209255 -30.0858403095939,30.2843632260048 -30.1137608252837,30.3090885086023 -30.1137608252837,30.317330269468 -30.0923756052706,30.2994731209255 -30.0858403095939))' resolution='0' minzoom='0' maxzoom='0' tilepath='gis/tiles/123' spectrum='True Color' tilestatus='completed' imagetype='png' description='' metadata='' source='{'name':'Sentinel-2'}'/><RecordMeta TagName='Tileset' /></DATA>",
+"SuccessMessageJSON": "{'Tileset' : [{'id': 123, 'geometry': 'POLYGON((30.2994731209255 -30.0858403095939,30.2843632260048 -30.1137608252837,30.3090885086023 -30.1137608252837,30.317330269468 -30.0923756052706,30.2994731209255 -30.0858403095939))', 'resolution': 0, 'minzoom': 0, 'maxzoom': 0, 'tilepath': 'gis/tiles/123', 'spectrum': 'True Color', 'tilestatus': 'completed', 'imagetype': 'png', 'description': '', 'metadata': '', 'source': {'name':'Sentinel-2'}}], 'RecordMeta' : [{'TagName' : 'Tileset'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Tileset (15) not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Tileset (15) not found.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing tileset id"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self        = shift;
+  my $tileset_id  = $self->param('id');
+
+  my $data_for_postrun_href;
+
+  my $dbh_read = connect_gis_read();
+  $dbh_read->{RaiseError} = 1;
+  eval {
+
+    my $sql = '';
+    $sql .= 'SELECT id AS id, ST_AsText(geometry) AS geometry, resolution AS resolution, ';
+    $sql .= 'minzoom AS minzoom, maxzoom AS maxzoom, tilepath AS tilepath, spectrum AS spectrum, ';
+    $sql .= 'tilestatus AS tilestatus, imagetype AS imagetype, description AS description, ';
+    $sql .= 'metadata AS metadata, source AS source FROM tileset WHERE id=?';
+
+    my $sth = $dbh_read->prepare($sql);
+    my $rv = $sth->execute($tileset_id);
+    my $tileset = $sth->fetchrow_hashref;
+
+    if (!defined($tileset)) {
+      $data_for_postrun_href = _set_error("Tileset ($tileset_id) not found.");
+      return 1;
+    }
+
+    $data_for_postrun_href            = {};
+    $data_for_postrun_href->{'Error'} = 0;
+    $data_for_postrun_href->{'Data'}  = {'Tileset'   => [$tileset],
+                                        'RecordMeta'=> [{'TagName' => 'Tileset'}],};
+
+    1;
+  } or do {
+    $self->logger->debug($@);
+    $data_for_postrun_href = _set_error("Unexpected error.");
+  };
+
+  $dbh_read->disconnect;
+  return $data_for_postrun_href;
+}
+
+sub update_tileset_runmode {
+
+=pod update_tileset_HELP_START
+{
+"OperationName": "Update tileset",
+"Description": "Update GIS tileset definition",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"KDDArTModule": "environment",
+"KDDArTTable": "tileset",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='Tileset (123) has been updated successfully.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'Tileset (123) has been updated successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Tileset (123) not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Tileset (123) not found.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing TilesetId"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self        = shift;
+  my $tileset_id  = $self->param('id');
+  my $query       = $self->query();
+
+  my $data_for_postrun_href;
+
+  my $dbh_write = connect_gis_write(1);
+  eval {
+    my $tileset;
+    {
+      my $sql = 'SELECT * FROM tileset WHERE id=?';
+      my $sth = $dbh_write->prepare($sql);
+      my $rv = $sth->execute($tileset_id);
+      $tileset = $sth->fetchrow_hashref;
+      if (!$tileset) {
+        $data_for_postrun_href = _set_error("Tileset ($tileset_id) not found.");
+        return 1;
+      }
+    }
+
+    my $minzoom = $query->param('minzoom') // '';
+    if (!length($minzoom)) {
+      $minzoom = $tileset->{minzoom};
+    } else {
+      my ($int_err, $int_msg_href) = check_integer_href({ 'minzoom' => $minzoom });
+      if ($int_err) { 
+        $data_for_postrun_href = _set_error([$int_msg_href]);
+        return 1;
+      }
+    }
+
+    my $maxzoom = $query->param('maxzoom') // '';
+    if (!length($maxzoom)) {
+      $maxzoom = $tileset->{maxzoom};
+    } else {
+      my ($int_err, $int_msg_href) = check_integer_href({ 'maxzoom' => $maxzoom });
+      if ($int_err) { 
+        $data_for_postrun_href = _set_error([$int_msg_href]);
+        return 1;
+      }
+    }
+
+    my $resolution = $query->param('resolution') // '';
+    if (!length($resolution)) {
+      $resolution = $tileset->{resolution};
+    } else {
+      my ($int_err, $int_msg_href) = check_integer_href({ 'resolution' => $resolution });
+      if ($int_err) { 
+        $data_for_postrun_href = _set_error([$int_msg_href]);
+        return 1;
+      }
+    }
+
+    my $geometry = $query->param('geometry') // "";
+    if (!length($geometry)) {
+      $geometry = $tileset->{geometry};
+    } else {
+      my ($is_wkt_err, undef) = is_valid_wkt_href($dbh_write, {'geometry' => $geometry}, 'polygon');
+      if ($is_wkt_err) {
+        $data_for_postrun_href = _set_error("geometry is not valid.");
+        return 1;
+      }
+    }
+
+    my $spectrum = $query->param('spectrum') // '';
+    if (!length($spectrum)) {
+      $spectrum = $tileset->{spectrum};
+    }
+
+    my $tilestatus = $query->param('tilestatus') // '';
+    if (!length($tilestatus)) {
+      $tilestatus = $tileset->{tilestatus};
+    } else {
+      my $status = lc($tilestatus);
+      if ($status ne "created" && $status ne "processing" && $status ne "completed") {
+        $data_for_postrun_href = _set_error("Tileset status ($tilestatus) not valid.");
+        return 1;
+      }
+      $tilestatus = $status;
+    }
+
+    my $imagetype = $query->param('imagetype') // '';
+    if (!length($imagetype)) {
+      $imagetype = $tileset->{imagetype};
+    }
+
+    my $description = $query->param('description') // '';
+    if (!length($description)) {
+      $description = $tileset->{description};
+    }
+
+    my $metadata = $query->param('metadata') // '';
+    if (!length($metadata)) {
+      $metadata = $tileset->{metadata};
+    } else {
+      my ($err, $errmsg) = validate_metadata($metadata);
+      if ($err) {
+        $data_for_postrun_href = _set_error($errmsg);
+        return 1;
+      }
+    }
+
+    my $source = $query->param('source') // '';
+    if (!length($source)) {
+      $source = $tileset->{source};
+    } else {
+      eval {
+        decode_json($source);
+        1;
+      } or do {
+        $data_for_postrun_href = _set_error("Source is not a valid JSON");
+        return 1;
+      };
+    }
+
+    {
+      my $sql = '';
+      $sql   .= 'UPDATE tileset SET ';
+      $sql   .= 'minzoom = ?, ';
+      $sql   .= 'maxzoom = ?, ';
+      $sql   .= 'resolution = ?, ';
+      $sql   .= 'geometry = ?, ';
+      $sql   .= 'spectrum = ?, ';
+      $sql   .= 'tilestatus = ?, ';
+      $sql   .= 'imagetype = ?, ';
+      $sql   .= 'description = ?, ';
+      $sql   .= 'metadata = ?, ';
+      $sql   .= 'source = ? ';
+      $sql   .= 'WHERE id=?';
+      my $sth = $dbh_write->prepare($sql);
+      my $rv = $sth->execute($minzoom, $maxzoom, $resolution, $geometry, $spectrum, $tilestatus, $imagetype, $description, $metadata, $source, $tileset_id);
+    }
+
+    $dbh_write->commit;
+
+    $data_for_postrun_href = {};
+    my $info_msg_aref = [{'Message' => "Tileset ($tileset_id) has been updated successfully."}];
+    $data_for_postrun_href->{'Error'}     = 0;
+    $data_for_postrun_href->{'Data'}      = {'Info' => $info_msg_aref};
+    $data_for_postrun_href->{'ExtraData'} = 0;
+
+    1;
+  } or do {
+    $self->logger->debug($@);
+    $data_for_postrun_href = _set_error("Unexpected error.");
+    eval {$dbh_write->rollback};
+  };
+
+  $dbh_write->disconnect;
+  return $data_for_postrun_href;
+}
+
+sub get_tile_runmode {
+
+=pod get_tile_HELP_START
+{
+"OperationName": "Get tile",
+"Description": "Get the raster image of a tile specified by tileset id, z, x, and y.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
+"URLParameter": [{"ParameterName": "id", "Description": "tileset id"}, {"ParameterName": "z", "Description": "zoom level of the tile"}, {"ParameterName": "x", "Description": "vertical location offset of the tile (aka. row)"}, {"ParameterName": "y", "Description": "horizontal location offset of the tile (aka. column)"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 404}]
+}
+=cut
+
+  my $self        = shift;
+  my $tileset_id  = $self->param('id');
+  my $z           = $self->param('z');
+  my $x           = $self->param('x');
+  my $y           = $self->param('y');
+
+  my $image_dir = "$TILES_PATH/";
+
+  $self->header_add(-status => 404);
+
+  if ($tileset_id !~ /^ *(\d+) *$/) {
+    return ""
+  } else {
+    $tileset_id = $1;
+  }
+
+  if ($z !~ /^ *(\d+) *$/) {
+    return ""
+  } else {
+    $z = $1;
+  }
+
+  if ($x !~ /^ *(\d+) *$/) {
+    return ""
+  } else {
+    $x = $1;
+  }
+
+  if ($y !~ /^ *(\d+) *$/) {
+    return ""
+  } else {
+    $y = $1;
+  }
+
+  $image_dir .= $tileset_id;
+  if (-d $image_dir) {
+    $image_dir .= "/$z";
+    if (-d $image_dir) {
+      $image_dir .= "/$x";
+      if (-d $image_dir) {
+        opendir(my $tiles_fh, $image_dir) || die $!;
+        my @image_files = grep {/^$y.(png|jpg)$/ && -f "$image_dir/$_"} readdir ($tiles_fh);
+        closedir $tiles_fh;
+        if (scalar(@image_files)) {
+          my $image_name = $image_files[0];
+          $image_dir .= "/$image_name";
+          my $ext = substr($image_name, -3);
+          open my $fh, '<', $image_dir or die $!;
+          my $image_content =  do { local $/; <$fh> };
+          $self->header_add(-status => 200);
+          $self->header_add(-type => $ext eq "png" ? "image/png" : "image/jpg" );
+          return $image_content
+        }
+      }
+    }
+  }
+
+  return ""
+}
+
+sub _set_error {
+  my $errmsg = $_[0] || "Unexpected error.";
+  return {
+    'Error' => 1,
+    'Data'  => { 'Error' => [ { 'Message' => $errmsg } ] }
+  };
+}
+
+sub read_layer_zooms_coordinates {
+  my $path = shift;
+
+  my $zooms_2coordinates_href = {};
+
+  opendir(my $layer_dh, $path) || die $!;
+  my @zooms = grep {/^\d+$/ && -d "$path/$_"} readdir ($layer_dh);
+  closedir $layer_dh;
+
+  foreach my $zoom (@zooms) {
+    my $zoom_path = "$path/$zoom";
+
+    $zoom = int($zoom);
+    my $x_2y_href = {};
+    $zooms_2coordinates_href->{$zoom} = $x_2y_href;
+
+    opendir(my $zoom_dh, $zoom_path) || die $!;
+    my @x_coords = grep {/^\d+$/ && -d "$zoom_path/$_"} readdir ($zoom_dh);
+    closedir $zoom_dh;
+
+    foreach my $x_coord (@x_coords) {
+      my $x_path = "$zoom_path/$x_coord";
+
+      $x_coord = int($x_coord);
+      my $y_href = {};
+      $x_2y_href->{$x_coord} = $y_href;
+
+      opendir(my $x_dh, $x_path) || die $!;
+      my @y_coords = grep {/^\d+.png$/ && -f "$x_path/$_"} readdir ($x_dh);
+      closedir $x_dh;
+
+      foreach my $y_coord (@y_coords) {
+        $y_coord =~ /^(\d+).png$/;
+        $y_coord = int($1);
+		    $y_href->{$y_coord} = undef;
+      }
+    }
+  }
+
+  return $zooms_2coordinates_href
+}
+
+sub is_tiles_directory_match {
+  my $truth = $_[0];
+  my $test = $_[1];
+  my @zooms = keys(%$truth);
+  return 0 if (scalar(@zooms) != scalar(keys(%$test)));
+  foreach my $zoom (@zooms) {
+    return 0 if (!defined($test->{$zoom}));
+    my @xcoords = keys(%{$truth->{$zoom}});
+    return 0 if (scalar(@xcoords) != scalar(keys(%{$test->{$zoom}})));
+    foreach my $xcoord (@xcoords) {
+      return 0 if (!defined($test->{$zoom}->{$xcoord}));
+      my @ycoords = keys(%{$truth->{$zoom}->{$xcoord}});
+      return 0 if (scalar(@ycoords) != scalar(keys(%{$test->{$zoom}->{$xcoord}})));
+      foreach my $ycoord (@ycoords) {
+        return 0 if (!defined($test->{$zoom}->{$xcoord}->{$ycoord}));
+      }
+    }
+  }
+  return 1;
+}
+
+sub tomultipolygon {
+  my $bound_aref = shift;
+  my $lat_deg  = $bound_aref->[0];
+  my $lon_deg  = $bound_aref->[1];
+  my $lat_deg1 = $bound_aref->[2];
+  my $lon_deg1 = $bound_aref->[3];
+  return "ST_GeomFromText('GEOMETRYCOLLECTION(POLYGON(($lon_deg $lat_deg, $lon_deg1 $lat_deg, $lon_deg1 $lat_deg1, $lon_deg $lat_deg1, $lon_deg $lat_deg)))')"
+}
+
+sub validate_metadata {
+  my $metadata = $_[0];
+  my $ret;
+  eval {
+      my $metadata_href = decode_json($metadata);
+      $ret = [0];
+      1;
+    } or do {
+      $ret = [1, "Metadata is not a valid JSON"];
+    };
+    return $ret->[0], $ret->[1];
+}
+
+sub create_tileset {
+  my $self      = $_[0];
+  my $layer_id  = $_[1];
+  my $query     = $_[2];
+
+  my $ret;
+
+  my $dbh_write = connect_gis_write(1);
+  eval {
+    my $layer_existence = record_existence($dbh_write, 'layer', 'id', $layer_id);
+    if (!$layer_existence) {
+      $ret = [1, "layer ($layer_id) does not exist."];
+      return 1;
+    }
+
+    my $tileset_existence = record_existence($dbh_write, 'tileset', 'id', $layer_id);
+    if ($tileset_existence) {
+      $ret = [1, "tileset ($layer_id) already exists."];
+      return 1;
+    }
+
+    my $layertype = read_cell_value($dbh_write, 'layer', 'layertype', 'id', $layer_id);
+    if (lc($layertype) ne "layertiles") {
+      $ret = [1, "layer type ($layertype) is not layertiles."];
+      return 1;
+    }
+
+    my $minzoom = $query->param('minzoom') // '';
+    if (!length($minzoom)) {
+      $minzoom = -1;
+    } else {
+      my ($int_err, undef) = check_integer_href({ 'minzoom' => $minzoom });
+      if ($int_err) { 
+        $ret = [1, "minzoom is not an integer"];
+        return 1;
+      }
+    }
+
+    my $maxzoom = $query->param('maxzoom') // '';
+    if (!length($maxzoom)) {
+      $maxzoom = -1;
+    } else {
+      my ($int_err, undef) = check_integer_href({ 'maxzoom' => $maxzoom });
+      if ($int_err) { 
+        $ret = [1, "maxzoom is not an integer"];
+        return 1;
+      }
+    }
+
+    my $resolution = $query->param('resolution') // '';
+    if (!length($resolution)) {
+      $resolution = -1;
+    } else {
+      my ($int_err, undef) = check_integer_href({ 'resolution' => $resolution });
+      if ($int_err) { 
+        $ret = [1, "resolution is not an integer"];
+        return 1;
+      }
+    }
+
+    my $geometry = $query->param('geometry') // "";
+    if (length($geometry)) {
+      my ($is_wkt_err, undef) = is_valid_wkt_href($dbh_write, {'geometry' => $geometry}, 'polygon');
+      if ($is_wkt_err) {
+        $ret = [1, "geometry is not valid."];
+        return 1;
+      }
+    } else {
+      $geometry = undef;
+    }
+
+    my $spectrum = $query->param('spectrum') // '';
+
+    my $imagetype = $query->param('imagetype') // '';
+
+    my $description = $query->param('description') // '';
+
+    my $metadata = $query->param('metadata') // '';
+    if (length($metadata)) {
+      my ($err, $errmsg) = validate_metadata($metadata);
+      if ($err) {
+        $ret = [1, $errmsg];
+        return 1;
+      }
+    }
+
+    my $source = $query->param('source') // '';
+    if (length($source)) {
+      eval {
+        decode_json($source);
+        1;
+      } or do {
+        $ret = [1, "Source is not a valid JSON"];
+        return 1;
+      };
+    }
+
+    my $sql = '';
+    $sql .= 'INSERT INTO tileset ';
+    $sql .= '(id, geometry, resolution, minzoom, maxzoom, tilepath, spectrum, ';
+    $sql .= 'tilestatus, imagetype, description, metadata, source) ';
+    $sql .= 'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
+    my $sth = $dbh_write->prepare($sql);
+    my $rv = $sth->execute($layer_id, $geometry, $resolution, $minzoom, $maxzoom, '', $spectrum, 'created', $imagetype, $description, $metadata, $source);
+
+    $dbh_write->commit;
+
+    $ret = [0];
+
+    1;
+  } or do {
+    $self->logger->debug($@);
+    eval {$dbh_write->rollback};
+    $ret = [1, "Unexpected error."];
+  };
+
+  $dbh_write->disconnect;
+  return $ret->[0], $ret->[1];
+}
+
+sub delete_tileset {
+  my $self        = $_[0];
+  my $tileset_id  = $_[1];
+
+  my $ret;
+
+  my $dbh_write = connect_gis_write(1);
+  eval {
+    my $tileset_existence = record_existence($dbh_write, 'tileset', 'id', $tileset_id);
+    if (!$tileset_existence) {
+      $ret = [1, "tileset ($tileset_id) does not exist."];
+      return 1;
+    }
+
+    {
+      # Remove all tiles belonging to the tileset
+      my $sql = '';
+      $sql .= 'DELETE FROM tiles WHERE tileset=?';
+      my $sth = $dbh_write->prepare($sql);
+      my $rv = $sth->execute($tileset_id);
+    }
+
+    {
+      # Remove the tiles folder
+      my $tiles_path = catfile($TILES_PATH, $tileset_id);
+      rmtree $tiles_path if (-e $tiles_path);
+    }
+
+    {
+      # Remove the tileset
+      my $sql = '';
+      $sql .= 'DELETE FROM tileset WHERE id=?';
+      my $sth = $dbh_write->prepare($sql);
+      my $rv = $sth->execute($tileset_id);
+    }
+
+    $dbh_write->commit;
+
+    $ret = [0];
+
+    1;
+  } or do {
+    $self->logger->debug($@);
+    eval {$dbh_write->rollback};
+    $ret = [1, "Unexpected error."];
+  };
+
+  $dbh_write->disconnect;
+  return $ret->[0], $ret->[1];
 }
 
 1;

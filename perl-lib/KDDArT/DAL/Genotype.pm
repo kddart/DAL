@@ -1181,7 +1181,7 @@ sub add_specimen_runmode {
   my $breed_method_id       = $query->param('BreedingMethodId');
 
   my $specimen_barcode      = undef;
-  my $is_active             = '';
+  my $is_active             = 1;
   my $pedigree              = '';
   my $selection_history     = '';
   my $filial_generation     = undef;
@@ -1193,7 +1193,7 @@ sub add_specimen_runmode {
     $is_active = $query->param('IsActive');
     $chk_int_href->{'IsActive'} = $is_active;
   }
-
+  
   if ( length($query->param('Pedigree')) > 0 ) {
 
     $pedigree  = $query->param('Pedigree');
@@ -13706,7 +13706,7 @@ sub list_gen_pedigree_advanced_runmode {
   $self->logger->debug("Field list all: " . join(',', @field_list_all));
 
   my $final_field_list = \@field_list_all;
-  my @filtering_field_list = ('GenotypeId','ParentGenotypeId', 'GenotypeName','ParentGenotypeName', 'GenParentTypeId','GenParentTypeName','GenPedigreeId');
+  my @filtering_field_list = ('GenotypeId','ParentGenotypeId', 'GenotypeName','ParentGenotypeName', 'GenParentTypeId','GenParentTypeName','GenPedigreeId', 'GenParentType');
 
   $self->logger->debug("Final field list: " . join(',', @{$final_field_list}));
 

@@ -3,7 +3,6 @@
   <Delete TargetURL="delete/trialunit/:TrialUnitId" />
   <INPUT ParaName="TrialId" SrcValue="xml/add_data_no_vcol/case_00007_add_trial.xml" />
   <INPUT ParaName="SampleSupplierId" Value="1" />
-  <INPUT ParaName="TreatmentId" SrcValue="xml/add_data_no_vcol/case_00119_add_treatment.xml" />
   <INPUT ParaName="ReplicateNumber" Value="2" />
   <INPUT ParaName="SampleEntryNumber" Value="3" />
   <INPUT ParaName="TrialUnitBarcode" PrefixVal="BAR" Random="1" />

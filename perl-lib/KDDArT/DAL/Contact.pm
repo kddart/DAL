@@ -33,6 +33,8 @@ use KDDArT::DAL::Security;
 use CGI::Application::Plugin::Session;
 use Log::Log4perl qw(get_logger :levels);
 use Time::HiRes qw( tv_interval gettimeofday );
+use DateTime;
+use DateTime::Format::Pg;
 
 
 sub setup {
@@ -1655,13 +1657,13 @@ sub add_contact_runmode {
 
     my $dbh_gis_write = connect_gis_write();
 
-    $sql  = "INSERT INTO contactloc (contactid, contactlocation) ";
-    $sql .= "VALUES (?, ST_Multi(ST_GeomFromText(?, -1)))";
+    $sql  = "INSERT INTO contactloc (contactid, contactlocation, contactlocdt, currentloc) ";
+    $sql .= "VALUES (?, ST_Multi(ST_GeomFromText(?, -1)), ?, ?)";
 
     $self->logger->debug("ContactId: $contact_id");
 
     my $gis_sth = $dbh_gis_write->prepare($sql);
-    $gis_sth->execute($contact_id, $contactlocation);
+    $gis_sth->execute($contact_id, $contactlocation, DateTime::Format::Pg->parse_datetime(DateTime->now()), 0);
 
     if ($dbh_gis_write->err()) {
 

@@ -54,7 +54,7 @@ password = monetdb
  - copy index.pl file there
  - create 'perl-lib' subfolder in '/srv/www/'
  - copy content of perl-lib installation into created folder
- - make sure you have a sufficient access privilegs to both folders and contents to be run 
+ - make sure you have a sufficient access privilegs to both folders and contents to be run
    by wwwrun user and www group
  - inside 'perl-lib' folder issue a command - find . -name '*.pm' -exec perl -c {} ";"
  - perl will report missing dependencies. Install them and re-issue above command until it does not
@@ -79,7 +79,7 @@ password = monetdb
 
 * Setting Default Permission on DAL temporary directory
 
-   In the marker module, DAL uses the COPY INTO file SQL statement supported by MonetDB to export the marker dataset into a file stored in DAL temporary directory '/tmp/kddart'. By default, upon creation, the file from MonetDB is readable only by root which causes a problem in the export marker dataset functionality. So, DAL relies on the file system Access Control List (ACL) to change the default permission of the file when it is created. Although ACLs are supported by most of the GNU/Linux file systems including ext4, its support is really dependent on the setting on the individual GNU/Linux system setting in /etc/fstab. 
+   In the marker module, DAL uses the COPY INTO file SQL statement supported by MonetDB to export the marker dataset into a file stored in DAL temporary directory '/tmp/kddart'. By default, upon creation, the file from MonetDB is readable only by root which causes a problem in the export marker dataset functionality. So, DAL relies on the file system Access Control List (ACL) to change the default permission of the file when it is created. Although ACLs are supported by most of the GNU/Linux file systems including ext4, its support is really dependent on the setting on the individual GNU/Linux system setting in /etc/fstab.
 
    To enable export marker dataset functionality, the mount arguments for / or the parent mount point where DAL temporary directory resides must contain an ACL like:
 
@@ -95,7 +95,7 @@ password = monetdb
  - Perl script other/dal_access_test.pl is a good example of how to use DAL programmatically. Initial DAL installation is done with user named 'admin' and password 'kddartadmin' and this user belongs to the group with id '0' (zero). To test your installation go to folder 'other' and issue a command:
 
    perl -w dal_access_test.pl 'http://kddart.example.com/dal' 'admin' 'kddartadmin' 0
-   
+
  - Full test suite of KDDart is located at other/whitebox_test_cases/TestSuite folder
  - in other/whitebox_test_cases/TestSuite, issue a command:
 

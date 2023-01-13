@@ -252,6 +252,18 @@ CGI::Application::Dispatch->dispatch(
     'layer2d/:layerid/delete/data/:recid'               => { app => 'KDDArT::DAL::Environment',
                                                              rm  => 'del_layer2d_data_gadmin' },
 
+    'add/tileset/:id'                                   => { app => 'KDDArT::DAL::Environment',
+                                                             rm  => 'add_tileset' },
+
+    'get/tileset/:id'                                   => { app => 'KDDArT::DAL::Environment',
+                                                             rm  => 'get_tileset' },
+
+    'update/tileset/:id'                                => { app => 'KDDArT::DAL::Environment',
+                                                             rm  => 'update_tileset' },
+
+    'tileset/:id/get/tile/:z/:x/:y'                     => { app => 'KDDArT::DAL::Environment',
+                                                             rm  => 'get_tile' },
+
     'add/genotype'                                      => { app => 'KDDArT::DAL::Genotype',
                                                              rm  => 'add_genotype' },
 
@@ -613,7 +625,6 @@ CGI::Application::Dispatch->dispatch(
     'delete/crossing/:id'                              => { app => 'KDDArT::DAL::Trial',
                                                           rm  => 'del_trial_crossing_gadmin' },
 
-
     'trial/:trialid/list/trialunit'                     => { app => 'KDDArT::DAL::Trial',
                                                              rm  => 'list_trial_unit_advanced' },
 
@@ -637,6 +648,18 @@ CGI::Application::Dispatch->dispatch(
 
     'trialunit/:id/list/specimen/:nperpage/page/:num'   => { app => 'KDDArT::DAL::Trial',
                                                              rm  => 'list_trial_unit_specimen_advanced' },
+
+    'trialunit/:id/add/treatment'                       => { app => 'KDDArT::DAL::Trial',
+                                                             rm  => 'add_trialunit_treatment' },
+
+    'get/trialunittreatment/:id'                        => { app => 'KDDArT::DAL::Trial',
+                                                             rm  => 'get_trialunit_treatment' },
+
+    'delete/trialunittreatment/:id'                     => { app => 'KDDArT::DAL::Trial',
+                                                             rm  => 'remove_trialunit_treatment' },
+
+    'update/trialunittreatment/:id'                     => { app => 'KDDArT::DAL::Trial',
+                                                             rm  => 'update_trialunit_treatment' },                                                                                   
 
     'list/trialunitspecimen/:nperpage/page/:num'        => { app => 'KDDArT::DAL::Trial',
                                                              rm  => 'list_trial_unit_specimen_advanced' },
@@ -1208,6 +1231,5 @@ CGI::Application::Dispatch->dispatch(
 
     'update/genotypeconfig'                             => { app => 'KDDArT::DAL::System',
                                                              rm  => 'update_genotype_config_gadmin' },
-
   ],
 );

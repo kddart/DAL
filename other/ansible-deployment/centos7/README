@@ -59,6 +59,11 @@ and replace x.x.x.x with the IP address of the target machine
 
 8. Run ansible-playbook kddart_dal_v2_5_0_server_deployment_centos7_from_file.yml
 
+It is possible to add specific variables to streamline the installation. For example:
+
+ansible-playbook kddart_dal_v2_7_0_server_deployment_centos7_from_file.yml --extra-vars="local_tar_gz_file='/root/dal.tar.gz' mysqlrootpass='testTest4$' dbpass='testTest4$' ip_network='10.92.17.224/23' dal_address_name='kddartdemo.diversityarrays.com'"
+
+
 9. Login as root to the target machine and execute /root/KDDArT-DAL-v2.5.0/other/run_create_dbs.sh
 
 10. Restart target machine. It must be done before proceeding to the next instruction due SELinux.

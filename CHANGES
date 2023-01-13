@@ -1,3 +1,41 @@
+Version 2.7.0
+Date: 11/01/2023
+Description: Major Database Upgrade 
+
+Database Changes:
+
++ Survey entity added that involves new relations and updates to Sample Measurements, Trial Units and Traits. This creates an opportunity to link multiple Trial Units across different Trials.  
+
++ Trial Unit Treatment entity added that involves new relations and updates to Treatment and Trial Units. This effective allows for multiple treatments to be added to a single Trial Unit. 
+
++ GPS Locations of Sites, Trials, Trial Units, Contacts all now have Datetime fields to allow multiple locations to be stored. Furthermore, Specimens, Surveys and Storage can now have GPS Locations added to them.
+
++ Tileset entity added to support the use of custom tiles for mapping purposes.
+
++ Extract Data and Extract Data File entities created to support expanded Marker Data Import.
+
++ Item Measurement entity added that involves new relation and updates to Item. This allows for measurements to be attached to Item entities.
+
++ Crossing Measurement entity added that involves new relations and updates to Crossing. This allows for measurements to be attached to Crossing entities.
++ Trial Unit Type added for General Types. 
+
++ Taxonomy entity added that invovles new relations and updates to Genotype
+
++ Pedigree allows relation to Trial Unit Specimen in addition to Specimen
+
++ Specimen allows relation to a Crossing to identify potential source Crossing.
+
+Major:
+
++ Trial Treatment endpoints updated to reflect new database structure change. This allows for multiple treatments to be added to a single Trial Unit and the return of multiple Treatments from a single Trial Unit. TreatmentId removed from Trial Unit calls and replaced with a Treatment field that is now an array. 
+
++ End points for Tile Data added. 
+
+Minor: 
+
++ Fixed issue #9522 relating to Genpedigree Filtering on GenParentType
+
+
 Version 2.6.3
 Date: 01/08/2022
 Description: Bug fixing version and minor improvements

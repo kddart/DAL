@@ -1,0 +1,149 @@
+#
+# DAL upgrade script for OpenSUSE Leap 42.2
+# Copyright (c) 2017, Diversity Arrays Technology, All rights reserved.
+#
+# Author: Puthick Hok
+# Date: 23/06/2011
+# Usage: ansible-playbook kddart_dal_upgrade_v2_4_0_to_v2_5_0_leap42_2_from_file.yml
+# Description: By running the usage command, ansible will upgrade DAL.
+#              This script can be run by root.
+#              For more information about how to read and write an ansible playbook,
+#              please refer to ansible documentation on the web.
+#
+
+- hosts: kddartserver
+  gather_facts: no
+
+  pre_tasks:
+    - name: Install sudo
+      raw: zypper --non-interactive --no-gpg-checks install sudo
+    - setup: # does gather_facts
+  
+  vars_prompt:
+    - name: "local_tar_gz_file"
+      prompt: "Enter the source tar.gz file of KDDart wih either relative or full path."
+      private: no
+
+  vars:
+    dal_version: v2.7.0
+    dal_db_version: v2_7_0
+    src_file: /root/KDDArT-DAL-{{ dal_version }}.tar.gz
+    old_dal_db_version: v2_6_0
+    local_dir: /root/KDDArT-DAL-{{ dal_version }}
+    backup_dir: /root/dal_upgrade_db_backup
+    apache_base_dir: /srv/www
+    solr_home: /var/solr
+    force_tasks: True
+
+  tasks:
+
+    - name: Copy the tar.gz file
+      copy: src={{ local_tar_gz_file }} dest={{ src_file }}
+
+    - name: Create local_dir
+      shell: "[[ -d {{ local_dir }} ]] || mkdir {{ local_dir }}"
+
+    - name: Untar and decompress KDDart source
+      shell: >
+        if [ -d {{ local_dir }} ]; then 
+        cd {{ local_dir }};
+        tar --no-same-owner -zxvf {{ src_file }} --strip 1;
+        fi;
+
+    - name: Retrieve MySQL password
+      shell: grep 'password' {{ apache_base_dir }}/secure/mysql_user.txt | gawk 'BEGIN{FS="="}{print $2}END{}' | sed 's| ||g'
+      register: mysqlrootpass
+
+    - name: Retrieve Monetdb password
+      shell: grep 'password' {{ apache_base_dir }}/secure/monetdb_user.txt | gawk 'BEGIN{FS="="}{print $2}END{}' | sed 's| ||g'
+      register: monetdbpass
+
+    - name: Retrieve vhost dir
+      shell: sed -n -e '/DSN_KDB_READ/,/DSN_KDB_WRITE/p' {{ apache_base_dir }}/secure/kddart_dal.cfg | grep 'DBI:mysql:database' | gawk 'BEGIN{FS="="}{print $1}END{}'
+      register: vhostdir
+
+    - name: Adjust create_dbs.sh update the password
+      shell: >
+        sed -i "s|MONET_PASS='monetdb'|MONET_PASS='{{ monetdbpass.stdout }}'|g" {{ local_dir }}/other/create_dbs.sh;
+        sed -i "s|DB_PASS='yourSecurePassword'|DB_PASS='{{ mysqlrootpass.stdout }}'|g" {{ local_dir }}/other/create_dbs.sh;
+        sed -i "s|INLINE_MYSQL_PASS='yourRootPassword'|INLINE_MYSQL_PASS='{{ mysqlrootpass.stdout }}'|" {{ local_dir }}/other/create_dbs.sh;
+
+    - name: Install Perl Libraries used in DAL
+      cpanm: name={{item}}
+      with_items:
+        - Moo
+        - Throwable::Error
+        - Geo::WKT::Simple
+        - HTTP::CookieJar::LWP
+        - File::Copy::Recursive
+
+    - name: Copy Perl packages
+      shell: >
+        cp -rp {{ local_dir }}/perl-lib/* {{ apache_base_dir }}/perl-lib;
+        cp {{ local_dir }}/cgi-bin/kddart/* {{ apache_base_dir }}/cgi-bin/kddart;
+
+    - name: Create new folders for tiles
+      shell: >
+        mkdir {{ apache_base_dir }}/{{ vhostdir.stdout }}/gis/tiles;
+        mkdir {{ apache_base_dir }}/{{ vhostdir.stdout }}/gis/quicklook;
+        chown apache:apache {{ apache_base_dir }}/{{ vhostdir.stdout }}/gis/tiles;
+        chown apache:apache {{ apache_base_dir }}/{{ vhostdir.stdout }}/gis/quicklook;
+
+    - name: Change DAL config file for new version
+      shell: >
+        sed -i "s|{{ old_dal_db_version }}|{{ dal_db_version }}|g" {{ apache_base_dir }}/secure/kddart_dal.cfg;
+
+        LAST=$(tail -1 {{ apache_base_dir }}/secure/kddart_dal.cfg);
+        if [ -n "$LAST" ]; then
+          printf "\n" >> {{ apache_base_dir }}/secure/kddart_dal.cfg;
+        fi;
+        
+        printf "\n[QUICKLOOK_PATH]\nQUICKLOOK_PATH={{apache_base_dir}}/{{ vhostdir.stdout }}/gis/quicklook\n" >> {{ apache_base_dir }}/secure/kddart_dal.cfg;
+        printf "\n[QUICKLOOK_PUBLIC_PATH]\nQUICKLOOK_PUBLIC_PATH=gis/quicklook\n" >> {{ apache_base_dir }}/secure/kddart_dal.cfg;
+        printf "\n[TILES_PATH]\nTILES_PATH={{apache_base_dir}}/{{ vhostdir.stdout }}/gis/tiles\n" >> {{ apache_base_dir }}/secure/kddart_dal.cfg;
+        printf "\n[TILES_PUBLIC_PATH]\nTILES_PUBLIC_PATH=gis/tiles\n" >> {{ apache_base_dir }}/secure/kddart_dal.cfg;
+        printf "\n[SENTINEL_USERNAME]\nSENTINEL_USERNAME=dart_sentinel1\n" >> {{ apache_base_dir }}/secure/kddart_dal.cfg;
+        printf "\n[SENTINEL_PASSWORD]\nSENTINEL_PASSWORD=3kEzjqtj\n" >> {{ apache_base_dir }}/secure/kddart_dal.cfg;
+
+    - name: Backup databases
+      shell: >
+        mkdir -p {{ backup_dir }};
+        cd {{ backup_dir }};
+        mysqldump -u root --password={{ mysqlrootpass.stdout }} kddart_{{ old_dal_db_version }} > {{ backup_dir }}/kddart_{{ old_dal_db_version }}-`date +"%Y%m%d"`.sql;
+        pg_dump -U postgres -d kddart_gis_enviro_{{ old_dal_db_version }} > {{ backup_dir }}/kddart_gis_enviro_{{ old_dal_db_version }}-`date +"%Y%m%d"`.sql;
+        export export DOTMONETDBFILE="./.monetdbuser";
+        echo -e "user=monetdb\npassword=monetdb\nlanguage=sql" > ./.monetdbuser;
+        msqldump -d kddart_marker_{{ old_dal_db_version }} > {{ backup_dir }}/kddart_marker_{{ old_dal_db_version }}-`date +"%Y%m%d"`.sql;
+
+    - name: Recreating databases from backup file into a new version for upgrade
+      shell: >
+        {{ local_dir }}/other/create_dbs.sh 2 kddart_gis_enviro_{{ dal_db_version }} {{ backup_dir }}/kddart_gis_enviro_{{ old_dal_db_version }}-`date +"%Y%m%d"`.sql kddart_{{ dal_db_version }} {{ backup_dir }}/kddart_{{ old_dal_db_version }}-`date +"%Y%m%d"`.sql kddart_marker_{{ dal_db_version }} {{ backup_dir }}/kddart_marker_{{ old_dal_db_version }}-`date +"%Y%m%d"`.sql 1 > /root/recreate_dbs.log 2>&1;        
+
+    - name: Remove column TreatmentId constraints
+      shell: >
+        res=$(mysql kddart_{{ dal_db_version }} -u root --password={{ mysqlrootpass.stdout }} -se "select CONSTRAINT_NAME from INFORMATION_SCHEMA.KEY_COLUMN_USAGE where TABLE_NAME = 'trialunit' AND COLUMN_NAME = 'TreatmentId' AND CONSTRAINT_SCHEMA = 'kddart_{{ dal_db_version }}'");
+        cons=(${res//\s/});
+        for con in "${cons[@]}"; do
+          mysql kddart_{{ dal_db_version }} -u root --password={{ mysqlrootpass.stdout }} -se "ALTER TABLE trialunit DROP FOREIGN KEY ${con}"
+        done
+        
+    - name: Upgrade database structures
+      shell: >
+        export export DOTMONETDBFILE="./.monetdbuser";
+        echo -e "user=monetdb\npassword=monetdb\nlanguage=sql" > ./.monetdbuser;
+        mclient -d kddart_marker_{{ dal_db_version }} < {{ local_dir }}/other/db_files/upgrade/to_v2_7_0/upgrade_marker_v2_6_0_to_v2_7_0.sql;
+        mysql kddart_{{ dal_db_version }} -u root --password={{ mysqlrootpass.stdout }} < {{ local_dir }}/other/db_files/upgrade/to_v2_7_0/upgrade_mysql_v2_6_0_to_v2_7_0.sql;
+        psql -h localhost -U kddart_dal -d kddart_gis_enviro_{{ dal_db_version }} -f {{ local_dir }}/other/db_files/upgrade/to_v2_7_0/upgrade_postgresql_v2_6_0_to_v2_7_0.sql;
+
+    - name: Restart mysql
+      shell: systemctl restart mysql
+
+    - name: Restart postgresql
+      shell: systemctl restart postgresql
+
+    - name: Restart apache
+      shell: systemctl restart apache2
+
+    - name: Restart solr
+      shell: >
+        [[ ! -e /etc/init.d/solr ]] || /etc/init.d/solr restart;

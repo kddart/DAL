@@ -2490,6 +2490,7 @@ sub list_item_advanced_runmode {
     elsif ($field =~ /^StorageId$/i) {
 
       push( @{$final_field_list}, 'storage.StorageLocation' );
+      push( @{$final_field_list}, 'storage.StorageBarcode' );
       $join .= ' LEFT JOIN storage ON storage.StorageId = item.StorageId ';
     }
     elsif ($field =~ /^ItemTypeId$/i) {
@@ -2649,10 +2650,11 @@ sub get_item_runmode {
                      'generalunit.UnitName',
                      'specimen.SpecimenName',
                      'storage.StorageLocation',
+                     'storage.StorageBarcode',
                      'a.TypeName as ItemTypeName',
                      'b.TypeName as ItemStateName',
                      'deviceregister.DeviceId',
-                     'systemuser.UserName as AddedByUser'
+                     'systemuser.UserName as AddedByUser',
       ];
 
   my $other_join = ' LEFT JOIN contact ON contact.ContactId = item.ItemSourceId';
@@ -9608,6 +9610,8 @@ sub update_item_bulk_runmode {
   my $data_for_postrun_href = {};
 
   my $json_data_str = $query->param('data');
+
+  $self->logger->debug("Data: $json_data_str");
 
   my ($missing_err, $missing_href) = check_missing_href( {'data' => $json_data_str } );
 

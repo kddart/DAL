@@ -1431,7 +1431,7 @@ sub list_treatment {
 
     if (scalar(@{$treatment_id_aref}) > 0) {
 
-      my $chk_table_aref = [{'TableName' => 'trialunit', 'FieldName' => 'TreatmentId'}];
+      my $chk_table_aref = [{'TableName' => 'trialunittreatment', 'FieldName' => 'TreatmentId'}];
 
       ($chk_id_err, $chk_id_msg,
        $used_id_href, $not_used_id_href) = id_existence_bulk($dbh, $chk_table_aref, $treatment_id_aref);
@@ -2955,6 +2955,15 @@ sub export_samplemeasurement_csv_runmode {
 
   while ( my $row_aref = $sth->fetchrow_arrayref() ) {
 
+    foreach my $col_entry (@{$row_aref}) {
+        if (length($col_entry)) {
+          $col_entry = qq|"$col_entry"|;
+        }
+        else {
+          $col_entry = "";
+        }
+    }
+
     my $csv_line = join(',', @{$row_aref});
 
     print $smeasure_csv_fh "$csv_line\n";
@@ -3721,7 +3730,7 @@ sub del_treatment_runmode {
     return $data_for_postrun_href;
   }
 
-  my $treatment_used = record_existence($dbh_k_read, 'trialunit', 'TreatmentId', $treatment_id);
+  my $treatment_used = record_existence($dbh_k_read, 'trialunittreatment', 'TreatmentId', $treatment_id);
 
   if ($treatment_used) {
 

@@ -1,0 +1,22 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Add Layer Layertiles" TargetURL="add/layer" Type="BLOCKING" />
+  <INPUT ParaName="layername" PrefixVal="Layer - " Random="1" />
+  <INPUT ParaName="alias" Value="" />
+  <INPUT ParaName="layertype" Value="layertiles" />
+  <INPUT ParaName="iseditable" Value="1" />
+  <INPUT ParaName="layermetadata" Value="Created from the test framework" />
+  <INPUT ParaName="geometrytype" Value="POINT" />
+  <INPUT ParaName="description" Value="Created by the automatic test." />
+  <INPUT ParaName="owngroupperm" Value="7" />
+  <INPUT ParaName="accessgroupid" Value="0" />
+  <INPUT ParaName="accessgroupperm" Value="5" />
+  <INPUT ParaName="otherperm" Value="5" />
+  <INPUT ParaName="geometry" Value="POLYGON ((149.08462111868045 -35.236666351700535, 149.08463184999385 -35.236924858974234, 149.08498598333597 -35.23692924044635, 149.08500744596276 -35.236626918315146, 149.08462111868045 -35.236666351700535))" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Match Attr="ParaName" Tag="ReturnId" Value="id" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <ReturnId ParaName="id" Value="13" />
+
+</TestCase>

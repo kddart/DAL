@@ -137,11 +137,11 @@ sub help_runmode {
 
   my $json_encoder = JSON::XS->new();
 
-  #$self->logger->debug($json_encoder->encode($operation2app));
+  $self->logger->debug($json_encoder->encode($operation2app));
 
   if ( !(defined $operation2app->{$oper}) ) {
 
-    my $err_msg = "Operation ($operation) not found.";
+    my $err_msg = "Operation ($operation) not found. $oper";
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg, 'ErrorId' => 1}]};
 
