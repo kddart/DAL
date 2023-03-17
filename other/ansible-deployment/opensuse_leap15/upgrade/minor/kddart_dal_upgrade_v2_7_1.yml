@@ -1,0 +1,28 @@
+#
+# DAL upgrade script for Opensuse
+# Copyright (c) 2017, Diversity Arrays Technology, All rights reserved.
+#
+# Author:
+# Date: 06/03/2023
+# Description: DAL upgrade script from 2.7.0 to 2.7.1
+#
+
+- name: Retrieve MySQL password
+  shell: grep 'password' {{ apache_base_dir }}/secure/mysql_user.txt | gawk 'BEGIN{FS="="}{print $2}END{}' | sed 's| ||g'
+  register: mysqlrootpass
+
+- name: Backup MySQL database
+  shell: >
+    mkdir -p {{ backup_dir }};
+    cd {{ backup_dir }};
+    mysqldump -u root --password={{ mysqlrootpass.stdout }} kddart_{{ dal_db_version }} > {{ backup_dir }}/kddart_{{ dal_db_version }}-`date +"%Y%m%d"`.sql;        
+
+- name: Update Taxonomy Table
+  shell: >
+    mysql kddart_{{ dal_db_version }} -u root --password={{ mysqlrootpass.stdout }} -se "ALTER TABLE taxonomy MODIFY TaxonomyName varchar(255) NOT NULL";
+
+- name: Restart mysql
+  shell: systemctl restart mysql
+
+- name: Restart Apache2
+  shell: systemctl restart apache2

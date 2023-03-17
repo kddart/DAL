@@ -137,7 +137,7 @@ sub help_runmode {
 
   my $json_encoder = JSON::XS->new();
 
-  $self->logger->debug($json_encoder->encode($operation2app));
+  #$self->logger->debug($json_encoder->encode($operation2app));
 
   if ( !(defined $operation2app->{$oper}) ) {
 

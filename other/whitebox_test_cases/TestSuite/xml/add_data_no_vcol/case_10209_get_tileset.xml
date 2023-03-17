@@ -1,10 +1,10 @@
 <TestCase>
-  <CaseInfo OutputFormat="JSON" Description="Get Tileset" TargetURL="tileset/:LayerId/get/tile/3/7/4" Type="BLOCKING" />
+  <CaseInfo OutputFormat="JSON" Description="Get Tileset" TargetURL="get/tileset/:LayerId" Type="BLOCKING" />
   <INPUT ParaName="LayerId" SrcValue="xml/add_data_no_vcol/case_10207_add_layer_layertiles.xml" />
   <Match Attr="StatusCode" Value="200" />
   <Match Attr="COUNT" Tag="Tileset" TargetDataType="MULTI" Value="boolex(x&gt;0)" />
   <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
   <Parent CaseFile="xml/add_data_no_vcol/case_10207_add_layer_layertiles.xml" Order="3" />
-  <Parent CaseFile="xml/add_data_no_vcol/case_10208_add_tileset.xml" Order="4" />
 </TestCase>
+

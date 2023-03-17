@@ -1,5 +1,5 @@
 #
-# DAL upgrade script for CentOS 7
+# DAL upgrade script for Opensuse
 # Copyright (c) 2018, Diversity Arrays Technology, All rights reserved.
 #
 # Author: George Xiyue Huang
@@ -16,18 +16,26 @@
       prompt: "Enter the source tar.gz file of KDDart wih either relative or full path."
       private: no
 
+    - name: "dal_version"
+      prompt: "Enter the version of DAL (e.g. v2.7.1)"
+      private: no
+
+    - name: "dal_db_version"
+      prompt: "Enter the version of DAL db (e.g. v2_7_0)"
+      private: no
+
+    - name: "task_file"
+      prompt: "Enter the task file with either relative or full path."
+      private: no
+
   vars:
-    dal_version: v2.6.1
-    dal_db_version: v2_6_0
     src_file: /root/KDDArT-DAL-{{ dal_version }}.tar.gz
-    old_dal_db_version: v2_6_0
     local_dir: /root/KDDArT-DAL-{{ dal_version }}
     backup_dir: /root/dal_upgrade_db_backup
     apache_base_dir: /srv/www
     force_tasks: True
 
   tasks:
-
     - name: Copy the tar.gz file
       copy: src={{ local_tar_gz_file }} dest={{ src_file }}
 
@@ -41,5 +49,16 @@
         tar --no-same-owner -zxvf {{ src_file }} --strip 1;
         fi;
 
-    - import_tasks: ./kddart_dal_upgrade_v2_6_2.yml
-      static: yes
+    - name: Copy perl package
+      shell: >
+        export VHOST_DIRS=`sed -n -e '/DSN_KDB_READ/,/DSN_KDB_WRITE/p' {{ apache_base_dir }}/secure/kddart_dal.cfg | grep 'DBI:mysql:database' | gawk 'BEGIN{FS="="}{print $1}END{}'`;
+
+        for EACH_VHOST_DIR in $VHOST_DIRS; do
+        cp -rp {{ local_dir }}/vhosts/kddart.example.com/* {{ apache_base_dir }}/$EACH_VHOST_DIR;
+        chown wwwrun:www {{ apache_base_dir }}/$EACH_VHOST_DIR -R;
+        done;
+
+        cp -rp {{ local_dir}}/perl-lib/* {{ apache_base_dir }}/perl-lib;
+        cp {{local_dir}}/cgi-bin/kddart/* {{ apache_base_dir }}/cgi-bin/kddart;
+        
+    - include_tasks: "{{ task_file }}"

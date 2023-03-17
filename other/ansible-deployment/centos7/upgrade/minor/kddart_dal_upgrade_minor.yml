@@ -7,18 +7,6 @@
 # Description: Supporting ansible playbook script
 #
 
-- name: Copy Perl packages
-  shell: >
-    export VHOST_DIRS=`sed -n -e '/DSN_KDB_READ/,/DSN_KDB_WRITE/p' {{ apache_base_dir }}/secure/kddart_dal.cfg | grep 'DBI:mysql:database' | gawk 'BEGIN{FS="="}{print $1}END{}'`;
-
-    for EACH_VHOST_DIR in $VHOST_DIRS; do
-    cp -rp {{ local_dir }}/vhosts/kddart.example.com/* {{ apache_base_dir }}/$EACH_VHOST_DIR;
-    chown apache:apache {{ apache_base_dir }}/$EACH_VHOST_DIR -R;
-    done;
-
-    cp -rp {{ local_dir}}/perl-lib/* {{ apache_base_dir }}/perl-lib;
-    cp {{local_dir}}/cgi-bin/kddart/* {{ apache_base_dir }}/cgi-bin/kddart;
-
 - name: Change ower and group manually for config file
   shell: chown apache:apache {{ apache_base_dir }}/secure/kddart_dal.cfg
 

@@ -147,7 +147,7 @@ CREATE TABLE surveytrialunit (
 CREATE TABLE taxonomy (
   TaxonomyId integer(11) NOT NULL comment 'taxonomy id - internal id of this database' auto_increment,
   ParentTaxonomyId integer(11) NULL comment 'parent taxonomy id - what is directly above in hierarchy',
-  TaxonomyName integer(11) NOT NULL comment 'main name used',
+  TaxonomyName VARCHAR(255) NOT NULL comment 'main name used',
   TaxonomyClass VARCHAR(255) NOT NULL comment 'class - species, genera, kingdom',
   TaxonomySource VARCHAR(255) NULL comment 'source of taxonomy data - e.g. NCBI, AviBase, World Flora Onlie',
   TaxonomyExtId VARCHAR(254) NULL comment 'id in the external source - e.g. tax_id from NCBI',

@@ -1,0 +1,57 @@
+#
+# DAL upgrade script for CentOS 7
+# Copyright (c) 2017, Diversity Arrays Technology, All rights reserved.
+#
+# Author: Puthick Hok
+# Date: 23/06/2011
+# Usage: ansible-playbook kddart_dal_upgrade_v2_3_2_to_v2_4_0_centos7_from_file.yml
+# Description: By running the usage command, ansible will install and configure DAL
+#              according the instructions in kddart_dal_upgrade_v2_3_2_to_v2_4_0_centos7.yml.
+#              This script can be run by root or a root super user which can do sudo without password.
+#              For more information about how to read and write an ansible playbook,
+#              please refer to ansible documentation on the web.
+#
+
+- hosts: kddartserver
+  gather_facts: yes
+  
+  vars_prompt:  
+    - name: "local_tar_gz_file"
+      prompt: "Enter the source tar.gz file of KDDart wih either relative or full path."
+      private: no
+
+    - name: "mysqlrootpass"
+      prompt: "Enter MySQL root password."
+      private: yes
+
+  vars:
+    dal_version: v2.4.0
+    dal_db_version: v2_4_0
+    src_file: /root/KDDArT-DAL-{{ dal_version }}.tar.gz
+    old_dal_db_version: v2_3_2
+    local_dir: /root/KDDArT-DAL-{{ dal_version }}
+    backup_dir: /root/dal_upgrade_db_backup
+    apache_base_dir: /var/www
+    solr_home: /var/solr
+    force_tasks: True
+
+  tasks:
+
+    - name: Copy the tar.gz file
+      become: yes
+      copy: src={{ local_tar_gz_file }} dest={{ src_file }}
+
+    - name: Create local_dir
+      become: yes
+      shell: "[[ -d {{ local_dir }} ]] || mkdir {{ local_dir }}"
+
+    - name: Untar and decompress KDDart source
+      become: yes
+      shell: >
+        if [ -d {{ local_dir }} ]; then 
+        cd {{ local_dir }};
+        tar --no-same-owner -zxvf {{ src_file }} --strip 1;
+        fi;
+
+    - include: ./kddart_dal_upgrade_v2_3_2_to_v2_4_0_centos7.yml
+      static: yes

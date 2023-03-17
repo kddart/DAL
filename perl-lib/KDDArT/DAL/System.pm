@@ -6,9 +6,9 @@
 # Author    : Puthick Hok
 # Created   : 02/06/2010
 # Modified  :
-# Purpose   : 
-#          
-#          
+# Purpose   :
+#
+#
 
 package KDDArT::DAL::System;
 
@@ -60,6 +60,7 @@ sub setup {
                                            'update_user_gadmin',
                                            'add_group_gadmin',
                                            'change_user_password',
+                                           'request_reset_password',
                                            'remove_group_member_gadmin',
                                            'remove_owner_status_gadmin',
                                            'change_permission',
@@ -91,6 +92,7 @@ sub setup {
                                                 'update_user_gadmin',
                                                 'add_group_gadmin',
                                                 'change_user_password',
+                                                'request_reset_password',
                                                 'remove_group_member_gadmin',
                                                 'remove_owner_status_gadmin',
                                                 'change_permission',
@@ -140,6 +142,7 @@ sub setup {
                                              'remove_keyword_from_group_gadmin',
                                              'del_keyword_group_gadmin',
                                              'update_group_gadmin',
+                                             'request_reset_password',
                                              'update_nursery_type_list_csv_gadmin',
                                              'update_genotype_config_gadmin',
       );
@@ -159,6 +162,7 @@ sub setup {
     'add_group_gadmin'             => 'add_group_runmode',
     'list_user_gadmin'             => 'list_user_runmode',
     'change_user_password'         => 'change_user_password_runmode',
+    'request_reset_password'       => 'request_reset_password_runmode',
     'remove_group_member_gadmin'   => 'remove_group_member_runmode',
     'remove_owner_status_gadmin'   => 'remove_owner_status_runmode',
     'change_permission'            => 'change_permission_runmode',
@@ -354,6 +358,8 @@ sub add_user_runmode {
     return $data_for_postrun_href;
   }
 
+  my $user_id = -1;
+
   my $sql = 'INSERT INTO systemuser SET ';
   $sql   .= 'UserName=?, ';
   $sql   .= 'UserPassword=?, ';
@@ -366,6 +372,7 @@ sub add_user_runmode {
   my $sth = $dbh_write->prepare($sql);
   $sth->execute($username, $password, $contact_id, $usertype);
 
+
   if ($dbh_write->err()) {
 
     $data_for_postrun_href->{'Error'} = 1;
@@ -373,13 +380,17 @@ sub add_user_runmode {
 
     return $data_for_postrun_href;
   }
+  else {
+    $user_id = $dbh_write->last_insert_id(undef, undef, 'systemuser', 'UserId');
+    $self->logger->debug("UserId: $user_id");
+  }
 
   $sth->finish();
 
   $dbh_write->disconnect();
 
   my $info_msg_aref  = [{'Message' => "User ($username) has been added successfully."}];
-  my $return_id_aref = [{'Value' => "$username", 'ParaName' => 'Username'}];
+  my $return_id_aref = [{'Value' => "$user_id", 'ParaName' => 'UserId'} ];
 
   $data_for_postrun_href->{'Error'}     = 0;
   $data_for_postrun_href->{'Data'}      = {'Info'      => $info_msg_aref,
@@ -1027,7 +1038,7 @@ sub add_group_member {
   }
 
   $dbh_write->disconnect();
-  
+
   my $info_msg_aref = [{'Message' => $return_msg}];
 
   $data_for_postrun_href->{'Error'}     = 0;
@@ -1576,18 +1587,18 @@ sub remove_owner_status_runmode {
   $sql  = 'UPDATE authorisedsystemgroup SET ';
   $sql .= 'IsGroupOwner=0 ';
   $sql .= 'WHERE AuthorisedSystemGroupId=?';
-  
+
   $sth = $dbh_write->prepare($sql);
   $sth->execute($authorised_sys_grp_id);
-  
+
   if ($dbh_write->err()) {
-    
+
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
     return $data_for_postrun_href;
   }
-  
+
   $sth->finish();
 
   $dbh_write->disconnect();
@@ -1925,13 +1936,13 @@ sub change_owner_runmode {
       }
     }
   }
- 
+
   my $is_table_with_perm = 1;
 
   for my $field (@{$perm_fields}) {
 
     my $field_exists = field_existence($dbh, $table_name, $field);
-    
+
     if ($field_exists == 0) {
 
       $is_table_with_perm = 0;
@@ -2060,7 +2071,7 @@ sub get_permission_runmode {
   my $dbh = $dbh_kdb;
 
   my $id_field = '';
- 
+
   if (defined $tablename2idfield->{$table_name}) {
 
     $id_field = $tablename2idfield->{$table_name};
@@ -2074,7 +2085,7 @@ sub get_permission_runmode {
   my $ulti_perm_field_name = 'UltimatePerm';
 
   my $table_exists_kdb = table_existence($dbh_kdb, $table_name);
-  
+
   if ($table_exists_kdb == 0) {
 
     my $table_exists_gis = table_existence($dbh_gis, $table_name);
@@ -2105,13 +2116,13 @@ sub get_permission_runmode {
       }
     }
   }
- 
+
   my $is_table_with_perm = 1;
 
   for my $field (@{$perm_fields}) {
 
     my $field_exists = field_existence($dbh, $table_name, $field);
-    
+
     if ($field_exists == 0) {
 
       $is_table_with_perm = 0;
@@ -2146,7 +2157,7 @@ sub get_permission_runmode {
   $sql   .= "AND $id_field = ?";
 
   my $perm_data = read_data($dbh, $sql, [$record_id]);
-  
+
   if (scalar(@{$perm_data}) == 0) {
 
     my $err_msg = "Record ($record_id) not found in table ($table_name).";
@@ -2410,7 +2421,7 @@ sub add_barcodeconf_runmode {
 
   my $self  = shift;
   my $query = $self->query();
-  
+
   my $data_for_postrun_href = {};
 
   # Generic required static field checking
@@ -2567,7 +2578,7 @@ sub list_barcodeconf {
 
   my $sth = $dbh->prepare($sql);
   # parameters provided by the caller
-  # for example, ('WHERE FieldA=?', '1') 
+  # for example, ('WHERE FieldA=?', '1')
   $sth->execute(@_);
 
   my $err = 0;
@@ -2603,7 +2614,7 @@ sub list_barcodeconf {
   my $gadmin_status = $self->authen->gadmin_status();
 
   for my $row (@{$barcode_conf_data}) {
-      
+
     if ($gadmin_status eq '1') {
 
       my $barcode_conf_id = $row->{'BarcodeConfId'};
@@ -2656,7 +2667,7 @@ sub list_barcodeconf_runmode {
 
     return $data_for_postrun_href;
   }
-  
+
   $data_for_postrun_href->{'Data'}    = {'BarcodeConf' => $barcode_conf_list_aref,
                                          'RecordMeta'   => [{'TagName' => 'BarcodeConf'}]
   };
@@ -2699,7 +2710,7 @@ sub get_barcodeconf_runmode {
     $data_for_postrun_href->{'Data'}        = {'Error' => [{'Message' => "BarcodeConf ($barcode_conf_id) not found."}]};
 
     return $data_for_postrun_href;
-  } 
+  }
 
   my $where_clause = 'WHERE BarcodeConfId=?';
   my ($barcode_conf_err, $barcode_conf_msg, $barcode_conf_list_aref) = $self->list_barcodeconf($where_clause,
@@ -3202,7 +3213,7 @@ sub get_multimedia_runmode {
   my $nb_df_val_rec    =  scalar(@{$media_df_val_data});
 
   if ($nb_df_val_rec != 1)  {
-  
+
      $self->logger->debug("Retrieve multimedia default values - number of records unacceptable: $nb_df_val_rec");
      $data_for_postrun_href->{'Error'} = 1;
      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
@@ -3546,7 +3557,7 @@ sub del_multimedia_runmode {
   my $nb_df_val_rec    =  scalar(@{$media_df_val_data});
 
   if ($nb_df_val_rec != 1)  {
-  
+
      $self->logger->debug("Retrieve multimedia default values - number of records unacceptable: $nb_df_val_rec");
      $data_for_postrun_href->{'Error'} = 1;
      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
@@ -5964,7 +5975,7 @@ sub list_keyword_advanced_runmode {
   $self->logger->debug("SQL with VCol: $sql");
   $self->logger->debug("Where arg: " . join(',', @{$where_arg}));
 
-  # where_arg here in the list function because of the filtering 
+  # where_arg here in the list function because of the filtering
   my ($read_kwd_err, $read_kwd_msg, $kwd_data) = $self->list_keyword(1, $sql, $where_arg);
 
   if ($read_kwd_err) {
@@ -6856,7 +6867,7 @@ sub list_keyword_group_runmode {
   $self->logger->debug("SQL with VCol: $sql");
   $self->logger->debug("Where arg: " . join(',', @{$where_arg}));
 
-  # where_arg here in the list function because of the filtering 
+  # where_arg here in the list function because of the filtering
   my ($read_kwd_grp_err, $read_kwd_grp_msg, $kwd_grp_data) = $self->list_keyword_group(1, $sql, $where_arg);
 
   if ($read_kwd_grp_err) {
@@ -7802,6 +7813,131 @@ sub get_keyword_group_dtd_file {
 
   return "${dtd_path}/keywordgroup.dtd";
 }
+
+sub request_reset_password_runmode {
+
+=pod request_reset_password_HELP_START
+{
+"OperationName": "Request a reset password token.",
+"Description": "Upon validation, a token is generated to allow a password to be reset through the password reset execute endpoint. This can only get generated by admin user.",
+"AuthRequired": 0,
+"GroupRequired": 1,
+"GroupAdminRequired": 1,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><ReturnId Value='dc9544d610dbb69bb7abc06b9aaed514abfa6789' ParaName='ResetToken' /><Info Message='Password Reset Token Succesfully Generated.' /></DATA>",
+"SuccessMessageJSON": "{'ReturnId' : [{'Value' : 'dc9544d610dbb69bb7abc06b9aaed514abfa6789', 'ParaName': 'ResetToken'}], 'StatInfo' : [{'ServerElapsedTime' : '0.007','Unit' : 'second'}],'Info' : [{'Message' : 'Password Reset Token Succesfully Generated.'}], 'RecordMeta' : [{'TagName' : 'ResetToken'}]}",
+"ErrorMessageXML": [{"SystemUserName": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unable to validate User' /></DATA>"}],
+"URLParameter": [{"ParameterName": "username", "Description": "Username requiring a password reset"}],
+"ErrorMessageJSON": [{"SystemUserName": "{'Error' : [{'Message' : 'Unable to validate User'}]}"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 401}]
+}
+=cut
+  my $self  = shift;
+  my $query = $self->query();
+
+  my $user_id = $self->authen->user_id();
+
+  $self->logger->debug("Logged User Id: $user_id");
+
+  my $data_for_postrun_href = {};
+
+  #allow only the admin user to perform this request
+  if ($user_id == 0) {
+
+      my $cur_dt = DateTime->now( time_zone => $TIMEZONE );
+      $cur_dt = DateTime::Format::MySQL->format_datetime($cur_dt);
+
+      my $password_reset_userid = $query->param('UserId');
+      my $password_reset_username = $self->param('username');
+
+      $self->logger->debug("Username: $password_reset_username");
+      $self->logger->debug("User Id: $password_reset_userid");
+
+      #sql to make sure user id input matches the username
+
+      my $sql  = 'SELECT systemuser.UserId, systemuser.UserName ';
+      $sql .= 'FROM systemuser ';
+      $sql .= 'WHERE systemuser.UserName=? AND systemuser.UserId=?';
+
+      my $dbh_k_read = connect_kdb_read();
+
+      my ($lookp_err, $lookup_user_id) = read_cell($dbh_k_read, $sql , [$password_reset_username, $password_reset_userid]);
+
+      $self->logger->debug($lookup_user_id);
+
+      if (length($lookup_user_id) != 1) {
+
+        my $err_msg = "Unable to validate user";
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'SystemUserName' => $err_msg}]};
+
+        return $data_for_postrun_href;
+
+
+      }
+
+      $dbh_k_read->disconnect();
+
+      my $rand_number = makerandom(Size => 128, Strength => 0);
+
+      my $phrase = "$rand_number:$cur_dt";
+      my $secret = $SECRETKEY_CFG;
+
+      my $password_reset_token = hmac_sha1_hex($phrase, $secret);
+
+      my $dbh_write = connect_kdb_write();
+
+      $sql  = 'UPDATE systemuser SET ';
+      $sql .= 'UserVerification=?, ';
+      $sql .= 'UserVerificationDT=? ';
+      $sql .= 'WHERE UserId=?';
+
+      my $sth = $dbh_write->prepare($sql);
+      $sth->execute($password_reset_token, $cur_dt,$password_reset_userid);
+
+      if ($dbh_write->err()) {
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+        return $data_for_postrun_href;
+      }
+
+      $sth->finish();
+
+      $dbh_write->disconnect();
+
+      log_activity($dbh_write, $user_id, 0, 'RESETPASSWORDREQUEST');
+
+      $self->logger->debug("Password Reset Token generated: $password_reset_token");
+
+
+      my $info_msg_aref = [{'Message' => "Password Reset Token Succesfully Generated." }];
+
+      $data_for_postrun_href->{'Error'}     = 0;
+      $data_for_postrun_href->{'Data'}      = {
+              'ReturnId'   => [{'Value' => $password_reset_token, 'ParaName' => 'ResetToken'}],
+              'Info'       => $info_msg_aref
+      };
+
+      return $data_for_postrun_href;
+
+  }
+  else {
+
+    my $err_msg_aref                  = [{'Message' => "Permission denied!"}];
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => $err_msg_aref};
+
+
+  }
+  return $data_for_postrun_href;
+
+}
+
+
+
+
 
 sub logger {
 

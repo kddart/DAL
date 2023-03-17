@@ -18,7 +18,7 @@
 
   pre_tasks:
     - name: Install python and other related prerequisite parts if missing
-      raw: zypper --non-interactive --no-gpg-checks install python python-xml python-pip
+      raw: echo "Hello";
     - setup: # does gather_facts
 
   vars_prompt:
@@ -32,10 +32,6 @@
 
     - name: "ip_network"
       prompt: "Enter IP network of the target machine, eg. 192.168.78.0/24"
-      private: no
-
-    - name: "dal_address_name"
-      prompt: "Enter address of the target machine"
       private: no
 
   vars:
@@ -85,15 +81,16 @@
     - name: Add zypper repo from Geo
       shell: >
         if [ ! `zypper lr | grep 'Geo'` ]; then
-        zypper ar --no-gpgcheck http://download.opensuse.org/repositories/Application:/Geo/openSUSE_Leap_{{ os_version.stdout }} Geo;
+        zypper ar --no-gpgcheck http://download.opensuse.org/repositories/Application:/Geo/openSUSE_Leap_15.3/ Geo;
         fi;
 
     - name: Add zypper repo for Perl-dev
       shell: >
         if [ ! `zypper lr | grep 'Perl-Dev'` ]; then
-        zypper ar --no-gpgcheck https://download.opensuse.org/repositories/devel:/languages:/perl/openSUSE_Leap_{{ os_version.stdout }} Perl-Dev;
+        zypper ar --no-gpgcheck https://download.opensuse.org/repositories/devel:/languages:/perl/openSUSE_Leap_{{ os_version.stdout }}  Perl-Dev;
         fi;
 
+<<<<<<< HEAD
     - name: Remove package - libressl-devel
       zypper: pkg=libressl-devel state=absent
 
@@ -101,19 +98,21 @@
       zypper: pkg=libopenssl-devel state=present
 
     - name: Install prerequisite for PostGIS - libpq5
-      raw: zypper --non-interactive --no-gpg-checks install https://download.opensuse.org/repositories/server:/database:/postgresql/openSUSE_Leap_15.2/x86_64/libpq5-14.2-lp152.27.1.x86_64.rpm
+      raw: zypper --non-interactive --no-gpg-checks install https://download.opensuse.org/repositories/server:/database:/postgresql/openSUSE_Leap_15.3/x86_64/libpq5-15.1-lp153.11.1.x86_64.rpm
 
     - name: Install prerequisite for PostGIS - postgresql14
-      raw: zypper --non-interactive --no-gpg-checks install https://download.opensuse.org/repositories/server:/database:/postgresql/openSUSE_Leap_15.2/x86_64/postgresql14-14.2-lp152.27.1.x86_64.rpm
+      raw: zypper --non-interactive --no-gpg-checks install https://download.opensuse.org/repositories/server:/database:/postgresql/openSUSE_Leap_15.3/x86_64/postgresql14-14.6-lp153.42.2.x86_64.rpm
 
     - name: Install prerequisite for PostGIS - postgresql14-server
-      raw: zypper --non-interactive --no-gpg-checks install https://download.opensuse.org/repositories/server:/database:/postgresql/openSUSE_Leap_15.2/x86_64/postgresql14-server-14.2-lp152.27.1.x86_64.rpm
+      raw: zypper --non-interactive --no-gpg-checks install https://download.opensuse.org/repositories/server:/database:/postgresql/openSUSE_Leap_15.3/x86_64/postgresql14-server-14.6-lp153.42.2.x86_64.rpm
 
     - name: Install supporting binaries - postgresql14-postgis
       community.general.zypper:
         name: postgresql14-postgis
         state: present
 
+=======
+>>>>>>> ea19f6ef3221f13d9b7c2efe45ad248fdea13f09
     - name: Install supporting binaries
       zypper: pkg={{item}} state=present disable_gpg_check=yes
       with_items:
@@ -137,10 +136,11 @@
         - perl-XML-LibXML
         - perl-Math-Pari
         - perl-Crypt-Random
-        - postgresql
-        - postgresql-server
-        - postgresql-init
-        - postgresql-contrib
+        - postgresql13
+        - postgresql13-server
+        - postgresql13-init
+        - postgresql13-contrib
+        - postgresql13-postgis
         - shapelib
         - libshp-devel
         - pcre
@@ -148,6 +148,7 @@
         - libxml2
         - libxml2-devel
         - java-1_8_0-openjdk
+        - libopenssl-devel
         - pcre-devel
         - libxml2-devel
         - acl
@@ -317,7 +318,7 @@
       shell: "[[ `grep '{{ dal_address_name }}' /etc/hosts` ]] || echo \"`ip route get 1 | awk '{print $NF;exit}'`  {{ dal_address_name }}\" >> /etc/hosts"
 
     - name: Copy apache configuration
-      shell: "[[ -f /etc/apache2/vhosts.d/http-{{ dal_address_name }}.conf ]] || cp {{local_dir}}/other/http-kddart.example.com.conf /etc/apache2/vhosts.d/http-{{ dal_address_name }}.conf"
+      shell: "[[ -f /etc/apache2/vhosts.d/http-kddart.example.com.conf ]] || cp {{local_dir}}/other/http-kddart.example.com.conf /etc/apache2/vhosts.d"
 
     - name: Create directories
       file: path={{ item }} state=directory owner=wwwrun group=www mode=0755

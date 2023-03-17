@@ -5,6 +5,7 @@
   <INPUT ParaName="MaleParentId" SrcValue="xml/add_data_no_vcol/case_00626_add_trialunitspecimen_extra.xml" />
   <INPUT ParaName="FemaleParentId" SrcValue="xml/add_data_no_vcol/case_00630_add_trialunitspecimen_extra1.xml" />
   <INPUT ParaName="UserId" Value="0" />
+  <Match Attr="StatusCode" Value="200" />
   <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
   <Match Attr="ParaName" Tag="ReturnId" Value="CrossingId" />
   <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />

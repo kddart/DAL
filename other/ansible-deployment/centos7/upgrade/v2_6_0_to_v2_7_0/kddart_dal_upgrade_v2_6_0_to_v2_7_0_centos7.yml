@@ -1,0 +1,105 @@
+- name: Retrieve MySQL password
+  shell: grep 'password' {{ apache_base_dir }}/secure/mysql_user.txt | gawk 'BEGIN{FS="="}{print $2}END{}' | sed 's| ||g'
+  register: mysqlrootpass
+
+- name: Retrieve Monetdb password
+  shell: grep 'password' {{ apache_base_dir }}/secure/monetdb_user.txt | gawk 'BEGIN{FS="="}{print $2}END{}' | sed 's| ||g'
+  register: monetdbpass
+
+- name: Retrieve vhost dir
+  shell: sed -n -e '/DSN_KDB_READ/,/DSN_KDB_WRITE/p' {{ apache_base_dir }}/secure/kddart_dal.cfg | grep 'DBI:mysql:database' | gawk 'BEGIN{FS="="}{print $1}END{}'
+  register: vhostdir
+
+- name: Adjust create_dbs.sh update the password
+  shell: >
+    sed -i "s|MONET_PASS='monetdb'|MONET_PASS='{{ monetdbpass.stdout }}'|g" {{ local_dir }}/other/create_dbs.sh;
+    sed -i "s|DB_PASS='yourSecurePassword'|DB_PASS='{{ mysqlrootpass.stdout }}'|g" {{ local_dir }}/other/create_dbs.sh;
+    sed -i "s|INLINE_MYSQL_PASS='yourRootPassword'|INLINE_MYSQL_PASS='{{ mysqlrootpass.stdout }}'|" {{ local_dir }}/other/create_dbs.sh;
+
+- name: Install Perl Libraries used in DAL
+  cpanm: name={{item}}
+  with_items:
+    - Moo
+    - Throwable::Error
+    - Geo::WKT::Simple
+    - HTTP::CookieJar::LWP
+    - File::Copy::Recursive
+
+- name: Install sentinel package
+  shell: >
+    cp {{ local_dir }}/other/DArT-Sentinal.tar.gz /tmp;
+    cd /tmp;
+    tar -xvzf ./DArT-Sentinal.tar.gz sentinel;
+    cd ./sentinel;
+    perl Makefile.PL;
+    make;
+    make test;
+    make install;
+    rm -rf /tmp/sentinel;
+    rm -rf /tmp/DArT-Sentinal.tar.gz;
+
+- name: Copy Perl packages
+  shell: >
+    cp -rp {{ local_dir }}/perl-lib/* {{ apache_base_dir }}/perl-lib;
+    cp {{ local_dir }}/cgi-bin/kddart/* {{ apache_base_dir }}/cgi-bin/kddart;
+
+- name: Create new folders for tiles
+  shell: >
+    mkdir {{ apache_base_dir }}/{{ vhostdir.stdout }}/gis/tiles;
+    mkdir {{ apache_base_dir }}/{{ vhostdir.stdout }}/gis/quicklook;
+    chown apache:apache {{ apache_base_dir }}/{{ vhostdir.stdout }}/gis/tiles;
+    chown apache:apache {{ apache_base_dir }}/{{ vhostdir.stdout }}/gis/quicklook;
+
+- name: Change DAL config file for new version
+  shell: >
+    sed -i "s|{{ old_dal_db_version }}|{{ dal_db_version }}|g" {{ apache_base_dir }}/secure/kddart_dal.cfg;
+
+    LAST=$(tail -1 {{ apache_base_dir }}/secure/kddart_dal.cfg);
+    if [ -n "$LAST" ]; then
+      printf "\n" >> {{ apache_base_dir }}/secure/kddart_dal.cfg;
+    fi;
+    
+    printf "\n[QUICKLOOK_PATH]\nQUICKLOOK_PATH={{apache_base_dir}}/{{ vhostdir.stdout }}/gis/quicklook\n" >> {{ apache_base_dir }}/secure/kddart_dal.cfg;
+    printf "\n[QUICKLOOK_PUBLIC_PATH]\nQUICKLOOK_PUBLIC_PATH=gis/quicklook\n" >> {{ apache_base_dir }}/secure/kddart_dal.cfg;
+    printf "\n[TILES_PATH]\nTILES_PATH={{apache_base_dir}}/{{ vhostdir.stdout }}/gis/tiles\n" >> {{ apache_base_dir }}/secure/kddart_dal.cfg;
+    printf "\n[TILES_PUBLIC_PATH]\nTILES_PUBLIC_PATH=gis/tiles\n" >> {{ apache_base_dir }}/secure/kddart_dal.cfg;
+    printf "\n[SENTINEL_USERNAME]\nSENTINEL_USERNAME=dart_sentinel1\n" >> {{ apache_base_dir }}/secure/kddart_dal.cfg;
+    printf "\n[SENTINEL_PASSWORD]\nSENTINEL_PASSWORD=3kEzjqtj\n" >> {{ apache_base_dir }}/secure/kddart_dal.cfg;
+
+- name: Backup databases
+  shell: >
+    mkdir -p {{ backup_dir }};
+    cd {{ backup_dir }};
+    mysqldump -u root --password={{ mysqlrootpass.stdout }} kddart_{{ old_dal_db_version }} > {{ backup_dir }}/kddart_{{ old_dal_db_version }}-`date +"%Y%m%d"`.sql;
+    pg_dump -U postgres -d kddart_gis_enviro_{{ old_dal_db_version }} > {{ backup_dir }}/kddart_gis_enviro_{{ old_dal_db_version }}-`date +"%Y%m%d"`.sql;
+    export export DOTMONETDBFILE="./.monetdbuser";
+    echo -e "user=monetdb\npassword=monetdb\nlanguage=sql" > ./.monetdbuser;
+    msqldump -d kddart_marker_{{ old_dal_db_version }} > {{ backup_dir }}/kddart_marker_{{ old_dal_db_version }}-`date +"%Y%m%d"`.sql;
+
+- name: Recreating databases from backup file into a new version for upgrade
+  shell: >
+    {{ local_dir }}/other/create_dbs.sh 2 kddart_gis_enviro_{{ dal_db_version }} {{ backup_dir }}/kddart_gis_enviro_{{ old_dal_db_version }}-`date +"%Y%m%d"`.sql kddart_{{ dal_db_version }} {{ backup_dir }}/kddart_{{ old_dal_db_version }}-`date +"%Y%m%d"`.sql kddart_marker_{{ dal_db_version }} {{ backup_dir }}/kddart_marker_{{ old_dal_db_version }}-`date +"%Y%m%d"`.sql 1 > /root/recreate_dbs.log 2>&1;
+    
+- name: Upgrade database structures
+  shell: >
+    export export DOTMONETDBFILE="./.monetdbuser";
+    echo -e "user=monetdb\npassword=monetdb\nlanguage=sql" > ./.monetdbuser;
+    mclient -d kddart_marker_{{ dal_db_version }} < {{ local_dir }}/other/db_files/upgrade/to_v2_7_0/upgrade_marker_v2_6_0_to_v2_7_0.sql;
+    mysql kddart_{{ dal_db_version }} -u root --password={{ mysqlrootpass.stdout }} < {{ local_dir }}/other/db_files/upgrade/to_v2_7_0/upgrade_mysql_v2_6_0_to_v2_7_0.sql;
+    psql -h localhost -U kddart_dal -d kddart_gis_enviro_{{ dal_db_version }} -f {{ local_dir }}/other/db_files/upgrade/to_v2_7_0/upgrade_postgresql_v2_6_0_to_v2_7_0.sql;
+
+- name: Restart mysql
+  shell: systemctl restart mysqld
+
+- name: Restart postgresql
+  shell: >
+    PSQL=$(systemctl list-units | grep postgresql | awk '{print $1}');
+    if [ -n "$PSQL" ]; then
+      systemctl restart $PSQL;
+    fi;
+
+- name: Restart apache
+  shell: systemctl restart httpd
+
+- name: Restart solr
+  shell: /etc/init.d/solr restart

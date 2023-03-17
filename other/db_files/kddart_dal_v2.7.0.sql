@@ -1667,7 +1667,7 @@ ALTER TABLE `surveytrialunit` CONVERT TO CHARACTER SET utf8 COLLATE utf8_general
 CREATE TABLE `taxonomy` (
   `TaxonomyId` INTEGER NOT NULL AUTO_INCREMENT COMMENT 'taxonomy id - internal id of this database',
   `ParentTaxonomyId` INTEGER NULL COMMENT 'parent taxonomy id - what is directly above in hierarchy',
-  `TaxonomyName` INTEGER NOT NULL COMMENT 'main name used',
+  `TaxonomyName` VARCHAR(255) NOT NULL COMMENT 'main name used',
   `TaxonomyClass` VARCHAR(255) NOT NULL COMMENT 'class - species, genera, kingdom',
   `TaxonomySource` VARCHAR(255) NULL COMMENT 'source of taxonomy data - e.g. NCBI, AviBase, World Flora Onlie',
   `TaxonomyExtId` VARCHAR(254) NULL COMMENT 'id in the external source - e.g. tax_id from NCBI',

@@ -62,7 +62,7 @@ our @EXPORT   = qw($DTD_PATH $RPOSTGRES_UP_FILE $GIS_BUFFER_DISTANCE
                    $OAUTH2_SCOPE $OAUTH2_ACCESS_TOKEN_URL $JSON_SCHEMA_PATH
                    $SOLR_URL $POINT2POLYGON_BUFFER4SITE $POINT2POLYGON_BUFFER4TRIAL
                    $MAX_RECURSIVE_ANCESTOR_LEVEL $MAX_RECURSIVE_DESCENDANT_LEVEL
-                   $WHO_CAN_CREATE_GENOTYPE $NURSERY_TYPE_LIST_CSV $ALLOWDUPLICATETRIALNAME_CFG $RESTRICTEDFACTORNAME_CFG
+                   $WHO_CAN_CREATE_GENOTYPE $NURSERY_TYPE_LIST_CSV $ALLOWDUPLICATETRIALNAME_CFG $RESTRICTEDFACTORNAME_CFG $SECRETKEY_CFG
                    trim ltrim rtrim read_uname_pass connect_kdb_read
                    execute_sql read_cell permission_phrase
                    read_cookie arrayref2csvfile arrayref2xml reconstruct_server_url
@@ -90,7 +90,7 @@ our @EXPORT   = qw($DTD_PATH $RPOSTGRES_UP_FILE $GIS_BUFFER_DISTANCE
                    filter_csv_aref parse_marker_sorting get_sorting_function check_static_field
                    get_next_value_for check_bool_href check_email_href check_value_href load_config read_cookies
                    record_existence_bulk get_solr_cores get_solr_fields get_solr_entities
-                   validate_trait_db_bulk get_filtering_parts
+                   validate_trait_db_bulk get_filtering_parts minute_diff
                  );
 
 our $COOKIE_DOMAIN            = {};
@@ -176,8 +176,8 @@ our $ACCEPT_HEADER_LOOKUP   = { 'application/json' => 'JSON',
 
 our $VALID_CTYPE            = {'xml' => 1, 'json' => 1, 'geojson' => 1};
 
-our $DAL_VERSION            = '2.7.0';
-our $DAL_COPYRIGHT          = 'Copyright (c) 2022, Diversity Arrays Technology, All rights reserved.';
+our $DAL_VERSION            = '2.7.1';
+our $DAL_COPYRIGHT          = 'Copyright (c) 2023, Diversity Arrays Technology, All rights reserved.';
 our $DAL_ABOUT              = 'Data Access Layer';
 
 our $GENO_SPEC_ONE2ONE      = '1-TO-1';
@@ -193,6 +193,8 @@ our $UNIT_POSITION_SPLITTER = "FROM CFG_FILE";
 our $ALLOWDUPLICATETRIALNAME_CFG = "FROM CFG_FILE";
 
 our $RESTRICTEDFACTORNAME_CFG  = "FROM CFG_FILE";
+
+our $SECRETKEY_CFG = "FROM_CFG_FILE";
 
 our $MAX_RECURSIVE_ANCESTOR_LEVEL     = "FROM CFG_FILE";
 our $MAX_RECURSIVE_DESCENDANT_LEVEL   = "FROM CFG_FILE";
@@ -7954,5 +7956,40 @@ sub get_filtering_parts {
 
   return ($field_name,$operator,$is_quote_arg_val);
 }
+
+sub minute_diff($) {
+  my $prev_dt = $_[0];
+
+  my $cur_dt = DateTime->now( time_zone => $TIMEZONE  );
+  my $dur = $cur_dt->subtract_datetime($prev_dt);
+
+  my $dur_in_mn  = 0;
+  $dur_in_mn    += $dur->years  * (365 * 24 * 60);
+  $dur_in_mn    += $dur->months * (30 * 24 * 60);
+  $dur_in_mn    += $dur->days   * (24 * 60);
+  $dur_in_mn    += $dur->hours  * (60);
+  $dur_in_mn    += $dur->minutes;
+  # The compare method return the sign of the different.
+  # If the refresh time is in the future, current datetime - refresh datetime
+  # will result in a negative value. Normally, the refresh time
+  # should be in the past, but the refresh
+  # datetime is set in the future for the remember me feature.
+  # However, the remember me feature was turned on 07/08/07 in the login script.
+  # Although, the feature was removed, the author was reluctant to
+  # remove the core mechanism.
+  $dur_in_mn    *= DateTime->compare($cur_dt, $prev_dt);
+
+  #warn "years  :" . $dur->years;
+  #warn "months :" . $dur->months;
+  #warn "days   :" . $dur->days;
+  #warn "hours  :" . $dur->hours;
+  #warn "minutes:" . $dur->minutes;
+
+  #warn "duratin in minutes: " . $dur_in_mn;
+
+  return $dur_in_mn;
+}
+
+
 
 1;

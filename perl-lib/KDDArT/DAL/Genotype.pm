@@ -50,8 +50,10 @@ sub setup {
   __PACKAGE__->authen->check_rand_runmodes('add_genotype',
                                            'add_genus_gadmin',
                                            'add_specimen',
+                                           'add_taxonomy',
                                            'update_genotype',
                                            'update_specimen',
+                                           'update_taxonomy',
                                            'add_genotype_to_specimen',
                                            'remove_genotype_from_specimen_gadmin',
                                            'add_genotype_alias',
@@ -69,6 +71,7 @@ sub setup {
                                            'del_specimen_gadmin',
                                            'del_specimen_group_gadmin',
                                            'del_genotype_gadmin',
+                                           'del_taxonomy_gadmin',
                                            'import_genotype_csv',
                                            'import_specimen_csv',
                                            'add_breedingmethod_gadmin',
@@ -90,8 +93,10 @@ sub setup {
   __PACKAGE__->authen->count_session_request_runmodes(':all');
   __PACKAGE__->authen->check_signature_runmodes('add_genotype',
                                                 'add_genus_gadmin',
+                                                'add_taxonomy',
                                                 'update_genotype',
                                                 'update_specimen',
+                                                'update_taxonomy',
                                                 'add_genotype_to_specimen',
                                                 'remove_genotype_from_specimen_gadmin',
                                                 'add_genotype_alias',
@@ -106,6 +111,7 @@ sub setup {
                                                 'del_specimen_gadmin',
                                                 'del_specimen_group_gadmin',
                                                 'del_genotype_gadmin',
+                                                'del_taxonomy_gadmin',
                                                 'add_breedingmethod_gadmin',
                                                 'update_breedingmethod_gadmin',
                                                 'del_breedingmethod_gadmin',
@@ -131,6 +137,7 @@ sub setup {
                                              'del_specimen_gadmin',
                                              'del_specimen_group_gadmin',
                                              'del_genotype_gadmin',
+                                             'del_taxonomy_gadmin',
                                              'add_breedingmethod_gadmin',
                                              'update_breedingmethod_gadmin',
                                              'del_breedingmethod_gadmin',
@@ -219,6 +226,11 @@ sub setup {
     'export_genpedigree'                        => 'export_genpedigree_runmode',
     'update_genpedigree_gadmin'                 => 'update_genpedigree_runmode',
     'del_genpedigree_gadmin'                    => 'del_genpedigree_runmode',
+    'add_taxonomy'                              => 'add_taxonomy_runmode',
+    'get_taxonomy'                              => 'get_taxonomy_runmode',
+    'list_taxonomy'                             => 'list_taxonomy_runmode',
+    'update_taxonomy'                           => 'update_taxonomy_runmode',
+    'del_taxonomy_gadmin'                       => 'del_taxonomy_gadmin_runmode',
     );
 
   my $logger = get_logger();
@@ -392,6 +404,24 @@ sub add_genotype_runmode {
     return $data_for_postrun_href;
   }
 
+  my $taxonomy_id = undef;
+
+  if (defined $query->param('TaxonomyId')) {
+
+    $taxonomy_id = $query->param('TaxonomyId');
+
+    my $taxonomy_existence = record_existence($dbh_k_read, 'taxonomy', 'TaxonomyId', $taxonomy_id);
+
+    if (!$taxonomy_existence) {
+
+      my $err_msg = "TaxonomyId ($taxonomy_id) does not exist.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'TaxonomyId' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
   my $genus_existence = record_existence($dbh_k_read, 'genus', 'GenusId', $genus_id);
 
   if (!$genus_existence) {
@@ -474,6 +504,7 @@ sub add_genotype_runmode {
   my $group_id = $self->authen->group_id();
 
   $sql    = 'INSERT INTO genotype SET ';
+  $sql   .= 'TaxonomyId=?, ';
   $sql   .= 'GenotypeName=?, ';
   $sql   .= 'GenusId=?, ';
   $sql   .= 'SpeciesName=?, ';
@@ -489,7 +520,7 @@ sub add_genotype_runmode {
   $sql   .= 'OtherPerm=?';
 
   my $sth = $dbh_k_write->prepare($sql);
-  $sth->execute($genotype_name, $genus_id, $species_name, $acronym,
+  $sth->execute($taxonomy_id, $genotype_name, $genus_id, $species_name, $acronym,
                 $origin_id, $can_publish, $note, $genotype_color,
                 $group_id, $access_group, $own_perm, $access_perm, $other_perm);
 
@@ -715,7 +746,7 @@ sub list_genus {
       push(@{$genus_id_aref}, $row->{'GenusId'});
     }
 
-    my $chk_table_aref = [{'TableName' => 'site', 'FieldName' => 'CurrentSiteManagerId'}];
+    my $chk_table_aref = [{'TableName' => 'genus', 'FieldName' => 'GenusId'}];
 
     my ($chk_id_err, $chk_id_msg,
         $used_id_href, $not_used_id_href) = id_existence_bulk($dbh, $chk_table_aref, $genus_id_aref);
@@ -1186,6 +1217,7 @@ sub add_specimen_runmode {
   my $selection_history     = '';
   my $filial_generation     = undef;
   my $specimen_note         = undef;
+  my $source_crossing_id    = undef;
 
   my $chk_int_href = {};
   if ( length($query->param('IsActive')) > 0 ) {
@@ -1193,7 +1225,7 @@ sub add_specimen_runmode {
     $is_active = $query->param('IsActive');
     $chk_int_href->{'IsActive'} = $is_active;
   }
-  
+
   if ( length($query->param('Pedigree')) > 0 ) {
 
     $pedigree  = $query->param('Pedigree');
@@ -1210,6 +1242,12 @@ sub add_specimen_runmode {
 
     $filial_generation     = $query->param('FilialGeneration');
     $chk_int_href->{'FilialGeneration'} = $filial_generation;
+  }
+
+  if (length($query->param('SourceCrossingId')) > 0) {
+
+    $source_crossing_id = $query->param('SourceCrossingId');
+    $chk_int_href->{'SourceCrossingId'} = $source_crossing_id;
   }
 
   my ($int_err, $int_err_href) = check_integer_href( $chk_int_href );
@@ -1231,6 +1269,15 @@ sub add_specimen_runmode {
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'BreedingMethodId' => $err_msg}]};
 
     return $data_for_postrun_href;
+  }
+
+  if (defined($source_crossing_id)) {
+    if ( !record_existence($dbh_write, 'crossing', 'CrossingId', $source_crossing_id) ) {
+      my $err_msg = "CrossingId ($source_crossing_id) not found.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'CrossingId' => $err_msg}]};
+      return $data_for_postrun_href;
+    }
   }
 
   my $barcode_start_time = [gettimeofday()];
@@ -1547,6 +1594,7 @@ sub add_specimen_runmode {
 
   $sql    = 'INSERT INTO specimen SET ';
   $sql   .= 'BreedingMethodId=?, ';
+  $sql   .= 'SourceCrossingId=?, ';
   $sql   .= 'SpecimenName=?, ';
   $sql   .= 'SpecimenBarcode=?, ';
   $sql   .= 'IsActive=?, ';
@@ -1561,7 +1609,7 @@ sub add_specimen_runmode {
   $sql   .= 'OtherPerm=?';
 
   my $sth = $dbh_write->prepare($sql);
-  $sth->execute($breed_method_id, $specimen_name, $specimen_barcode,
+  $sth->execute($breed_method_id, $source_crossing_id, $specimen_name, $specimen_barcode,
                 $is_active, $pedigree, $selection_history, $filial_generation, $specimen_note,
                 $inh_own_grp_id, $inh_own_grp_perm, $inh_acc_grp_id, $inh_acc_grp_perm, $inh_oth_perm
                );
@@ -2518,6 +2566,7 @@ sub update_genotype_runmode {
   my $acronym        = undef;
   my $note           = undef;
   my $genotype_color = undef;
+  my $taxonomy_id    = undef;
 
   my $df_val_start_time = [gettimeofday()];
 
@@ -2550,6 +2599,7 @@ sub update_genotype_runmode {
   $acronym        = $geno_df_val_data->[0]->{'IsActive'};
   $note           = $geno_df_val_data->[0]->{'Pedigree'};
   $genotype_color = $geno_df_val_data->[0]->{'SelectionHistory'};
+  $taxonomy_id    = $geno_df_val_data->[0]->{'TaxonomyId'};
 
   my $df_val_elapsed = tv_interval($df_val_start_time);
 
@@ -2574,6 +2624,23 @@ sub update_genotype_runmode {
 
     $genotype_color = $query->param('GenotypeColor');
   }
+
+  if (length($query->param('TaxonomyId')) > 0) {
+
+    $taxonomy_id = $query->param('TaxonomyId');
+
+    my $taxonomy_existence = record_existence($dbh_k_read, 'taxonomy', 'TaxonomyId', $taxonomy_id);
+
+    if (!$taxonomy_existence) {
+
+      my $err_msg = "TaxonomyId ($taxonomy_id) does not exist.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'TaxonomyId' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
 
   my $group_id = $self->authen->group_id();
   my $gadmin_status = $self->authen->gadmin_status();
@@ -2712,6 +2779,7 @@ sub update_genotype_runmode {
   my $dbh_k_write = connect_kdb_write();
 
   $sql    = 'UPDATE genotype SET ';
+  $sql   .= 'TaxonomyId=?, ';
   $sql   .= 'GenotypeName=?, ';
   $sql   .= 'GenusId=?, ';
   $sql   .= 'SpeciesName=?, ';
@@ -2723,7 +2791,7 @@ sub update_genotype_runmode {
   $sql   .= 'WHERE GenotypeId=?';
 
   $sth = $dbh_k_write->prepare($sql);
-  $sth->execute($genotype_name, $genus_id, $species_name, $acronym,
+  $sth->execute($taxonomy_id, $genotype_name, $genus_id, $species_name, $acronym,
                 $origin_id, $can_publish, $note, $genotype_color, $genotype_id);
 
   if ($dbh_k_write->err()) {
@@ -2922,7 +2990,7 @@ sub update_specimen_runmode {
 
   my $df_val_start_time = [gettimeofday()];
 
-  my $read_sql = 'SELECT SpecimenBarcode, IsActive, Pedigree, SelectionHistory, FilialGeneration, ';
+  my $read_sql = 'SELECT SpecimenBarcode, SourceCrossingId, IsActive, Pedigree, SelectionHistory, FilialGeneration, ';
   $read_sql   .= 'SpecimenNote FROM specimen WHERE SpecimenId=?';
 
   my ($r_df_val_err, $r_df_val_msg, $spec_df_val_data) = read_data($dbh_k_read, $read_sql, [$specimen_id]);
@@ -2942,6 +3010,7 @@ sub update_specimen_runmode {
   my $selection_history     = undef;
   my $filial_generation     = undef;
   my $specimen_note         = undef;
+  my $source_crossing_id    = undef;
 
   my $nb_df_val_rec = scalar(@{$spec_df_val_data});
 
@@ -2954,12 +3023,13 @@ sub update_specimen_runmode {
     return $data_for_postrun_href;
   }
 
-  $specimen_barcode  = $spec_df_val_data->[0]->{'SpecimenBarcode'};
-  $is_active         = $spec_df_val_data->[0]->{'IsActive'};
-  $pedigree          = $spec_df_val_data->[0]->{'Pedigree'};
-  $selection_history = $spec_df_val_data->[0]->{'SelectionHistory'};
-  $filial_generation = $spec_df_val_data->[0]->{'FilialGeneration'};
-  $specimen_note     = $spec_df_val_data->[0]->{'SpecimenNote'};
+  $specimen_barcode   = $spec_df_val_data->[0]->{'SpecimenBarcode'};
+  $is_active          = $spec_df_val_data->[0]->{'IsActive'};
+  $pedigree           = $spec_df_val_data->[0]->{'Pedigree'};
+  $selection_history  = $spec_df_val_data->[0]->{'SelectionHistory'};
+  $filial_generation  = $spec_df_val_data->[0]->{'FilialGeneration'};
+  $specimen_note      = $spec_df_val_data->[0]->{'SpecimenNote'};
+  $source_crossing_id = $spec_df_val_data->[0]->{'SourceCrossingId'};
 
   my $df_val_elapsed = tv_interval($df_val_start_time);
 
@@ -3002,6 +3072,13 @@ sub update_specimen_runmode {
     $filial_generation     = $query->param('FilialGeneration');
     $chk_int_href->{'FilialGeneration'} = $filial_generation;
   }
+
+  if ( length($query->param('SourceCrossingId')) > 0 ) {
+
+    $source_crossing_id = $query->param('SourceCrossingId');
+    $chk_int_href->{'SourceCrossingId'} = $source_crossing_id;
+  }
+
 
   my ($int_err, $int_err_href) = check_integer_href( $chk_int_href );
 
@@ -3046,6 +3123,16 @@ sub update_specimen_runmode {
 
     $specimen_barcode = undef;
   }
+
+  if ( length($query->param('SourceCrossingId')) > 0 ) {
+    if ( !record_existence($dbh_k_read, 'crossing', 'CrossingId', $source_crossing_id) ) {
+      my $err_msg = "SourceCrossingId ($source_crossing_id) not found.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'SourceCrossingId' => $err_msg}]};
+      return $data_for_postrun_href;
+    }
+  }
+
 
   my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength ";
   $sql   .= "FROM factor ";
@@ -3110,6 +3197,7 @@ sub update_specimen_runmode {
 
   $sql    = 'UPDATE specimen SET ';
   $sql   .= 'BreedingMethodId=?, ';
+  $sql   .= 'SourceCrossingId=?, ';
   $sql   .= 'SpecimenName=?, ';
   $sql   .= 'SpecimenBarcode=?, ';
   $sql   .= 'IsActive=?, ';
@@ -3120,7 +3208,7 @@ sub update_specimen_runmode {
   $sql   .= 'WHERE SpecimenId=?';
 
   my $sth = $dbh_write->prepare($sql);
-  $sth->execute($breed_method_id, $specimen_name, $specimen_barcode,
+  $sth->execute($breed_method_id, $source_crossing_id, $specimen_name, $specimen_barcode,
                 $is_active, $pedigree, $selection_history, $filial_generation, $specimen_note,
                 $specimen_id);
 
@@ -8342,6 +8430,7 @@ sub import_genotype_csv_runmode {
   my $CanPublishGenotype_col    = $query->param('CanPublishGenotype');
   my $GenotypeColor_col         = $query->param('GenotypeColor');
   my $GenotypeNote_col          = $query->param('GenotypeNote');
+  my $TaxonomyId_col            = $query->param('TaxonomyId');
 
   my $chk_col_def_data = { 'GenotypeName'          => $GenotypeName_col,
                            'GenusId'               => $GenusId_col,
@@ -8351,6 +8440,7 @@ sub import_genotype_csv_runmode {
                            'CanPublishGenotype'    => $CanPublishGenotype_col,
                            'GenotypeColor'         => $GenotypeColor_col,
                            'GenotypeNote'          => $GenotypeNote_col,
+                          #  'TaxonomyId'            => $TaxonomyId_col,
   };
 
   my $matched_col = {};
@@ -8363,6 +8453,8 @@ sub import_genotype_csv_runmode {
   $matched_col->{$CanPublishGenotype_col}    = 'CanPublishGenotype';
   $matched_col->{$GenotypeColor_col}         = 'GenotypeColor';
   $matched_col->{$GenotypeNote_col}          = 'GenotypeNote';
+  $matched_col->{$TaxonomyId_col}            = 'TaxonomyId';
+
 
   my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength ";
   $sql   .= "FROM factor ";
@@ -8447,6 +8539,7 @@ sub import_genotype_csv_runmode {
     my $smallest_num = $num_of_rows > $inner_loop_max_j ? $inner_loop_max_j : $num_of_rows;
 
     my $uniq_geno_name_where     = '';
+    my $uniq_taxonomy_id_href    = {};
 
     #$self->logger->debug("Checking: $i, $smallest_num");
 
@@ -8482,9 +8575,17 @@ sub import_genotype_csv_runmode {
         return $self->_set_error($err_msg);
       }
 
-      my ($int_id_err, $int_id_msg) = check_integer_value( { 'GenusId'    => $data_row->{'GenusId'},
-                                                             'OriginId'   => $data_row->{'OriginId'},
-                                                           });
+      my $int_chk_href = { 'GenusId'    => $data_row->{'GenusId'},
+                           'OriginId'   => $data_row->{'OriginId'},
+                        };
+
+      my $taxonomy_id = $data_row->{'TaxonomyId'} // "";
+      if (length($taxonomy_id)) {
+        $int_chk_href->{'TaxonomyId'} = $taxonomy_id;
+        $uniq_taxonomy_id_href->{$taxonomy_id} = $row_counter;
+      }
+
+      my ($int_id_err, $int_id_msg) = check_integer_value($int_chk_href);
 
       if ($int_id_err) {
 
@@ -8592,6 +8693,29 @@ sub import_genotype_csv_runmode {
       }
     }
 
+    my @taxonomy_id_list = keys(%{$uniq_taxonomy_id_href});
+    if (scalar(@taxonomy_id_list) > 0) {
+      my $check_crossing_sql = "SELECT TaxonomyId FROM taxonomy ";
+      $check_crossing_sql .= "WHERE TaxonomyId IN (" . join(',', @taxonomy_id_list) . ")";
+      my $found_taxonomy_data = $dbh_write->selectall_hashref($check_crossing_sql, 'TaxonomyId');
+      if (scalar(keys(%$found_taxonomy_data)) < scalar(@taxonomy_id_list)) {
+
+        my @unknown_taxonomy_rownum;
+        my @unknown_taxonomy_id;
+        for my $taxonomy_id_in_csv (keys(%$uniq_taxonomy_id_href)) {
+          if (!defined($found_taxonomy_data->{$taxonomy_id_in_csv})) {
+
+            push(@unknown_taxonomy_id, $taxonomy_id_in_csv);
+            push(@unknown_taxonomy_rownum, $uniq_taxonomy_id_href->{$taxonomy_id_in_csv});
+          }
+        }
+
+        my $err_msg = 'Row (' . join(',', @unknown_taxonomy_rownum) . '): TaxonomyId (';
+        $err_msg   .= join(',', @unknown_taxonomy_id) . ') not found.';
+        return $self->_set_error($err_msg);
+      }
+    }
+
     $i += $num_of_bulk_insert;
 
     #$self->logger->debug("Smallest num: $smallest_num");
@@ -8639,7 +8763,7 @@ sub import_genotype_csv_runmode {
     #$self->logger->debug("Composing: $i, $smallest_num");
 
     my $bulk_sql = 'INSERT INTO genotype ';
-    $bulk_sql   .= '(GenotypeName,GenusId,SpeciesName,GenotypeAcronym,OriginId,CanPublishGenotype,GenotypeColor, ';
+    $bulk_sql   .= '(TaxonomyId,GenotypeName,GenusId,SpeciesName,GenotypeAcronym,OriginId,CanPublishGenotype,GenotypeColor, ';
     $bulk_sql   .= 'GenotypeNote,OwnGroupId,AccessGroupId,OwnGroupPerm,AccessGroupPerm,OtherPerm) ';
     $bulk_sql   .= 'VALUES ';
 
@@ -8682,9 +8806,14 @@ sub import_genotype_csv_runmode {
         $geno_note = $dbh_write->quote($data_row->{'GenotypeNote'});
       }
 
+      my $taxonomy_id = $data_row->{'TaxonomyId'} // "";
+      if (!length($taxonomy_id)) {
+        $taxonomy_id = 'NULL';
+      }
+
       $geno_name_where .= "$geno_name,";
 
-      $bulk_sql .= "($geno_name,$genus_id,$species_name,$geno_acronym,$origin_id,$can_publish,$geno_color,";
+      $bulk_sql .= "($taxonomy_id,$geno_name,$genus_id,$species_name,$geno_acronym,$origin_id,$can_publish,$geno_color,";
       $bulk_sql .= "$geno_note,$group_id,$group_id,$default_owner_perm,$default_acc_perm,$default_oth_perm),";
 
       $j += 1;
@@ -9292,6 +9421,12 @@ sub import_specimen_csv_runmode {
     $matched_col->{$geno_id_field_col}  = 'GenotypeId';
   }
 
+  if (defined $query->param('SourceCrossingId')) {
+    my $sourceCrossing_col = $query->param('SourceCrossingId');
+    $chk_col_def_data->{'SourceCrossingId'} = $sourceCrossing_col;
+    $matched_col->{$sourceCrossing_col} = 'SourceCrossingId';
+  }
+
   my $geno_i = 1;
   my $geno_break_flag = 0;
 
@@ -9428,8 +9563,10 @@ sub import_specimen_csv_runmode {
 
     my $specimen_name_where     = '';
     my $barcode_where           = '';
+    my $crossing_where          = '';
     my $uniq_geno_href          = {};
     my $uniq_inherit_geno_href  = {};
+    my $unique_crossing_id_href = {};
 
     #$self->logger->debug("Checking: $i, $smallest_num");
 
@@ -9462,6 +9599,11 @@ sub import_specimen_csv_runmode {
       if (defined $data_row->{'FilialGeneration'}) {
 
         $int_chk_href->{'FilialGeneration'} = $data_row->{'FilialGeneration'};
+      }
+
+      if (defined $data_row->{'SourceCrossingId'}) {
+
+        $int_chk_href->{'SourceCrossingId'} = $data_row->{'SourceCrossingId'};
       }
 
       my ($int_id_err, $int_id_msg) = check_integer_value( $int_chk_href );
@@ -9534,6 +9676,11 @@ sub import_specimen_csv_runmode {
           $specimen_barcode = $dbh_write->quote($specimen_barcode);
           $barcode_where   .= "$specimen_barcode,";
         }
+      }
+
+      my $crossing_id = $data_row->{'SourceCrossingId'} // "";
+      if (length($crossing_id) > 0) {
+        $unique_crossing_id_href->{$crossing_id} = $row_counter;
       }
 
       my $missing_geno_data_href = {};
@@ -9775,6 +9922,30 @@ sub import_specimen_csv_runmode {
       }
     }
 
+    my @crossing_id_list = keys(%{$unique_crossing_id_href});
+    if (scalar(@crossing_id_list) > 0) {
+      my $check_crossing_sql = "SELECT CrossingId FROM crossing ";
+      $check_crossing_sql .= "WHERE CrossingId IN (" . join(',', @crossing_id_list) . ")";
+      my $found_crossing_data = $dbh_write->selectall_hashref($check_crossing_sql, 'CrossingId');
+      if (scalar(keys(%$found_crossing_data)) < scalar(@crossing_id_list)) {
+
+        my @unknown_crossing_rownum;
+        my @unknown_crossing_id;
+        for my $crossing_id_in_csv (keys(%$unique_crossing_id_href)) {
+          if (!defined($found_crossing_data->{$crossing_id_in_csv})) {
+
+            push(@unknown_crossing_id, $crossing_id_in_csv);
+            push(@unknown_crossing_rownum, $unique_crossing_id_href->{$crossing_id_in_csv});
+          }
+        }
+
+        my $err_msg = 'Row (' . join(',', @unknown_crossing_rownum) . '): CrossingId (';
+        $err_msg   .= join(',', @unknown_crossing_id) . ') not found.';
+        return $self->_set_error($err_msg);
+      }
+    }
+
+
     $i += $num_of_bulk_insert;
 
     #$self->logger->debug("Smallest num: $smallest_num");
@@ -9823,7 +9994,7 @@ sub import_specimen_csv_runmode {
     #$self->logger->debug("Composing: $i, $smallest_num");
 
     my $bulk_sql = 'INSERT INTO specimen ';
-    $bulk_sql   .= '(SpecimenName,BreedingMethodId,SpecimenBarcode,IsActive,Pedigree,';
+    $bulk_sql   .= '(SpecimenName,BreedingMethodId,SourceCrossingId,SpecimenBarcode,IsActive,Pedigree,';
     $bulk_sql   .= 'SelectionHistory,FilialGeneration,SpecimenNote,OwnGroupId,OwnGroupPerm,AccessGroupId,';
     $bulk_sql   .= 'AccessGroupPerm,OtherPerm) ';
     $bulk_sql   .= 'VALUES ';
@@ -9848,6 +10019,12 @@ sub import_specimen_csv_runmode {
         $specimen_barcode = 'NULL';
       }
 
+      my $crossing_id;
+      if (length($data_row->{'SourceCrossingId'}) > 0) {
+        $crossing_id = $data_row->{'SourceCrossingId'};
+      } else {
+        $crossing_id = 'NULL';
+      }
 
       my $is_active = 1;
 
@@ -9925,7 +10102,7 @@ sub import_specimen_csv_runmode {
       my $acc_grp_perm  = $inherit_perm_info_lookup->{$inherit_geno_id}->{'AccessGroupPerm'};
       my $oth_perm      = $inherit_perm_info_lookup->{$inherit_geno_id}->{'OtherPerm'};
 
-      $bulk_sql .= "($specimen_name,$breeding_method_id,$specimen_barcode,$is_active,$pedigree,";
+      $bulk_sql .= "($specimen_name,$breeding_method_id,$crossing_id,$specimen_barcode,$is_active,$pedigree,";
       $bulk_sql .= "$selection_history,$filial_generation,$specimen_note,$own_grp_id,$own_grp_perm,$acc_grp_id,$acc_grp_perm,";
       $bulk_sql .= "$oth_perm),";
 
@@ -11162,6 +11339,13 @@ sub import_pedigree_csv_runmode {
     $matched_col->{$NumberOfSpecimens_col}   = 'NumberOfSpecimens';
   }
 
+  if (defined $query->param('ParentTrialUnitSpecimenId')) {
+
+    my $ParentTrialUnitSpecimenId_col = $query->param('ParentTrialUnitSpecimenId');
+    $chk_col_def_data->{'ParentTrialUnitSpecimenId'} = $ParentTrialUnitSpecimenId_col;
+    $matched_col->{$ParentTrialUnitSpecimenId_col}   = 'ParentTrialUnitSpecimenId';
+  }
+
   my ($col_def_err, $col_def_msg) = check_col_definition( $chk_col_def_data, $num_of_col );
 
   if ($col_def_err) {
@@ -11205,6 +11389,7 @@ sub import_pedigree_csv_runmode {
 
   my $unique_parent_href      = {};
   my $unique_parent_type_href = {};
+  my $unique_parent_trialunit_spec_href  = {};
 
   my $inner_loop_max_j = 0;
 
@@ -11244,6 +11429,11 @@ sub import_pedigree_csv_runmode {
       if (defined $data_row->{'NumberOfSpecimens'}) {
 
         $int_chk_href->{'NumberOfSpecimens'} = $data_row->{'NumberOfSpecimens'};
+      }
+
+      if (defined $data_row->{'ParentTrialUnitSpecimenId'}) {
+
+        $int_chk_href->{'ParentTrialUnitSpecimenId'} = $data_row->{'ParentTrialUnitSpecimenId'};
       }
 
       my ($int_id_err, $int_id_msg) = check_integer_value( $int_chk_href );
@@ -11286,6 +11476,12 @@ sub import_pedigree_csv_runmode {
       else {
 
         $unique_parent_href->{$parent_key} = 1;
+      }
+
+      my $parent_trialunit_spec = $data_row->{'ParentTrialUnitSpecimenId'};
+      if (length($parent_trialunit_spec) > 0) {
+
+        $unique_parent_trialunit_spec_href->{$parent_trialunit_spec} = $row_counter;
       }
 
       $unique_specimen_href->{$specimen_id}        = $row_counter;
@@ -11430,6 +11626,36 @@ sub import_pedigree_csv_runmode {
     }
   }
 
+  my @parent_trialunit_spec_list = keys(%{$unique_parent_trialunit_spec_href});
+
+  if (scalar(@parent_trialunit_spec_list) > 0) {
+
+    my $parent_trialunit_spec_where = join(',', @parent_trialunit_spec_list);
+
+    my $chk_parent_trialunit_spec_sql = "SELECT TrialUnitSpecimenId FROM trialunitspecimen ";
+    $chk_parent_trialunit_spec_sql   .= "WHERE TrialUnitSpecimenId IN ($parent_trialunit_spec_where)";
+
+    my $found_parent_trialunit_spec_data = $dbh_write->selectall_hashref($chk_parent_trialunit_spec_sql, 'TrialUnitSpecimenId');
+
+    if (scalar(keys(%{$found_parent_trialunit_spec_data})) < scalar(@parent_trialunit_spec_list)) {
+
+      my @unknown_parent_trialunit_spec;
+      my @unknown_parent_trialunit_spec_rownum;
+
+      for my $parent_trialunit_spec_in_csv (keys(%$unique_parent_trialunit_spec_href)) {
+        if (!(defined $found_parent_trialunit_spec_data->{$parent_trialunit_spec_in_csv})) {
+
+          push(@unknown_parent_trialunit_spec, $parent_trialunit_spec_in_csv);
+          push(@unknown_parent_trialunit_spec_rownum, $unique_parent_trialunit_spec_href->{$parent_trialunit_spec_in_csv});
+        }
+      }
+
+      my $err_msg = 'Row (' . join(',', @unknown_parent_trialunit_spec_rownum) . '): TrialUnitSpecimenId (';
+      $err_msg   .= join(',', @unknown_parent_trialunit_spec) . ') not found. ' . $chk_parent_trialunit_spec_sql;
+      return $self->_set_error($err_msg);
+    }
+  }
+
   my $total_affected_records = 0;
   $i = 0;
 
@@ -11442,7 +11668,7 @@ sub import_pedigree_csv_runmode {
     #$self->logger->debug("Composing: $i, $smallest_num");
 
     my $bulk_sql = 'INSERT INTO pedigree ';
-    $bulk_sql   .= '(SpecimenId,ParentSpecimenId,ParentType,SelectionReason,NumberOfSpecimens) ';
+    $bulk_sql   .= '(SpecimenId,ParentSpecimenId,ParentType,SelectionReason,NumberOfSpecimens,ParentTrialUnitSpecimenId) ';
     $bulk_sql   .= 'VALUES ';
 
     while( $j < $smallest_num ) {
@@ -11467,7 +11693,14 @@ sub import_pedigree_csv_runmode {
         $number_of_specimens = $data_row->{'NumberOfSpecimens'};
       }
 
-      $bulk_sql .= "($specimen_id,$parent_specimen_id,$parent_type,$selection_reason,$number_of_specimens),";
+      my $parent_trial_unit_spec = 'NULL';
+
+      if (length($data_row->{'ParentTrialUnitSpecimenId'}) > 0) {
+
+        $parent_trial_unit_spec = $data_row->{'ParentTrialUnitSpecimenId'};
+      }
+
+      $bulk_sql .= "($specimen_id,$parent_specimen_id,$parent_type,$selection_reason,$number_of_specimens,$parent_trial_unit_spec),";
 
       $j += 1;
     }
@@ -12134,6 +12367,14 @@ sub add_pedigree_runmode {
     $chk_int_href->{'NumberOfSpecimens'} = $nb_of_specimens;
   }
 
+  my $parent_trialunit_spec = undef;
+
+  if (length($query->param('ParentTrialUnitSpecimenId')) > 0) {
+
+    $parent_trialunit_spec = $query->param('ParentTrialUnitSpecimenId');
+    $chk_int_href->{'ParentTrialUnitSpecimenId'} = $parent_trialunit_spec;
+  }
+
   my ($int_err, $int_err_href) = check_integer_href( $chk_int_href );
 
   if ($int_err) {
@@ -12175,7 +12416,7 @@ sub add_pedigree_runmode {
 
     return $data_for_postrun_href;
   }
-
+  
   my $group_id  = $self->authen->group_id();
   my $gadmin_status = $self->authen->gadmin_status();
   my $perm_str = permission_phrase($group_id, 0, $gadmin_status, 'genotype');
@@ -12216,11 +12457,11 @@ sub add_pedigree_runmode {
   $sql   .= 'ParentSpecimenId=?, ';
   $sql   .= 'ParentType=?, ';
   $sql   .= 'SelectionReason=?, ';
-  $sql   .= 'NumberOfSpecimens=?';
-
+  $sql   .= 'NumberOfSpecimens=?, ';
+  $sql   .= 'ParentTrialUnitSpecimenId=?';
 
   my $sth = $dbh_write->prepare($sql);
-  $sth->execute($specimen_id, $p_specimen_id, $parent_type, $select_reason, $nb_of_specimens);
+  $sth->execute($specimen_id, $p_specimen_id, $parent_type, $select_reason, $nb_of_specimens, $parent_trialunit_spec);
 
   if ($dbh_write->err()) {
 
@@ -12336,6 +12577,14 @@ sub update_pedigree_runmode {
     $chk_int_href->{'NumberOfSpecimens'} = $nb_of_specimens;
   }
 
+  my $parent_trialunit_spec = undef;
+
+  if (length($query->param('ParentTrialUnitSpecimenId')) > 0) {
+
+    $parent_trialunit_spec = $query->param('ParentTrialUnitSpecimenId');
+    $chk_int_href->{'ParentTrialUnitSpecimenId'} = $parent_trialunit_spec;
+  }
+
   my ($int_err, $int_err_href) = check_integer_href( $chk_int_href );
 
   if ($int_err) {
@@ -12371,6 +12620,16 @@ sub update_pedigree_runmode {
 
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'ParentSpecimenId' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (defined $parent_trialunit_spec && !record_existence($dbh_write, 'trialunitspecimen', 'TrialUnitSpecimenId', $parent_trialunit_spec)) {
+
+    my $err_msg = "ParentTrialUnitSpecimenId ($parent_trialunit_spec): not found.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'ParentTrialUnitSpecimenId' => $err_msg}]};
 
     return $data_for_postrun_href;
   }
@@ -12438,12 +12697,13 @@ sub update_pedigree_runmode {
   $sql   .= 'ParentSpecimenId=?, ';
   $sql   .= 'ParentType=?, ';
   $sql   .= 'SelectionReason=?, ';
-  $sql   .= 'NumberOfSpecimens=? ';
+  $sql   .= 'NumberOfSpecimens=?, ';
+  $sql   .= 'ParentTrialUnitSpecimenId=? ';
   $sql   .= 'WHERE PedigreeId=?';
 
 
   my $sth = $dbh_write->prepare($sql);
-  $sth->execute($specimen_id, $p_specimen_id, $parent_type, $select_reason, $nb_of_specimens, $pedigree_id);
+  $sth->execute($specimen_id, $p_specimen_id, $parent_type, $select_reason, $nb_of_specimens, $parent_trialunit_spec, $pedigree_id);
 
   if ($dbh_write->err()) {
 
@@ -15351,8 +15611,6 @@ sub del_genpedigree_runmode {
     return $data_for_postrun_href;
   }
 
-  $dbh_k_read->disconnect();
-
   my $dbh_k_write = connect_kdb_write();
 
   my $sql = 'DELETE FROM genpedigree WHERE GenPedigreeId=?';
@@ -15377,6 +15635,736 @@ sub del_genpedigree_runmode {
   $data_for_postrun_href->{'Error'}     = 0;
   $data_for_postrun_href->{'Data'}      = {'Info' => $info_msg_aref};
   $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+
+sub add_taxonomy_runmode {
+
+=pod add_taxonomy_HELP_START
+{
+"OperationName": "Add Taxonomy",
+"Description": "This interface can be used to add a taxonomy to KDDart",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 1,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"KDDArTModule": "main",
+"KDDArTTable": "taxonomy",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><ReturnId Value='1' ParaName='TaxonomyId' /><Info Message='Taxonomy (1) has been added successfully.' /></DATA>",
+"SuccessMessageJSON": "{ 'ReturnId' : [{ 'Value' : '7', 'ParaName' : 'TaxonomyId' }], 'Info' : [{ 'Message' : 'Taxonomy (1) has been added successfully.' }]}",
+"ErrorMessageXML": [{"NameAlreadyExists": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error TaxonomyName='TaxonomyName (Triticeae): already exists.' /></DATA>", "MissingParameter": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error TaxonomyName='TaxonomyName is missing.' /></DATA>"}],
+"ErrorMessageJSON": [{"NameAlreadyExists": "{'Error' : [ {'TaxonomyName' : 'TaxonomyName (Triticeae): already exists.'} ] }", "MissingParameter": "{ 'Error' : [ { 'TaxonomyName' : 'TaxonomyName is missing.' } ] }"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+
+=cut
+
+  my $self  = shift;
+  my $query = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  my $dbh_read = connect_kdb_read();
+
+  my $skip_field = {};
+
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'taxonomy', $skip_field);
+
+
+  if ($chk_sfield_err) {
+
+    $self->logger->debug($chk_sfield_msg);
+
+    return $for_postrun_href;
+  }
+
+  $dbh_read->disconnect();
+
+  my $taxonomy_name = $query->param('TaxonomyName');
+  my $taxonomy_class = $query->param('TaxonomyClass');
+
+  my $dbh_write = connect_kdb_write();
+
+  my $taxonomy_name_exist = record_existence($dbh_write, 'taxonomy', 'TaxonomyName', $taxonomy_name);
+
+  if ($taxonomy_name_exist) {
+
+    my $err_msg = "TaxonomyName ($taxonomy_name): already exists.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'TaxonomyName' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $taxonomy_source = "";
+  my $taxonomy_extid = "";
+  my $taxonomy_url = "";
+  my $taxonomy_note = "";
+
+  my $chk_int_href = {};
+
+  if ( length($query->param('TaxonomySource')) > 0 ) {
+
+    $taxonomy_source  = $query->param('TaxonomySource');
+  }
+
+  if ( length($query->param('TaxonomyExtId')) > 0 ) {
+
+    $taxonomy_extid  = $query->param('TaxonomyExtId');
+  }
+
+  if ( length($query->param('TaxonomyURL')) > 0 ) {
+
+    $taxonomy_url  = $query->param('TaxonomyURL');
+  }
+
+  if ( length($query->param('TaxonomyNote')) > 0 ) {
+
+    $taxonomy_note  = $query->param('TaxonomyNote');
+  }
+
+  my $parent_taxonomy_id = undef;
+
+  if ( length($query->param('ParentTaxonomyId')) > 0 ) {
+
+    $parent_taxonomy_id = $query->param('ParentTaxonomyId');
+    $chk_int_href->{'ParentTaxonomyId'} = $parent_taxonomy_id;
+  }
+
+  my ($int_err, $int_err_href) = check_integer_href( $chk_int_href );
+
+  if ($int_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$int_err_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  if ($parent_taxonomy_id eq '0') {
+
+    $parent_taxonomy_id = undef;
+  }
+
+
+  if (defined $parent_taxonomy_id) {
+    if (!record_existence($dbh_write, 'taxonomy', 'TaxonomyId', $parent_taxonomy_id)) {
+
+      my $err_msg = "ParentTaxonomyId ($parent_taxonomy_id): not found.";
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'ParentTaxonomyId' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+  }
+
+  my $sql    = 'INSERT INTO taxonomy SET ';
+  $sql   .= 'TaxonomyName=?, ';
+  $sql   .= 'TaxonomyClass=?, ';
+  $sql   .= 'TaxonomySource=?, ';
+  $sql   .= 'TaxonomyExtId=?, ';
+  $sql   .= 'TaxonomyURL=?, ';
+  $sql   .= 'TaxonomyNote=?, ';
+  $sql   .= 'ParentTaxonomyId=? ';
+
+  my $sth = $dbh_write->prepare($sql);
+
+  $sth->execute($taxonomy_name, $taxonomy_class,
+              $taxonomy_source, $taxonomy_extid, $taxonomy_url, $taxonomy_note,
+              $parent_taxonomy_id
+              );
+
+  if ($dbh_write->err()) {
+
+    $self->logger->debug("SQL Error:" . $dbh_write->errstr());
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sth->finish();
+
+  my $taxonomy_id = $dbh_write->last_insert_id(undef, undef, 'taxonomy', 'TaxonomyId');
+
+  $dbh_write->disconnect();
+
+  my $info_msg_aref  = [{'Message' => "Taxonomy ($taxonomy_id) has been added successfully."}];
+  my $return_id_aref = [{'Value' => "$taxonomy_id", 'ParaName' => 'TaxonomyId'}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'      => $info_msg_aref,
+                                           'ReturnId'  => $return_id_aref,
+  };
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub get_taxonomy_runmode {
+
+=pod get_taxonomy_HELP_START
+{
+"OperationName": "Get taxonomy",
+"Description": "Return detailed information about a taxonomy specified by id.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><RecordMeta TagName='Taxonomy' /><Taxonomy TaxonomyName='triticum' TaxonomyId='1' delete='delete/taxonomy/1' update='update/taxonomy/1' /></DATA>",
+"SuccessMessageJSON": "{ 'RecordMeta' : [{'TagName' : 'Taxonomy'} ], 'Taxonomy' : [{'delete' : 'delete/taxonomy/1', 'TaxonomyId' : '1', 'TaxonomyName' : 'triticum', 'update' : 'update/taxonomy/1'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Taxonomy (15) not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{ 'Error' : [  {   'Message' : 'Taxonomy (15) not found.'  } ]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing taxonomy id."}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+
+=cut
+
+  my $self     = shift;
+  my $taxonomy_id = $self->param('id');
+
+  my $data_for_postrun_href = {};
+
+  my $dbh = connect_kdb_read();
+  my $taxonomy_exist = record_existence($dbh, 'taxonomy', 'TaxonomyId', $taxonomy_id);
+  $dbh->disconnect();
+
+  if (!$taxonomy_exist) {
+
+    my $err_msg = "Taxonomy ($taxonomy_id) not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $where_clause = 'WHERE TaxonomyId=?';
+
+  my ($taxonomy_err, $taxonomy_msg, $taxonomy_data) = $self->list_taxonomy(1, $where_clause, $taxonomy_id);
+
+  if ($taxonomy_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Taxonomy'      => $taxonomy_data,
+                                           'RecordMeta' => [{'TagName' => 'Genus'}],
+  };
+
+  return $data_for_postrun_href;
+
+
+}
+
+sub list_taxonomy {
+
+  my $self            = shift;
+  my $extra_attr_yes  = shift;
+  my $where_clause    = qq{};
+  $where_clause       = shift;
+
+  if (length($where_clause) > 0) {
+
+    my $count = 0;
+    while ($where_clause =~ /\?/g) {
+
+      $count += 1;
+    }
+
+    if ( scalar(@_) != $count ) {
+
+      my $msg = 'Number of arguments does not match with ';
+      $msg   .= 'number of SQL parameter.';
+      return (1, $msg, []);
+    }
+  }
+
+  my $dbh = connect_kdb_read();
+
+  my $sql = 'SELECT * FROM taxonomy ';
+  $sql   .= $where_clause;
+  $sql   .= ' ORDER BY TaxonomyId DESC';
+
+  my $sth = $dbh->prepare($sql);
+  # parameters provided by the caller
+  # for example, ('WHERE FieldA=?', '1')
+  $sth->execute(@_);
+
+  my $err = 0;
+  my $msg = '';
+  my $taxonomy_data = [];
+
+  if ( !$dbh->err() ) {
+
+    my $array_ref = $sth->fetchall_arrayref({});
+
+    if ( !$sth->err() ) {
+
+      $taxonomy_data = $array_ref;
+    }
+    else {
+
+      $err = 1;
+      $msg = 'Unexpected error';
+      $self->logger->debug('Err: ' . $dbh->errstr());
+    }
+  }
+  else {
+
+    $err = 1;
+    $msg = 'Unexpected error';
+    $self->logger->debug('Err: ' . $dbh->errstr());
+  }
+
+  $sth->finish();
+
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  my $extra_attr_taxonomy_data = [];
+
+  if ($extra_attr_yes && ($gadmin_status eq '1')) {
+
+    my $taxonomy_id_aref = [];
+
+    for my $row (@{$taxonomy_data}) {
+
+      push(@{$taxonomy_id_aref}, $row->{'TaxonomyId'});
+    }
+
+    my $chk_table_aref = [{'TableName' => 'taxonomy', 'FieldName' => 'TaxonomyId'}];
+
+    my ($chk_id_err, $chk_id_msg,
+        $used_id_href, $not_used_id_href) = id_existence_bulk($dbh, $chk_table_aref, $taxonomy_id_aref);
+
+    if ($chk_id_err) {
+
+      $self->logger->debug("Check id existence error: $chk_id_msg");
+      $err = 1;
+      $msg = $chk_id_msg;
+
+      return ($err, $msg, []);
+    }
+
+    for my $row (@{$taxonomy_data}) {
+
+      my $taxonomy_id = $row->{'TaxonomyId'};
+      $row->{'update'}   = "update/taxonomy/$taxonomy_id";
+
+      if ($not_used_id_href->{$taxonomy_id}) {
+
+        $row->{'delete'}   = "delete/taxonomy/$taxonomy_id";
+      }
+
+      push(@{$extra_attr_taxonomy_data}, $row);
+    }
+  }
+  else {
+
+    $extra_attr_taxonomy_data = $taxonomy_data;
+  }
+
+  $dbh->disconnect();
+
+  return ($err, $msg, $extra_attr_taxonomy_data);
+}
+
+
+
+
+sub update_taxonomy_runmode {
+
+=pod update_taxonomy_HELP_START
+{
+"OperationName": "Update taxonomy",
+"Description": "Update information about the taxonomy specified by taxonomy id.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"KDDArTModule": "main",
+"KDDArTTable": "taxonomy",
+"KDDArTFactorTable": "taxonomyfactor",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='Taxonomy (1) has been updated successfully.' /></DATA>",
+"SuccessMessageJSON": "{ 'Info' : [{ 'Message' : 'Taxonomy (1) has been updated successfully.' }]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Taxonomy (1) not found.' /></DATA>", "PermissionDenied": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Taxonomy (1) permission denied.' /></DATA>" }],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [ {'Message' : 'Taxonomy (1) not found.'} ] }", "PermissionDeined": "{ 'Error' : [ { 'Message' : 'Taxonomy (1) permission denied.' } ] }" }],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing TaxonomyId"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+
+  my $self        = shift;
+  my $query       = $self->query();
+  my $taxonomy_id = $self->param('id');
+
+  my $data_for_postrun_href = {};
+
+  my $dbh_k_read = connect_kdb_read();
+
+  my $skip_field = {};
+
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_k_read,
+                                                                                'taxonomy', $skip_field);
+
+
+
+  # Generic required static field checking
+
+  my $taxonomy_name = $query->param('TaxonomyName');
+  my $taxonomy_class = $query->param('TaxonomyClass');
+
+  my $taxonomy_exist = record_existence($dbh_k_read, 'taxonomy', 'TaxonomyId', $taxonomy_id);
+
+  if (!$taxonomy_exist) {
+
+    my $err_msg = "Taxonomy ($taxonomy_id) not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $chk_gname_sql = 'SELECT TaxonomyId FROM taxonomy WHERE TaxonomyName=? AND TaxonomyId <> ?';
+
+  my ($read_err, $db_taxonomy_id) = read_cell($dbh_k_read, $chk_gname_sql, [$taxonomy_name, $taxonomy_id]);
+
+  if ($read_err) {
+
+    $self->logger->debug("Read exististing taxonomy name failed");
+
+    my $err_msg = 'Unexpected Error.';
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (length($db_taxonomy_id) > 0) {
+
+    my $err_msg = "TaxonomyName ($taxonomy_name): already exists";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'TaxonomyName' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $df_val_start_time = [gettimeofday()];
+
+  my $read_sql = 'SELECT TaxonomySource, TaxonomyExtId, TaxonomyURL, TaxonomyNote, ParentTaxonomyId ';
+  $read_sql   .= 'FROM taxonomy WHERE TaxonomyId=?';
+
+  my ($r_df_val_err, $r_df_val_msg, $taxonomy_df_val_data) = read_data($dbh_k_read, $read_sql, [$taxonomy_id]);
+
+  if ($r_df_val_err) {
+
+    $self->logger->debug("Retrieve taxonomy default values for optional fields failed: $r_df_val_msg");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $taxonomy_source = undef;
+  my $taxonomy_extid = undef;
+  my $taxonomy_url = undef;
+  my $taxonomy_note = undef;
+
+  my $nb_df_val_rec = scalar(@{$taxonomy_df_val_data});
+
+  if ($nb_df_val_rec != 1) {
+
+    $self->logger->debug("Retrieve taxonomy default values - number of records unacceptable: $nb_df_val_rec");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $taxonomy_source = $taxonomy_df_val_data->[0]->{'TaxonomySource'};
+  $taxonomy_extid = $taxonomy_df_val_data->[0]->{'TaxonomyExtId'};
+  $taxonomy_url = $taxonomy_df_val_data->[0]->{'TaxonomyURL'};
+  $taxonomy_note = $taxonomy_df_val_data->[0]->{'TaxonomyNote'};
+
+  my $df_val_elapsed = tv_interval($df_val_start_time);
+
+  $self->logger->debug("Retrieving default value time: $df_val_elapsed");
+
+  if (length($taxonomy_source) == 0) {
+
+    $taxonomy_source = undef;
+  }
+
+  if (length($taxonomy_extid) == 0) {
+
+    $taxonomy_extid = undef;
+  }
+
+  if (length($taxonomy_url) == 0) {
+
+    $taxonomy_url = undef;
+  }
+
+  if (length($taxonomy_note) == 0) {
+
+    $taxonomy_note = undef;
+  }
+
+
+  my $chk_int_href = {};
+
+  if ( length($query->param('TaxonomySource')) > 0 ) {
+
+    $taxonomy_source  = $query->param('TaxonomySource');
+  }
+
+  if ( length($query->param('TaxonomyExtId')) > 0 ) {
+
+    $taxonomy_extid  = $query->param('TaxonomyExtId');
+  }
+
+  if ( length($query->param('TaxonomyURL')) > 0 ) {
+
+    $taxonomy_url  = $query->param('TaxonomyURL');
+  }
+
+  if ( length($query->param('TaxonomyNote')) > 0 ) {
+
+    $taxonomy_note  = $query->param('TaxonomyNote');
+  }
+
+  my $parent_taxonomy_id = undef;
+
+
+  if ( length($query->param('ParentTaxonomyId')) > 0 ) {
+
+    $parent_taxonomy_id = $query->param('ParentTaxonomyId');
+    $chk_int_href->{'ParentTaxonomyId'} = $parent_taxonomy_id;
+  }
+
+  my ($int_err, $int_err_href) = check_integer_href( $chk_int_href );
+
+  if ($int_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$int_err_href]};
+
+    return $data_for_postrun_href;
+  }
+
+
+  if ($parent_taxonomy_id eq '0') {
+
+    $parent_taxonomy_id = undef;
+  }
+
+  if (defined $parent_taxonomy_id) {
+    if (!record_existence($dbh_k_read, 'taxonomy', 'TaxonomyId', $parent_taxonomy_id)) {
+
+      my $err_msg = "ParentTaxonomyId ($parent_taxonomy_id): not found.";
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'ParentTaxonomyId' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+  }
+
+  $dbh_k_read->disconnect();
+
+  my $dbh_write = connect_kdb_write();
+
+
+  my $sql = 'UPDATE taxonomy SET ';
+  $sql   .= 'TaxonomyName=?, ';
+  $sql   .= 'TaxonomyClass=?, ';
+  $sql   .= 'TaxonomySource=?, ';
+  $sql   .= 'TaxonomyExtId=?, ';
+  $sql   .= 'TaxonomyURL=?, ';
+  $sql   .= 'TaxonomyNote=?, ';
+  $sql   .= 'ParentTaxonomyId=? ';
+  $sql   .= 'WHERE TaxonomyId=?';
+
+  $self->logger->debug($sql);
+
+  my $sth = $dbh_write->prepare($sql);
+  $sth->execute($taxonomy_name, $taxonomy_class, $taxonomy_source, $taxonomy_extid, $taxonomy_url,$taxonomy_note,$parent_taxonomy_id,
+                $taxonomy_id);
+
+  if ($dbh_write->err()) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+  $sth->finish();
+
+  $dbh_write->disconnect();
+
+  my $info_msg = "Taxonomy ($taxonomy_id) has been updated successfully.";
+  my $info_msg_aref = [{'Message' => $info_msg}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info' => $info_msg_aref};
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub list_taxonomy_runmode {
+
+=pod list_taxonomy_HELP_START
+{
+"OperationName": "List taxonomy",
+"Description": "Return list of taxonomyes in the system.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<DATA><RecordMeta TagName='Taxonomy' /><Taxonomy TaxonomyName='Taxonomy_5477708' TaxonomyId='30' delete='delete/taxonomy/30' update='update/taxonomy/30' /><Taxonomy TaxonomyName='Taxonomy_4085568' TaxonomyId='29' delete='delete/taxonomy/29' update='update/taxonomy/29' /></DATA>",
+"SuccessMessageJSON": "{'RecordMeta' : [{ 'TagName' : 'Taxonomy' }], 'Taxonomy' : [{'delete' : 'delete/taxonomy/30', 'TaxonomyId' : '30', 'TaxonomyName' : 'Taxonomy_5477708', 'update' : 'update/taxonomy/30'}, {'delete' : 'delete/taxonomy/29', 'TaxonomyId' : '29', 'TaxonomyName' : 'Taxonomy_4085568', 'update' : 'update/taxonomy/29'}]}",
+"ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
+"ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self = shift;
+
+  my $data_for_postrun_href = {};
+
+  my $msg = '';
+
+  my ($taxonomy_err, $taxonomy_msg, $taxonomy_data) = $self->list_taxonomy(1, '');
+
+  if ($taxonomy_err) {
+
+    $self->logger->debug($taxonomy_msg);
+
+    $msg = 'Unexpected error';
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Taxonomy'      => $taxonomy_data,
+                                           'RecordMeta' => [{'TagName' => 'Taxonomy'}],
+  };
+
+  return $data_for_postrun_href;
+}
+
+
+sub del_taxonomy_gadmin_runmode {
+
+=pod del_taxonomy_gadmin_HELP_START
+{
+"OperationName": "Delete taxonomy",
+"Description": "Delete taxonomy using specified id. Taxonomy can be deleted only if not attached to any lower level related record.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 1,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='Taxonomy (3) has been deleted successfully.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'Taxonomy (3) has been deleted successfully.'}]}",
+"ErrorMessageXML": [{"IdUsed": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Taxonomy (5) is used in Genotype.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdUsed": "{'Error' : [{'Message' : 'Taxonomy (5) is used in Genotype.'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing TaxonomyId."}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self       = shift;
+  my $taxonomy_id = $self->param('id');
+
+  my $data_for_postrun_href = {};
+
+  my $dbh_k_read = connect_kdb_read();
+
+  my $taxonomy_exist = record_existence($dbh_k_read, 'taxonomy', 'TaxonomyId', $taxonomy_id);
+
+  if (!$taxonomy_exist) {
+
+    my $err_msg = "Taxonomy ($taxonomy_id) not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $taxonomy_used = record_existence($dbh_k_read, 'genotype', 'TaxonomyId', $taxonomy_id);
+
+  if ($taxonomy_used) {
+
+    my $err_msg = "Taxonomy ($taxonomy_id) is used in genotype.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $parent_taxonomy_used = record_existence($dbh_k_read, 'taxonomy', 'ParentTaxonomyId', $taxonomy_id);
+
+  if ($parent_taxonomy_used) {
+
+    my $err_msg = "Taxonomy ($taxonomy_id) is used as a parent for another Taxonomy.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+
+  $dbh_k_read->disconnect();
+
+  my $dbh_k_write = connect_kdb_write();
+
+  my $sql = 'DELETE FROM taxonomy WHERE TaxonomyId=?';
+  my $sth = $dbh_k_write->prepare($sql);
+
+  $sth->execute($taxonomy_id);
+
+  if ($dbh_k_write->err()) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sth->finish();
+
+  $dbh_k_write->disconnect();
+
+  my $info_msg_aref = [{'Message' => "Taxonomy ($taxonomy_id) has been deleted successfully."}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info' => $info_msg_aref};
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+
+
+  my $data_for_postrun_href = {};
 
   return $data_for_postrun_href;
 }

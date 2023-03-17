@@ -159,11 +159,11 @@ sub login {
     my $write_token = '';
     if (uc($output_format) eq 'XML') {
 
-      $write_token_aref = XMLin($write_token_result, ForceArray => 1);
+      eval { $write_token_aref = XMLin($write_token_result, ForceArray => 1); };
     }
     elsif (uc($output_format) eq 'JSON') {
 
-      $write_token_aref = decode_json($write_token_result);
+      eval { $write_token_aref = decode_json($write_token_result); };
     }
     $write_token = $write_token_aref->{'WriteToken'}->[0]->{'Value'};
     chomp($write_token);
@@ -194,6 +194,97 @@ sub login {
   return (@is_match_return, undef);
 }
 
+sub execute_reset_password {
+
+  my $parameter     = $_[0];
+  my $output_format = $_[1];
+  my $match         = $_[2];
+  my $logger        = $_[3];
+
+  my $new_password   = $parameter->{'NewUserPassword'};
+  my $new_password_confirmed = $parameter->{'NewUserPasswordConfirmed'};
+  my $password_token        = $parameter->{'PasswordToken'};
+  my $url        = $parameter->{'URL'};
+
+  my $browser  = LWP::UserAgent->new();
+
+  my $process_id = $$;
+
+  if (defined $ACCEPT_HEADER_LOOKUP->{$output_format}) {
+
+    $browser->default_header('Accept' => $ACCEPT_HEADER_LOOKUP->{$output_format});
+  }
+
+  my $cookie_jar = HTTP::Cookies->new(
+    file => "./lwp_cookies_${process_id}.dat",
+    autosave => 1,
+    );
+
+  $browser->cookie_jar($cookie_jar);
+
+  while($url =~ /:(\w+)\/?/ ) {
+
+    my $para_name = $1;
+    my $para_val  = $parameter->{$para_name};
+    $url =~ s/:${para_name}/${para_val}/;
+  }
+
+  $logger->debug("URL: $url");
+
+  my $start_time = [gettimeofday()];
+
+  my $auth_req_res = POST($url,
+                          [
+                            NewUserPassword      => "$new_password",
+                            NewUserPasswordConfirmed           => "$new_password_confirmed",
+                            PasswordToken     => "$password_token",
+                            ]);
+
+  my $auth_response = $browser->request($auth_req_res);
+  my $msg_xml       = '';
+
+  $logger->debug("Code: " . $auth_response->code());
+
+  if ($auth_response->is_success) {
+
+    $logger->debug("Status line: " . $auth_response->status_line);
+    $logger->debug("Successful");
+
+    my $reset_password_result = $auth_response->content();
+
+    my $reset_password_aref = {};
+    my $reset_password = '';
+    if (uc($output_format) eq 'XML') {
+
+      eval { $reset_password_aref = XMLin($reset_password_result, ForceArray => 1); };
+    }
+    elsif (uc($output_format) eq 'JSON') {
+
+      eval { $reset_password_aref = decode_json($reset_password_result); };
+    }
+
+    my $auth_req_elapsed = tv_interval($start_time);
+    $logger->debug("Authentication request elapsed time: $auth_req_elapsed");
+  }
+  else {
+
+    $msg_xml = $auth_response->content();
+
+    $logger->debug("Status line: " . $auth_response->status_line);
+    $logger->debug("Content: " . $msg_xml);
+  }
+
+  my @is_match_return = is_match($auth_response, $output_format, $match, $logger);
+
+  if ($is_match_return[0] == 1) {
+
+    #print "$msg_xml\n";
+  }
+
+  return (@is_match_return, undef);
+}
+
+
 sub is_match {
 
   my $response      = $_[0];
@@ -202,6 +293,7 @@ sub is_match {
   my $logger        = $_[3];
 
   my $process_id = $$;
+
 
   my $err = 0;
   my $attr_csv = '';
@@ -233,6 +325,10 @@ sub is_match {
         $attr_name = 'Factor' . $vir_attr_ref->{'FactorName'}->[0]->{'Value'};
       }
     }
+    else {
+
+      print "No attribtue defined in match\n";
+    }
 
     my $tag_name = '';
 
@@ -249,11 +345,11 @@ sub is_match {
       my $data_ref = {};
       if (uc($output_format) eq 'XML') {
 
-        $data_ref = XMLin($response_content, ForceArray => 1);
+        eval { $data_ref = XMLin($response_content, ForceArray => 1); };
       }
       elsif (uc($output_format) eq 'JSON') {
 
-        $data_ref = decode_json($response_content);
+        eval { $data_ref = decode_json($response_content); };
       }
 
       my $except_val = $match_info->{'Value'};
@@ -279,6 +375,7 @@ sub is_match {
 
     if ($attr_name eq 'StatusCode') {
 
+      $logger->debug("Response code: " . $response->code() . " - match con: $match_con");
       if ($response->code() != $match_con) {
 
         $err = 1;
@@ -298,11 +395,11 @@ sub is_match {
       my $data_ref = {};
       if (uc($output_format) eq 'XML') {
 
-        $data_ref = XMLin($response_content, ForceArray => 1);
+        eval { $data_ref = XMLin($response_content, ForceArray => 1); };
       }
       elsif (uc($output_format) eq 'JSON') {
 
-        $data_ref = decode_json($response_content);
+        eval { $data_ref = decode_json($response_content); };
       }
 
       $logger->debug("Number of keys: " . keys(%{$data_ref}));
@@ -730,6 +827,8 @@ sub get_case_parameter {
       }
     }
 
+    
+
     if (defined $input_href->{'Value'}) {
 
       $para_val  = $input_href->{'Value'};
@@ -738,6 +837,9 @@ sub get_case_parameter {
       if (defined $input_href->{'SrcValue'}) {
 
         my $src_case_file = $input_href->{'SrcValue'};
+
+        $logger->debug("Para name: $para_name looking for " . $input_href->{'SrcValue'});
+        $logger->debug("Checking ". $src_case_file);
 
         #print "Src case file: $src_case_file\n";
 
@@ -758,7 +860,7 @@ sub get_case_parameter {
             # This is for static file like permission and group file
             if ($src_case_file !~ /case_\d+_\w+\.xml$/) {
 
-              $src_case_data_ref = XMLin($src_case_file, ForceArray => 1);
+              eval { $src_case_data_ref = XMLin($src_case_file, ForceArray => 1); };
             }
             else {
 
@@ -817,11 +919,11 @@ sub get_case_parameter {
 
             if (uc($file_format) eq 'XML') {
 
-              $id_data = XMLin($id_file_content, ForceArray => 1);
+              eval { $id_data = XMLin($id_file_content, ForceArray => 1); };
             }
             elsif (uc($file_format) eq 'JSON') {
 
-              $id_data = decode_json($id_file_content);
+              eval { $id_data = decode_json($id_file_content); };
             }
 
             $id_data_lookup_href->{$id_file} = $id_data;
@@ -945,7 +1047,9 @@ sub get_case_parameter {
 
             my $main_tag = $input_href->{'ParaName'};
 
-            my $src_file_ref = XMLin($src_file, ForceArray => 1);
+            my $src_file_ref = {};
+            eval { $src_file_ref = XMLin($src_file, ForceArray => 1); };
+
             for (my $i = 0; $i < scalar(@{$src_file_ref->{$main_tag}}); ++$i) {
 
               my $src_file_rec = $src_file_ref->{$main_tag}->[$i];
@@ -1125,7 +1229,9 @@ sub get_case_parameter {
           die "$case_file: $para_name XSL file $xsl_file not readable.";
         }
 
-        my $src_file_ref = XMLin($src_xml_file, ForceArray => 1);
+        my $src_file_ref = {};
+        eval { $src_file_ref = XMLin($src_xml_file, ForceArray => 1); };
+
         for my $level1_key (keys(%{$src_file_ref})) {
 
           #print "Level1 key: $level1_key\n";
@@ -1298,11 +1404,11 @@ sub standard_request {
 
     if (uc($output_format) eq 'XML') {
 
-      $return_data = XMLin($msg_content, ForceArray => 1);
+      eval { $return_data = XMLin($msg_content, ForceArray => 1); };
     }
     elsif (uc($output_format) eq 'JSON') {
 
-      $return_data = decode_json($msg_content);
+      eval { $return_data = decode_json($msg_content); };
     }
   }
 
@@ -1310,7 +1416,7 @@ sub standard_request {
 
   if ($is_match_return[0] == 1) {
 
-    #print "$msg_content\n";
+    print "$msg_content\n";
   }
 
   return (@is_match_return, undef, $return_data);
@@ -1381,11 +1487,11 @@ sub logout {
 
     if (uc($output_format) eq 'XML') {
 
-      $return_data = XMLin($msg_content, ForceArray => 1);
+      eval { $return_data = XMLin($msg_content, ForceArray => 1); };
     }
     elsif (uc($output_format) eq 'JSON') {
 
-      $return_data = decode_json($msg_content);
+      eval { $return_data = decode_json($msg_content); };
     }
   }
 
@@ -1671,11 +1777,11 @@ sub add_record_upload {
 
     if (uc($output_format) eq 'XML') {
 
-      $return_data = XMLin($msg_content, ForceArray => 1);
+      eval { $return_data = XMLin($msg_content, ForceArray => 1); };
     }
     elsif (uc($output_format) eq 'JSON') {
 
-      $return_data = decode_json($msg_content);
+      eval { $return_data = decode_json($msg_content); };
     }
 
     if (defined $return_data->{'ReturnId'}) {
@@ -1818,11 +1924,11 @@ sub add_record {
 
     if (uc($output_format) eq 'XML') {
 
-      $return_data = XMLin($msg_content, ForceArray => 1);
+      eval { $return_data = XMLin($msg_content, ForceArray => 1); };
     }
     elsif (uc($output_format) eq 'JSON') {
 
-      $return_data = decode_json($msg_content);
+      eval { $return_data = decode_json($msg_content); };
     }
 
     if (defined $return_data->{'ReturnId'}) {
@@ -1861,7 +1967,9 @@ sub run_test_case {
 
   my $start_time = [gettimeofday()];
 
-  my $tcase_data_ref = XMLin($case_file, ForceArray => 1);
+  my $tcase_data_ref = {};
+
+  eval { $tcase_data_ref = XMLin($case_file, ForceArray => 1); };
 
   if (defined $STORAGE->{"${case_file}_${process_id}"}) {
 
@@ -1950,6 +2058,7 @@ sub run_test_case {
   my @sorted_match = map { $_->[1] }
                      sort { $a->[0] <=> $b->[0] } @temp_sorted_match;
 
+
   my $case_err       = 0;
   my $attr_csv       = '';
   my $return_id_href = undef;
@@ -1962,12 +2071,12 @@ sub run_test_case {
     ($case_err, $attr_csv, $return_id_href, $return_data) = $custom_method->($parameter, $output_format, \@sorted_match, $logger);
   }
   else {
-
     ($case_err, $attr_csv, $return_id_href, $return_data) = standard_request($parameter, $output_format, \@sorted_match, $logger);
   }
 
   if (defined $return_id_href) {
 
+    print "$case_file : with return data\n";
     $tcase_data_ref->{'ReturnId'} = [$return_id_href];
   }
   else {
@@ -2154,11 +2263,11 @@ sub claim_grp_ownership {
 
     if (uc($output_format) eq 'XML') {
 
-      $return_data = XMLin($msg_content, ForceArray => 1);
+      eval { $return_data = XMLin($msg_content, ForceArray => 1); };
     }
     elsif (uc($output_format) eq 'JSON') {
 
-      $return_data = decode_json($msg_content);
+      eval { $return_data = decode_json($msg_content); };
     }
   }
 
@@ -2195,7 +2304,9 @@ sub is_add_case {
 
   my $status = 0;
 
-  my $tcase_data_ref = XMLin($case_file, ForceArray => 1);
+  my $tcase_data_ref = {};
+
+  eval { $tcase_data_ref = XMLin($case_file, ForceArray => 1); };
 
   if (defined $STORAGE->{"${case_file}_${process_id}"}) {
 
@@ -2233,7 +2344,9 @@ sub who_has_no_dependent {
 
       my %who_i_depend_on;
 
-      my $tcase_data_ref = XMLin($case_file, ForceArray => 1);
+      my $tcase_data_ref = {};
+      eval { $tcase_data_ref = XMLin($case_file, ForceArray => 1); };
+
       for my $input_tag (@{$tcase_data_ref->{'INPUT'}}) {
 
         if (defined $input_tag->{'SrcName'}) {
@@ -2373,7 +2486,8 @@ sub delete_test_record {
 
   $browser->cookie_jar($cookie_jar);
 
-  my $tcase_data_ref = XMLin($case_file, ForceArray => 1);
+  my $tcase_data_ref = {};
+  eval { $tcase_data_ref = XMLin($case_file, ForceArray => 1); };
 
   print "Delete test record in case $case_file\n";
 
@@ -2543,7 +2657,8 @@ sub xml2arrayref {
   my $data_src = $_[0];
   my $tag_name = $_[1];
 
-  my $data_ref = XMLin($data_src, ForceArray => 1);
+  my $data_ref = {};
+  eval { $data_ref = XMLin($data_src, ForceArray => 1); };
 
   my $data_row_ref = [];
   if ($data_ref->{$tag_name}) {

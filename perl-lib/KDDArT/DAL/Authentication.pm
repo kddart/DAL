@@ -83,6 +83,7 @@ sub setup {
     'switch_extra_data'         => 'switch_extra_data_runmode',
     'oauth2_google'             => 'oauth2_google_runmode',
     'clone'                     => 'clone_runmode',
+    'execute_reset_password'    => 'execute_reset_password_runmode',
       );
 
   my $logger = get_logger();
@@ -120,6 +121,8 @@ sub setup {
   my $setup_elapsed = tv_interval($start_time);
   $logger->debug("Setup elapsed time: $setup_elapsed");
 }
+
+
 
 sub login_runmode {
 
@@ -996,6 +999,176 @@ sub clone_runmode {
   $data_for_postrun_href->{'ExtraData'} = 0;
 
   return $data_for_postrun_href;
+}
+
+sub execute_reset_password_runmode {
+
+=pod execute_reset_password_HELP_START
+{
+"OperationName": "Execute a password reset",
+"Description": "Upon validation with reset token, the password is updated to given parameters",
+"AuthRequired": 0,
+"GroupRequired": 1,
+"GroupAdminRequired": 1,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='Your password has been changed successfully.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'Your password has been changed successfully.' }]}",
+"ErrorMessageXML": [{"SystemUserName": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Passwords do not match.' /></DATA>"}],
+"ErrorMessageJSON": [{"SystemUserName": "{'Error' : [{'Message' : 'Passwords do not match.'}]}"}],
+"URLParameter": [{"ParameterName": "username", "Description": "Username of user having password reset"}],
+"HTTPParameter": [{"Required": 1, "Name": "NewUserPassword", "Description": "New Password"}, {"Required": 1, "Name": "NewUserPasswordConfirmed", "Description": "New Password Confirmed"}, {"Required": 1, "Name": "PasswordToken", "Description": "Token for validation"} ],
+"HTTPReturnedErrorCode": [{"HTTPCode": 401}]
+}
+=cut
+  my $self  = shift;
+  my $query = $self->query();
+  my $data_for_postrun_href = {};
+
+  my $cur_dt = DateTime->now( time_zone => $TIMEZONE );
+  $cur_dt = DateTime::Format::MySQL->format_datetime($cur_dt);
+
+  my $username_on_request = $self->param('username');
+
+  my $new_pass            = $query->param('NewUserPassword');
+  my $new_pass_confirmed  = $query->param('NewUserPasswordConfirmed');
+  my $password_reset_token= $query->param('PasswordToken');
+
+  #$self->logger->debug("Param: $username_on_request, $new_pass , $new_pass_confirmed, $password_reset_token");
+
+  my ($missing_err, $missing_href) = check_missing_href( { 'NewUserPassword'     => $new_pass, 'NewUserPasswordConfirmed' => $new_pass_confirmed, 'PasswordToken' => $password_reset_token } );
+
+  if ($missing_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
+
+    $self->logger->debug("Fail because missing fields");
+
+    return $data_for_postrun_href;
+  }
+
+  if ($new_pass ne $new_pass_confirmed) {
+    my $err_msg = "Passwords do not match.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    $self->logger->debug("Fail because of password mismatch.");
+
+    return $data_for_postrun_href;
+  };
+
+  #make sure user exists
+
+  my $dbh_write = connect_kdb_write();
+
+  if (!record_existence($dbh_write, 'systemuser', 'UserName', $username_on_request)) {
+
+    my $err_msg = "Unexpected Error.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    $self->logger->debug("Fail because of database look up failed to return user.");
+
+    return $data_for_postrun_href;
+  }
+
+  #check date is still valid and confirm token match
+  my $failure_interval_mn = 30;
+  my $nb_failure_limit = 5;
+
+  my $dbh = connect_kdb_read();
+
+  my $sql  = 'SELECT systemuser.UserId, systemuser.UserVerificationDT, systemuser.UserName, ';
+  $sql .= 'contact.ContactLastName, contact.ContactEMail ';
+  $sql .= 'FROM systemuser ';
+  $sql .= 'LEFT JOIN contact ON systemuser.ContactId = contact.ContactId ';
+  $sql .= 'WHERE systemuser.UserName=? AND systemuser.UserVerification=?';
+
+  $self->logger->debug($sql);
+
+  my ($read_user_err, $read_user_msg, $user_aref) = read_data($dbh, $sql, [$username_on_request,$password_reset_token]);
+
+  $dbh->disconnect();
+
+  if ($read_user_err) {
+
+    $self->logger->debug("Fail because of database lookup with failed UserVerfication");
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+
+  }
+
+  if (length($user_aref) < 1 || (!defined $user_aref->[0]->{'UserVerificationDT'})) {
+
+    $self->logger->debug("Fail because of database model failure");
+
+    $data_for_postrun_href->{'Error'} = 1;
+
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => "Unexpected error."}]};
+
+    return $data_for_postrun_href;
+
+  }
+
+  my $password_request_date   = $user_aref->[0]->{'UserVerificationDT'};
+
+  $self->logger->debug("Date of initial password request: $password_request_date");
+
+  my $req_dt = DateTime::Format::MySQL->parse_datetime($password_request_date);
+  my $dur_in_mn = minute_diff($req_dt);
+
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'UserDate'      => $password_request_date,
+                                           'RecordMeta' => [{'TagName' => 'SystemUser'}],
+  };
+
+  # 1 hour token expiry
+  if ($dur_in_mn > 60) {
+
+    $self->logger->debug("Fail because of token expiring");
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Token Expired'}]};
+
+    return $data_for_postrun_href;
+
+  }
+
+  $sql = 'UPDATE systemuser SET ';
+  $sql   .= 'UserPassword=?, UserVerification=? ';
+  $sql   .= 'WHERE UserName=?';
+
+  my $sth = $dbh_write->prepare($sql);
+  $sth->execute($new_pass, "", $username_on_request);
+
+  if ($dbh_write->err()) {
+
+    $self->logger->debug("Fail resetting user password request information");
+
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sth->finish();
+
+  $dbh_write->disconnect();
+
+  my $info_msg_aref = [{'Message' => "Your password has been changed successfully."}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info' => $info_msg_aref};
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+
 }
 
 sub logger {

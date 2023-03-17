@@ -13,6 +13,5 @@
   <Parent CaseFile="xml/add_data_no_vcol/case_00218_add_spec4pedigree_1.xml" Force="1" Order="3" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00219_add_spec4pedigree_2.xml" Order="4" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00343_add_parent_type.xml" Order="5" />
-  
-  
+
 </TestCase>

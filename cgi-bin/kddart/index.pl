@@ -310,6 +310,22 @@ CGI::Application::Dispatch->dispatch(
     'get/genotypealias/:id'                             => { app => 'KDDArT::DAL::Genotype',
                                                              rm  => 'get_genotype_alias' },
 
+    'add/taxonomy'                                      => { app => 'KDDArT::DAL::Genotype',
+                                                             rm  => 'add_taxonomy' },
+
+    'get/taxonomy/:id'                                  => { app => 'KDDArT::DAL::Genotype',
+                                                             rm  => 'get_taxonomy' },
+
+    'update/taxonomy/:id'                               => { app => 'KDDArT::DAL::Genotype',
+                                                             rm  => 'update_taxonomy' },
+
+    'delete/taxonomy/:id'                               => { app => 'KDDArT::DAL::Genotype',
+                                                             rm  => 'del_taxonomy_gadmin' },
+
+
+    'list/taxonomy'                                       => { app => 'KDDArT::DAL::Genotype',
+                                                             rm  => 'list_taxonomy' },
+
     'add/genus'                                         => { app => 'KDDArT::DAL::Genotype',
                                                              rm  => 'add_genus_gadmin' },
 
@@ -1214,6 +1230,12 @@ CGI::Application::Dispatch->dispatch(
     'get/crossing/:id'                                  => { app => 'KDDArT::DAL::Trial',
                                                              rm  => 'get_crossing' },
 
+    'user/:username/request/passwordreset'              => { app => 'KDDArT::DAL::System',
+                                                             rm  => 'request_reset_password'},   
+
+    'user/:username/execute/passwordreset'              => { app => 'KDDArT::DAL::Authentication',
+                                                             rm  => 'execute_reset_password'},     
+    
     'list/solrcore'                                     => { app => 'KDDArT::DAL::Search',
                                                              rm  => 'list_solr_core' },
 

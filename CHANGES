@@ -1,3 +1,23 @@
+Version 2.7.1
+Date: 16/03/2023
+Description: New Features and Improvements
+
++ Taxonomy related endpoints added and Genotype related endpoints updated to include TaxonomyId as a field where relavent. 
+
++ Pedgiree endpoints updated to include new field ParentTrialUnitSpecimenId.
+
++ Specimen endpoints updated to include new field SourceCrossingId
+
++ New endpoints user/:username/request/passwordreset and user/:username/execute/passwordreset to support password reset feature
+
+Database update
+
++ Taxonomy's TaxonomyName field has been corrected. Please ensure to use ansible upgrade scripts to update the table.
+
+Instance Testing
+
++ A number of new whitebox tests have been added. This takes the number of tests that can be run at the start of deployment to 421. 
+
 Version 2.7.0
 Date: 11/01/2023
 Description: Major Database Upgrade 
