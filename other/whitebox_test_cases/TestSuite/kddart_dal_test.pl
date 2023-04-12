@@ -240,7 +240,7 @@ foreach my $test_case (keys(%{$global_stat_href})) {
     my $dal_time  = $time_aref->[2];
 
     $total_test_time += $test_time;
-    $total_dal_time  += $dal_time;
+    #$total_dal_time  += $dal_time;
 
     $counter += 1;
   }

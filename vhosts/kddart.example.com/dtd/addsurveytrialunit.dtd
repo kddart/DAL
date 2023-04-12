@@ -1,0 +1,7 @@
+<!ELEMENT DATA ( surveytrialunit+ ) >
+
+<!ELEMENT surveytrialunit EMPTY >
+<!ATTLIST surveytrialunit TrialUnitId NMTOKEN #REQUIRED >
+<!ATTLIST surveytrialunit VisitTime NMTOKEN #REQUIRED >
+<!ATTLIST surveytrialunit VisitOrder NMTOKEN #IMPLIED >
+<!ATTLIST surveytrialunit CollectorId NMTOKEN #IMPLIED >

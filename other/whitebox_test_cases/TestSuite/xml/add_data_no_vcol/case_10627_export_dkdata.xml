@@ -1,0 +1,14 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record_upload" Description="Export data capture data" TargetURL="trial/:TrialId/export/dkdata" Type="BLOCKING" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <INPUT ParaName="TrialId" SrcValue="xml/add_data_no_vcol/case_00007_add_trial.xml" />
+  <INPUT ParaName="SampleTypeId" SrcValue="xml/add_data_no_vcol/case_00201_add_sampletype.xml" />
+  <INPUT ParaName="RowColName" Value="TrialUnitY" />
+  <INPUT ParaName="ColumnColName" Value="TrialUnitX" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00007_add_trial.xml" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00201_add_sampletype.xml" Order="9" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_10631_import_samplemeasurements_dkdata.xml" Order="4"/>
+</TestCase>

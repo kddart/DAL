@@ -15,4 +15,5 @@ do
   	rm -f *.csv_*
   	rm -f *.xml_*
   	rm -f *.json_*
+	rm -f xml/add_data_no_vcol/*_p_*.xml
 done

@@ -1,0 +1,18 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Add Survey" TargetURL="add/survey" Type="BLOCKING" />
+  <INPUT ParaName="SurveyManagerId" SrcValue="xml/add_data_no_vcol/case_00102_add_con.xml" />
+  <INPUT ParaName="SurveyTypeId" SrcValue="xml/add_data_no_vcol/case_10601_add_survey_type.xml" />
+  <INPUT ParaName="SurveyName" PrefixVal="Survey_" Random="1" />
+  <INPUT ParaName="SurveyStartTime" Value="2023-03-15" />
+  <INPUT ParaName="SurveyEndTime" Value="2023-04-15" />
+  <INPUT ParaName="SurveyNote" Value="SurveyNote" />
+  <INPUT SrcName="xml/add_data_vcol/case_01101_add_vcol_survey.xml" Value="Survey Extra data" Virtual="1" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Match Attr="ParaName" Tag="ReturnId" Value="SurveyId" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00102_add_con.xml" Force="1" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_10601_add_survey_type.xml" Force="1" Order="4" />
+  <Parent CaseFile="xml/add_data_vcol/case_01101_add_vcol_survey.xml" Force="1" Order="5" />
+</TestCase>

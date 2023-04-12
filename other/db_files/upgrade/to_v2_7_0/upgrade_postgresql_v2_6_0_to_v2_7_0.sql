@@ -35,16 +35,16 @@ CREATE INDEX "xstl_currentloc" on "storageloc" ("currentloc");
 CREATE TABLE "surveyloc" (
   "surveylocid" serial NOT NULL,
   "surveyid" bigint NOT NULL,
-  "surverylocation" geography(GEOMETRYCOLLECTION, 4326) NOT NULL,
-  "surverylocdt" timestamp NOT NULL,
+  "surveylocation" geography(GEOMETRYCOLLECTION, 4326) NOT NULL,
+  "surveylocdt" timestamp NOT NULL,
   "currentloc" smallint NOT NULL,
   "description" character varying(254),
   PRIMARY KEY ("surveylocid")
 );
 
 CREATE INDEX "xsul_surveyid" on "surveyloc" ("surveyid");
-CREATE INDEX "xsul_surveylocation" on "surveyloc" USING GIST  ("surverylocation");
-CREATE INDEX "xsul_surveylocdt" on "surveyloc" ("surverylocdt");
+CREATE INDEX "xsul_surveylocation" on "surveyloc" USING GIST  ("surveylocation");
+CREATE INDEX "xsul_surveylocdt" on "surveyloc" ("surveylocdt");
 CREATE INDEX "xsul_currentloc" on "surveyloc" ("currentloc");
 
 CREATE TABLE "tiles" (

@@ -10,7 +10,7 @@
   <INPUT ParaName="ContactTelephone" Value="+61261227335" />
   <INPUT ParaName="ContactMobile" Value="04 12345678" />
   <INPUT ParaName="ContactEMail" Value="admin@kddart.example.com" />
-  <INPUT ParaName="contactlocation" Value="POINT(149.1057021617679 -35.317184619919445)" />
+  <INPUT ParaName="contactlocation" Value="MULTIPOINT(149.1057021617679 -35.317184619919445)" />
   <Match Attr="StatusCode" Value="200" />
   <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
   <Match Attr="ParaName" Tag="ReturnId" Value="ContactId" />

@@ -1,0 +1,135 @@
+#$Id$
+#$Author$
+
+# Copyright (c) 2023, Diversity Arrays Technology, All rights reserved.
+
+# Author    : User Name
+# Created   : dd/mm/yyyy
+# Modified  :
+# Purpose   :
+#
+#
+
+package KDDArT::DAL::Survey;
+
+use strict;
+use warnings;
+
+BEGIN {
+  use File::Spec;
+
+  my ($volume, $current_dir, $file) = File::Spec->splitpath(__FILE__);
+
+  my @current_dir_part = split('/perl-lib/KDDArT/DAL/', $current_dir);
+  $main::kddart_base_dir = $current_dir_part[0];
+}
+
+use lib "$main::kddart_base_dir/perl-lib";
+
+use base 'KDDArT::DAL::Transformation';
+
+use KDDArT::DAL::Common;
+use KDDArT::DAL::Security;
+use CGI::Application::Plugin::Session;
+use Log::Log4perl qw(get_logger :levels);
+use XML::Checker::Parser;
+use Crypt::Random qw( makerandom );
+use Time::HiRes qw( tv_interval gettimeofday );
+use DateTime;
+use DateTime::Format::Pg;
+
+sub setup {
+  __PACKAGE__->authen->init_config_parameters();
+  __PACKAGE__->authen->check_login_runmodes(':all');
+  __PACKAGE__->authen->check_content_type_runmodes(':all');
+  __PACKAGE__->authen->check_rand_runmodes('function_1',
+                                           'function_2'
+  );
+
+  __PACKAGE__->authen->count_session_request_runmodes(':all');
+  __PACKAGE__->authen->check_signature_runmodes('function_1rm',
+                                                'function_2rm'
+  );
+  __PACKAGE__->authen->check_gadmin_runmodes('admin_functions);
+  __PACKAGE__->authen->check_sign_upload_runmodes('upload_functions');
+
+  $self->run_modes(
+    #all endpoints to runmode functions go here (e.g.)
+    # 'add_survey' => 'add_survey_runmode',
+  );
+
+  my $logger = get_logger();
+  Log::Log4perl::MDC->put('client_ip', $ENV{'REMOTE_ADDR'});
+
+  if ( ! $logger->has_appenders() ) {
+    my $app = Log::Log4perl::Appender->new(
+                               "Log::Log4perl::Appender::Screen",
+                               utf8 => undef
+        );
+
+    my $layout = Log::Log4perl::Layout::PatternLayout->new("[%d] [%H] [%X{client_ip}] [%p] [%F{1}:%L] [%M] [%m]%n");
+
+    $app->layout($layout);
+
+    $logger->add_appender($app);
+  }
+  $logger->level($DEBUG);
+
+  $self->{logger} = $logger;
+
+  my $domain_name = $COOKIE_DOMAIN->{$ENV{DOCUMENT_ROOT}};
+  $self->logger->debug("COOKIE DOMAIN: $domain_name");
+
+  $self->authen->config(LOGIN_URL => '');
+  $self->session_config(
+          CGI_SESSION_OPTIONS => [ "driver:File", $self->query, {Directory => $SESSION_STORAGE_PATH} ],
+          SEND_COOKIE         => 0,
+      );
+}
+
+sub add_genotype_runmode {
+  =pod add_survey_HELP_START
+{
+"OperationName": "Add survey",
+"Description": "Add a new survey to the system.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 1,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"KDDArTModule": "main",
+"KDDArTTable": "survey",
+"KDDArTFactorTable": "surveyfactor",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><ReturnId Value='10' ParaName='SurveyId' /><Info Message='Survey (10) has been added successfully.' /></DATA>",
+"SuccessMessageJSON": "{'ReturnId' : [{'Value' : '9','ParaName' : 'SurveyId'}],'Info' : [{'Message' : 'Survey (9) has been added successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error SurveyTypeId='Survey Type (111) does not exist.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'SurveyTypeId' : 'Survey Type (111) does not exist.'}]}"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+}
+
+sub another_function {
+=pod add_survey_HELP_START
+{
+"OperationName": "Add survey",
+"Description": "Add a new survey to the system.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 1,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"KDDArTModule": "main",
+"KDDArTTable": "survey",
+"KDDArTFactorTable": "surveyfactor",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><ReturnId Value='10' ParaName='SurveyId' /><Info Message='Survey (10) has been added successfully.' /></DATA>",
+"SuccessMessageJSON": "{'ReturnId' : [{'Value' : '9','ParaName' : 'SurveyId'}],'Info' : [{'Message' : 'Survey (9) has been added successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error SurveyTypeId='Survey Type (111) does not exist.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'SurveyTypeId' : 'Survey Type (111) does not exist.'}]}"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  #some code goes here
+
+}

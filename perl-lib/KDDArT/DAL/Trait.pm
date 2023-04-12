@@ -847,7 +847,7 @@ sub import_samplemeasurement_csv_runmode {
 "RequiredUpload": 1,
 "UploadFileFormat": "CSV",
 "UploadFileParameterName": "uploadfile",
-"HTTPParameter": [{"Required": 1, "Name": "TrialUnitId", "Description": "Column number counting from zero for TrialUnitId column in the upload CSV file"}, {"Required": 1, "Name": "SampleTypeId", "Description": "Column number counting from zero for SampleTypeId column in the upload CSV file"}, {"Required": 1, "Name": "TraitId", "Description": "Column number counting from zero for TraitId column in the upload CSV file"}, {"Required": 1, "Name": "OperatorId", "Description": "Column number counting from zero for OperatorId column for the upload CSV file"}, {"Required": 1, "Name": "MeasureDateTime", "Description": "Column number counting from zero for MeasureDateTime column in the upload CSV file"}, {"Required": 1, "Name": "InstanceNumber", "Description": "Column number counting from zero for InstanceNumber column in the upload CSV file"}, {"Required": 1, "Name": "TraitValue", "Description": "Column number counting from zero for TraitValue column in the upload CSV file"}, {"Required": 0, "Name": "TrialUnitSpecimenId", "Description": "Column number counting from zero for TrialUnitSpecimenId column in the upload CSV file for sub-plot scoring"}, {"Required": 0, "Name": "StateReason", "Description": "Column number counting from zero for StateReason column in the upload CSV file for sub-plot scoring"}],
+"HTTPParameter": [{"Required": 1, "Name": "TrialUnitId", "Description": "Column number counting from zero for TrialUnitId column in the upload CSV file"}, {"Required": 1, "Name": "SampleTypeId", "Description": "Column number counting from zero for SampleTypeId column in the upload CSV file"}, {"Required": 1, "Name": "TraitId", "Description": "Column number counting from zero for TraitId column in the upload CSV file"}, {"Required": 1, "Name": "OperatorId", "Description": "Column number counting from zero for OperatorId column for the upload CSV file"}, {"Required": 1, "Name": "MeasureDateTime", "Description": "Column number counting from zero for MeasureDateTime column in the upload CSV file"}, {"Required": 1, "Name": "InstanceNumber", "Description": "Column number counting from zero for InstanceNumber column in the upload CSV file"}, {"Required": 1, "Name": "TraitValue", "Description": "Column number counting from zero for TraitValue column in the upload CSV file"}, {"Required": 1, "Name": "SurveyId", "Description": "Column number counting from zero for SurveyId column in the upload CSV file"},{"Required": 0, "Name": "TrialUnitSpecimenId", "Description": "Column number counting from zero for TrialUnitSpecimenId column in the upload CSV file for sub-plot scoring"}, {"Required": 0, "Name": "StateReason", "Description": "Column number counting from zero for StateReason column in the upload CSV file for sub-plot scoring"}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
@@ -911,6 +911,19 @@ sub import_samplemeasurement_csv_runmode {
       $chk_col_href->{'StateReason'} = $StateReason_col;
 
       $matched_col->{$StateReason_col} = 'StateReason';
+    }
+  }
+
+  my  $SurveyId_col        = undef;
+
+  if (defined $query->param('SurveyId')) {
+
+    if (length($query->param('SurveyId')) > 0) {
+
+      $SurveyId_col = $query->param('SurveyId');
+      $chk_col_href->{'SurveyId'} = $SurveyId_col;
+
+      $matched_col->{$SurveyId_col} = 'SurveyId';
     }
   }
 
@@ -2647,7 +2660,7 @@ sub export_samplemeasurement_csv_runmode {
 "SuccessMessageJSON": "{'OutputFile' : [{'csv' : 'http://kddart-d.diversityarrays.com/data/admin/export_samplemeasurement_fc77a5593427a35b804a07150dccb942.csv'}]}",
 "ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
 "ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
-"HTTPParameter": [{"Required": 0, "Name": "TrialUnitIdCSV", "Description": "Filtering parameter for TrialUnitId. The value is comma separated value of TrialUnitId."}, {"Required": 0, "Name": "SampleTypeIdCSV", "Description": "Filtering parameter for SampleTypeId. The value is comma separated value of SampleTypeId."}, {"Required": 0, "Name": "TraitIdCSV", "Description": "Filtering parameter for TraitId. The value is comma separated value of TraitId."}, {"Required": 0, "Name": "OperatorIdCSV", "Description": "Filtering parameter for OperatorId. The value is comma separated value of OperatorId."}, {"Required": 0, "Name": "MeasureDateTimeFrom", "Description": "Filtering parameter for MeasureDateTime. The value is correctly formatted date/time from which the sample measurement was recorded."}, {"Required": 0, "Name": "MeasureDateTimeTo", "Description": "Filtering parameter for MeasureDateTime. The value is correctly formatted date/time to which the sample measurement was recorded."}, {"Required": 0, "Name": "TrialIdCSV", "Description": "Filtering parameter for TrialId. The value is comma separated value of TrialId. This filtering parameter could be overridden by TrialUnitIdCSV if it is provided because filtering on TrialUnitId is at a lower level."}, {"Required": 0, "Name": "SMGroupIdCSV", "Description": "Filtering parameter for SMGroupId. The value is comma separated value of SMGroupId."}],
+"HTTPParameter": [{"Required": 0, "Name": "TrialUnitIdCSV", "Description": "Filtering parameter for TrialUnitId. The value is comma separated value of TrialUnitId."}, {"Required": 0, "Name": "SampleTypeIdCSV", "Description": "Filtering parameter for SampleTypeId. The value is comma separated value of SampleTypeId."}, {"Required": 0, "Name": "TraitIdCSV", "Description": "Filtering parameter for TraitId. The value is comma separated value of TraitId."}, {"Required": 0, "Name": "OperatorIdCSV", "Description": "Filtering parameter for OperatorId. The value is comma separated value of OperatorId."}, {"Required": 0, "Name": "MeasureDateTimeFrom", "Description": "Filtering parameter for MeasureDateTime. The value is correctly formatted date/time from which the sample measurement was recorded."}, {"Required": 0, "Name": "MeasureDateTimeTo", "Description": "Filtering parameter for MeasureDateTime. The value is correctly formatted date/time to which the sample measurement was recorded."}, {"Required": 0, "Name": "TrialIdCSV", "Description": "Filtering parameter for TrialId. The value is comma separated value of TrialId. This filtering parameter could be overridden by TrialUnitIdCSV if it is provided because filtering on TrialUnitId is at a lower level."}, {"Required": 0, "Name": "SMGroupIdCSV", "Description": "Filtering parameter for SMGroupId. The value is comma separated value of SMGroupId."}, {"Required": 0, "Name": "SurveyIdCSV", "Description": "Filtering parameter for SurveyId. The value is comma separated value of SurveyId."}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
@@ -2704,6 +2717,13 @@ sub export_samplemeasurement_csv_runmode {
   if (defined $query->param('MeasureDateTimeTo')) {
 
     $measure_dt_to = $query->param('MeasureDateTimeTo');
+  }
+
+  my $survey_id_csv = '';
+
+  if (defined $query->param('SurveyIdCSV')) {
+
+    $survey_id_csv = $query->param('SurveyIdCSV');
   }
 
   my $smgroup_id_csv = '';
@@ -2821,6 +2841,23 @@ sub export_samplemeasurement_csv_runmode {
     push(@where_phrases, $where_operator);
   }
 
+  if (length($survey_id_csv) > 0) {
+
+  my ($survey_exist_err, $survey_rec_str) = record_exist_csv($dbh, 'survey', 'SurveyId', $survey_id_csv);
+
+  if ($survey_exist_err) {
+
+    my $err_msg = "Survey ($survey_rec_str) not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $where_trial = " SurveyId IN ($survey_rec_str) ";
+  push(@where_phrases, $where_trial);
+}
+
   my $where_measure_time = '';
 
   if (length($measure_dt_from) > 0) {
@@ -2866,7 +2903,7 @@ sub export_samplemeasurement_csv_runmode {
 
   my @field_headers = ('TrialUnitId', 'TraitId', 'OperatorId', 'MeasureDateTime',
                        'InstanceNumber', 'SampleTypeId', 'TrialUnitSpecimenId', 'TraitValue',
-                       'SMGroupId', 'StateReason');
+                       'SMGroupId', 'StateReason', 'SurveyId');
 
   my @sql_field_list;
 
@@ -6678,6 +6715,19 @@ sub import_smgroup_data_csv_runmode {
     }
   }
 
+  my $SurveyId_col      = undef;
+
+  if (defined $query->param('SurveyIdCol')) {
+
+    if (length($query->param('SurveyIdCol')) > 0) {
+
+      $SurveyId_col = $query->param('SurveyIdCol');
+      $chk_col_href->{'SurveyIdCol'} = $SurveyId_col;
+
+      $matched_col->{$SurveyId_col} = 'SurveyId';
+    }
+  }
+
   my ($col_def_err, $col_def_err_href) = check_col_def_href( $chk_col_href, $num_of_col);
 
   if ($col_def_err) {
@@ -6691,7 +6741,6 @@ sub import_smgroup_data_csv_runmode {
   my @fieldname_list;
 
   for (my $i = 0; $i < $num_of_col; $i++) {
-
     if ($matched_col->{$i}) {
 
       push(@fieldname_list, $matched_col->{$i});
@@ -8854,6 +8903,7 @@ sub logger {
 #version 2 of import sample measurement functions that return all errors in the CSV
 
 #inserting with returning of collective errors
+#Update 28/03/2023: Allow SurveyId
 sub insert_samplemeasurement_data_v2 {
 
   my $self                = $_[0];
@@ -8904,7 +8954,8 @@ sub insert_samplemeasurement_data_v2 {
   }
 
   my $bulk_sql = 'INSERT INTO samplemeasurement ';
-  $bulk_sql   .= '(TrialUnitId,SampleTypeId,SMGroupId,TraitId,OperatorId,MeasureDateTime,InstanceNumber,TraitValue,TrialUnitSpecimenId,StateReason) ';
+  $bulk_sql   .= '(TrialUnitId,SampleTypeId,SMGroupId,TraitId,OperatorId,MeasureDateTime,InstanceNumber,TraitValue,TrialUnitSpecimenId,StateReason,
+  SurveyId) ';
   $bulk_sql   .= 'VALUES ';
 
   my $sql;
@@ -8917,6 +8968,14 @@ sub insert_samplemeasurement_data_v2 {
   my $uniq_sam_type_href      = {};
   my $sam_type_val_aref       = [];
   my $sam_type_idx_aref       = [];
+
+  my $uniq_survey_href         = {};
+  my $survey_val_aref          = [];
+  my $survey_idx_aref          = [];
+
+  my $survey_tu_check_href     = {};
+  my $survey_tu_check_val_aref = [];
+  my $survey_tu_check_idx_aref = [];
 
   my $uniq_trait_id_href      = {};
   my $trait_id_val_aref       = [];
@@ -8952,6 +9011,8 @@ sub insert_samplemeasurement_data_v2 {
     my $trait_id          = $data_row->{'TraitId'};
 
     my $tu_spec_id        = '0';
+
+    my $survey_id         = 'NULL';
 
     $uniq_trait_id_href->{$trait_id}     = 1;
     $uniq_sam_type_href->{$samp_type_id} = 1;
@@ -9042,6 +9103,44 @@ sub insert_samplemeasurement_data_v2 {
       }
     }
 
+    if (defined $data_row->{'SurveyId'}) {
+
+      if (length($data_row->{'SurveyId'}) > 0) {
+
+        $survey_id = $data_row->{'SurveyId'};
+
+        my ($int_err, $int_msg) = check_integer_value( { 'SurveyId' => $survey_id } );
+
+        if ($int_err) {
+
+          $int_msg = "Row ($row_counter): " . $int_msg . ' not an integer.';
+          #$data_for_postrun_href->{'Error'} = 1;
+          #$data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $int_msg}]};
+
+          #return $data_for_postrun_href;
+
+          my $error_obj = {};
+
+          $error_obj->{'Message'} = $int_msg;
+          $error_obj->{'Row'} = $row_counter;
+          $error_obj->{'Type'} = 'SurveyInteger';
+          $error_obj->{'ErrorInput'} = $survey_id;
+
+          push(@{$full_error_aref}, $error_obj);
+        }
+
+        $uniq_survey_href->{$survey_id} = 1;
+        push(@{$survey_val_aref}, $survey_id);
+        push(@{$survey_idx_aref}, $row_counter);
+
+        #$survey_tu_check_href->{$survey_id} = {};
+        #$survey_tu_check_href->{$survey_id}->{$trialunit_id} = 1;
+
+        push(@{$survey_tu_check_val_aref}, [$trialunit_id, $survey_id]);
+        push(@{$survey_tu_check_idx_aref}, $row_counter);
+      }
+    }
+
     my $trait_val = $data_row->{'TraitValue'};
     my $db_trait_val = $dbh_write->quote($trait_val);
 
@@ -9103,7 +9202,7 @@ sub insert_samplemeasurement_data_v2 {
     }
 
     $bulk_sql .= "($trialunit_id,$samp_type_id,$smgroup_id,$trait_id,$effective_user_id,";
-    $bulk_sql .= "'$measure_dt',$instance_num,$db_trait_val,$tu_spec_id,$state_reason),";
+    $bulk_sql .= "'$measure_dt',$instance_num,$db_trait_val,$tu_spec_id,$state_reason, $survey_id),";
 
     $row_counter += 1;
   }
@@ -9176,6 +9275,7 @@ sub insert_samplemeasurement_data_v2 {
 
   my $uniq_trial_href = {};
 
+  
   foreach my $tu_rec (@{$tu_data}) {
 
     my $tu_id      = $tu_rec->{'TrialUnitId'};
@@ -9399,6 +9499,94 @@ sub insert_samplemeasurement_data_v2 {
     }
   }
 
+  my @survey_list = keys(%{$uniq_survey_href});
+
+  #release memory 
+  $uniq_survey_href = {};
+
+  my $survey_info = {};
+
+  if (scalar(@survey_list) > 0) {
+
+    $sql = "SELECT SurveyId FROM survey WHERE SurveyId IN (" . join(',', @survey_list) . ")";
+
+    my $survey_lookup = $dbh_write->selectall_hashref($sql, 'SurveyId');
+
+    if ($dbh_write->err()) {
+
+      $self->logger->debug("Get survey info failed");
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    $sql  = "SELECT TrialUnitId, SurveyId ";
+    $sql .= "FROM surveytrialunit ";
+    $sql .= "WHERE SurveyId IN (" . join(',', @survey_list) . ')';
+
+    my ($r_stu_err, $r_stu_msg, $stu_data) = read_data($dbh_write, $sql, []);
+
+    if ($dbh_write->err()) {
+
+      $self->logger->debug("Get surveytrialunit info failed");
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    foreach my $stu_rec (@{$stu_data}) {
+      my $tu_id      = $stu_rec->{'TrialUnitId'};
+      my $survey_id  = $stu_rec->{'SurveyId'};
+
+      if (! defined $survey_info->{$survey_id}) {
+          $survey_info->{$survey_id} = {};
+          $survey_info->{$survey_id}->{'TrialUnit'} = {};
+      }
+
+      $self->logger->debug("Linking $tu_id and $survey_id");
+
+      $survey_info->{$survey_id}->{'TrialUnit'}->{$tu_id} = 1;
+    }
+
+    #check if trial unit and survey matches up
+
+    if ($dbh_write->err()) {
+
+      $self->logger->debug("Get survey info failed");
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    for (my $i = 0; $i < scalar(@{$survey_val_aref}); $i++) {
+
+      my $survey_id_row  = $survey_val_aref->[$i];
+      my $row_num  = $survey_idx_aref->[$i];
+
+      if (! defined $survey_lookup->{$survey_id_row}) {
+
+        my $err_msg = "Row ($row_num): Survey ($survey_id_row) does not exist.";
+        #$data_for_postrun_href->{'Error'} = 1;
+        #$data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+        #return $data_for_postrun_href;
+
+        my $error_obj = {};
+
+        $error_obj->{'Message'} = $err_msg;
+        $error_obj->{'Row'} = $row_num;
+        $error_obj->{'Type'} = "Survey";
+        #$error_obj->{'Date'} = $measure_dt;
+        $error_obj->{'ErrorInput'} = "Survey ($survey_id_row)";
+
+        push(@{$full_error_aref}, $error_obj);
+      }
+    }
+  }
+
   my @sample_type_list = keys(%{$uniq_sam_type_href});
 
   if (scalar(@sample_type_list) == 0) {
@@ -9476,6 +9664,34 @@ sub insert_samplemeasurement_data_v2 {
     }
   }
 
+  my $stu_mistmatch_flag = 0;
+  my $stu_mismatch_list = [];
+
+  for (my $i = 0; $i < scalar(@{$survey_tu_check_val_aref}); $i++) {
+
+    my $tu_id      = $survey_tu_check_val_aref->[$i]->[0];
+    my $survey_id  = $survey_tu_check_val_aref->[$i]->[1];
+    my $row_num    = $survey_tu_check_idx_aref->[$i];
+
+    my $stu_info_href = $survey_info->{$survey_id}->{'TrialUnit'};
+
+    if (! defined $stu_info_href->{$tu_id}) {
+
+        my $err_msg = "Row ($row_num): TrialUnit ($tu_id) and Survey ($survey_id) not compatible.";
+
+        $self->logger->debug($err_msg);
+
+        my $error_obj = {};
+
+        $error_obj->{'Message'} = $err_msg;
+        $error_obj->{'Row'} = $row_num;
+        $error_obj->{'Type'} = "SurveyTrialUnit Mismatch";
+        #$error_obj->{'Date'} = $measure_dt;
+        $error_obj->{'ErrorInput'} = "TrialUnit ($tu_id) and Survey ($survey_id)";
+
+        push(@{$full_error_aref}, $error_obj);
+    }
+  }
 
   # Release memory
   $tu_tu_spec_val_aref = [];
@@ -9525,6 +9741,10 @@ sub insert_samplemeasurement_data_v2 {
     #$data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
     #return $data_for_postrun_href;
+  }
+
+  foreach my $error_obj (@{$full_error_aref}) {
+      $self->logger->debug($error_obj->{'Row'}. ": " . $error_obj->{'Message'});
   }
 
   if (scalar(@{$full_error_aref}) > 0) {

@@ -1,0 +1,13 @@
+<TestCase>
+  <CaseInfo Description="List Analysis Group Extract Data" TargetURL="get/extractdata/:ExtractDataId" Type="BLOCKING" />
+  <INPUT ParaName="ExtractDataId" SrcValue="xml/add_data_no_vcol/case_10615_add_extractdata.xml" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="COUNT" Tag="ExtractData" TargetDataType="MULTI" Value="boolex(x&gt;0)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/login_testuser/case_00204_switch_extra_data_off.xml" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00303_add_analysisgroup.xml" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_10204_add_extract_analgroup.xml" Order="4" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_10615_add_extractdata.xml" Order="5" />
+</TestCase>
+

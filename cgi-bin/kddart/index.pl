@@ -84,6 +84,9 @@ CGI::Application::Dispatch->dispatch(
     'get/contact/:id'                                   => { app => 'KDDArT::DAL::Contact',
                                                              rm  => 'get_contact' },
 
+    'contact/:id/update/geography'                      => { app => 'KDDArT::DAL::Contact',
+                                                             rm  => 'update_contact_geography' },
+
     'add/user'                                          => { app => 'KDDArT::DAL::System',
                                                              rm  => 'add_user_gadmin' },
 
@@ -383,6 +386,8 @@ CGI::Application::Dispatch->dispatch(
     'specimen/:id/list/genotype'                        => { app => 'KDDArT::DAL::Genotype',
                                                              rm  => 'list_genotype_in_specimen' },
 
+
+
     'import/pedigree/csv'                               => { app => 'KDDArT::DAL::Genotype',
                                                              rm  => 'import_pedigree_csv' },
 
@@ -448,6 +453,9 @@ CGI::Application::Dispatch->dispatch(
 
     'get/specimen/:id'                                  => { app => 'KDDArT::DAL::Genotype',
                                                              rm  => 'get_specimen' },
+
+    'specimen/:id/update/geography'                     => { app => 'KDDArT::DAL::Genotype',
+                                                             rm  => 'update_specimen_geography' },
 
     'add/breedingmethod'                                => { app => 'KDDArT::DAL::Genotype',
                                                              rm  => 'add_breedingmethod_gadmin' },
@@ -675,7 +683,7 @@ CGI::Application::Dispatch->dispatch(
                                                              rm  => 'remove_trialunit_treatment' },
 
     'update/trialunittreatment/:id'                     => { app => 'KDDArT::DAL::Trial',
-                                                             rm  => 'update_trialunit_treatment' },                                                                                   
+                                                             rm  => 'update_trialunit_treatment' },
 
     'list/trialunitspecimen/:nperpage/page/:num'        => { app => 'KDDArT::DAL::Trial',
                                                              rm  => 'list_trial_unit_specimen_advanced' },
@@ -819,8 +827,44 @@ CGI::Application::Dispatch->dispatch(
     'dataset/:dsid/list/markermetafield'                => { app => 'KDDArT::DAL::Marker',
                                                              rm  => 'list_marker_meta_field' },
 
-    'analysisgroup/:analid/list/extract'                    => { app => 'KDDArT::DAL::Extract',
+    'analysisgroup/:analid/list/extract'                => { app => 'KDDArT::DAL::Extract',
                                                              rm  => 'list_extract_advanced' },
+
+    'analgroupextract/:id/add/extractdata'              => { app => 'KDDArT::DAL::Extract',
+                                                             rm  => 'add_extractdata' },
+
+    'analgroupextract/:id/list/extractdata'             => { app => 'KDDArT::DAL::Extract',
+                                                             rm  => 'list_extractdata' },
+
+    'get/extractdata/:id'                               => { app => 'KDDArT::DAL::Extract',
+                                                             rm  => 'get_extractdata' },
+
+    #'update/extractdata/:id'                           => { app => 'KDDArT::DAL::Extract',
+    #                                                         rm  => 'update_extractdata' },
+    # To come in 2.7.3
+
+    'delete/extractdata/:id'                           => { app => 'KDDArT::DAL::Extract',
+                                                            rm  => 'delete_extractdata' },
+    
+    #'delete/extractdatafile/:id'                       => { app => 'KDDArT::DAL::Extract',
+    #                                                        rm  => 'delete_extractdatafile' },
+    # TO come in 2.7.3
+
+    #'update/extractdatafile/:id'                       => { app => 'KDDArT::DAL::Extract',
+    #                                                        rm  => 'update_extractdatafile' },
+    # TO come in 2.7.3
+
+
+    'extractdata/:id/add/datafile'                      => { app => 'KDDArT::DAL::Extract',
+                                                             rm  => 'add_extractdata_file' },
+
+
+    #'get/extractdatafile/:id'                           => { app => 'KDDArT::DAL::Extract',
+    #                                                         rm  => 'get_extractdata_file' },
+    # to come in 2.7.3
+
+    'analgroupextract/:id/list/extractdatafile'         => { app => 'KDDArT::DAL::Extract',
+                                                             rm  => 'list_extractdata_file' },
 
     'list/extract/:nperpage/page/:num'                  => { app => 'KDDArT::DAL::Extract',
                                                              rm  => 'list_extract_advanced' },
@@ -917,6 +961,9 @@ CGI::Application::Dispatch->dispatch(
 
     'delete/storage/:id'                                => { app => 'KDDArT::DAL::Inventory',
                                                              rm  => 'del_storage_gadmin' },
+
+    'storage/:id/update/geography'                      => { app => 'KDDArT::DAL::Inventory',
+                                                             rm  => 'update_storage_geography' },
 
     'add/generalunit'                                   => { app => 'KDDArT::DAL::Inventory',
                                                              rm  => 'add_generalunit_gadmin' },
@@ -1231,11 +1278,11 @@ CGI::Application::Dispatch->dispatch(
                                                              rm  => 'get_crossing' },
 
     'user/:username/request/passwordreset'              => { app => 'KDDArT::DAL::System',
-                                                             rm  => 'request_reset_password'},   
+                                                             rm  => 'request_reset_password'},
 
     'user/:username/execute/passwordreset'              => { app => 'KDDArT::DAL::Authentication',
-                                                             rm  => 'execute_reset_password'},     
-    
+                                                             rm  => 'execute_reset_password'},
+
     'list/solrcore'                                     => { app => 'KDDArT::DAL::Search',
                                                              rm  => 'list_solr_core' },
 
@@ -1253,5 +1300,57 @@ CGI::Application::Dispatch->dispatch(
 
     'update/genotypeconfig'                             => { app => 'KDDArT::DAL::System',
                                                              rm  => 'update_genotype_config_gadmin' },
+
+    'add/survey'                                        => { app => 'KDDArT::DAL::Survey',
+                                                             rm  => 'add_survey' },
+
+    'get/survey/:id'                                    => { app => 'KDDArT::DAL::Survey',
+                                                             rm  => 'get_survey' },
+
+    'update/survey/:id'                                 => { app => 'KDDArT::DAL::Survey',
+                                                             rm  => 'update_survey' },
+
+    'delete/survey/:id'                                 => { app => 'KDDArT::DAL::Survey',
+                                                             rm  => 'delete_survey' },
+
+    'list/survey/:nperpage/page/:num'                    => { app => 'KDDArT::DAL::Survey',
+                                                             rm  => 'list_survey_advanced' },
+
+    'survey/:id/add/trialunit'                          => { app => 'KDDArT::DAL::Survey',
+                                                             rm  => 'add_survey_trial_unit' },
+
+    'survey/:id/add/trialunit/bulk'                     => { app => 'KDDArT::DAL::Survey',
+                                                             rm  => 'add_survey_trial_unit_bulk' },
+
+    'survey/:id/add/trait'                              => { app => 'KDDArT::DAL::Survey',
+                                                             rm  => 'add_survey_trait' },
+
+    'survey/:id/list/trait'                             => { app => 'KDDArT::DAL::Survey',
+                                                             rm  => 'list_survey_trait' },
+
+    'get/surveytrait/:id'                               => { app => 'KDDArT::DAL::Survey',
+                                                             rm  => 'get_survey_trait' },
+
+    'get/surveytrialunit/:id'                           => { app => 'KDDArT::DAL::Survey',
+                                                             rm  => 'get_survey_trial_unit' },
+
+    'survey/:id/list/trialunit'                         => { app => 'KDDArT::DAL::Survey',
+                                                             rm  => 'list_survey_trial_unit' },
+
+    'update/surveytrialunit/:id'                        => { app => 'KDDArT::DAL::Survey',
+                                                             rm  => 'update_survey_trial_unit' },
+
+    'delete/surveytrialunit/:id'                        => { app => 'KDDArT::DAL::Survey',
+                                                             rm  => 'delete_survey_trial_unit' },
+
+    'survey/:id/update/geography'                       => { app => 'KDDArT::DAL::Survey',
+                                                             rm  => 'update_survey_geography' },
+
+    'survey/:surveyid/delete/trait/:traitid'            => { app => 'KDDArT::DAL::Survey',
+                                                             rm  => 'delete_survey_trait' },
+
+    'update/surveytrait/:id'                            => { app => 'KDDArT::DAL::Survey',
+                                                             rm  => 'update_survey_trait' },
+
   ],
 );

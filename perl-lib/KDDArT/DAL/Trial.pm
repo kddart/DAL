@@ -275,7 +275,7 @@ sub add_site_runmode {
 "SuccessMessageJSON": "{'ReturnId' : [{'Value' : '9','ParaName' : 'SiteId'}],'Info' : [{'Message' : 'Site (9) has been added successfully.'}]}",
 "ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error SiteTypeId='SiteType (111) does not exist.' /></DATA>"}],
 "ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'SiteTypeId' : 'SiteType (111) does not exist.'}]}"}],
-"HTTPParameter": [{"Name": "sitelocation", "DataType": "polygon_wkt", "Description": "GIS field defining the polygon geometry object of the site in a standard GIS well-known text.", "Type": "LCol", "Required": "0"}],
+"HTTPParameter": [{"Name": "sitelocation", "DataType": "polygon_wkt", "Description": "GIS field defining the polygon geometry object of the site in a standard GIS well-known text.", "Type": "LCol", "Required": "0"},{"Name": "sitelocdt", "DataType": "timestamp", "Description": "DateTime of site location", "Type": "LCol", "Required": "0"},{"Name": "currentloc", "DataType": "tinyint", "Description": "Flag to notify current location", "Type": "LCol", "Required": "0"},{"Name": "description", "DataType": "varchar", "Description": "Description for location", "Type": "LCol", "Required": "0"}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
@@ -499,66 +499,37 @@ sub add_site_runmode {
 
   if (length($site_location) > 0) {
 
-    my $dbh_gis_write = connect_gis_write();
-
-    if ($site_location =~ /^POINT/i) {
-
+    my $sub_PGIS_val_builder = sub {
+      my $wkt = shift;
       my $st_buffer_val = $POINT2POLYGON_BUFFER4SITE->{$ENV{DOCUMENT_ROOT}};
+      if ($wkt =~ /^POINT/i) {
+        return "ST_Multi(ST_Buffer(ST_GeomFromText(?, -1), $st_buffer_val, 1))";
+      } else {
+        return "ST_Multi(ST_GeomFromText(?, -1))";
+      }
+    };
 
-      $sql  = "INSERT INTO siteloc (siteid, sitelocation, sitelocdt, currentloc) ";
-      $sql .= "VALUES (?, ST_Multi(ST_Buffer(ST_GeomFromText(?, -1), $st_buffer_val, 1)), ?, ?)";
-    }
-    else {
+    my ($err, $err_msg) = append_geography_loc(
+                                          "site", 
+                                          $site_id, 
+                                          ['POINT', 'POLYGON', 'MULTIPOLYGON'], 
+                                          $query,
+                                          $sub_PGIS_val_builder,
+                                          $self->logger,
+                                        );
 
-      $sql  = 'INSERT INTO siteloc (siteid, sitelocation, sitelocdt, currentloc) ';
-      $sql .= 'VALUES (?, ST_Multi(ST_GeomFromText(?, -1)), ?, ?)';
-    }
-
-    $self->logger->debug("SQL: $sql");
-    $self->logger->debug("SiteId: $site_id");
-
-    my $gis_sth = $dbh_gis_write->prepare($sql);
-    $gis_sth->execute($site_id, $site_location, DateTime::Format::Pg->parse_datetime(DateTime->now()), 0);
-
-    if ($dbh_gis_write->err()) {
-
-      my $sql_err_str = $dbh_gis_write->errstr();
-
+    if ($err) {
       my ($rollback_err, $rollback_msg) = $self->rollback_cleanup($dbh_k_write, $inserted_id);
-
       if ($rollback_err) {
-
         $self->logger->debug("Rollback error msg: $rollback_msg");
-
         $data_for_postrun_href->{'Error'} = 1;
         $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
         return $data_for_postrun_href;
-      }
-
-      $self->logger->debug("SQL err number: " . $dbh_gis_write->err());
-      $self->logger->debug("SQL err: " . $dbh_gis_write->errstr());
-
-      if ($sql_err_str =~ /duplicate key/) {
-
-        my $err_msg = "Site ($site_id) already exists in siteloc.";
-        $data_for_postrun_href->{'Error'} = 1;
-        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-        return $data_for_postrun_href;
-      }
-      else {
-
-        my $err_msg = 'Unexpected error: adding siteloc data';
-        $data_for_postrun_href->{'Error'} = 1;
-        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
+      } else {
+        $data_for_postrun_href = $self->_set_error($err_msg);
         return $data_for_postrun_href;
       }
     }
-
-    $gis_sth->finish();
-    $dbh_gis_write->disconnect();
   }
 
   $dbh_k_write->disconnect();
@@ -721,7 +692,7 @@ sub add_trial_runmode {
 "SuccessMessageJSON": "{'ReturnId' : [{'Value' : '9','ParaName' : 'TrialId'}],'Info' : [{'Message' : 'Trial (9) has been added successfully.'}]}",
 "ErrorMessageXML": [{"MissingParameter": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error TrialName='TrialName is missing.' /></DATA>"}],
 "ErrorMessageJSON": [{"MissingParameter": "{'Error' : [{'TrialName' : 'TrialName is missing.'}]}"}],
-"HTTPParameter": [{"Name": "triallocation", "DataType": "polygon_wkt", "Description": "GIS field defining the polygon geometry object of the trial in a standard GIS well-known text.", "Type": "LCol", "Required": "0"}],
+"HTTPParameter": [{"Name": "triallocation", "DataType": "polygon_wkt", "Description": "GIS field defining the polygon geometry object of the trial in a standard GIS well-known text.", "Type": "LCol", "Required": "0"},{"Name": "triallocdt", "DataType": "timestamp", "Description": "DateTime of trial location", "Type": "LCol", "Required": "0"},{"Name": "currentloc", "DataType": "tinyint", "Description": "Flag to notify current location", "Type": "LCol", "Required": "0"},{"Name": "description", "DataType": "varchar", "Description": "Description for location", "Type": "LCol", "Required": "0"}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
@@ -1130,143 +1101,70 @@ sub add_trial_runmode {
     }
   }
 
-  my $dbh_gis_write = connect_gis_write();
+  my $is_trial_within_site = 1;
   if (length($trial_location) > 0) {
 
-    if ($trial_location =~ /^POINT/i) {
-
+    my $sub_PGIS_val_builder = sub {
+      my $wkt = shift;
       my $st_buffer_val = $POINT2POLYGON_BUFFER4TRIAL->{$ENV{DOCUMENT_ROOT}};
-
-      $sql  = "INSERT INTO trialloc (trialid, triallocation, triallocdt, currentloc) ";
-      $sql .= "VALUES (?, ST_Multi(ST_Buffer(ST_GeomFromText(?, -1), $st_buffer_val, 1)), ?, ?)";
-    }
-    else {
-
-      $sql  = 'INSERT INTO trialloc (trialid, triallocation, triallocdt, currentloc) ';
-      $sql .= 'VALUES (?, ST_Multi(ST_GeomFromText(?, -1)), ?, ?)';
-    }
-
-    $self->logger->debug("SQL: $sql");
-    $self->logger->debug("TrialId: $trial_id");
-    $self->logger->debug("Current time: " . DateTime::Format::Pg->parse_datetime(DateTime->now()));
-
-    my $gis_sth = $dbh_gis_write->prepare($sql);
-    $gis_sth->execute($trial_id, $trial_location, DateTime::Format::Pg->parse_datetime(DateTime->now()), 0);
-
-    if ($dbh_gis_write->err()) {
-
-      my $sql_err_str = $dbh_gis_write->errstr();
-
-      my ($rollback_err, $rollback_msg) = $self->rollback_cleanup($dbh_k_write, $inserted_id);
-
-      if ($rollback_err) {
-
-        $self->logger->debug("Rollback error msg: $rollback_msg");
-        $data_for_postrun_href->{'Error'} = 1;
-        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-        return $data_for_postrun_href;
+      if ($wkt =~ /^POINT/i) {
+        return "ST_Multi(ST_Buffer(ST_GeomFromText(?, -1), $st_buffer_val, 1))";
+      } else {
+        return "ST_Multi(ST_GeomFromText(?, -1))";
       }
+    };
 
-      $self->logger->debug("SQL err number: " . $dbh_gis_write->err());
-      $self->logger->debug("SQL err: " . $dbh_gis_write->errstr());
+    my $sub_WKT_validator = sub {
+      my $gis_write = $_[0];
+      my $entity    = $_[1];
+      my $entity_id = $_[2];
+      my $wkt       = $_[3];
 
-      if ($sql_err_str =~ /(non\-closed rings)/) {
+      my $site_id = read_cell_value($dbh_k_read, 'trial', 'SiteId', 'TrialId', $trial_id);
 
-        my $err_msg = "trialloc does not meet polygon requirements: $1";
-        $data_for_postrun_href->{'Error'} = 1;
-        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+      my ($is_within_err, $is_within) = is_within($gis_write, 'siteloc', 'siteid',
+                                                'sitelocation', $wkt, $site_id);
 
-        return $data_for_postrun_href;
-      }
-      elsif ($sql_err_str =~ /duplicate key/) {
-
-        my $err_msg = "There is trial ($trial_id) in gis database: duplicate.";
-        $data_for_postrun_href->{'Error'} = 1;
-        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-        return $data_for_postrun_href;
-      }
-      else {
-
-        my $err_msg = 'Unexpected error: adding trialloc data';
-        $data_for_postrun_href->{'Error'} = 1;
-        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-        return $data_for_postrun_href;
-      }
-    }
-    $gis_sth->finish();
-  }
-
-  my $info_msg_aref = [{'Message' => "Trial ($trial_id) has been added successfully."}];
-  my $return_id_aref = [{'Value' => "$trial_id", 'ParaName' => 'TrialId'}];
-
-  if (length($trial_location) > 0) {
-
-    my ($is_within_err, $is_within) = is_within($dbh_gis_write, 'siteloc', 'siteid',
-                                                'sitelocation', $trial_location, $site_id);
-
-    if ($is_within_err) {
-
-      $self->logger->debug("IsWithin Err: $is_within_err");
-      $self->logger->debug("IsWithin: $is_within");
-
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-      return $data_for_postrun_href;
-    }
-    else {
-
-      if (!$is_within) {
-
+      if ($is_within_err) {
+        return (1, "Unexpected error.");
+      } elsif (!$is_within) {
         if ($GIS_ENFORCE_GEO_WITHIN) {
-
-          my ($rollback_err, $rollback_msg) = $self->rollback_cleanup($dbh_k_write, $inserted_id);
-
-          if ($rollback_err) {
-
-            $self->logger->debug("Rollback error msg: $rollback_msg");
-            $data_for_postrun_href->{'Error'} = 1;
-            $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-            return $data_for_postrun_href;
-          }
-
-          $inserted_id = {};
-          $inserted_id->{'trialloc'} = ['trialid', $trial_id];
-
-          ($rollback_err, $rollback_msg) = $self->rollback_cleanup($dbh_gis_write, $inserted_id);
-
-          if ($rollback_err) {
-
-            $self->logger->debug("Rollback error msg: $rollback_msg");
-            $data_for_postrun_href->{'Error'} = 1;
-            $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-            return $data_for_postrun_href;
-          }
-
-          my $err_msg = "This trial geography is not within site (${site_id}) geography.";
-          $data_for_postrun_href->{'Error'} = 1;
-          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-          return $data_for_postrun_href;
-        }
-        else {
-
-          my $msg = "Trial ($trial_id) has been added successfully. ";
-          $msg   .= "However, this trial's geography is not within site (${site_id})'s geography.";
-          $info_msg_aref = [{'Message' => $msg}];
+          return (1, "This trial geography is not within site ($site_id)'s geography.");
+        } else {
+          $is_trial_within_site = 0;
         }
       }
+    };
+
+    my ($err, $err_msg) = append_geography_loc(
+                                            "trial", 
+                                            $trial_id, 
+                                            ['POINT', 'POLYGON', 'MULTIPOLYGON'], 
+                                            $query,
+                                            $sub_PGIS_val_builder,
+                                            $self->logger,
+                                            $sub_WKT_validator,
+                                          );
+
+    if ($err) {
+      my ($rollback_err, $rollback_msg) = $self->rollback_cleanup($dbh_k_write, $inserted_id);
+      if ($rollback_err) {
+        $self->logger->debug("Rollback error msg: $rollback_msg");
+        return $self->_set_error($err_msg);
+      }
+      return $self->_set_error($err_msg);
     }
   }
 
   $dbh_k_write->disconnect();
-  $dbh_gis_write->disconnect();
 
+  my $msg = "Trial ($trial_id) has been added successfully. ";
+  if (!$is_trial_within_site) {
+    $msg   .= "However, this trial's geography is not within site ($site_id)'s geography.";
+  }
+
+  my $info_msg_aref = [{'Message' => $msg}];
+  my $return_id_aref = [{'Value' => "$trial_id", 'ParaName' => 'TrialId'}];
   $data_for_postrun_href->{'Error'}     = 0;
   $data_for_postrun_href->{'Data'}      = {'Info'     => $info_msg_aref,
                                            'ReturnId' => $return_id_aref,
@@ -1299,7 +1197,7 @@ sub add_trial_unit_runmode {
 "UploadFileParameterName": "uploadfile",
 "DTDFileNameForUploadXML": "addtrialunit_upload.dtd",
 "URLParameter": [{"ParameterName": "id", "Description": "Existing TrialId"}],
-"HTTPParameter": [{"Name": "Force", "Description": "0|1 flag by default, it is 0. Under normal circumstances, DAL will check EntryId and X, Y, Z combination for uniqueness both in the upload data file and against existing records in the database. If only X and Y dimensions are defined. DAL will check X, Y uniqueness in normal mode. When force is set to 1, these uniqueness checkings will be ignored.", "Required": "0"}, {"Name": "trialunitlocation", "DataType": "point_wkt", "Description": "GIS field defining the geometric point of the trial unit in a standard GIS well-known text.", "Type": "LCol", "Required": "0"}],
+"HTTPParameter": [{"Name": "Force", "Description": "0|1 flag by default, it is 0. Under normal circumstances, DAL will check EntryId and X, Y, Z combination for uniqueness both in the upload data file and against existing records in the database. If only X and Y dimensions are defined. DAL will check X, Y uniqueness in normal mode. When force is set to 1, these uniqueness checkings will be ignored.", "Required": "0"}, {"Name": "trialunitlocation", "DataType": "polygon_wkt", "Description": "GIS field defining the polygon geometry object of the trial unit in a standard GIS well-known text.", "Type": "LCol", "Required": "0"},{"Name": "trialunitlocdt", "DataType": "timestamp", "Description": "DateTime of trial unit location", "Type": "LCol", "Required": "0"},{"Name": "currentloc", "DataType": "tinyint", "Description": "Flag to notify current location", "Type": "LCol", "Required": "0"},{"Name": "description", "DataType": "varchar", "Description": "Description for location", "Type": "LCol", "Required": "0"}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
@@ -1365,7 +1263,6 @@ sub add_trial_unit_runmode {
     $sample_supplier_id = $query->param('SampleSupplierId');
   }
 
-  my $trialunitlocation   = '';
   my $barcode             = '0';
 
   my $trial_unit_comment  = '';
@@ -1378,28 +1275,6 @@ sub add_trial_unit_runmode {
   if (length($query->param('TrialUnitBarcode')) > 0) {
 
     $barcode = $query->param('TrialUnitBarcode');
-  }
-
-  if (length($query->param('trialunitlocation')) > 0) {
-
-    $trialunitlocation = $query->param('trialunitlocation');
-  }
-
-  if (length($trialunitlocation) > 0) {
-
-    my $dbh_gis_read = connect_gis_read();
-    my ($is_wkt_err, $wkt_err_href) = is_valid_wkt_href($dbh_gis_read,
-                                                        { 'trialunitlocation' => $trialunitlocation },
-                                                        'POINT');
-    $dbh_gis_read->disconnect();
-
-    if ($is_wkt_err) {
-
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [$wkt_err_href]};
-
-      return $data_for_postrun_href;
-    }
   }
 
   my $trialunit_info_xml_file = $self->authen->get_upload_file();
@@ -1858,6 +1733,24 @@ sub add_trial_unit_runmode {
 
   my $trial_unit_id = $dbh_k_write->last_insert_id(undef, undef, 'trialunit', 'TrialUnitId');
 
+  if (length $query->param('trialunitlocation')) {
+    my $sub_PGIS_val_builder = sub {
+      return "ST_ForceCollection(ST_GeomFromText(?, -1))";
+    };
+    my ($err, $err_msg) = append_geography_loc(
+                                                "trialunit", 
+                                                $trial_unit_id, 
+                                                ['POINT', 'POLYGON', 'MULTIPOLYGON'], 
+                                                $query,
+                                                $sub_PGIS_val_builder,
+                                                $self->logger,
+                                              );
+    if ($err) {
+      return $self->_set_error($err_msg);
+    }
+  }
+
+
   for my $trialunitspecimen (@{$trialunit_info_aref}) {
 
     my $specimen_id  = $trialunitspecimen->{'SpecimenId'};
@@ -1930,27 +1823,6 @@ sub add_trial_unit_runmode {
   }
 
   $dbh_k_write->disconnect();
-
-  my $dbh_gis_write = connect_gis_write();
-
-  $sql  = 'INSERT INTO trialunitloc (trialunitid, trialunitlocation, trialunitlocdt, currentloc) ';
-  $sql .= "VALUES (?, ST_ForceCollection(ST_GeomFromText(?, -1)), ?, ?)";
-
-  my $gis_sth = $dbh_gis_write->prepare($sql);
-  $gis_sth->execute($trial_unit_id, $trialunitlocation, DateTime::Format::Pg->parse_datetime(DateTime->now()), 0);
-
-  if ($dbh_gis_write->err()) {
-
-    $self->logger->debug("SQL err: " . $dbh_gis_write->errstr());
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-    return $data_for_postrun_href;
-  }
-
-  $gis_sth->finish();
-
-  $dbh_gis_write->disconnect();
 
   my $info_msg_aref  = [{'Message' => "TrialUnit ($trial_unit_id) has been added successfully."}];
   my $return_id_aref = [{'Value' => "$trial_unit_id", 'ParaName' => 'TrialUnitId'}];
@@ -3115,9 +2987,9 @@ sub list_site {
 
       my $dbh_gis = connect_gis_read();
 
-      my $gis_where = 'WHERE siteid IN (' . join(',', @{$site_id_aref}) . ')';
+      my $gis_where = 'WHERE siteid IN (' . join(',', @{$site_id_aref}) . ') AND currentloc = 1';
 
-      my $siteloc_sql = 'SELECT siteid, ST_AsText(sitelocation) AS sitelocation, ';
+      my $siteloc_sql = 'SELECT siteid, sitelocdt, description, ST_AsText(sitelocation) AS sitelocation, ';
       $siteloc_sql   .= 'ST_AsText(ST_Centroid(geometry(sitelocation))) AS sitecentroid ';
       $siteloc_sql   .= 'FROM siteloc ';
       $siteloc_sql   .= $gis_where;
@@ -3209,6 +3081,10 @@ sub list_site {
       $site_row->{'sitelocation'} = $site_loc_gis->{$site_id}->{'sitelocation'};
     }
 
+    $site_row->{'sitelocdt'} = $site_loc_gis->{$site_id}->{'sitelocdt'};
+
+    $site_row->{'sitelocdescription'} = $site_loc_gis->{$site_id}->{'description'};
+
     if ($extra_attr_yes) {
 
       if ($gadmin_status eq '1') {
@@ -3239,8 +3115,8 @@ sub get_site_full_runmode {
 "GroupAdminRequired": 0,
 "SignatureRequired": 0,
 "AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Site Longitude='149.10164' CurrentSiteManagerName='Testing User-5411143' SiteId='1' sitelocation='POLYGON((148.99658 -35.48192,149.2067 -35.48192,149.2067 -35.19626,148.99658 -35.19626,148.99658 -35.48192))' CurrentSiteManagerId='3' SiteTypeName='SiteType - 2130908' SiteEndDate='' SiteName='DArT Test Site (Updated)' Latitude='-35.33909' SiteStartDate='' SiteTypeId='6' SiteAcronym='GH' delete='delete/site/1' update='update/site/1' /><RecordMeta TagName='Site' /></DATA>",
-"SuccessMessageJSON": "{'VCol' : [],'Site' : [{'Longitude' : '149.10164','CurrentSiteManagerName' : 'Testing User-5411143','sitelocation' : 'POLYGON((148.99658 -35.48192,149.2067 -35.48192,149.2067 -35.19626,148.99658 -35.19626,148.99658 -35.48192))','SiteId' : '1','CurrentSiteManagerId' : '3','SiteName' : 'DArT Test Site (Updated)','SiteEndDate' : null,'SiteTypeName' : 'SiteType - 2130908','Latitude' : '-35.33909','SiteStartDate' : null,'SiteTypeId' : '6','SiteAcronym' : 'GH','delete' : 'delete/site/1','update' : 'update/site/1'}],'RecordMeta' : [{'TagName' : 'Site'}]}",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Site SiteStartDate='' delete='delete/site/18' CurrentSiteManagerId='41' SiteTypeName='SiteType - 22416809916' update='update/site/18' sitelocation='MULTIPOLYGON(((149.05803801025291 -35.28275454804866,149.06078459228328 -35.315257984493236,149.12120939696936 -35.31637855978221,149.05803801025291 -35.28275454804866)))' sitelocdt='2023-04-11 05:19:52' SiteAcronym='GH' Latitude='-35.3047970307747' SiteTypeId='46' SiteEndDate='' CurrentSiteManagerName='Testing User-25644445488' SiteId='18' SiteName='DArT Test Site' sitelocdescription='' Longitude='149.08001066650183'/></DATA>",
+"SuccessMessageJSON": "{'VCol' : [],'Site' : [{ 'SiteName' : 'DArT Test Site', 'sitelocdescription' : '', 'Longitude' : '149.08001066650183', 'CurrentSiteManagerName' : 'Testing User-25644445488', 'SiteId' : 18, 'update' : 'update/site/18', 'Latitude' : '-35.3047970307747', 'SiteAcronym' : 'GH', 'sitelocdt' : '2023-04-11 05:19:52', 'sitelocation' : 'MULTIPOLYGON(((149.05803801025291 -35.28275454804866,149.06078459228328 -35.315257984493236,149.12120939696936 -35.31637855978221,149.05803801025291 -35.28275454804866)))', 'SiteEndDate' : null, 'SiteTypeId' : 46, 'delete' : 'delete/site/18', 'SiteStartDate' : null, 'CurrentSiteManagerId' : 41, 'SiteTypeName' : 'SiteType - 22416809916' }],'RecordMeta' : [{'TagName' : 'Site'}]}",
 "ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Site (20) not found.' /></DATA>"}],
 "ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Site (20) not found.'}]}"}],
 "URLParameter": [{"ParameterName": "id", "Description": "Existing SiteId"}],
@@ -3659,14 +3535,14 @@ sub update_site_geography_runmode {
 "Description": "Update site's geographical location.",
 "AuthRequired": 1,
 "GroupRequired": 1,
-"GroupAdminRequired": 1,
+"GroupAdminRequired": 0,
 "SignatureRequired": 1,
 "AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
 "SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='Site (1) location has been updated successfully.' /></DATA>",
 "SuccessMessageJSON": "{'Info' : [{'Message' : 'Site (1) location has been updated successfully.'}]}",
 "ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Site (20) not found.' /></DATA>"}],
 "ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Site (20) not found.'}]}"}],
-"HTTPParameter": [{"Name": "sitelocation", "DataType": "polygon_wkt", "Description": "GIS field defining the polygon geometry object of the site in a standard GIS well-known text.", "Type": "LCol", "Required": "1"}],
+"HTTPParameter": [{"Name": "sitelocation", "DataType": "polygon_wkt", "Description": "GIS field defining the polygon geometry object of the site in a standard GIS well-known text.", "Type": "LCol", "Required": "1"},{"Name": "sitelocdt", "DataType": "timestamp", "Description": "DateTime of site location", "Type": "LCol", "Required": "0"},{"Name": "currentloc", "DataType": "tinyint", "Description": "Flag to notify current location", "Type": "LCol", "Required": "0"},{"Name": "description", "DataType": "varchar", "Description": "Description for location", "Type": "LCol", "Required": "0"}],
 "URLParameter": [{"ParameterName": "id", "Description": "Existing SiteId"}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
@@ -3691,101 +3567,33 @@ sub update_site_geography_runmode {
     return $data_for_postrun_href;
   }
 
-  my $site_location = $query->param('sitelocation');
-
-  my ($missing_err, $missing_href) = check_missing_href( { 'sitelocation' => $site_location } );
-
-  if ($missing_err) {
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
-
-    return $data_for_postrun_href;
-  }
-
-  my $dbh_gis_read = connect_gis_read();
-  my ($is_wkt_err, $wkt_err_href) = is_valid_wkt_href($dbh_gis_read, {'sitelocation' => $site_location},
-                                                      ['POLYGON', 'MULTIPOLYGON', 'POINT']);
-  $dbh_gis_read->disconnect();
-
-  if ($is_wkt_err) {
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$wkt_err_href]};
-
-    return $data_for_postrun_href;
-  }
-
-  my $dbh_gis_write = connect_gis_write();
-
-
-  my $sql = '';
-  my @sql_arg_list;
-
-  if (record_existence($dbh_gis_write, 'siteloc', 'siteid', $site_id)) {
-
-    if ($site_location =~ /^POINT/i) {
-
-      my $st_buffer_val = $POINT2POLYGON_BUFFER4SITE->{$ENV{DOCUMENT_ROOT}};
-
-      $sql     = "UPDATE siteloc SET ";
-      $sql    .= "sitelocation=ST_Multi(ST_Buffer(ST_GeomFromText(?, -1), $st_buffer_val, 1)) ";
-      $sql    .= 'WHERE siteid=?';
+  my $sub_PGIS_val_builder = sub {
+    my $wkt = shift;
+    my $st_buffer_val = $POINT2POLYGON_BUFFER4SITE->{$ENV{DOCUMENT_ROOT}};
+    if ($wkt =~ /^POINT/i) {
+      return "ST_Multi(ST_Buffer(ST_GeomFromText(?, -1), $st_buffer_val, 1))";
+    } else {
+      return "ST_Multi(ST_GeomFromText(?, -1))";
     }
-    else {
+  };
 
-      $sql     = 'UPDATE siteloc SET ';
-      $sql    .= 'sitelocation=ST_Multi(ST_GeomFromText(?, -1)) ';
-      $sql    .= 'WHERE siteid=?';
-    }
+  my ($err, $err_msg) = append_geography_loc(
+                                              "site", 
+                                              $site_id, 
+                                              ['POINT', 'POLYGON', 'MULTIPOLYGON'], 
+                                              $query,
+                                              $sub_PGIS_val_builder,
+                                              $self->logger,
+                                            );
 
-    @sql_arg_list = ($site_location, $site_id);
+  if ($err) {
+    $data_for_postrun_href = $self->_set_error($err_msg);
+  } else {
+    my $info_msg_aref = [{'Message' => "Site ($site_id) location has been updated successfully."}];
+    $data_for_postrun_href->{'Error'}     = 0;
+    $data_for_postrun_href->{'Data'}      = {'Info' => $info_msg_aref};
+    $data_for_postrun_href->{'ExtraData'} = 0;
   }
-  else {
-
-    if ($site_location =~ /^POINT/i) {
-
-      my $st_buffer_val = $POINT2POLYGON_BUFFER4SITE->{$ENV{DOCUMENT_ROOT}};
-
-      $sql  = "INSERT INTO siteloc (siteid, sitelocation, sitelocdt, currentloc) ";
-      $sql .= "VALUES (?, ST_Multi(ST_Buffer(ST_GeomFromText(?, -1), $st_buffer_val, 1)), ?, ?)";
-    }
-    else {
-
-      $sql  = 'INSERT INTO siteloc (siteid, sitelocation, sitelocdt, currentloc) ';
-      $sql .= 'VALUES (?, ST_Multi(ST_GeomFromText(?, -1)), ?, ?)';
-    }
-
-    @sql_arg_list = ($site_id, $site_location, DateTime::Format::Pg->parse_datetime(DateTime->now()), 0);
-  }
-
-  $self->logger->debug("SQL: $sql");
-  $self->logger->debug("SiteId: $site_id");
-
-  my $gis_sth = $dbh_gis_write->prepare($sql);
-  $gis_sth->execute(@sql_arg_list);
-
-  if ($dbh_gis_write->err()) {
-
-    my $sql_err_str = $dbh_gis_write->errstr();
-
-    $self->logger->debug("SQL err number: " . $dbh_gis_write->err());
-    $self->logger->debug("SQL err: " . $dbh_gis_write->errstr());
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-    return $data_for_postrun_href;
-  }
-
-  $gis_sth->finish();
-  $dbh_gis_write->disconnect();
-
-  my $info_msg_aref = [{'Message' => "Site ($site_id) location has been updated successfully."}];
-
-  $data_for_postrun_href->{'Error'}     = 0;
-  $data_for_postrun_href->{'Data'}      = {'Info'     => $info_msg_aref};
-  $data_for_postrun_href->{'ExtraData'} = 0;
 
   return $data_for_postrun_href;
 }
@@ -4558,9 +4366,9 @@ sub list_trial {
 
     if (scalar(@trial_id_list) > 0) {
 
-      my $gis_where = "WHERE trialid IN (" . join(',', @trial_id_list) . ")";
+      my $gis_where = "WHERE trialid IN (" . join(',', @trial_id_list) . ") AND currentloc = 1";
 
-      my $trialloc_sql = 'SELECT trialid, ST_AsText(triallocation) AS triallocation, ';
+      my $trialloc_sql = 'SELECT trialid, triallocdt, description, ST_AsText(triallocation) AS triallocation, ';
       $trialloc_sql   .= 'ST_AsText(ST_Centroid(geometry(triallocation))) AS trialcentroid ';
       $trialloc_sql   .= 'FROM trialloc ';
       $trialloc_sql   .= $gis_where;
@@ -4635,6 +4443,10 @@ sub list_trial {
 
       $row->{'triallocation'} = $trial_loc_gis->{$trial_id}->{'triallocation'};
     }
+
+    $row->{'triallocdt'} = $trial_loc_gis->{$trial_id}->{'triallocdt'};
+
+    $row->{'triallocdescription'} = $trial_loc_gis->{$trial_id}->{'description'};
 
     my $own_grp_id   = $row->{'OwnGroupId'};
     my $acc_grp_id   = $row->{'AccessGroupId'};
@@ -4763,8 +4575,8 @@ sub list_trial_advanced_runmode {
 "GroupAdminRequired": 0,
 "SignatureRequired": 0,
 "AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "FILTERING"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Pagination NumOfRecords='10' NumOfPages='10' Page='1' NumPerPage='1' /><RecordMeta TagName='Trial' /><Trial TrialNote='none' TrialAcronym='TEST' AccessGroupId='0' chgPerm='trial/11/change/permission' map='trial/11/on/map' TrialManagerId='16' OwnGroupPermission='Read/Write/Link' TrialTypeName='TrialType - 9439035' DesignTypeId='15' SiteName='DArT Test Site' AccessGroupName='admin' Latitude='-35.3048782165934' addTrait='trial/11/add/trait' CurrentWorkflowId='0' TrialNumber='1' OwnGroupId='0' UltimatePerm='7' TrialEndDate='2011-03-31 00:00:00' TrialTypeId='95' Longitude='149.092717866478' AccessGroupPerm='5' SiteId='14' AccessGroupPermission='Read/Link' OtherPermission='Read/Link' OtherPerm='5' OwnGroupPerm='7' DesignTypeName='Traditional - 6428435' ProjectId='' listTrialUnit='trial/11/list/trialunit' OwnGroupName='admin' ProjectName='' triallocation='POLYGON((149.092666904502 -35.3047819041308,149.092784921705 -35.3047819041308,149.09276882845 -35.3049745290585,149.092650811256 -35.3049745290585,149.092666904502 -35.3047819041308))' TrialStartDate='2010-10-15 00:00:00' TrialName='Trial_4571671' TrialManagerName='Testing User-5854495' chgOwner='trial/11/change/owner' UltimatePermission='Read/Write/Link' update='update/trial/11' TrialId='11' /></DATA>",
-"SuccessMessageJSON": "{'Pagination' : [{'NumOfRecords' : '10','NumOfPages' : 10,'NumPerPage' : '1','Page' : '1'}],'VCol' : [],'RecordMeta' : [{'TagName' : 'Trial'}],'Trial' : [{'TrialNote' : 'none','TrialAcronym' : 'TEST','AccessGroupId' : '0','chgPerm' : 'trial/11/change/permission','map' : 'trial/11/on/map','TrialManagerId' : '16','OwnGroupPermission' : 'Read/Write/Link','TrialTypeName' : 'TrialType - 9439035','DesignTypeId' : '15','SiteName' : 'DArT Test Site','AccessGroupName' : 'admin','Latitude' : '-35.3048782165934','addTrait' : 'trial/11/add/trait','CurrentWorkflowId' : '0','TrialNumber' : '1','OwnGroupId' : '0','UltimatePerm' : '7','TrialEndDate' : '2011-03-31 00:00:00','TrialTypeId' : '95','Longitude' : '149.092717866478','AccessGroupPerm' : '5','SiteId' : '14','AccessGroupPermission' : 'Read/Link','OtherPermission' : 'Read/Link','OtherPerm' : '5','OwnGroupPerm' : '7','DesignTypeName' : 'Traditional - 6428435','ProjectId' : null,'listTrialUnit' : 'trial/11/list/trialunit','OwnGroupName' : 'admin','ProjectName' : null,'triallocation' : 'POLYGON((149.092666904502 -35.3047819041308,149.092784921705 -35.3047819041308,149.09276882845 -35.3049745290585,149.092650811256 -35.3049745290585,149.092666904502 -35.3047819041308))','TrialStartDate' : '2010-10-15 00:00:00','chgOwner' : 'trial/11/change/owner','TrialManagerName' : 'Testing User-5854495','TrialName' : 'Trial_4571671','UltimatePermission' : 'Read/Write/Link','update' : 'update/trial/11','TrialId' : '11'}]}",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Pagination NumOfRecords='10' NumOfPages='10' Page='1' NumPerPage='1' /><RecordMeta TagName='Trial' /><Trial ProjectName='' AccessGroupName='admin' TrialLayout='{}' SeasonId='43' TrialTypeName='TrialType - 23515779554' UltimatePerm='7' map='trial/12/on/map' TrialStartDate='2010-10-15 00:00:00' UltimatePermission='Read/Write/Link' AccessGroupId='0' OtherPerm='5' AccessGroupPerm='5' TULastUpdateTimeStamp='2023-04-11 15:19:47' OwnGroupPermission='Read/Write/Link' TrialNote='none' TrialManagerId='38' TrialEndDate='2011-03-31 00:00:00' OwnGroupPerm='7' chgPerm='trial/12/change/permission' triallocation='MULTIPOLYGON(((149.05803801025291 -35.28275454804866,149.06078459228328 -35.315257984493236,149.12120939696936 -35.31637855978221,149.05803801025291 -35.28275454804866)))' addTrait='trial/12/add/trait' TrialTypeId='42' SiteName='DArT Test Site' OwnGroupId='0' CurrentWorkflowId='' TrialManagerName='Testing User-77999475926' triallocdt='2023-04-11 05:19:47' TrialId='12' TrialName='Trial_21200739082' update='update/trial/12' TrialNumber='1' Longitude='149.08001066650183' ProjectId='' AccessGroupPermission='Read/Link' OwnGroupName='admin' TrialAcronym='TEST' triallocdescription='' DesignTypeName='Traditional - 88649882141' delete='delete/trial/12' Latitude='-35.3047970307747' SeasonName='Season - 52508821522' SiteId='15' OtherPermission='Read/Link' DesignTypeId='12' chgOwner='trial/12/change/owner'/></DATA>",
+"SuccessMessageJSON": "{'Pagination' : [{'NumOfRecords' : '10','NumOfPages' : 10,'NumPerPage' : '1','Page' : '1'}],'VCol' : [],'RecordMeta' : [{'TagName' : 'Trial'}],'Trial' : [{ 'triallocation' : 'MULTIPOLYGON(((149.05803801025291 -35.28275454804866,149.06078459228328 -35.315257984493236,149.12120939696936 -35.31637855978221,149.05803801025291 -35.28275454804866)))', 'chgPerm' : 'trial/12/change/permission', 'trialevent' : [], 'TrialTypeId' : 42, 'addTrait' : 'trial/12/add/trait', 'OtherPermission' : 'Read/Link', 'SiteName' : 'DArT Test Site', 'DesignTypeId' : 12, 'chgOwner' : 'trial/12/change/owner', 'SiteId' : 15, 'OwnGroupPerm' : 7, 'TrialEndDate' : '2011-03-31 00:00:00', 'TrialManagerId' : 38, 'Latitude' : '-35.3047970307747', 'TULastUpdateTimeStamp' : '2023-04-11 15:19:47', 'SeasonName' : 'Season - 52508821522', 'TrialNote' : 'none', 'OwnGroupPermission' : 'Read/Write/Link', 'AccessGroupPerm' : 5, 'triallocdescription' : '', 'TrialAcronym' : 'TEST', 'OwnGroupName' : 'admin', 'delete' : 'delete/trial/12', 'DesignTypeName' : 'Traditional - 88649882141', 'Longitude' : '149.08001066650183', 'AccessGroupPermission' : 'Read/Link', 'trialdimension' : [], 'ProjectId' : null, 'AccessGroupId' : 0, 'UltimatePermission' : 'Read/Write/Link', 'OtherPerm' : 5, 'UltimatePerm' : 7, 'TrialTypeName' : 'TrialType - 23515779554', 'TrialStartDate' : '2010-10-15 00:00:00', 'map' : 'trial/12/on/map', 'trialworkflow' : [], 'TrialNumber' : 1, 'triallocdt' : '2023-04-11 05:19:47', 'TrialManagerName' : 'Testing User-77999475926', 'TrialLayout' : '{}', 'TrialId' : 12, 'SeasonId' : 43, 'update' : 'update/trial/12', 'TrialName' : 'Trial_21200739082', 'OwnGroupId' : 0, 'ProjectName' : null, 'AccessGroupName' : 'admin', 'CurrentWorkflowId' : null }]}",
 "ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
 "ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
 "URLParameter": [{"ParameterName": "nperpage", "Description": "Number of records in a page for pagination"}, {"ParameterName": "num", "Description": "The page number of the pagination"}],
@@ -4942,8 +4754,8 @@ sub list_trial_advanced_runmode {
     for my $fd_name (@{$final_field_list}) {
 
       # need to remove location field because generate_factor_sql does not understand these field
-      if ( (!($fd_name =~ /Longitude/)) && (!($fd_name =~ /Latitude/)) && (!($fd_name =~ /triallocation/)) ) {
-
+      if ( (!($fd_name =~ /Longitude/)) && (!($fd_name =~ /Latitude/)) && (!($fd_name =~ /triallocation/)) && (!($fd_name =~ /triallocdt/)) && (!($fd_name =~ /triallocdescription/))) {
+        
         push(@{$sql_field_list}, $fd_name);
       }
     }
@@ -4953,7 +4765,7 @@ sub list_trial_advanced_runmode {
     for my $fd_name (@{$final_field_list}) {
 
       # need to remove location field because generate_factor_sql does not understand these field
-      if ( (!($fd_name =~ /Longitude/)) && (!($fd_name =~ /Latitude/)) && (!($fd_name =~ /triallocation/)) ) {
+      if ( (!($fd_name =~ /Longitude/)) && (!($fd_name =~ /Latitude/)) && (!($fd_name =~ /triallocation/)) && (!($fd_name =~ /triallocdt/)) && (!($fd_name =~ /triallocdescription/))) {
 
         push(@{$sql_field_list}, $fd_name);
       }
@@ -5234,8 +5046,8 @@ sub get_trial_runmode {
 "GroupAdminRequired": 0,
 "SignatureRequired": 0,
 "AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><RecordMeta TagName='Trial' /><Trial TrialNote='none' TrialAcronym='TEST' AccessGroupId='0' chgPerm='trial/1/change/permission' map='trial/1/on/map' TrialManagerId='4' OwnGroupPermission='Read/Write/Link' TrialTypeName='TrialType - 8010193' DesignTypeId='2' SiteName='DArT Test Site' AccessGroupName='admin' Latitude='-35.3048782165934' addTrait='trial/1/add/trait' TrialNumber='1' CurrentWorkflowId='0' OwnGroupId='0' UltimatePerm='7' TrialEndDate='2011-03-31 00:00:00' TrialTypeId='14' Longitude='149.092717866478' AccessGroupPerm='5' SiteId='2' AccessGroupPermission='Read/Link' OtherPermission='Read/Link' OtherPerm='5' OwnGroupPerm='7' DesignTypeName='Traditional - 9354393' ProjectId='' listTrialUnit='trial/1/list/trialunit' OwnGroupName='admin' triallocation='POLYGON((149.092666904502 -35.3047819041308,149.092784921705 -35.3047819041308,149.09276882845 -35.3049745290585,149.092650811256 -35.3049745290585,149.092666904502 -35.3047819041308))' TrialStartDate='2010-10-15 00:00:00' TrialManagerName='Testing User-2157263' TrialName='Trial_3426887' chgOwner='trial/1/change/owner' UltimatePermission='Read/Write/Link' update='update/trial/1' TrialId='1' /></DATA>",
-"SuccessMessageJSON": "{'VCol' : [],'RecordMeta' : [{'TagName' : 'Trial'}],'Trial' : [{'TrialNote' : 'none','TrialAcronym' : 'TEST','AccessGroupId' : '0','chgPerm' : 'trial/1/change/permission','map' : 'trial/1/on/map','TrialManagerId' : '4','OwnGroupPermission' : 'Read/Write/Link','TrialTypeName' : 'TrialType - 8010193','DesignTypeId' : '2','SiteName' : 'DArT Test Site','AccessGroupName' : 'admin','Latitude' : '-35.3048782165934','addTrait' : 'trial/1/add/trait','CurrentWorkflowId' : '0','TrialNumber' : '1','OwnGroupId' : '0','UltimatePerm' : '7','TrialEndDate' : '2011-03-31 00:00:00','TrialTypeId' : '14','Longitude' : '149.092717866478','AccessGroupPerm' : '5','SiteId' : '2','AccessGroupPermission' : 'Read/Link','OtherPermission' : 'Read/Link','OtherPerm' : '5','OwnGroupPerm' : '7','DesignTypeName' : 'Traditional - 9354393','ProjectId' : null,'listTrialUnit' : 'trial/1/list/trialunit','OwnGroupName' : 'admin','triallocation' : 'POLYGON((149.092666904502 -35.3047819041308,149.092784921705 -35.3047819041308,149.09276882845 -35.3049745290585,149.092650811256 -35.3049745290585,149.092666904502 -35.3047819041308))','TrialStartDate' : '2010-10-15 00:00:00','chgOwner' : 'trial/1/change/owner','TrialName' : 'Trial_3426887','TrialManagerName' : 'Testing User-2157263','UltimatePermission' : 'Read/Write/Link','update' : 'update/trial/1','TrialId' : '1'}]}",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><RecordMeta TagName='Trial' /><Trial ProjectName='' AccessGroupName='admin' TrialLayout='{}' SeasonId='43' TrialTypeName='TrialType - 23515779554' UltimatePerm='7' map='trial/12/on/map' TrialStartDate='2010-10-15 00:00:00' UltimatePermission='Read/Write/Link' AccessGroupId='0' OtherPerm='5' AccessGroupPerm='5' TULastUpdateTimeStamp='2023-04-11 15:19:47' OwnGroupPermission='Read/Write/Link' TrialNote='none' TrialManagerId='38' TrialEndDate='2011-03-31 00:00:00' OwnGroupPerm='7' chgPerm='trial/12/change/permission' triallocation='MULTIPOLYGON(((149.05803801025291 -35.28275454804866,149.06078459228328 -35.315257984493236,149.12120939696936 -35.31637855978221,149.05803801025291 -35.28275454804866)))' addTrait='trial/12/add/trait' TrialTypeId='42' SiteName='DArT Test Site' OwnGroupId='0' CurrentWorkflowId='' TrialManagerName='Testing User-77999475926' triallocdt='2023-04-11 05:19:47' TrialId='12' TrialName='Trial_21200739082' update='update/trial/12' TrialNumber='1' Longitude='149.08001066650183' ProjectId='' AccessGroupPermission='Read/Link' OwnGroupName='admin' TrialAcronym='TEST' triallocdescription='' DesignTypeName='Traditional - 88649882141' delete='delete/trial/12' Latitude='-35.3047970307747' SeasonName='Season - 52508821522' SiteId='15' OtherPermission='Read/Link' DesignTypeId='12' chgOwner='trial/12/change/owner'/></DATA>",
+"SuccessMessageJSON": "{'VCol' : [],'RecordMeta' : [{'TagName' : 'Trial'}],'Trial' : [{ 'triallocation' : 'MULTIPOLYGON(((149.05803801025291 -35.28275454804866,149.06078459228328 -35.315257984493236,149.12120939696936 -35.31637855978221,149.05803801025291 -35.28275454804866)))', 'chgPerm' : 'trial/12/change/permission', 'trialevent' : [], 'TrialTypeId' : 42, 'addTrait' : 'trial/12/add/trait', 'OtherPermission' : 'Read/Link', 'SiteName' : 'DArT Test Site', 'DesignTypeId' : 12, 'chgOwner' : 'trial/12/change/owner', 'SiteId' : 15, 'OwnGroupPerm' : 7, 'TrialEndDate' : '2011-03-31 00:00:00', 'TrialManagerId' : 38, 'Latitude' : '-35.3047970307747', 'TULastUpdateTimeStamp' : '2023-04-11 15:19:47', 'SeasonName' : 'Season - 52508821522', 'TrialNote' : 'none', 'OwnGroupPermission' : 'Read/Write/Link', 'AccessGroupPerm' : 5, 'triallocdescription' : '', 'TrialAcronym' : 'TEST', 'OwnGroupName' : 'admin', 'delete' : 'delete/trial/12', 'DesignTypeName' : 'Traditional - 88649882141', 'Longitude' : '149.08001066650183', 'AccessGroupPermission' : 'Read/Link', 'trialdimension' : [], 'ProjectId' : null, 'AccessGroupId' : 0, 'UltimatePermission' : 'Read/Write/Link', 'OtherPerm' : 5, 'UltimatePerm' : 7, 'TrialTypeName' : 'TrialType - 23515779554', 'TrialStartDate' : '2010-10-15 00:00:00', 'map' : 'trial/12/on/map', 'trialworkflow' : [], 'TrialNumber' : 1, 'triallocdt' : '2023-04-11 05:19:47', 'TrialManagerName' : 'Testing User-77999475926', 'TrialLayout' : '{}', 'TrialId' : 12, 'SeasonId' : 43, 'update' : 'update/trial/12', 'TrialName' : 'Trial_21200739082', 'OwnGroupId' : 0, 'ProjectName' : null, 'AccessGroupName' : 'admin', 'CurrentWorkflowId' : null }]}",
 "ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Trial (20) not found.' /></DATA>"}],
 "ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Trial (20) not found.'}]}"}],
 "URLParameter": [{"ParameterName": "id", "Description": "Existing TrialId"}],
@@ -5954,7 +5766,7 @@ sub update_trial_geography_runmode {
 "SuccessMessageJSON": "{'Info' : [{'Message' : 'Trial (1) geography has been updated successfully.'}]}",
 "ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Trial (20) not found.' /></DATA>"}],
 "ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Trial (20) not found.'}]}"}],
-"HTTPParameter": [{"Name": "triallocation", "DataType": "polygon_wkt", "Description": "GIS field defining the polygon geometry object of the trial in a standard GIS well-known text.", "Type": "LCol", "Required": "0"}],
+"HTTPParameter": [{"Name": "triallocation", "DataType": "polygon_wkt", "Description": "GIS field defining the polygon geometry object of the trial in a standard GIS well-known text.", "Type": "LCol", "Required": "1"},{"Name": "triallocdt", "DataType": "timestamp", "Description": "DateTime of trial location", "Type": "LCol", "Required": "0"},{"Name": "currentloc", "DataType": "tinyint", "Description": "Flag to notify current location", "Type": "LCol", "Required": "0"},{"Name": "description", "DataType": "varchar", "Description": "Description for location", "Type": "LCol", "Required": "0"}],
 "URLParameter": [{"ParameterName": "id", "Description": "Existing TrialId"}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
@@ -5997,146 +5809,64 @@ sub update_trial_geography_runmode {
     }
   }
 
+
+  my $sub_PGIS_val_builder = sub {
+    my $wkt = shift;
+    my $st_buffer_val = $POINT2POLYGON_BUFFER4TRIAL->{$ENV{DOCUMENT_ROOT}};
+    if ($wkt =~ /^POINT/i) {
+      return "ST_Multi(ST_Buffer(ST_GeomFromText(?, -1), $st_buffer_val, 1))";
+    } else {
+      return "ST_Multi(ST_GeomFromText(?, -1))";
+    }
+  };
+
+  my $is_trial_within_site = 1;
   my $site_id = read_cell_value($dbh_k_read, 'trial', 'SiteId', 'TrialId', $trial_id);
 
-  $dbh_k_read->disconnect();
+  my $sub_WKT_validator = sub {
+    my $gis_write = $_[0];
+    my $entity    = $_[1];
+    my $entity_id = $_[2];
+    my $wkt       = $_[3];
 
-  my $trial_location = $query->param('triallocation');
+    my ($is_within_err, $is_within) = is_within($gis_write, 'siteloc', 'siteid',
+                                              'sitelocation', $wkt, $site_id);
 
-  my ($missing_err, $missing_href) = check_missing_href( { 'triallocation' => $trial_location } );
-
-  if ($missing_err) {
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
-
-    return $data_for_postrun_href;
-  }
-
-  my $dbh_gis_read = connect_gis_read();
-  my ($is_wkt_err, $wkt_err_href) = is_valid_wkt_href($dbh_gis_read,
-                                                      {'triallocation' => $trial_location},
-                                                      ['POLYGON', 'MULTIPOLYGON', 'POINT']);
-  $dbh_gis_read->disconnect();
-
-  if ($is_wkt_err) {
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$wkt_err_href]};
-
-    return $data_for_postrun_href;
-  }
-
-  my $dbh_gis_write = connect_gis_write();
-
-  my ($is_within_err, $is_within) = is_within($dbh_gis_write, 'siteloc', 'siteid',
-                                              'sitelocation', $trial_location, $site_id);
-
-  my $msg = '';
-  my $does_actual_update = 0;
-
-  if ($is_within_err) {
-
-    $self->logger->debug("IsWithin Err: $is_within_err");
-    $self->logger->debug("IsWithin: $is_within");
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-    return $data_for_postrun_href;
-  }
-  else {
-
-    if (!$is_within) {
-
+    if ($is_within_err) {
+      return (1, "Unexpected error.");
+    } elsif (!$is_within) {
       if ($GIS_ENFORCE_GEO_WITHIN) {
-
-        my $err_msg = "New geography is not within site (${site_id}).";
-
-        $data_for_postrun_href->{'Error'} = 1;
-        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-        return $data_for_postrun_href;
-      }
-      else {
-
-        $msg    = "Trial ($trial_id) has been updated successfully. ";
-        $msg   .= "However, this new geography is not within its site (${site_id}).";
+        return (1, "This trial geography is not within site ($site_id)'s geography.");
+      } else {
+        $is_trial_within_site = 0;
       }
     }
-    else {
+  };
 
-      $msg = "Trial ($trial_id) geography has been updated successfully.";
-      $does_actual_update = 1;
+  my ($err, $err_msg) = append_geography_loc(
+                                              "trial", 
+                                              $trial_id, 
+                                              ['POINT', 'POLYGON', 'MULTIPOLYGON'], 
+                                              $query,
+                                              $sub_PGIS_val_builder,
+                                              $self->logger,
+                                              $sub_WKT_validator,
+                                            );
+
+  if ($err) {
+    $data_for_postrun_href = $self->_set_error($err_msg);
+  } else {
+    my $msg = "Trial ($trial_id) location has been updated successfully.";
+    if (!$is_trial_within_site) {
+      $msg .= " However, this trial's geography is not within site ($site_id)'s geography.";
     }
+    my $info_msg_aref = [{'Message' => $msg}];
+    $data_for_postrun_href->{'Error'}     = 0;
+    $data_for_postrun_href->{'Data'}      = {'Info' => $info_msg_aref};
+    $data_for_postrun_href->{'ExtraData'} = 0;
   }
 
-
-  my $postgres_trial_id = read_cell_value($dbh_gis_write, 'trialloc', 'trialid', 'trialid', $trial_id);
-
-  my @sql_arg;
-
-  if ($does_actual_update) {
-
-    if ($trial_location =~ /^POINT/i) {
-
-      my $st_buffer_val = $POINT2POLYGON_BUFFER4TRIAL->{$ENV{DOCUMENT_ROOT}};
-
-      if (length($postgres_trial_id) > 0) {
-
-        $sql  = "UPDATE trialloc SET ";
-        $sql .= "triallocation = ST_Multi(ST_Buffer(ST_GeomFromText(?, -1), $st_buffer_val, 1)) ";
-        $sql .= "WHERE trialid=?";
-        @sql_arg = ($trial_location, $trial_id);
-      }
-      else {
-
-        $sql  = "INSERT INTO trialloc (triallocation, trialid, triallocdt, currentloc) ";
-        $sql .= "VALUES (ST_Multi(ST_Buffer(ST_GeomFromText(?, -1), $st_buffer_val, 1)), ?, ?, ?)";
-        @sql_arg = ($trial_location, $trial_id, DateTime::Format::Pg->parse_datetime(DateTime->now()), 0);
-      }
-    }
-    else {
-
-      if (length($postgres_trial_id) > 0) {
-
-        $sql  = 'UPDATE trialloc SET ';
-        $sql .= 'triallocation = ST_Multi(ST_GeomFromText(?, -1)) ';
-        $sql .= 'WHERE trialid=?';
-        @sql_arg = ($trial_location, $trial_id);
-      }
-      else {
-
-        $sql  = 'INSERT INTO trialloc (triallocation, trialid, triallocdt, currentloc) ';
-        $sql .= 'VALUES (ST_Multi(ST_GeomFromText(?, -1)), ?, ?, ?)';
-        @sql_arg = ($trial_location, $trial_id, DateTime::Format::Pg->parse_datetime(DateTime->now()), 0);
-      }
-    }
-
-    my $gis_sth = $dbh_gis_write->prepare($sql);
-    $gis_sth->execute(@sql_arg);
-
-    if ($dbh_gis_write->err()) {
-
-      $self->logger->debug("SQL err number: " . $dbh_gis_write->err());
-      $self->logger->debug("SQL err: " . $dbh_gis_write->errstr());
-
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-      return $data_for_postrun_href;
-    }
-    $gis_sth->finish();
-  }
-
-  $dbh_gis_write->disconnect();
-
-  my $info_msg_aref = [{'Message' => $msg}];
-
-  $data_for_postrun_href->{'Error'}     = 0;
-  $data_for_postrun_href->{'Data'}      = {'Info'       => $info_msg_aref};
-  $data_for_postrun_href->{'ExtraData'} = 0;
-
+  $dbh_k_read->disconnect();
   return $data_for_postrun_href;
 }
 
@@ -6307,9 +6037,9 @@ sub list_trial_unit {
 
       my $dbh_gis = connect_gis_read();
 
-      my $gis_where = "WHERE trialunitid IN (" . join(',', @trial_unit_id_list) . ")";
+      my $gis_where = "WHERE trialunitid IN (" . join(',', @trial_unit_id_list) . ") AND currentloc = 1";
 
-      my $trialunitloc_sql = 'SELECT trialunitid, ST_AsText(trialunitlocation) AS trialunitlocation, ';
+      my $trialunitloc_sql = 'SELECT trialunitid, trialunitlocdt, description, ST_AsText(trialunitlocation) AS trialunitlocation, ';
       $trialunitloc_sql   .= 'ST_AsText(ST_Centroid(geometry(trialunitlocation))) AS trialunitcentroid ';
       $trialunitloc_sql   .= 'FROM trialunitloc ';
       $trialunitloc_sql   .= $gis_where;
@@ -6387,6 +6117,10 @@ sub list_trial_unit {
       $row->{'trialunitlocation'} = $trial_unit_loc_gis->{$trial_unit_id}->{'trialunitlocation'};
     }
 
+    $row->{'trialunitlocdt'} = $trial_unit_loc_gis->{$trial_unit_id}->{'trialunitlocdt'};
+
+    $row->{'trialunitlocdescription'} = $trial_unit_loc_gis->{$trial_unit_id}->{'description'};
+
     if ($extra_attr_yes) {
 
       if (defined($tu_specimen_href->{$trial_unit_id})) {
@@ -6440,8 +6174,8 @@ sub get_trial_unit_runmode {
 "GroupAdminRequired": 0,
 "SignatureRequired": 0,
 "AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><RecordMeta TagName='TrialUnit' /><TrialUnit Longitude='149.09269513468' listSpecimen='trialunit/1/list/specimen' UnitPositionId='2' UnitPositionText='block01|row1|column1' TrialUnitId='1' SampleSupplierId='1' TreatmentId='2' TrialUnitBarcode='3963264' SiteName='DArT Glass house' ReplicateNumber='2' Latitude='-35.3048528069633' TrialUnitNote='Trial unit part of automatic testing' UltimatePermission='Read/Write/Link' trialunitlocation='POINT(149.09269513468 -35.3048528069633)' TreatmentText='Removing weeds' addSpecimen='trialunit/1/add/specimen' update='update/trialunit/1' SourceTrialUnitId='0' UltimatePerm='7' TrialId='1'><Specimen SpecimenName='Specimen4TrialUnit_4774155' Notes='none' ItemId='' TrialUnitId='1' TrialUnitSpecimenId='1' HarvestDate='2008-08-01' PlantDate='2011-09-01' HasDied='0' SpecimenId='4' /><Specimen SpecimenName='Specimen4TrialUnit_1134469' Notes='none' ItemId='' TrialUnitId='1' TrialUnitSpecimenId='2' HarvestDate='0000-00-00' PlantDate='0000-00-00' HasDied='0' SpecimenId='5' /><Specimen SpecimenName='Specimen4TrialUnit_8074320' Notes='none' ItemId='' TrialUnitId='1' TrialUnitSpecimenId='3' HarvestDate='0000-00-00' PlantDate='2011-09-01' HasDied='0' SpecimenId='6' /><Specimen SpecimenName='Specimen4TrialUnit_3163264' Notes='none' ItemId='' TrialUnitId='1' TrialUnitSpecimenId='4' HarvestDate='0000-00-00' PlantDate='2011-09-01' HasDied='0' SpecimenId='7' /></TrialUnit></DATA>",
-"SuccessMessageJSON": "{'RecordMeta' : [{'TagName' : 'TrialUnit'}],'TrialUnit' : [{'Longitude' : '149.09269513468','listSpecimen' : 'trialunit/1/list/specimen','UnitPositionId' : '2','TrialUnitId' : '1','UnitPositionText' : 'block01|row1|column1','Specimen' : [{'SpecimenName' : 'Specimen4TrialUnit_4774155','Notes' : 'none','ItemId' : null,'TrialUnitId' : '1','TrialUnitSpecimenId' : '1','HarvestDate' : '2008-08-01','PlantDate' : '2011-09-01','HasDied' : '0','SpecimenId' : '4'},{'SpecimenName' : 'Specimen4TrialUnit_1134469','Notes' : 'none','ItemId' : null,'TrialUnitId' : '1','TrialUnitSpecimenId' : '2','HarvestDate' : '0000-00-00','PlantDate' : '0000-00-00','HasDied' : '0','SpecimenId' : '5'},{'SpecimenName' : 'Specimen4TrialUnit_8074320','Notes' : 'none','ItemId' : null,'TrialUnitId' : '1','TrialUnitSpecimenId' : '3','HarvestDate' : '0000-00-00','PlantDate' : '2011-09-01','HasDied' : '0','SpecimenId' : '6'},{'SpecimenName' : 'Specimen4TrialUnit_3163264','Notes' : 'none','ItemId' : null,'TrialUnitId' : '1','TrialUnitSpecimenId' : '4','HarvestDate' : '0000-00-00','PlantDate' : '2011-09-01','HasDied' : '0','SpecimenId' : '7'}],'SampleSupplierId' : '1','TreatmentId' : '2','TrialUnitBarcode' : '3963264','SiteName' : 'DArT Glass house','ReplicateNumber' : '2','Latitude' : '-35.3048528069633','TrialUnitNote' : 'Trial unit part of automatic testing','UltimatePermission' : 'Read/Write/Link','trialunitlocation' : 'POINT(149.09269513468 -35.3048528069633)','TreatmentText' : 'Removing weeds','addSpecimen' : 'trialunit/1/add/specimen','update' : 'update/trialunit/1','UltimatePerm' : '7','TrialId' : '1','SourceTrialUnitId' : '0'}]}",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><RecordMeta TagName='TrialUnit' /><TrialUnit SourceTrialUnitId='' update='update/trialunit/6' TrialUnitBarcode='BAR77863798194' TrialId='9' Latitude='-35.3047970307747' ReplicateNumber='2' TrialUnitZ='' TrialUnitEntryId='' listSpecimen='trialunit/6/list/specimen' TrialUnitTypeId='' trialunitlocation='GEOMETRYCOLLECTION(POLYGON((149.05803801025291 -35.28275454804866,149.06078459228328 -35.315257984493236,149.12120939696936 -35.31637855978221,149.05803801025291 -35.28275454804866)))' addSpecimen='trialunit/6/add/specimen' TrialUnitX='' TrialUnitPosition='' TrialUnitY='2745' SiteName='DArT Test Site' trialunitlocdt='2023-04-11 05:19:36' UltimatePermission='Read/Write/Link' trialunitlocdescription='' addKeyword='trialunit/6/add/keyword' TrialUnitId='6' Longitude='149.08001066650183' SampleSupplierId='1' TrialUnitNote='Trial unit part of automatic testing' SiteId='12' UltimatePerm='7'><Specimen PlantDate='2011-09-01' HarvestDate='2008-08-01' Notes='none' TrialUnitSpecimenId='26' TUSBarcode='' SpecimenNumber='0' Pedigree='' SpecimenName='Specimen4TrialUnit_94277815385' TUSLabel='' TrialUnitId='6' ItemId='' HasDied='' SpecimenId='7'/></TrialUnit></DATA>",
+"SuccessMessageJSON": "{'RecordMeta' : [{'TagName' : 'TrialUnit'}],'TrialUnit' : [{ 'TrialUnitZ' : null, 'ReplicateNumber' : 2, 'Latitude' : '-35.3047970307747', 'TrialUnitEntryId' : null, 'SourceTrialUnitId' : null, 'update' : 'update/trialunit/6', 'TrialId' : 9, 'TrialUnitBarcode' : 'BAR77863798194', 'Specimen' : [ { 'HarvestDate' : '2008-08-01', 'PlantDate' : '2011-09-01', 'Notes' : 'none', 'TrialUnitSpecimenId' : 26, 'TUSBarcode' : null, 'SpecimenNumber' : 0, 'Pedigree' : '', 'SpecimenName' : 'Specimen4TrialUnit_94277815385', 'TrialUnitId' : 6, 'TUSLabel' : null, 'ItemId' : null, 'HasDied' : null, 'SpecimenId' : 7 }], 'addSpecimen' : 'trialunit/6/add/specimen', 'TrialUnitX' : null, 'trialunitlocation' : 'GEOMETRYCOLLECTION(POLYGON((149.05803801025291 -35.28275454804866,149.06078459228328 -35.315257984493236,149.12120939696936 -35.31637855978221,149.05803801025291 -35.28275454804866)))', 'TrialUnitTypeId' : null, 'listSpecimen' : 'trialunit/6/list/specimen', 'TrialUnitPosition' : null, 'addKeyword' : 'trialunit/6/add/keyword', 'trialunitlocdescription' : '', 'TrialUnitId' : 6, 'Longitude' : '149.08001066650183', 'trialunitlocdt' : '2023-04-11 05:19:36', 'SiteName' : 'DArT Test Site', 'TrialUnitY' : 2745, 'UltimatePermission' : 'Read/Write/Link', 'TrialUnitNote' : 'Trial unit part of automatic testing', 'SiteId' : 12, 'UltimatePerm' : 7, 'SampleSupplierId' : 1 }]}",
 "ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='TrialUnit (100) not found.' /></DATA>"}],
 "ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'TrialUnit (100) not found.'}]}"}],
 "URLParameter": [{"ParameterName": "id", "Description": "Existing TrialUnitId"}],
@@ -6903,7 +6637,7 @@ sub update_trial_unit_geography_runmode {
 "SuccessMessageJSON": "{'Info' : [{'Message' : 'TrialUnit (1) geography has been updated successfully.'}]}",
 "ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='TrialUnit (100) not found.' /></DATA>"}],
 "ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'TrialUnit (100) not found.'}]}"}],
-"HTTPParameter": [{"Name": "trialunitlocation", "DataType": "point_wkt", "Description": "GIS field defining the geometric point of the trial unit in a standard GIS well-known text.", "Type": "LCol", "Required": "1"}],
+"HTTPParameter": [{"Name": "trial unitlocation", "DataType": "polygon_wkt", "Description": "GIS field defining the polygon geometry object of the trial unit in a standard GIS well-known text.", "Type": "LCol", "Required": "1"},{"Name": "trial unitlocationdt", "DataType": "timestamp", "Description": "DateTime of trial unit location", "Type": "LCol", "Required": "0"},{"Name": "currentloc", "DataType": "tinyint", "Description": "Flag to notify current location", "Type": "LCol", "Required": "0"},{"Name": "description", "DataType": "varchar", "Description": "Description for location", "Type": "LCol", "Required": "0"}],
 "URLParameter": [{"ParameterName": "id", "Description": "Existing TrialUnitId"}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
@@ -6949,140 +6683,27 @@ sub update_trial_unit_geography_runmode {
     return $data_for_postrun_href;
   }
 
-  my $trial_unit_location = $query->param('trialunitlocation');
+  my $sub_PGIS_val_builder = sub {
+    return "ST_ForceCollection(ST_GeomFromText(?, -1))";
+  };
 
-  my ($missing_err, $missing_href) = check_missing_href( { 'trialunitlocation' => $trial_unit_location } );
+  my ($err, $err_msg) = append_geography_loc(
+                                              "trialunit", 
+                                              $trial_unit_id, 
+                                              ['POINT', 'POLYGON', 'MULTIPOLYGON'], 
+                                              $query,
+                                              $sub_PGIS_val_builder,
+                                              $self->logger,
+                                            );
 
-  if ($missing_err) {
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
-
-    return $data_for_postrun_href;
+  if ($err) {
+    $data_for_postrun_href = $self->_set_error($err_msg);
+  } else {
+    my $info_msg_aref = [{'Message' => "TrialUnit ($trial_unit_id) location has been updated successfully."}];
+    $data_for_postrun_href->{'Error'}     = 0;
+    $data_for_postrun_href->{'Data'}      = {'Info' => $info_msg_aref};
+    $data_for_postrun_href->{'ExtraData'} = 0;
   }
-
-  my $dbh_gis_read = connect_gis_read();
-  my ($is_wkt_err, $wkt_err_href) = is_valid_wkt_href($dbh_gis_read,
-                                                      {'trialunitlocation' => $trial_unit_location},
-                                                      'POINT');
-  $dbh_gis_read->disconnect();
-
-  if ($is_wkt_err) {
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$wkt_err_href]};
-
-    return $data_for_postrun_href;
-  }
-
-  #see if trialunitlocation exists for the trialunit
-  my $trialunit_loc_gis = {};
-
-  my $dbh_gis = connect_gis_read();
-
-  my $gis_where = 'WHERE trialunitid='.$trial_unit_id;
-
-  my $trialunitloc_sql = 'SELECT trialunitid, ST_AsText(trialunitlocation) AS trialunitlocation ';
-  $trialunitloc_sql   .= 'FROM trialunitloc ';
-  $trialunitloc_sql   .= $gis_where;
-
-  $self->logger->debug("trialunitloc_sql: $trialunitloc_sql");
-
-  my $sth_gis = $dbh_gis->prepare($trialunitloc_sql);
-  $sth_gis->execute();
-
-  my $err = 0;
-  my $msg = "";
-
-  if (!$dbh_gis->err()) {
-
-    my $gis_href = $sth_gis->fetchall_hashref('trialunitid');
-
-    if (!$sth_gis->err()) {
-
-      $trialunit_loc_gis = $gis_href;
-    }
-    else {
-
-      $err = 1;
-      $msg = 'Unexpected error';
-      $self->logger->debug('Err: ' . $dbh_gis->errstr());
-    }
-  }
-  else {
-
-    $err = 1;
-    $msg = 'Unexpected error';
-    $self->logger->debug('Err: ' . $dbh_gis->errstr());
-  }
-
-  $dbh_gis->disconnect();
-
-  my $trialunit_loc_gis_count = scalar(keys(%{$trialunit_loc_gis}));
-  $self->logger->debug("GIS trialunit loc count: $trialunit_loc_gis_count");
-
-  if ($err == 1) {
-    $data_for_postrun_href->{'Error'} = $err;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $msg}]};
-
-    return $data_for_postrun_href;
-  }
-
-  if ($trialunit_loc_gis_count < 1) {
-    #write new entry
-    my $dbh_gis_write = connect_gis_write();
-
-    my $tu_loc_bulk_sql = 'INSERT INTO trialunitloc (trialunitid, trialunitlocation, trialunitlocdt, currentloc) VALUES (?, ST_ForceCollection(ST_GeomFromText(?, -1)), ?, ?)' ;
-
-    $self->logger->debug("SQL " .$tu_loc_bulk_sql . " $trial_unit_location and $trial_unit_id");
-
-    my $gis_sth = $dbh_gis_write->prepare($tu_loc_bulk_sql);
-    $gis_sth->execute($trial_unit_id, $trial_unit_location, DateTime::Format::Pg->parse_datetime(DateTime->now()), 0);
-
-    if ($dbh_gis_write->err()) {
-
-      $self->logger->debug("SQL err: " . $dbh_gis_write->errstr());
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-      return $data_for_postrun_href;
-    }
-
-    $gis_sth->finish();
-
-    $dbh_gis_write->disconnect();
-  }
-  else {
-    my $dbh_gis_write = connect_gis_write();
-
-    $sql    = 'UPDATE trialunitloc SET  ';
-    $sql   .= 'trialunitlocation=ST_ForceCollection(ST_GeomFromText(?, -1)) ';
-    $sql   .= 'WHERE trialunitid=?';
-
-    $self->logger->debug("SQL " .$sql . " $trial_unit_location and $trial_unit_id");
-
-    my $gis_sth = $dbh_gis_write->prepare($sql);
-    $gis_sth->execute($trial_unit_location, $trial_unit_id);
-
-    if ($dbh_gis_write->err()) {
-
-      $self->logger->debug("SQL err: " . $dbh_gis_write->errstr());
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-      return $data_for_postrun_href;
-    }
-
-    $gis_sth->finish();
-
-    $dbh_gis_write->disconnect();
-  }
-
-  my $info_msg_aref = [{'Message' => "TrialUnit ($trial_unit_id) geography has been updated successfully."}];
-
-  $data_for_postrun_href->{'Error'}     = 0;
-  $data_for_postrun_href->{'Data'}      = {'Info'       => $info_msg_aref};
-  $data_for_postrun_href->{'ExtraData'} = 0;
 
   return $data_for_postrun_href;
 }
@@ -7983,8 +7604,8 @@ sub list_site_advanced_runmode {
 "GroupAdminRequired": 0,
 "SignatureRequired": 0,
 "AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "FILTERING"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Pagination NumOfRecords='15' NumOfPages='15' Page='1' NumPerPage='1' /><Site Longitude='149.10164' CurrentSiteManagerName='Testing User-8788499' SiteId='16' sitelocation='POLYGON((148.99658 -35.48192,149.2067 -35.48192,149.2067 -35.19626,148.99658 -35.19626,148.99658 -35.48192))' CurrentSiteManagerId='18' SiteTypeName='SiteType - 5695208' SiteEndDate='0000-00-00 00:00:00' SiteName='DArT Test Site' Latitude='-35.33909' SiteStartDate='0000-00-00 00:00:00' SiteTypeId='98' SiteAcronym='GH' update='update/site/16' /><RecordMeta TagName='Site' /></DATA>",
-"SuccessMessageJSON": "{'Pagination' : [{'NumOfRecords' : '15','NumOfPages' : 15,'NumPerPage' : '1','Page' : '1'}],'VCol' : [],'Site' : [{'Longitude' : '149.10164','CurrentSiteManagerName' : 'Testing User-8788499','sitelocation' : 'POLYGON((148.99658 -35.48192,149.2067 -35.48192,149.2067 -35.19626,148.99658 -35.19626,148.99658 -35.48192))','SiteId' : '16','CurrentSiteManagerId' : '18','SiteName' : 'DArT Test Site','SiteEndDate' : '0000-00-00 00:00:00','SiteTypeName' : 'SiteType - 5695208','Latitude' : '-35.33909','SiteStartDate' : '0000-00-00 00:00:00','SiteTypeId' : '98','SiteAcronym' : 'GH','update' : 'update/site/16'}],'RecordMeta' : [{'TagName' : 'Site'}]}",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Pagination NumOfRecords='15' NumOfPages='15' Page='1' NumPerPage='1' /><Site SiteStartDate='' delete='delete/site/18' CurrentSiteManagerId='41' SiteTypeName='SiteType - 22416809916' update='update/site/18' sitelocation='MULTIPOLYGON(((149.05803801025291 -35.28275454804866,149.06078459228328 -35.315257984493236,149.12120939696936 -35.31637855978221,149.05803801025291 -35.28275454804866)))' sitelocdt='2023-04-11 05:19:52' SiteAcronym='GH' Latitude='-35.3047970307747' SiteTypeId='46' SiteEndDate='' CurrentSiteManagerName='Testing User-25644445488' SiteId='18' SiteName='DArT Test Site' sitelocdescription='' Longitude='149.08001066650183'/><RecordMeta TagName='Site' /></DATA>",
+"SuccessMessageJSON": "{'Pagination' : [{'NumOfRecords' : '15','NumOfPages' : 15,'NumPerPage' : '1','Page' : '1'}],'VCol' : [],'Site' : [{ 'SiteName' : 'DArT Test Site', 'sitelocdescription' : '', 'Longitude' : '149.08001066650183', 'CurrentSiteManagerName' : 'Testing User-25644445488', 'SiteId' : 18, 'update' : 'update/site/18', 'Latitude' : '-35.3047970307747', 'SiteAcronym' : 'GH', 'sitelocdt' : '2023-04-11 05:19:52', 'sitelocation' : 'MULTIPOLYGON(((149.05803801025291 -35.28275454804866,149.06078459228328 -35.315257984493236,149.12120939696936 -35.31637855978221,149.05803801025291 -35.28275454804866)))', 'SiteEndDate' : null, 'SiteTypeId' : 46, 'delete' : 'delete/site/18', 'SiteStartDate' : null, 'CurrentSiteManagerId' : 41, 'SiteTypeName' : 'SiteType - 22416809916' }],'RecordMeta' : [{'TagName' : 'Site'}]}",
 "ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
 "ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
 "URLParameter": [{"ParameterName": "nperpage", "Description": "Number of records in a page for pagination"}, {"ParameterName": "num", "Description": "The page number of the pagination"}],
@@ -8123,7 +7744,7 @@ sub list_site_advanced_runmode {
     for my $fd_name (@{$final_field_list}) {
 
       # need to remove location field because generate_factor_sql does not understand these field
-      if ( (!($fd_name =~ /Longitude/)) && (!($fd_name =~ /Latitude/)) && (!($fd_name =~ /sitelocation/)) ) {
+      if ( (!($fd_name =~ /Longitude/)) && (!($fd_name =~ /Latitude/)) && (!($fd_name =~ /sitelocation/)) && (!($fd_name =~ /sitelocdt/)) && (!($fd_name =~ /sitelocdescription/))) {
 
         push(@{$sql_field_list}, $fd_name);
       }
@@ -8134,7 +7755,7 @@ sub list_site_advanced_runmode {
     for my $fd_name (@{$final_field_list}) {
 
       # need to remove location field because generate_factor_sql does not understand these field
-      if ( (!($fd_name =~ /Longitude/)) && (!($fd_name =~ /Latitude/)) && (!($fd_name =~ /sitelocation/)) ) {
+      if ( (!($fd_name =~ /Longitude/)) && (!($fd_name =~ /Latitude/)) && (!($fd_name =~ /sitelocation/)) && (!($fd_name =~ /sitelocdt/)) && (!($fd_name =~ /sitelocdescription/))) {
 
         push(@{$sql_field_list}, $fd_name);
       }
@@ -8373,8 +7994,8 @@ sub list_trial_unit_advanced_runmode {
 "GroupAdminRequired": 0,
 "SignatureRequired": 0,
 "AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "FILTERING"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Pagination Page='1' NumOfRecords='75' NumOfPages='75' NumPerPage='1' /><RecordMeta TagName='TrialUnit' /><TrialUnit Longitude='149.09269513468' listSpecimen='trialunit/76/list/specimen' UnitPositionId='2' SiteId='16' UnitPositionText='block01|row1|column1' TrialUnitId='76' SampleSupplierId='1' TreatmentId='11' TrialUnitBarcode='4118705' SiteName='DArT Test Site' Latitude='-35.3048528069633' ReplicateNumber='2' TrialUnitNote='Trial unit part of automatic testing' UltimatePermission='Read/Write/Link' TreatmentText='Removing weeds' addSpecimen='trialunit/76/add/specimen' update='update/trialunit/76' TrialId='13' SourceTrialUnitId='0' UltimatePerm='7'><Specimen SpecimenName='Specimen4TrialUnit_1235991' Notes='none' ItemId='' TrialUnitId='76' TrialUnitSpecimenId='105' HarvestDate='2008-08-01' PlantDate='2011-09-01' HasDied='0' SpecimenId='473' /><Specimen SpecimenName='Specimen4TrialUnit_6879865' Notes='none' ItemId='' TrialUnitId='76' TrialUnitSpecimenId='106' HarvestDate='0000-00-00' PlantDate='0000-00-00' HasDied='0' SpecimenId='474' /><Specimen SpecimenName='Specimen4TrialUnit_4240384' Notes='none' ItemId='' TrialUnitId='76' TrialUnitSpecimenId='107' HarvestDate='0000-00-00' PlantDate='2011-09-01' HasDied='0' SpecimenId='475' /><Specimen SpecimenName='Specimen4TrialUnit_6019689' Notes='none' ItemId='' TrialUnitId='76' TrialUnitSpecimenId='108' HarvestDate='0000-00-00' PlantDate='2011-09-01' HasDied='0' SpecimenId='476' /><Specimen SpecimenName='Specimen_0435994' Notes='None' ItemId='0' TrialUnitId='76' TrialUnitSpecimenId='109' HarvestDate='0000-00-00' PlantDate='0000-00-00' HasDied='0' SpecimenId='477' /></TrialUnit></DATA>",
-"SuccessMessageJSON": "{'Pagination' : [{'NumOfRecords' : '75','NumOfPages' : 75,'NumPerPage' : '1','Page' : '1'}],'RecordMeta' : [{'TagName' : 'TrialUnit'}],'TrialUnit' : [{'Longitude' : '149.09269513468','listSpecimen' : 'trialunit/76/list/specimen','UnitPositionId' : '2','SiteId' : '16','TrialUnitId' : '76','UnitPositionText' : 'block01|row1|column1','Specimen' : [{'SpecimenName' : 'Specimen_0435994','Notes' : 'None','ItemId' : '0','TrialUnitId' : '76','TrialUnitSpecimenId' : '109','HarvestDate' : '0000-00-00','PlantDate' : '0000-00-00','HasDied' : '0','SpecimenId' : '477'}],'SampleSupplierId' : '1','TreatmentId' : '11','TrialUnitBarcode' : '4118705','SiteName' : 'DArT Test Site','ReplicateNumber' : '2','Latitude' : '-35.3048528069633','TrialUnitNote' : 'Trial unit part of automatic testing','UltimatePermission' : 'Read/Write/Link','TreatmentText' : 'Removing weeds','addSpecimen' : 'trialunit/76/add/specimen','update' : 'update/trialunit/76','UltimatePerm' : '7','SourceTrialUnitId' : '0','TrialId' : '13'}]}",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Pagination Page='1' NumOfRecords='75' NumOfPages='75' NumPerPage='1' /><RecordMeta TagName='TrialUnit' /><TrialUnit SourceTrialUnitId='' update='update/trialunit/6' TrialUnitBarcode='BAR77863798194' TrialId='9' Latitude='-35.3047970307747' ReplicateNumber='2' TrialUnitZ='' TrialUnitEntryId='' listSpecimen='trialunit/6/list/specimen' TrialUnitTypeId='' trialunitlocation='GEOMETRYCOLLECTION(POLYGON((149.05803801025291 -35.28275454804866,149.06078459228328 -35.315257984493236,149.12120939696936 -35.31637855978221,149.05803801025291 -35.28275454804866)))' addSpecimen='trialunit/6/add/specimen' TrialUnitX='' TrialUnitPosition='' TrialUnitY='2745' SiteName='DArT Test Site' trialunitlocdt='2023-04-11 05:19:36' UltimatePermission='Read/Write/Link' trialunitlocdescription='' addKeyword='trialunit/6/add/keyword' TrialUnitId='6' Longitude='149.08001066650183' SampleSupplierId='1' TrialUnitNote='Trial unit part of automatic testing' SiteId='12' UltimatePerm='7'><Specimen PlantDate='2011-09-01' HarvestDate='2008-08-01' Notes='none' TrialUnitSpecimenId='26' TUSBarcode='' SpecimenNumber='0' Pedigree='' SpecimenName='Specimen4TrialUnit_94277815385' TUSLabel='' TrialUnitId='6' ItemId='' HasDied='' SpecimenId='7'/></TrialUnit></DATA>",
+"SuccessMessageJSON": "{'Pagination' : [{'NumOfRecords' : '75','NumOfPages' : 75,'NumPerPage' : '1','Page' : '1'}],'RecordMeta' : [{'TagName' : 'TrialUnit'}],'TrialUnit' : [{ 'TrialUnitZ' : null, 'ReplicateNumber' : 2, 'Latitude' : '-35.3047970307747', 'TrialUnitEntryId' : null, 'SourceTrialUnitId' : null, 'update' : 'update/trialunit/6', 'TrialId' : 9, 'TrialUnitBarcode' : 'BAR77863798194', 'Specimen' : [ { 'HarvestDate' : '2008-08-01', 'PlantDate' : '2011-09-01', 'Notes' : 'none', 'TrialUnitSpecimenId' : 26, 'TUSBarcode' : null, 'SpecimenNumber' : 0, 'Pedigree' : '', 'SpecimenName' : 'Specimen4TrialUnit_94277815385', 'TrialUnitId' : 6, 'TUSLabel' : null, 'ItemId' : null, 'HasDied' : null, 'SpecimenId' : 7 }], 'addSpecimen' : 'trialunit/6/add/specimen', 'TrialUnitX' : null, 'trialunitlocation' : 'GEOMETRYCOLLECTION(POLYGON((149.05803801025291 -35.28275454804866,149.06078459228328 -35.315257984493236,149.12120939696936 -35.31637855978221,149.05803801025291 -35.28275454804866)))', 'TrialUnitTypeId' : null, 'listSpecimen' : 'trialunit/6/list/specimen', 'TrialUnitPosition' : null, 'addKeyword' : 'trialunit/6/add/keyword', 'trialunitlocdescription' : '', 'TrialUnitId' : 6, 'Longitude' : '149.08001066650183', 'trialunitlocdt' : '2023-04-11 05:19:36', 'SiteName' : 'DArT Test Site', 'TrialUnitY' : 2745, 'UltimatePermission' : 'Read/Write/Link', 'TrialUnitNote' : 'Trial unit part of automatic testing', 'SiteId' : 12, 'UltimatePerm' : 7, 'SampleSupplierId' : 1 }]}",
 "ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
 "ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
 "URLParameter": [{"ParameterName": "nperpage", "Description": "Number of records in a page for pagination", "Optional": 1}, {"ParameterName": "num", "Description": "The page number of the pagination", "Optional": 1}, {"ParameterName": "trialid", "Description": "Existing TrialId", "Optional": 1}],
@@ -8556,7 +8177,7 @@ sub list_trial_unit_advanced_runmode {
     for my $fd_name (@{$final_field_list}) {
 
       # need to remove location field because generate_factor_sql does not understand these field
-      if ( (!($fd_name =~ /Longitude/)) && (!($fd_name =~ /Latitude/)) && (!($fd_name =~ /trialunitlocation/)) ) {
+      if ( (!($fd_name =~ /Longitude/)) && (!($fd_name =~ /Latitude/)) && (!($fd_name =~ /trialunitlocation/)) && (!($fd_name =~ /trialunitlocdt/)) && (!($fd_name =~ /trialunitlocdescription/))) {
 
         push(@{$sql_field_list}, "trialunit.$fd_name");
         push(@{$filtering_field_list}, $fd_name);
@@ -8568,7 +8189,7 @@ sub list_trial_unit_advanced_runmode {
     for my $fd_name (@{$final_field_list}) {
 
       # need to remove location field because generate_factor_sql does not understand these field
-      if ( (!($fd_name =~ /Longitude/)) && (!($fd_name =~ /Latitude/)) && (!($fd_name =~ /trialunitlocation/)) ) {
+      if ( (!($fd_name =~ /Longitude/)) && (!($fd_name =~ /Latitude/)) && (!($fd_name =~ /trialunitlocation/)) && (!($fd_name =~ /trialunitlocdt/)) && (!($fd_name =~ /trialunitlocdescription/))) {
 
         push(@{$sql_field_list}, "trialunit.$fd_name");
         push(@{$filtering_field_list}, $fd_name);

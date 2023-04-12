@@ -6,6 +6,7 @@
   <INPUT ParaName="MeasureDateTime" Value="3" />
   <INPUT ParaName="InstanceNumber" Value="4" />
   <INPUT ParaName="TraitValue" Value="5" />
+  <INPUT ParaName="SurveyId" Value="6" />
   <INPUT SrcXML="xml/add_data_no_vcol/samplemeasurement_NA_value.xml" Transform="1" XSL="xml/add_data_no_vcol/samplemeasurement_1.xsl" />
   <Match Attr="StatusCode" Value="200" />
   <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
@@ -14,6 +15,7 @@
   <Parent CaseFile="xml/add_data_no_vcol/case_00358_add_trialunit.xml" Force="1" Order="3" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00471_add_trait_boolex_with_NA.xml" Force="1" Order="4" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00201_add_sampletype.xml" Order="5" />
-  <Parent CaseFile="xml/add_data_no_vcol/case_00472_add_trialtrait_boolex_with_NA.xml" Force="1" Order="6" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_10600_add_survey.xml" Force="1" Order="6" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00472_add_trialtrait_boolex_with_NA.xml" Force="1" Order="7" />
   
 </TestCase>

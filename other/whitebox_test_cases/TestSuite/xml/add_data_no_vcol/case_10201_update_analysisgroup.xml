@@ -8,6 +8,8 @@
   <INPUT ParaName="OtherPerm" Value="0" />
   <INPUT ParaName="AnalysisGroupDescription" Value="TestTestTest" />
   <INPUT ParaName="ContactId" Value="22" />
+  <INPUT ParaName="DateCreated" Value="2023-03-20 13:00:00" />
+  <INPUT ParaName="DateUpdated" Value="2023-03-20 13:00:00" />
   <INPUT ParaName="AnalysisGroupId" SrcValue="xml/add_data_no_vcol/case_00303_add_analysisgroup.xml" />
   <Match Attr="StatusCode" Value="200" />
   <Match Attr="Message" Tag="Info" Value="regex(successfully)" />

@@ -1,11 +1,12 @@
 <TestCase>
   <CaseInfo CustomMethod="add_record" Description="Add Extract to Analysis Group" TargetURL="analysisgroup/:AnalysisGroupId/add/extract" Type="BLOCKING" />
   <INPUT ParaName="AnalysisGroupId" SrcValue="xml/add_data_no_vcol/case_00303_add_analysisgroup.xml" />
-  <INPUT ParaName="ExtractId" SrcValue="xml/add_data_no_vcol/case_00302_add_extract.xml" />
+  <INPUT ParaName="ExtractId" SrcValue="xml/add_data_no_vcol/case_10624_add_extract_extra.xml" />
   <Match Attr="StatusCode" Value="200" />
   <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
   <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
-  <Parent CaseFile="xml/add_data_no_vcol/case_00302_add_extract.xml" Order="3" />
-  <Parent CaseFile="xml/add_data_no_vcol/case_00303_add_analysisgroup.xml" Order="4" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00303_add_analysisgroup.xml" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_10624_add_extract_extra.xml" Order="4" />
+   <ReturnId ParaName="AnalGroupExtractId" Value="4" />
 </TestCase>

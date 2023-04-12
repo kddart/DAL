@@ -179,15 +179,15 @@ CREATE INDEX "xspl_currentloc" on "specimenloc" ("currentloc");
 CREATE TABLE "surveyloc" (
   "surveylocid" serial NOT NULL,
   "surveyid" bigint NOT NULL,
-  "surverylocation" geography(GEOMETRYCOLLECTION, 4326) NOT NULL,
-  "surverylocdt" timestamp NOT NULL,
+  "surveylocation" geography(GEOMETRYCOLLECTION, 4326) NOT NULL,
+  "surveylocdt" timestamp NOT NULL,
   "currentloc" smallint NOT NULL,
   "description" character varying(254),
   PRIMARY KEY ("surveylocid")
 );
 CREATE INDEX "xsul_surveyid" on "surveyloc" ("surveyid");
-CREATE INDEX "xsul_surveylocation" on "surveyloc" USING GIST  ("surverylocation");
-CREATE INDEX "xsul_surveylocdt" on "surveyloc" ("surverylocdt");
+CREATE INDEX "xsul_surveylocation" on "surveyloc" USING GIST  ("surveylocation");
+CREATE INDEX "xsul_surveylocdt" on "surveyloc" ("surveylocdt");
 CREATE INDEX "xsul_currentloc" on "surveyloc" ("currentloc");
 
 CREATE TABLE "storageloc" (
@@ -410,13 +410,13 @@ COMMENT ON COLUMN specimenloc.currentloc IS 'flag indicating if the location is 
 
 COMMENT ON COLUMN specimenloc.description IS 'location description - optional';
 
-COMMENT ON COLUMN surveyloc.surveylocid IS 'internal id of the survery location';
+COMMENT ON COLUMN surveyloc.surveylocid IS 'internal id of the survey location';
 
 COMMENT ON COLUMN surveyloc.surveyid IS '(FK) survey id from main database';
 
-COMMENT ON COLUMN surveyloc.surverylocation IS 'geometry for survey - should have spatial index GIST in PostGIS!!!';
+COMMENT ON COLUMN surveyloc.surveylocation IS 'geometry for survey - should have spatial index GIST in PostGIS!!!';
 
-COMMENT ON COLUMN surveyloc.surverylocdt IS 'creation date of the survey location';
+COMMENT ON COLUMN surveyloc.surveylocdt IS 'creation date of the survey location';
 
 COMMENT ON COLUMN surveyloc.currentloc IS 'flag indicating if the location is current';
 

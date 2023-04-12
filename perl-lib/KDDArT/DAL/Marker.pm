@@ -836,17 +836,28 @@ sub import_markerdata_dart_runmode {
       }
     }
 
+    my $cur_dt = DateTime->now( time_zone => $TIMEZONE );
+    $cur_dt = DateTime::Format::MySQL->format_datetime($cur_dt);
+
+    my $DateUpdated               = $cur_dt;
+
+    if (defined($query->param('DateUpdated'))) {
+
+      $DateUpdated = $query->param('DateUpdated');
+    }
+
     $sql  = 'UPDATE "dataset" SET ';
     $sql .= '"MarkerNameFieldName"=?, ';
     $sql .= '"MarkerSequenceFieldName"=?, ';
     $sql .= '"ParentDataSetId"=?, ';
     $sql .= '"DataSetType"=?, ';
-    $sql .= '"Description"=? ';
+    $sql .= '"Description"=?, ';
+    $sql .= '"DateUpdated"=? ';
     $sql .= 'WHERE "DataSetId"=?';
 
     $sth = $dbh_m_write->prepare($sql);
     $sth->execute($mrk_name_field_name, $seq_field_name, $parent_dataset_id, $dataset_type,
-                  $description, $dataset_id);
+                  $description, $DateUpdated,$dataset_id);
 
     if ($dbh_m_write->err()) {
 
@@ -871,6 +882,11 @@ sub import_markerdata_dart_runmode {
       return $data_for_postrun_href;
     }
 
+    my $cur_dt = DateTime->now( time_zone => $TIMEZONE );
+    $cur_dt = DateTime::Format::MySQL->format_datetime($cur_dt);
+
+    my $DateCreated = $cur_dt;
+
     $sql  = 'INSERT INTO "dataset"(';
     $sql .= '"DataSetId", ';
     $sql .= '"AnalysisGroupId", ';
@@ -878,16 +894,20 @@ sub import_markerdata_dart_runmode {
     $sql .= '"MarkerSequenceFieldName", ';
     $sql .= '"ParentDataSetId", ';
     $sql .= '"DataSetType", ';
-    $sql .= '"Description") ';
-    $sql .= 'VALUES (?, ?, ?, ?, ?, ?, ?)';
+    $sql .= '"Description",';
+    $sql .= '"DateCreated") ';
+    $sql .= 'VALUES (?, ?, ?, ?, ?, ?, ?,?)';
+
+    my $debug_values = "($ds_id, $anal_id, $mrk_name_field_name, $seq_field_name, $parent_dataset_id, $dataset_type, $description, $DateCreated)";
+
 
     $sth = $dbh_m_write->prepare($sql);
     $sth->execute($ds_id, $anal_id, $mrk_name_field_name, $seq_field_name,
-                  $parent_dataset_id, $dataset_type, $description);
+                  $parent_dataset_id, $dataset_type, $description,$DateCreated);
 
     if ($dbh_m_write->err()) {
 
-      $self->logger->debug("Insert into dataset failed");
+      $self->logger->debug("Insert into dataset failed $sql");
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 

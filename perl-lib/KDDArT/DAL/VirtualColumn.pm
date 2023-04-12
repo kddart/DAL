@@ -1559,6 +1559,7 @@ sub add_general_type_runmode {
                        'breedingmethod'       => 1,
                        'traitdatatype'        => 1,
                        'season'               => 1,
+                       'survey'               => 1,
   };
 
   if (!($class_lookup->{$class})) {
@@ -1735,6 +1736,7 @@ sub list_general_type {
                                  'specimengroupstatus' => [{'TableName' => 'specimengroup', 'FieldName' => 'SpecimenGroupStatus'}],
                                  'traitgroup'          => [{'TableName' => 'trait', 'FieldName' => 'TraitGroupTypeId'}],
                                  'traitdatatype'       => [{'TableName' => 'trait', 'FieldName' => 'TraitDataType'}],
+                                 'survey'          => [{'TableName' => 'survey', 'FieldName' => 'SurveyType'}],
                                  'season'              => [{'TableName' => 'trial', 'FieldName' => 'SeasonId'}],
                                  'trial'               => [{'TableName' => 'trial', 'FieldName' => 'TrialTypeId'}],
                                  'trialevent'          => [{'TableName' => 'trialevent', 'FieldName' => 'EventTypeId'}],
@@ -1790,6 +1792,9 @@ sub list_general_type {
       my $not_used_id_href  = {};
 
       if ( !(defined $class2chk_table_lookup->{$type_class}) ) {
+        
+        $self->logger->debug("Type class -> $type_class");
+
 
         if (scalar(@{$class2chk_table_lookup->{$type_class}}) > 0) {
 
@@ -1915,6 +1920,7 @@ sub list_general_type_runmode {
                        'breedingmethod'       => 1,
                        'traitdatatype'        => 1,
                        'season'               => 1,
+                       'survey'               => 1,
                        'any'                  => 1
   };
 

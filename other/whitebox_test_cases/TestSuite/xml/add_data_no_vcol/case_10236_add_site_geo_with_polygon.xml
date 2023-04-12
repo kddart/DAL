@@ -1,0 +1,19 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Add a site" TargetURL="add/site" Type="BLOCKING" />
+  <Delete TargetURL="delete/site/:SiteId" />
+  <INPUT ParaName="SiteName" Value="DArT Test Site" />
+  <INPUT ParaName="SiteTypeId" SrcValue="xml/add_data_no_vcol/case_00005_add_sitetype.xml" />
+  <INPUT ParaName="SiteAcronym" Value="GH" />
+  <INPUT ParaName="CurrentSiteManagerId" SrcValue="xml/add_data_no_vcol/case_00102_add_con.xml" />
+  <INPUT ParaName="CurrentMetStationId" Value="0" />
+  <INPUT ParaName="sitelocation" Value="POLYGON((149.13006477584383 -35.13085205733206,148.9144580863907 -35.27672827800681,149.07650642623446 -35.49057823701658,149.23443489303133 -35.39100140882231,149.30859260787508 -35.29690586341122,149.13006477584383 -35.13085205733206))" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Match Attr="ParaName" Tag="ReturnId" Value="SiteId" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00102_add_con.xml" Force="1" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00005_add_sitetype.xml" Force="1" Order="4" />
+  <ReturnId ParaName="SiteId" Value="9" />
+  
+</TestCase>

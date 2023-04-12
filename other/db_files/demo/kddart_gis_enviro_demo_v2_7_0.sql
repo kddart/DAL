@@ -822,8 +822,8 @@ ALTER SEQUENCE public.storageloc_storagelocid_seq OWNED BY public.storageloc.sto
 CREATE TABLE public.surveyloc (
     surveylocid integer NOT NULL,
     surveyid bigint NOT NULL,
-    surverylocation public.geography(GeometryCollection,4326) NOT NULL,
-    surverylocdt timestamp without time zone NOT NULL,
+    surveylocation public.geography(GeometryCollection,4326) NOT NULL,
+    surveylocdt timestamp without time zone NOT NULL,
     currentloc smallint NOT NULL,
     description character varying(254)
 );
@@ -1240,7 +1240,7 @@ COPY public.storageloc (storagelocid, storageid, storagelocation, storagelocdt, 
 -- Data for Name: surveyloc; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.surveyloc (surveylocid, surveyid, surverylocation, surverylocdt, currentloc, description) FROM stdin;
+COPY public.surveyloc (surveylocid, surveyid, surveylocation, surveylocdt, currentloc, description) FROM stdin;
 \.
 
 
@@ -2014,14 +2014,14 @@ CREATE INDEX xsul_surveyid ON public.surveyloc USING btree (surveyid);
 -- Name: xsul_surveylocation; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX xsul_surveylocation ON public.surveyloc USING gist (surverylocation);
+CREATE INDEX xsul_surveylocation ON public.surveyloc USING gist (surveylocation);
 
 
 --
 -- Name: xsul_surveylocdt; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX xsul_surveylocdt ON public.surveyloc USING btree (surverylocdt);
+CREATE INDEX xsul_surveylocdt ON public.surveyloc USING btree (surveylocdt);
 
 
 --

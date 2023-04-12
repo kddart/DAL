@@ -6,6 +6,7 @@
 <MeasurementDateTime Value="2011-01-15 14:28:37" />
 <InstanceNumber Value="4" />
 <TraitValue Value="1" />
+<SurveyId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/case_10600_add_survey.xml" />
 </ROW>
 <ROW>
 <TrialUnitId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/case_00358_add_trialunit.xml" />
@@ -14,5 +15,6 @@
 <MeasurementDateTime Value="2011-01-15 14:28:37" />
 <InstanceNumber Value="6" />
 <TraitValue Value="NA" />
+<SurveyId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/case_10600_add_survey.xml" />
 </ROW>
 </DATA>

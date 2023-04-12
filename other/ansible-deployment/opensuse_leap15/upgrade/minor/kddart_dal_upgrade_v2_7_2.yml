@@ -1,0 +1,32 @@
+#
+# DAL upgrade script for Opensuse
+# Copyright (c) 2017, Diversity Arrays Technology, All rights reserved.
+#
+# Author:
+# Date: 06/03/2023
+# Description: DAL upgrade script from 2.7.1 to 2.7.2
+#
+
+- name: Backup PostgreSQL database
+  shell: >
+    mkdir -p {{ backup_dir }};
+    cd {{ backup_dir }};
+    pg_dump -U postgres kddart_gis_enviro_v2_7_0 >  {{ backup_dir }}/kddart_gis_enviro_{{ dal_db_version }}-`date +"%Y%m%d"`.sql;
+
+- name: Update surveyloc Table
+  shell: >
+    psql -U postgres -d kddart_gis_enviro_{{ dal_db_version }} -c 'alter table "surveyloc" rename column "surverylocdt" to "surveylocdt";';
+    psql -U postgres -d kddart_gis_enviro_{{ dal_db_version }} -c 'alter table "surveyloc" rename column "surverylocation" to "surveylocation";';
+    psql -U postgres -d kddart_gis_enviro_{{ dal_db_version }} -c 'drop INDEX "xsul_surveylocdt";';
+    psql -U postgres -d kddart_gis_enviro_{{ dal_db_version }} -c 'drop INDEX "xsul_surveylocation";';
+    psql -U postgres -d kddart_gis_enviro_{{ dal_db_version }} -c 'CREATE INDEX "xsul_surveylocation" on "surveyloc" USING GIST  ("surveylocation");';
+    psql -U postgres -d kddart_gis_enviro_{{ dal_db_version }} -c 'CREATE INDEX "xsul_surveylocdt" on "surveyloc" ("surveylocdt");';
+
+- name: Add Extract Data File Path
+  shell: echo '[EXTRACTDATAFILE_STORAGE_PATH]' >> {{ apache_base_dir }}/secure/kddart_dal.cfg; echo 'EXTRACTDATAFILE_STORAGE_PATH="storage/extractdata"' >> {{ apache_base_dir }}/secure/kddart_dal.cfg;
+
+- name: Restart postgresql
+  shell: systemctl restart postgresql
+
+- name: Restart Apache2
+  shell: systemctl restart apache2

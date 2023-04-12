@@ -2,7 +2,7 @@
 
 <xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
 
-<xsl:template match="DATA">#TrialUnitId,SampleTypeId,TraitId,MeasurementDateTime,InstanceNumber,TraitValue
+<xsl:template match="DATA">#TrialUnitId,SampleTypeId,TraitId,MeasurementDateTime,InstanceNumber,TraitValue,TrialUnitSpecimenId
 <xsl:apply-templates select="ROW"/>
 </xsl:template>
 

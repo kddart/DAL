@@ -1,3 +1,25 @@
+Version 2.7.2
+Date: 12/04/2023
+Description: New Features and Improvements
+
++ Survey related endpoints added
+
++ Sample Measurement endpoints ammended to include Survey as a relation
+
++ Extract Data related enpoints added
+
++ Specimen, Storage Location, Survey update geography added.
+
++ Trial Unit, Trial and Site updage geography updated to conform to new model.
+
+Databse Update
+
++ Survey Location spelling mistake corrected
+
+Instance Testing 
+
++ A number of new whitebox tests have been added. This takes the number of tests that can be run at the start of deployment to 465.
+
 Version 2.7.1
 Date: 16/03/2023
 Description: New Features and Improvements

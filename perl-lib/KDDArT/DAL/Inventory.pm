@@ -76,6 +76,7 @@ sub setup {
                                            'del_conversionrule_gadmin',
                                            'update_conversionrule_gadmin',
                                            'update_item_bulk_gadmin',
+                                           'update_storage_geography',
       );
   __PACKAGE__->authen->count_session_request_runmodes(':all');
 
@@ -99,6 +100,7 @@ sub setup {
                                                 'del_conversionrule_gadmin',
                                                 'update_conversionrule_gadmin',
                                                 'update_item_bulk_gadmin',
+                                                'update_storage_geography',
       );
   __PACKAGE__->authen->check_gadmin_runmodes(#'add_storage_gadmin',
                                              #'update_storage_gadmin',
@@ -120,6 +122,7 @@ sub setup {
                                              'del_conversionrule_gadmin',
                                              'update_conversionrule_gadmin',
                                              #'update_item_bulk_gadmin',
+                                             'update_storage_geography',
       );
   __PACKAGE__->authen->check_sign_upload_runmodes('add_itemgroup_gadmin',
                                                   'import_item_csv_gadmin',
@@ -134,6 +137,7 @@ sub setup {
     'del_storage_gadmin'            => 'del_storage_runmode',
     'list_storage'                  => 'list_storage_runmode',
     'get_storage'                   => 'get_storage_runmode',
+    'update_storage_geography'      => 'update_storage_geography_runmode',
 
     # Item
     'add_item'                      => 'add_item_runmode',
@@ -4259,6 +4263,7 @@ sub add_storage_runmode {
 "SuccessMessageJSON": "{'ReturnId' : [{'Value' : '16', 'ParaName' : 'StorageId'}], 'Info' : [{'Message' : 'StorageId (16) has been added successfully.'}]}",
 "ErrorMessageXML": [{"NameAlreadyExists": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error StorageBarcode='StorageBarcode (S_): already used.' /></DATA>"}],
 "ErrorMessageJSON": [{"NameAlreadyExists": "{'Error' : [{'StorageBarcode' : 'StorageBarcode (S_): already used.'}]}"}],
+"HTTPParameter": [{"Name": "storagelocation", "DataType": "polygon_wkt", "Description": "GIS field defining the polygon geometry object of the storage in a standard GIS well-known text.", "Type": "LCol", "Required": "0"},{"Name": "storagelocdt", "DataType": "timestamp", "Description": "DateTime of storage location", "Type": "LCol", "Required": "0"},{"Name": "currentloc", "DataType": "tinyint", "Description": "Flag to notify current location", "Type": "LCol", "Required": "0"},{"Name": "description", "DataType": "varchar", "Description": "Description for location", "Type": "LCol", "Required": "0"}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
@@ -4313,74 +4318,75 @@ sub add_storage_runmode {
     $storage_note = $query->param('StorageNote');
   }
 
-  my $dbh_k_write = connect_kdb_write();
-
-  if (defined $storage_parent_id) {
-
-    if (!record_existence($dbh_k_write, 'storage', 'StorageId', $storage_parent_id)) {
-
-      my $err_msg = "StorageParentId ($storage_parent_id): not found.";
-
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-      return $data_for_postrun_href;
+  my $dbh_k_write = connect_kdb_write(1);
+  eval {
+    if (length $storage_parent_id) {
+      if (!record_existence($dbh_k_write, 'storage', 'StorageId', $storage_parent_id)) {
+        my $err_msg = "StorageParentId ($storage_parent_id): not found.";
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+        return 1;
+      }
     }
-  }
 
-  if (length($storage_barcode) > 0) {
-
-    if (record_existence($dbh_k_write, 'storage', 'StorageBarcode', $storage_barcode)) {
-
-      my $err_msg = "StorageBarcode ($storage_barcode): already used.";
-
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'StorageBarcode' => $err_msg}]};
-
-      return $data_for_postrun_href;
+    if (length $storage_barcode) {
+      if (record_existence($dbh_k_write, 'storage', 'StorageBarcode', $storage_barcode)) {
+        my $err_msg = "StorageBarcode ($storage_barcode): already used.";
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'StorageBarcode' => $err_msg}]};
+        return 1;
+      }
     }
-  }
-  else {
 
-    $storage_barcode = undef;
-  }
+    my $sql = 'INSERT INTO storage SET ';
+    $sql   .= 'StorageBarcode=?, ';
+    $sql   .= 'StorageLocation=?, ';
+    $sql   .= 'StorageParentId=?, ';
+    $sql   .= 'StorageDetails=?, ';
+    $sql   .= 'StorageNote=?';
 
-  my $sql = 'INSERT INTO storage SET ';
-  $sql   .= 'StorageBarcode=?, ';
-  $sql   .= 'StorageLocation=?, ';
-  $sql   .= 'StorageParentId=?, ';
-  $sql   .= 'StorageDetails=?, ';
-  $sql   .= 'StorageNote=?';
-
-  my $sth = $dbh_k_write->prepare($sql);
-  $sth->execute($storage_barcode, $storage_loc, $storage_parent_id, $storage_details, $storage_note);
-
-  my $storage_id = -1;
-  if (!$dbh_k_write->err()) {
-
-    $storage_id = $dbh_k_write->last_insert_id(undef, undef, 'storage', 'StorageId');
+    my $sth = $dbh_k_write->prepare($sql);
+    $sth->execute($storage_barcode, $storage_loc, $storage_parent_id, $storage_details, $storage_note);
+    my $storage_id = $dbh_k_write->last_insert_id(undef, undef, 'storage', 'StorageId');
     $self->logger->debug("StorageId: $storage_id");
-  }
-  else {
+    $sth->finish();
 
-    $data_for_postrun_href->{'Error'}       = 1;
-    $data_for_postrun_href->{'Data'}        = {'Error' => [{'Message' => 'Unexpected error.'}]};
+    if (length $query->param('storagelocation')) {
+      my $sub_PGIS_val_builder = sub {
+        return "ST_ForceCollection(ST_GeomFromText(?, -1))";
+      };
 
-    return $data_for_postrun_href;
-  }
-  $sth->finish();
+      my ($err, $err_msg) = append_geography_loc(
+                                                  "storage",
+                                                  $storage_id,
+                                                  'POINT',
+                                                  $query,
+                                                  $sub_PGIS_val_builder,
+                                                  $self->logger,
+                                                );
+
+      if ($err) {
+        eval {$dbh_k_write->rollback;};
+        $data_for_postrun_href = $self->_set_error($err_msg);
+        return 1;
+      }
+    }
+
+    $dbh_k_write->commit;
+
+    my $info_msg_aref  = [{'Message' => "StorageId ($storage_id) has been added successfully."}];
+    my $return_id_aref = [{'Value' => "$storage_id", 'ParaName' => 'StorageId'}];
+    $data_for_postrun_href->{'Error'}     = 0;
+    $data_for_postrun_href->{'Data'}      = {'Info' => $info_msg_aref, 'ReturnId' => $return_id_aref, };
+    $data_for_postrun_href->{'ExtraData'} = 0;
+
+    1;
+  } or do {
+    eval {$dbh_k_write->rollback;};
+    $data_for_postrun_href = $self->_set_error();
+  };
 
   $dbh_k_write->disconnect();
-
-  my $info_msg_aref  = [{'Message' => "StorageId ($storage_id) has been added successfully."}];
-  my $return_id_aref = [{'Value' => "$storage_id", 'ParaName' => 'StorageId'}];
-
-  $data_for_postrun_href->{'Error'}     = 0;
-  $data_for_postrun_href->{'Data'}      = {'Info'     => $info_msg_aref,
-                                           'ReturnId' => $return_id_aref,
-  };
-  $data_for_postrun_href->{'ExtraData'} = 0;
-
   return $data_for_postrun_href;
 }
 
@@ -4638,10 +4644,22 @@ sub del_storage_runmode {
     return $self->_set_error($err_msg);
   }
 
-  my $sql = 'DELETE FROM storage ';
+  my $dbh_gis_write = connect_gis_write();
+  my $sql = 'DELETE FROM storageloc WHERE storageid=?';
+  my $sth = $dbh_gis_write->prepare($sql);
+  $sth->execute($storage_id);
+  if ($dbh_gis_write->err()) {
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+    return $data_for_postrun_href;
+  }
+  $dbh_gis_write->disconnect();
+
+
+  $sql = 'DELETE FROM storage ';
   $sql   .= 'WHERE StorageId=?';
 
-  my $sth = $dbh_k_write->prepare($sql);
+  $sth = $dbh_k_write->prepare($sql);
   $sth->execute($storage_id);
 
   if ($dbh_k_write->err()) {
@@ -4799,6 +4817,55 @@ sub list_storage {
     $extra_attr_storage_data = $storage_data;
   }
 
+  if (scalar(@$extra_attr_storage_data)) {
+    my $gis_read = connect_gis_read();
+    
+    my $storage_ids = [];
+
+    foreach my $storage_href (@$extra_attr_storage_data) {
+        push(@$storage_ids, $storage_href->{StorageId});
+    }
+
+    my $gis_where = "WHERE storageid IN (" . join(',', @$storage_ids) . ") AND currentloc = 1";
+
+    my $storageloc_sql = 'SELECT storageid, storagelocdt, description, ST_AsText(storagelocation) AS storagelocation ';
+    $storageloc_sql .= 'FROM storageloc ';
+    $storageloc_sql .= $gis_where;
+
+    $self->logger->debug("storageloc sql: $storageloc_sql");
+
+    my $sth_gis = $gis_read->prepare($storageloc_sql);
+    $sth_gis->execute();
+
+    if ($gis_read->err()) {
+      $err = 1;
+      $msg = 'Unexpected error';
+      $self->logger->debug('Err: ' . $gis_read->errstr());
+    } else {
+      my $gis_href = $sth_gis->fetchall_hashref('storageid');
+      if ($sth_gis->err()) {
+        $err = 1;
+        $msg = 'Unexpected error';
+        $self->logger->debug('Err: ' . $gis_read->errstr());
+      } else {
+          foreach my $storage_href (@$extra_attr_storage_data) {
+          my $storage_id = $storage_href->{StorageId};
+          if (exists $gis_href->{$storage_id}) {
+            $storage_href->{storagelocdt} = $gis_href->{$storage_id}->{storagelocdt};
+            $storage_href->{storagelocdescription} = $gis_href->{$storage_id}->{description};
+            $storage_href->{storagelocation} = $gis_href->{$storage_id}->{storagelocation};
+          } else {
+            $storage_href->{storagelocdt} = undef;
+            $storage_href->{storagelocdescription} = undef;
+            $storage_href->{storagelocation} = undef;
+          }
+        }
+      }
+    }
+
+    $gis_read->disconnect();
+  }
+
   $dbh->disconnect();
 
   return ($err, $msg, $extra_attr_storage_data);
@@ -4815,10 +4882,8 @@ sub list_storage_runmode {
 "GroupAdminRequired": 0,
 "SignatureRequired": 0,
 "AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><RecordMeta TagName='Storage' /><Storage StorageParentId='0' StorageDetails='Testing' StorageId='16' StorageBarcode='S_3304968' StorageNote='' StorageLocation='Non existing' delete='delete/storage/16' update='update/storage/16'><StorageChildren StorageId='310' StorageBarcode='2_00_1533112918_9' StorageLocation='Testing Child 1'/><StorageChildren StorageId='309' StorageBarcode='2_00_1533112918_8' StorageLocation='Testing Child 2'/></Storage></DATA>",
-"SuccessMessageJSON": "{'RecordMeta' : [{'TagName' : 'Storage'}], 'Storage' : [{'StorageParentId' : '0', 'StorageDetails' : 'Testing', 'StorageId' : '16', 'delete' : 'delete/storage/16', 'StorageBarcode' : 'S_3304968', 'update' : 'update/storage/16', 'StorageLocation' : 'Non existing', 'StorageNote' : '','StorageChildren' : [{'StorageId' : '26','StorageBarcode' : '2_00_1533112918_9','StorageLocation' : 'Testing Child 1'},{'StorageId' : '25',      'StorageBarcode' : '2_00_1533112918_8','StorageLocation' : 'Testing Child 2'}]}]}",
-"ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
-"ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><RecordMeta TagName='Storage' /><Storage StorageBarcode='S_78956322041' StorageLocation='Building1|Room1|Cabinet1' StorageParentId='' StorageDetails='Testing' storagelocdt='2023-04-11 05:19:17' StorageChildren='' delete='delete/storage/2' storagelocation='GEOMETRYCOLLECTION(POINT(149.1057021617679 -35.317184619919445))' StorageNote='' storagelocdescription='' StorageId='2' update='update/storage/2'/></DATA>",
+"SuccessMessageJSON": "{ 'StatInfo' : [ { 'ServerElapsedTime' : '0.102', 'Unit' : 'second' } ], 'Storage' : [ { 'storagelocdescription' : '', 'StorageBarcode' : 'S_78956322041', 'StorageId' : 2, 'storagelocdt' : '2023-04-11 05:19:17', 'StorageDetails' : 'Testing', 'StorageChildren' : null, 'StorageLocation' : 'Building1|Room1|Cabinet1', 'update' : 'update/storage/2', 'storagelocation' : 'GEOMETRYCOLLECTION(POINT(149.1057021617679 -35.317184619919445))', 'delete' : 'delete/storage/2', 'StorageParentId' : null, 'StorageNote' : '' } ], 'RecordMeta' : [ { 'TagName' : 'Storage' } ] }",
 "HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database field name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases."}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
@@ -11095,6 +11160,71 @@ sub get_update_item_bulk_json_schema_file {
   my $json_schema_path = $ENV{DOCUMENT_ROOT} . '/' . $JSON_SCHEMA_PATH;
 
   return "${json_schema_path}/updateitembulk.schema.json";
+}
+
+sub update_storage_geography_runmode {
+
+=pod update_storage_geography_HELP_START
+{
+"OperationName": "Update storage location",
+"Description": "Update storage's geographical location.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='Storage (1) location has been updated successfully.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'Storage (1) location has been updated successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Storage (20) not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Storage (20) not found.'}]}"}],
+"HTTPParameter": [{"Name": "storagelocation", "DataType": "polygon_wkt", "Description": "GIS field defining the polygon geometry object of the storage in a standard GIS well-known text.", "Type": "LCol", "Required": "1"},{"Name": "storagelocdt", "DataType": "timestamp", "Description": "DateTime of storage location", "Type": "LCol", "Required": "0"},{"Name": "currentloc", "DataType": "tinyint", "Description": "Flag to notify current location", "Type": "LCol", "Required": "0"},{"Name": "description", "DataType": "varchar", "Description": "Description for location", "Type": "LCol", "Required": "0"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing StorageId"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self        = shift;
+  my $storage_id  = $self->param('id');
+  my $query       = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  my $dbh_k_read = connect_kdb_read();
+  my $storage_exist = record_existence($dbh_k_read, 'storage', 'StorageId', $storage_id);
+  $dbh_k_read->disconnect();
+
+  if (!$storage_exist) {
+
+    my $err_msg = "Storage ($storage_id) not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $sub_PGIS_val_builder = sub {
+    return "ST_ForceCollection(ST_GeomFromText(?, -1))";
+  };
+
+  my ($err, $err_msg) = append_geography_loc(
+                                              "storage",
+                                              $storage_id,
+                                              'POINT',
+                                              $query,
+                                              $sub_PGIS_val_builder,
+                                              $self->logger,
+                                            );
+
+  if ($err) {
+    $data_for_postrun_href = $self->_set_error($err_msg);
+  } else {
+    my $info_msg_aref = [{'Message' => "Storage ($storage_id) location has been updated successfully."}];
+    $data_for_postrun_href->{'Error'}     = 0;
+    $data_for_postrun_href->{'Data'}      = {'Info' => $info_msg_aref};
+    $data_for_postrun_href->{'ExtraData'} = 0;
+  }
+
+  return $data_for_postrun_href;
 }
 
 

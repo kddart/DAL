@@ -52,6 +52,7 @@ sub setup {
                                            'del_organisation_gadmin',
                                            'update_contact_gadmin',
                                            'del_contact_gadmin',
+                                           'update_contact_geography',
       );
   __PACKAGE__->authen->count_session_request_runmodes(':all');
 
@@ -61,6 +62,7 @@ sub setup {
                                                 'del_organisation_gadmin',
                                                 'update_contact_gadmin',
                                                 'del_contact_gadmin',
+                                                'update_contact_geography',
       );
   __PACKAGE__->authen->check_gadmin_runmodes('update_organisation_gadmin',
                                              'add_contact_gadmin',
@@ -68,20 +70,22 @@ sub setup {
                                              'del_organisation_gadmin',
                                              'update_contact_gadmin',
                                              'del_contact_gadmin',
+                                             'update_contact_geography',
       );
 
   $self->run_modes(
-    'list_organisation_advanced'   => 'list_organisation_advanced_runmode',
-    'get_organisation'             => 'get_organisation_runmode',
-    'update_organisation_gadmin'   => 'update_organisation_runmode',
-    'add_contact_gadmin'           => 'add_contact_runmode',
-    'add_organisation_gadmin'      => 'add_organisation_runmode',
-    'del_organisation_gadmin'      => 'del_organisation_runmode',
-    'update_contact_gadmin'        => 'update_contact_runmode',
-    'del_contact_gadmin'           => 'del_contact_runmode',
-    'get_contact'                  => 'get_contact_runmode',
-    'list_contact_advanced'        => 'list_contact_advanced_runmode',
-      );
+    'list_organisation_advanced'  => 'list_organisation_advanced_runmode',
+    'get_organisation'            => 'get_organisation_runmode',
+    'update_organisation_gadmin'  => 'update_organisation_runmode',
+    'add_contact_gadmin'          => 'add_contact_runmode',
+    'add_organisation_gadmin'     => 'add_organisation_runmode',
+    'del_organisation_gadmin'     => 'del_organisation_runmode',
+    'update_contact_gadmin'       => 'update_contact_runmode',
+    'del_contact_gadmin'          => 'del_contact_runmode',
+    'get_contact'                 => 'get_contact_runmode',
+    'list_contact_advanced'       => 'list_contact_advanced_runmode',
+    'update_contact_geography'    => 'update_contact_geography_runmode',
+  );
 
   my $logger = get_logger();
   Log::Log4perl::MDC->put('client_ip', $ENV{'REMOTE_ADDR'});
@@ -874,8 +878,8 @@ sub list_contact_advanced_runmode {
 "GroupAdminRequired": 0,
 "SignatureRequired": 0,
 "AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "FILTERING"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Pagination Page='22' NumOfRecords='22' NumOfPages='22' NumPerPage='1' /><Contact ContactTelephone='02 6122 7300' ContactFirstName='Diversity' Longitude='' ContactMobile='' ContactAddress='Building 3, Level D, University of Canberra, Kirinari St. Bruce ACT 2617' ContactLastName='Arrays' ContactAcronym='' OrganisationId='1' Latitude='' contactlocation='' ContactId='1' OrganisationName='Diversity Arrays Technology Pty Ltd' ContactEMail='dart-it@diversityarrays.com' update='update/contact/1' /><RecordMeta TagName='Contact' /></DATA>",
-"SuccessMessageJSON": "{'Pagination' : [{'NumOfRecords' : '22','NumOfPages' : 22,'NumPerPage' : '1','Page' : '22'}],'Contact' : [{'Longitude' : null,'ContactFirstName' : 'Diversity','ContactTelephone' : '02 6122 7300','ContactMobile' : '','ContactAddress' : 'Building 3, Level D, University of Canberra, Kirinari St. Bruce ACT 2617','ContactLastName' : 'Arrays','ContactAcronym' : '','contactlocation' : null,'Latitude' : null,'OrganisationId' : '1','ContactId' : '1','update' : 'update/contact/1','ContactEMail' : 'dart-it@diversityarrays.com','OrganisationName' : 'Diversity Arrays Technology Pty Ltd'}],'VCol' : [],'RecordMeta' : [{'TagName' : 'Contact'}]}",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Pagination Page='22' NumOfRecords='22' NumOfPages='22' NumPerPage='1' /><Contact OrganisationId='41' ContactLastName='User-25644445488' Longitude='149.1057021617679' ContactFirstName='Testing' ContactId='41' ContactAcronym='TU' OrganisationName='DArT Testing 90760121344' contactlocdt='2023-04-11 05:19:51' update='update/contact/41' contactlocation='MULTIPOINT(149.1057021617679 -35.317184619919445)' Latitude='-35.317184619919445' ContactEMail='admin@kddart.example.com' ContactMobile='04 12345678' ContactAddress='1 Wilf Crane Crescent Yarralumla ACT 2600 Australia' ContactTelephone='+61261227335' contactlocdescription=''/></DATA>",
+"SuccessMessageJSON": "{'Pagination' : [{'NumOfRecords' : '22','NumOfPages' : 22,'NumPerPage' : '1','Page' : '22'}],'Contact' : [{ 'ContactFirstName' : 'Testing', 'ContactAcronym' : 'TU', 'ContactId' : 41, 'OrganisationId' : 41, 'ContactLastName' : 'User-25644445488', 'Longitude' : '149.1057021617679', 'ContactMobile' : '04 12345678', 'ContactAddress' : '1 Wilf Crane Crescent Yarralumla ACT 2600 Australia', 'ContactTelephone' : '+61261227335', 'contactlocdescription' : '', 'OrganisationName' : 'DArT Testing 90760121344', 'contactlocdt' : '2023-04-11 05:19:51', 'update' : 'update/contact/41', 'contactlocation' : 'MULTIPOINT(149.1057021617679 -35.317184619919445)', 'Latitude' : '-35.317184619919445', 'ContactEMail' : 'admin@kddart.example.com' }]}",
 "ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
 "ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
 "URLParameter": [{"ParameterName": "nperpage", "Description": "Number of records in a page for pagination"}, {"ParameterName": "num", "Description": "The page number of the pagination"}],
@@ -1011,7 +1015,11 @@ sub list_contact_advanced_runmode {
     for my $fd_name (@{$final_field_list}) {
 
       # need to remove location field because generate_factor_sql does not understand these field
-      if ( (!($fd_name =~ /Longitude/)) && (!($fd_name =~ /Latitude/)) && (!($fd_name =~ /contactlocation/)) ) {
+      if ( (!($fd_name =~ /Longitude/)) && 
+            (!($fd_name =~ /Latitude/)) && 
+            (!($fd_name =~ /contactlocation/)) && 
+            (!($fd_name =~ /contactlocdt/)) && 
+            (!($fd_name =~ /contactlocdescription/))) {
 
         push(@{$sql_field_list}, $fd_name);
       }
@@ -1022,7 +1030,11 @@ sub list_contact_advanced_runmode {
     for my $fd_name (@{$final_field_list}) {
 
       # need to remove location field because generate_factor_sql does not understand these field
-      if ( (!($fd_name =~ /Longitude/)) && (!($fd_name =~ /Latitude/)) && (!($fd_name =~ /contactlocation/)) ) {
+      if ( (!($fd_name =~ /Longitude/)) && 
+            (!($fd_name =~ /Latitude/)) && 
+            (!($fd_name =~ /contactlocation/)) && 
+            (!($fd_name =~ /contactlocdt/)) && 
+            (!($fd_name =~ /contactlocdescription/))) {
 
         push(@{$sql_field_list}, $fd_name);
       }
@@ -1313,9 +1325,9 @@ sub list_contact {
     if (scalar(keys(%{$field_list_loc_href})) > 0) {
 
       my $dbh_gis = connect_gis_read();
-      $sql  = 'SELECT contactid, ST_AsText(contactlocation) AS contactlocation ';
+      $sql  = 'SELECT contactid, contactlocdt, description, ST_AsText(contactlocation) AS contactlocation ';
       $sql .= 'FROM ContactLoc ';
-      $sql .= 'WHERE contactid IN (' . join(',', @{$contact_id_aref}) . ')';
+      $sql .= 'WHERE contactid IN (' . join(',', @{$contact_id_aref}) . ') AND currentloc = 1';
 
       my $sth_gis = $dbh_gis->prepare($sql);
       $sth_gis->execute();
@@ -1410,6 +1422,9 @@ sub list_contact {
       }
 
       #$self->logger->debug("Geocode: $longitute, $latitute");
+      $row->{'contactlocdt'} = $contact_gis->{$contact_id}->{'contactlocdt'};
+
+      $row->{'contactlocdescription'} = $contact_gis->{$contact_id}->{'description'};
 
       if ($extra_attr_yes && ($gadmin_status eq '1') ) {
 
@@ -1448,6 +1463,7 @@ sub add_contact_runmode {
 "SuccessMessageJSON": "{'ReturnId' : [{'Value' : '25','ParaName' : 'ContactId'}],'Info' : [{'Message' : 'Contact (25) has been added successfully.'}]}",
 "ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error OrganisationId='Organisation (25) does not exist.' /></DATA>"}],
 "ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'OrganisationId' : 'Organisation (25) does not exist.'}]}"}],
+"HTTPParameter": [{"Name": "contactlocation", "DataType": "polygon_wkt", "Description": "GIS field defining the polygon geometry object of the survey in a standard GIS well-known text.", "Type": "LCol", "Required": "0"},{"Name": "contactlocdt", "DataType": "timestamp", "Description": "DateTime of survey location", "Type": "LCol", "Required": "0"},{"Name": "currentloc", "DataType": "tinyint", "Description": "Flag to notify current location", "Type": "LCol", "Required": "0"},{"Name": "description", "DataType": "varchar", "Description": "Description for location", "Type": "LCol", "Required": "0"}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
@@ -1522,21 +1538,6 @@ sub add_contact_runmode {
     $contactlocation = $query->param('contactlocation');
   }
 
-  if (length($contactlocation) > 0) {
-
-    my $dbh_gis_read = connect_gis_read();
-    my ($is_wkt_err, $wkt_err_href) = is_valid_wkt_href($dbh_gis_read, {'contactlocation' => $contactlocation}, ['POINT', 'MULTIPOINT']);
-    $dbh_gis_read->disconnect();
-
-    if ($is_wkt_err) {
-
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [$wkt_err_href]};
-
-      return $data_for_postrun_href;
-    }
-  }
-
   $self->logger->debug("First name: $fname");
 
   my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength ";
@@ -1596,98 +1597,79 @@ sub add_contact_runmode {
     return $data_for_postrun_href;
   }
 
-  my $dbh_k_write = connect_kdb_write();
+  my $dbh_k_write = connect_kdb_write(1);
+  eval {
+    $sql  = 'INSERT INTO contact SET ';
+    $sql .= 'ContactLastName=?, ';
+    $sql .= 'ContactFirstName=?, ';
+    $sql .= 'ContactAcronym=?, ';
+    $sql .= 'ContactAddress=?, ';
+    $sql .= 'ContactTelephone=?, ';
+    $sql .= 'ContactMobile=?, ';
+    $sql .= 'ContactEMail=?, ';
+    $sql .= 'OrganisationId=?';
 
-  $sql  = 'INSERT INTO contact SET ';
-  $sql .= 'ContactLastName=?, ';
-  $sql .= 'ContactFirstName=?, ';
-  $sql .= 'ContactAcronym=?, ';
-  $sql .= 'ContactAddress=?, ';
-  $sql .= 'ContactTelephone=?, ';
-  $sql .= 'ContactMobile=?, ';
-  $sql .= 'ContactEMail=?, ';
-  $sql .= 'OrganisationId=?';
+    my $sth = $dbh_k_write->prepare($sql);
+    $sth->execute($lname, $fname, $acronym, $address, $telephone, $mobile, $email, $org_id);
+    my $contact_id = $dbh_k_write->last_insert_id(undef, undef, 'contact', 'ContactId');
+    $sth->finish();
 
-  my $sth = $dbh_k_write->prepare($sql);
-  $sth->execute($lname, $fname, $acronym, $address, $telephone, $mobile, $email, $org_id);
+    for my $vcol_id (keys(%{$vcol_data})) {
+      my $factor_value = $query->param('VCol_' . "$vcol_id");
+      if (length($factor_value) > 0) {
+        $sql  = 'INSERT INTO contactfactor SET ';
+        $sql .= 'ContactId=?, ';
+        $sql .= 'FactorId=?, ';
+        $sql .= 'FactorValue=?';
+        my $factor_sth = $dbh_k_write->prepare($sql);
+        $factor_sth->execute($contact_id, $vcol_id, $factor_value);
+        $factor_sth->finish();
+      }
+    }
 
-  my $contact_id = -1;
-  if (!$dbh_k_write->err()) {
+    if (length($contactlocation) > 0) {
+      my $sub_PGIS_val_builder = sub {
+        my $wkt = shift;
+        if ($wkt =~ /^POINT/i) {
+          return "ST_Multi(ST_GeomFromText(?, -1))";
+        } else {
+          return "ST_GeomFromText(?, -1)";
+        }
+      };
+      my ($err, $err_msg) = append_geography_loc(
+                                                  "contact",
+                                                  $contact_id,
+                                                  ['POINT','MULTIPOINT'],
+                                                  $query,
+                                                  $sub_PGIS_val_builder,
+                                                  $self->logger,
+                                                );
+      if ($err) {
+        eval {$dbh_k_write->rollback;};
+        $data_for_postrun_href = $self->_set_error($err_msg);
+        return 1;
+      }
+    }
 
-    $contact_id = $dbh_k_write->last_insert_id(undef, undef, 'contact', 'ContactId');
-    $self->logger->debug("ContactId: $contact_id");
-  }
-  else {
+    $dbh_k_write->commit;
 
+    my $info_msg_aref  = [{'Message' => "Contact ($contact_id) has been added successfully."}];
+    my $return_id_aref = [{'Value' => "$contact_id", 'ParaName' => 'ContactId'}];
+    $data_for_postrun_href->{'Error'}     = 0;
+    $data_for_postrun_href->{'Data'}      = {'Info'     => $info_msg_aref,
+                                            'ReturnId' => $return_id_aref,
+    };
+    $data_for_postrun_href->{'ExtraData'} = 0;
+
+    1;
+  } or do {
+    eval {$dbh_k_write->rollback;};
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
     return $data_for_postrun_href;
-  }
-  $sth->finish();
-
-  for my $vcol_id (keys(%{$vcol_data})) {
-
-    my $factor_value = $query->param('VCol_' . "$vcol_id");
-
-    if (length($factor_value) > 0) {
-
-      $sql  = 'INSERT INTO contactfactor SET ';
-      $sql .= 'ContactId=?, ';
-      $sql .= 'FactorId=?, ';
-      $sql .= 'FactorValue=?';
-      my $factor_sth = $dbh_k_write->prepare($sql);
-      $factor_sth->execute($contact_id, $vcol_id, $factor_value);
-
-      if ($dbh_k_write->err()) {
-
-        $data_for_postrun_href->{'Error'} = 1;
-        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-        return $data_for_postrun_href;
-      }
-
-      $factor_sth->finish();
-    }
-  }
-
-  $dbh_k_write->disconnect();
-
-  if (length($contactlocation) > 0) {
-
-    my $dbh_gis_write = connect_gis_write();
-
-    $sql  = "INSERT INTO contactloc (contactid, contactlocation, contactlocdt, currentloc) ";
-    $sql .= "VALUES (?, ST_Multi(ST_GeomFromText(?, -1)), ?, ?)";
-
-    $self->logger->debug("ContactId: $contact_id");
-
-    my $gis_sth = $dbh_gis_write->prepare($sql);
-    $gis_sth->execute($contact_id, $contactlocation, DateTime::Format::Pg->parse_datetime(DateTime->now()), 0);
-
-    if ($dbh_gis_write->err()) {
-
-      $self->logger->debug("SQL err: " . $dbh_gis_write->errstr());
-
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-      return $data_for_postrun_href;
-    }
-
-    $gis_sth->finish();
-    $dbh_gis_write->disconnect();
-  }
-
-  my $info_msg_aref  = [{'Message' => "Contact ($contact_id) has been added successfully."}];
-  my $return_id_aref = [{'Value' => "$contact_id", 'ParaName' => 'ContactId'}];
-
-  $data_for_postrun_href->{'Error'}     = 0;
-  $data_for_postrun_href->{'Data'}      = {'Info'     => $info_msg_aref,
-                                           'ReturnId' => $return_id_aref,
   };
-  $data_for_postrun_href->{'ExtraData'} = 0;
 
+  $dbh_k_write->disconnect;
   return $data_for_postrun_href;
 }
 
@@ -2477,8 +2459,8 @@ sub get_contact_runmode {
 "GroupAdminRequired": 0,
 "SignatureRequired": 0,
 "AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Contact ContactTelephone='02 6122 7300' ContactFirstName='Diversity' Longitude='' ContactMobile='' ContactAddress='Building 3, Level D, University of Canberra, Kirinari St. Bruce ACT 2617' ContactLastName='Arrays' ContactAcronym='' OrganisationId='1' Latitude='' contactlocation='' ContactId='1' OrganisationName='Diversity Arrays Technology Pty Ltd' ContactEMail='dart-it@diversityarrays.com' update='update/contact/1' /><RecordMeta TagName='Contact' /></DATA>",
-"SuccessMessageJSON": "{'Contact' : [{'Longitude' : null,'ContactFirstName' : 'Diversity','ContactTelephone' : '02 6122 7300','ContactMobile' : '','ContactAddress' : 'Building 3, Level D, University of Canberra, Kirinari St. Bruce ACT 2617','ContactLastName' : 'Arrays','ContactAcronym' : '','contactlocation' : null,'Latitude' : null,'OrganisationId' : '1','ContactId' : '1','update' : 'update/contact/1','ContactEMail' : 'dart-it@diversityarrays.com','OrganisationName' : 'Diversity Arrays Technology Pty Ltd'}],'VCol' : [],'RecordMeta' : [{'TagName' : 'Contact'}]}",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><<Contact OrganisationId='41' ContactLastName='User-25644445488' Longitude='149.1057021617679' ContactFirstName='Testing' ContactId='41' ContactAcronym='TU' OrganisationName='DArT Testing 90760121344' contactlocdt='2023-04-11 05:19:51' update='update/contact/41' contactlocation='MULTIPOINT(149.1057021617679 -35.317184619919445)' Latitude='-35.317184619919445' ContactEMail='admin@kddart.example.com' ContactMobile='04 12345678' ContactAddress='1 Wilf Crane Crescent Yarralumla ACT 2600 Australia' ContactTelephone='+61261227335' contactlocdescription=''/></DATA>",
+"SuccessMessageJSON": "{'Contact' : [{ 'ContactFirstName' : 'Testing', 'ContactAcronym' : 'TU', 'ContactId' : 41, 'OrganisationId' : 41, 'ContactLastName' : 'User-25644445488', 'Longitude' : '149.1057021617679', 'ContactMobile' : '04 12345678', 'ContactAddress' : '1 Wilf Crane Crescent Yarralumla ACT 2600 Australia', 'ContactTelephone' : '+61261227335', 'contactlocdescription' : '', 'OrganisationName' : 'DArT Testing 90760121344', 'contactlocdt' : '2023-04-11 05:19:51', 'update' : 'update/contact/41', 'contactlocation' : 'MULTIPOINT(149.1057021617679 -35.317184619919445)', 'Latitude' : '-35.317184619919445', 'ContactEMail' : 'admin@kddart.example.com' }],'VCol' : [],'RecordMeta' : [{'TagName' : 'Contact'}]}",
 "ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='ContactId (25): not found.' /></DATA>"}],
 "ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'ContactId (25): not found.'}]}"}],
 "URLParameter": [{"ParameterName": "id", "Description": "Existing ContactId"}],
@@ -2549,10 +2531,90 @@ sub get_contact_runmode {
   return $data_for_postrun_href;
 }
 
+sub update_contact_geography_runmode {
+
+=pod update_contact_geography_HELP_START
+{
+"OperationName": "Update contact location",
+"Description": "Update contact's geographical location.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='Contact (1) location has been updated successfully.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'Contact (1) location has been updated successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Contact (20) not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Contact (20) not found.'}]}"}],
+"HTTPParameter": [{"Name": "contactlocation", "DataType": "polygon_wkt", "Description": "GIS field defining the polygon geometry object of the contact in a standard GIS well-known text.", "Type": "LCol", "Required": "1"},{"Name": "contactlocdt", "DataType": "timestamp", "Description": "DateTime of contact location", "Type": "LCol", "Required": "0"},{"Name": "currentloc", "DataType": "tinyint", "Description": "Flag to notify current location", "Type": "LCol", "Required": "0"},{"Name": "description", "DataType": "varchar", "Description": "Description for location", "Type": "LCol", "Required": "0"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing ContactId"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self        = shift;
+  my $contact_id  = $self->param('id');
+  my $query       = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  my $dbh_k_read = connect_kdb_read();
+  my $contact_exist = record_existence($dbh_k_read, 'contact', 'ContactId', $contact_id);
+  $dbh_k_read->disconnect();
+
+  if (!$contact_exist) {
+
+    my $err_msg = "Contact ($contact_id) not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $sub_PGIS_val_builder = sub {
+    my $wkt = shift;
+    if ($wkt =~ /^POINT/i) {
+      return "ST_Multi(ST_GeomFromText(?, -1))";
+    } else {
+      return "ST_GeomFromText(?, -1)";
+    }
+  };
+
+  my ($err, $err_msg) = append_geography_loc(
+                                              "contact",
+                                              $contact_id,
+                                              ['POINT','MULTIPOINT'],
+                                              $query,
+                                              $sub_PGIS_val_builder,
+                                              $self->logger,
+                                            );
+
+  if ($err) {
+    $data_for_postrun_href = $self->_set_error($err_msg);
+  } else {
+    my $info_msg_aref = [{'Message' => "Contact ($contact_id) location has been updated successfully."}];
+    $data_for_postrun_href->{'Error'}     = 0;
+    $data_for_postrun_href->{'Data'}      = {'Info' => $info_msg_aref};
+    $data_for_postrun_href->{'ExtraData'} = 0;
+  }
+
+  return $data_for_postrun_href;
+}
+
+
 sub logger {
 
   my $self = shift;
   return $self->{logger};
+}
+
+sub _set_error {
+
+  my ( $self, $error_message ) = @_;
+  return {
+    'Error' => 1,
+    'Data'  => { 'Error' => [ { 'Message' => $error_message || 'Unexpected error.' } ] }
+  };
 }
 
 1;

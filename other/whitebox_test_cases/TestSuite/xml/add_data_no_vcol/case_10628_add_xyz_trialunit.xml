@@ -1,0 +1,27 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record_upload" Description="Add a trial unit" TargetURL="trial/:TrialId/add/trialunit" Type="BLOCKING" />
+  <Delete TargetURL="delete/trialunit/:TrialUnitId" />
+  <INPUT ParaName="TrialId" SrcValue="xml/add_data_no_vcol/case_00007_add_trial.xml" />
+  <INPUT ParaName="SampleSupplierId" Value="1" />
+  <INPUT ParaName="ReplicateNumber" Value="2" />
+  <INPUT ParaName="SampleEntryNumber" Value="3" />
+  <INPUT ParaName="TrialUnitBarcode" PrefixVal="BAR" Random="1" />
+  <INPUT ParaName="TrialUnitNote" Value="Trial unit part of automatic testing" />
+  <INPUT ParaName="SourceTrialUnitId" Value="0" />
+  <INPUT ParaName="TrialUnitY" Random="1" Size="4" />
+  <INPUT ParaName="TrialUnitX" Random="1" Size="4" />
+  <INPUT ParaName="trialunitspecimen" Process="1" SrcFile="xml/add_data_no_vcol/trialunit.xml" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Match Attr="ParaName" Tag="ReturnId" Value="TrialUnitId" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00007_add_trial.xml" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00114_add_specimen1.xml" Order="4" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00115_add_specimen2.xml" Order="5" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00116_add_specimen3.xml" Order="6" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00117_add_specimen4.xml" Order="7" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00119_add_treatment.xml" Force="1" Order="8" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_10629_add_x_dimension.xml" Order="9" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_10630_add_y_dimension.xml" Order="10" />
+</TestCase>

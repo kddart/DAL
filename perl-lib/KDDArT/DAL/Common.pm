@@ -43,6 +43,7 @@ use LWP::UserAgent;
 use HTTP::Request::Common qw(POST GET);
 use JSON::XS qw(decode_json);
 use DateTime::Format::Flexible;
+use DateTime::Format::Pg;
 
 
 our @ISA      = qw(Exporter);
@@ -54,7 +55,7 @@ our @EXPORT   = qw($DTD_PATH $RPOSTGRES_UP_FILE $GIS_BUFFER_DISTANCE
                    $DAL_VERSION $DAL_ABOUT $DAL_COPYRIGHT $NB_RECORD_BULK_INSERT
                    $UNIT_POSITION_SPLITTER $M2M_RELATION
                    $GENO_SPEC_ONE2ONE $GENO_SPEC_ONE2MANY $GENO_SPEC_MANY2MANY
-                   $GENOTYPE2SPECIMEN_CFG $MULTIMEDIA_STORAGE_PATH $ERR_INFO_AREF
+                   $GENOTYPE2SPECIMEN_CFG $MULTIMEDIA_STORAGE_PATH $EXTRACTDATAFILE_STORAGE_PATH $ERR_INFO_AREF
                    $CFG_FILE_PATH $DSN_KDB_READ $DSN_KDB_WRITE $DSN_MDB_READ
                    $DSN_MDB_WRITE $DSN_GIS_READ $DSN_GIS_WRITE $RMYSQL_UP_FILE
                    $MONETDB_UP_FILE $GENOTYPE2SPECIMEN_CFG $GENOTYPEFACTORFILTERING_CFG $OAUTH2_SITE
@@ -90,7 +91,7 @@ our @EXPORT   = qw($DTD_PATH $RPOSTGRES_UP_FILE $GIS_BUFFER_DISTANCE
                    filter_csv_aref parse_marker_sorting get_sorting_function check_static_field
                    get_next_value_for check_bool_href check_email_href check_value_href load_config read_cookies
                    record_existence_bulk get_solr_cores get_solr_fields get_solr_entities
-                   validate_trait_db_bulk get_filtering_parts minute_diff
+                   validate_trait_db_bulk get_filtering_parts minute_diff append_geography_loc
                  );
 
 our $COOKIE_DOMAIN            = {};
@@ -128,6 +129,8 @@ our $OAUTH2_SCOPE             = {};
 our $OAUTH2_ACCESS_TOKEN_URL  = {};
 
 our $MULTIMEDIA_STORAGE_PATH  = "FROM CFG_FILE";
+
+our $EXTRACTDATAFILE_STORAGE_PATH = "FROM CFG_FILE";
 
 our $DTD_PATH                 = "FROM CFG_FILE";
 
@@ -176,7 +179,7 @@ our $ACCEPT_HEADER_LOOKUP   = { 'application/json' => 'JSON',
 
 our $VALID_CTYPE            = {'xml' => 1, 'json' => 1, 'geojson' => 1};
 
-our $DAL_VERSION            = '2.7.1';
+our $DAL_VERSION            = '2.7.2';
 our $DAL_COPYRIGHT          = 'Copyright (c) 2023, Diversity Arrays Technology, All rights reserved.';
 our $DAL_ABOUT              = 'Data Access Layer';
 
@@ -3035,31 +3038,28 @@ sub is_within {
   my $wkt         = $_[4];
   my $id_val      = $_[5];
 
-  my $is_within = 0;
+  my $is_within = 1;
   my $err = 0;
 
-  if ( ! record_existence($dbh, $tname, $id_fname, $id_val) ) {
-
-    $is_within = 1;
-    return ($err, $is_within);
-  }
+  my $dt = $tname . "dt";
 
   my $sql = "SELECT ST_Within(ST_GeomFromText(?, 4326), CAST($geo_fname AS Geometry)) AS IsWithin ";
   $sql   .= "FROM $tname ";
-  $sql   .= "WHERE $id_fname=?";
+  $sql   .= "WHERE $id_fname=? AND currentloc = 1 ";
+  $sql   .= "ORDER BY $dt DESC";
 
   my $sth = $dbh->prepare($sql);
   $sth->execute($wkt, $id_val);
 
   if ($dbh->err()) {
-
     $err = 1;
-  }
-  else {
-
-    $sth->bind_col(1, \$is_within);
-    $sth->fetch();
-    $sth->finish();
+  } else {
+    my $row_aref = $sth->fetchrow_arrayref;
+    if ($dbh->err()) {
+      $err = 1;
+    } elsif (defined $row_aref) {
+      $is_within = $row_aref->[0];
+    }
   }
 
   return ($err, $is_within);
@@ -5203,6 +5203,11 @@ sub WKT2geoJSON {
 
   my $wkt = $_[0];
 
+  if ($wkt =~/^GEOMETRYCOLLECTION/) {
+    $wkt =~ s/GEOMETRYCOLLECTION\(//og;
+    $wkt =~ s/\)$//;
+  }
+
   my $geom = {};
   if ($wkt =~ /^POLYGON/) {
 
@@ -5235,16 +5240,6 @@ sub WKT2geoJSON {
 
     $geom->{type} = "MultiPoint";
     $wkt =~ s/MULTIPOINT//og;
-    $wkt =~ s/\)/\]/og;
-    $wkt =~ s/\(/\[/og;
-    $wkt =~ s/(-?\d+(?:\.\d+)?)\s(-?\d+(?:\.\d+)?)/ $1, $2/og;
-    $geom->{'coordinates'} = eval($wkt);
-  }
-  elsif ($wkt =~ /^GEOMETRYCOLLECTION\(POINT/) {
-
-    $geom->{type} = "Point";
-    $wkt =~ s/GEOMETRYCOLLECTION\(POINT//og;
-    $wkt =~ s/\)$//;
     $wkt =~ s/\)/\]/og;
     $wkt =~ s/\(/\[/og;
     $wkt =~ s/(-?\d+(?:\.\d+)?)\s(-?\d+(?:\.\d+)?)/ $1, $2/og;
@@ -5364,6 +5359,7 @@ sub samplemeasure_row2col {
 
       my $trait_val_field_name = '';
       my $date_field_name      = '';
+      my $survey_field_name      = '';
       my $hum_inst_num         = $inst_num;
 
       # this means that there is only one instance, because instance number start from 0
@@ -5371,11 +5367,13 @@ sub samplemeasure_row2col {
 
         $trait_val_field_name = $trait_name;
         $date_field_name      = "Date_${trait_name}";
+        $survey_field_name    = "Survey_${trait_name}";
       }
       else {
 
-        $trait_val_field_name = "${trait_name}__$hum_inst_num";;
+        $trait_val_field_name = "${trait_name}__$hum_inst_num";
         $date_field_name      = "Date_${trait_name}__$hum_inst_num";
+        $survey_field_name    = "Survey_${trait_name}__$hum_inst_num";
       }
 
       my $chk_inst_num_sql = 'SELECT samplemeasurement.TrialUnitId ';
@@ -5409,6 +5407,12 @@ sub samplemeasure_row2col {
 
       push(@sub_sql_list, $sub_sql);
       push(@{$field_order_aref}, $date_field_name);
+
+      $sub_sql    = qq| GROUP_CONCAT( IF(TraitId = $trait_id, IF(InstanceNumber = $inst_num, SurveyId, NULL) , NULL) SEPARATOR '' ) |;
+      $sub_sql   .= qq|AS \`${survey_field_name}\` |;
+
+      push(@sub_sql_list, $sub_sql);
+      push(@{$field_order_aref}, $survey_field_name);
     }
   }
 
@@ -7990,6 +7994,132 @@ sub minute_diff($) {
   return $dur_in_mn;
 }
 
+sub append_geography_loc {
+  my $entity                = $_[0];  # *, Entity name, either site, trial, trialunit, contact, specimen, survey, or storage.
+  my $entity_id             = $_[1];  # *, Id of the tuple in the table $entity.
+  my $geotypes              = $_[2];  # *, Acceptable geometry types represented as either a string or a ref to an array of strings, e.g. "Polygon", ["Line", "Polygon", "Multipoint"].
+  my $query                 = $_[3];  # *, Query object passed to the API handler.
+  my $sub_PGIS_val_builder  = $_[4];  # *, A ref to a subroutine that returns a string representing the VALUE of the geolocation that will be copied into the final INSERT statement.
+  my $logger                = $_[5];  # *, Logger object.
+  my $sub_WKT_validator     = $_[6];  #  , A ref to a subroutine that does extra checks on the geography location.
+                                      #    For examples, in update_trial_geography_runmode, this subroutine also checks if the trial's new location is within site's.
 
+  my ($missing_err, $missing_href) = check_missing_href({
+    "0"   => $entity,
+    "1"   => $entity_id,
+    "2"   => $geotypes,
+    "3"   => $query,
+    "4"   => $sub_PGIS_val_builder,
+    "5"   => $logger,
+  });
+
+  if ($missing_err) {
+    die 'Missing input(s)';
+  }
+  
+  if (ref \$geotypes eq "SCALAR") {
+    $geotypes = [$geotypes];
+  } elsif (ref $geotypes ne "ARRAY") {
+    die 'Acceptable geotypes should be either a string or an array of strings.';
+  }
+
+  if (ref $sub_PGIS_val_builder ne "CODE") {
+    die 'builder is not a reference to code.';
+  }
+
+  if (length $sub_WKT_validator && ref $sub_WKT_validator ne "CODE") {
+    die 'validator is not a reference to code.';
+  }
+
+  my $gis_write = connect_gis_write(1);
+  my $err = 1;
+  my $err_msg;
+  eval {
+    my $param_location        = $entity . "location";
+    my $param_location_date   = $entity . "locdt";
+    my $param_is_current_loc  = "currentloc";
+    my $param_location_desc   = "description";
+
+    # Check non-optional fields
+    my $wkt = $query->param($param_location);
+    ($missing_err, $missing_href) = check_missing_href({
+                                                        $param_location => $wkt,
+                                                      });
+    if ($missing_err) {
+      $err_msg = "$param_location is missing.";
+      return 1;
+    }
+
+    my ($is_wkt_err, $wkt_err_href) = is_valid_wkt_href(
+                                                        $gis_write,
+                                                        {$param_location => $wkt},
+                                                        $geotypes,
+                                                      );
+    if ($is_wkt_err) {
+      $err_msg = "$param_location is not a valid WKT string.";
+      return 1;
+    }
+
+    # Check validity of location's date
+    my $locdt = $query->param($param_location_date);
+    if (!length $locdt) {
+      $locdt = DateTime::Format::Pg->parse_datetime(DateTime->now());
+    } else {
+      my ($date_err, $date_href) = check_dt_href({$param_location_date => $locdt});
+      if ($date_err) {
+        $err_msg = "$param_location_date is not a standard datetime format.";
+        return 1;
+      }
+    }
+
+    # Check validity of whether the location is current
+    my $is_cur = $query->param($param_is_current_loc);
+    if (!length $is_cur) {
+      $is_cur = 1;
+    } elsif ($is_cur !~ /^\s*([01])\s*$/) {
+      $err_msg = "currentloc ($is_cur): can only be 0 or 1.";
+      return 1;
+    } else {
+      $is_cur = $1 + 0;
+    }
+
+    # Run more constriants checks provided by caller
+    if (length $sub_WKT_validator) {
+      my ($err_validate, $err_msg_validate) = $sub_WKT_validator->($gis_write, $entity, $entity_id, $wkt);
+      if ($err_validate) {
+        $err_msg = $err_msg_validate;
+        return 1;
+      }
+    }
+
+    my ($table, $field_id, $field_loc, $field_dt) = ($entity . "loc", $entity . "id", $entity . "location", $entity . "locdt");
+
+    if ($is_cur) {
+      my $sql = "UPDATE $table SET currentloc=0 WHERE $field_id=?";
+      my $sth = $gis_write->prepare($sql);
+      $sth->execute($entity_id);
+    }
+
+    my $pgis_value = $sub_PGIS_val_builder->($wkt);
+
+    my $sql = "INSERT INTO $table ($field_id, $field_loc, $field_dt, currentloc, description) VALUES (?, $pgis_value, ?, ?, ?)";
+    my $sth = $gis_write->prepare($sql);
+    $sth->execute($entity_id, $wkt, $locdt, $is_cur, $query->param('description') // "");
+
+    $gis_write->commit;
+
+    $err = 0;
+    $err_msg = "$entity ($entity_id) geography has been updated successfully.";
+
+    1;
+  } or do {
+    $logger->debug($@);
+    eval {$gis_write->rollback;};
+    $err_msg = "Unexpected error.";
+  };
+
+  $gis_write->disconnect;
+  return ($err, $err_msg);
+}
 
 1;

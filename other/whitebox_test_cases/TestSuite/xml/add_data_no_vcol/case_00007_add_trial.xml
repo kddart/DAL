@@ -26,6 +26,6 @@
   <Parent CaseFile="xml/add_data_no_vcol/case_00006_add_site.xml" Force="1" Order="3" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00339_add_trialtype.xml" Force="1" Order="4" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00118_add_designtype.xml" Force="1" Order="5" />
-  <Parent CaseFile="xml/add_data_no_vcol/case_00102_add_con.xml" Order="6" />
-  <Parent CaseFile="xml/add_data_no_vcol/case_00619_add_season.xml" Order="7" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00102_add_con.xml" Force="1" Order="6" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00619_add_season.xml" Force="1" Order="7" />
 </TestCase>

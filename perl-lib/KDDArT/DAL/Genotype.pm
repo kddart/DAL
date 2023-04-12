@@ -37,6 +37,7 @@ use Time::HiRes qw( tv_interval gettimeofday );
 use Digest::MD5 qw(md5 md5_hex md5_base64);
 use File::Lockfile;
 use Crypt::Random qw( makerandom );
+use Data::Dumper;
 
 sub setup {
 
@@ -88,6 +89,7 @@ sub setup {
                                            'import_genpedigree_csv',
                                            'update_genpedigree_gadmin',
                                            'del_genpedigree_gadmin',
+                                           'update_specimen_geography',
                                           );
 
   __PACKAGE__->authen->count_session_request_runmodes(':all');
@@ -124,6 +126,7 @@ sub setup {
                                                 'remove_specimen_keyword',
                                                 'update_genpedigree_gadmin',
                                                 'del_genpedigree_gadmin',
+                                                'update_specimen_geography',
                                                );
 
   __PACKAGE__->authen->check_gadmin_runmodes('add_genus_gadmin',
@@ -145,6 +148,7 @@ sub setup {
                                              'del_pedigree_gadmin',
                                              'update_genpedigree_gadmin',
                                              'del_genpedigree_gadmin',
+                                             'update_specimen_geography',
                                             );
 
   __PACKAGE__->authen->check_sign_upload_runmodes('add_specimen',
@@ -231,6 +235,7 @@ sub setup {
     'list_taxonomy'                             => 'list_taxonomy_runmode',
     'update_taxonomy'                           => 'update_taxonomy_runmode',
     'del_taxonomy_gadmin'                       => 'del_taxonomy_gadmin_runmode',
+    'update_specimen_geography'                 => 'update_specimen_geography_runmode',
     );
 
   my $logger = get_logger();
@@ -1171,6 +1176,7 @@ sub add_specimen_runmode {
 "UploadFileFormat": "XML",
 "UploadFileParameterName": "uploadfile",
 "DTDFileNameForUploadXML": "genotypespecimen.dtd",
+"HTTPParameter": [{"Name": "specimenlocation", "DataType": "polygon_wkt", "Description": "GIS field defining the polygon geometry object of the specimen in a standard GIS well-known text.", "Type": "LCol", "Required": "0"},{"Name": "specimenlocdt", "DataType": "timestamp", "Description": "DateTime of specimen location", "Type": "LCol", "Required": "0"},{"Name": "currentloc", "DataType": "tinyint", "Description": "Flag to notify current location", "Type": "LCol", "Required": "0"},{"Name": "description", "DataType": "varchar", "Description": "Description for location", "Type": "LCol", "Required": "0"}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
@@ -1650,6 +1656,23 @@ sub add_specimen_runmode {
     }
   }
 
+  if (length $query->param('specimenlocation')) {
+    my $sub_PGIS_val_builder = sub {
+      return "ST_ForceCollection(ST_GeomFromText(?, -1))";
+    };
+    my ($err, $err_msg) = append_geography_loc(
+                                                "specimen",
+                                                $specimen_id,
+                                                'POINT',
+                                                $query,
+                                                $sub_PGIS_val_builder,
+                                                $self->logger,
+                                              );
+    if ($err) {
+      return $self->_set_error($err_msg);
+    }
+  }
+
   for my $geno_info (@{$geno_info_aref}) {
 
     my $geno_id = $geno_info->{'GenotypeId'};
@@ -2045,6 +2068,55 @@ sub list_specimen {
     push(@extra_attr_specimen_data, $specimen_row);
   }
 
+  if (scalar(@extra_attr_specimen_data)) {
+    my $gis_read = connect_gis_read();
+    
+    my $specimen_ids = [];
+
+    foreach my $specimen_href (@extra_attr_specimen_data) {
+        push(@$specimen_ids, $specimen_href->{SpecimenId});
+    }
+
+    my $gis_where = "WHERE specimenid IN (" . join(',', @$specimen_ids) . ") AND currentloc = 1";
+
+    my $specimen_loc = 'SELECT specimenid, specimenlocdt, description, ST_AsText(specimenlocation) AS specimenlocation ';
+    $specimen_loc .= 'FROM specimenloc ';
+    $specimen_loc .= $gis_where;
+
+    $self->logger->debug("specimenloc sql: $specimen_loc");
+
+    my $sth_gis = $gis_read->prepare($specimen_loc);
+    $sth_gis->execute();
+
+    if ($gis_read->err()) {
+      $err = 1;
+      $msg = 'Unexpected error';
+      $self->logger->debug('Err: ' . $gis_read->errstr());
+    } else {
+      my $gis_href = $sth_gis->fetchall_hashref('specimenid');
+      if ($sth_gis->err()) {
+        $err = 1;
+        $msg = 'Unexpected error';
+        $self->logger->debug('Err: ' . $gis_read->errstr());
+      } else {
+        foreach my $specimen_href (@extra_attr_specimen_data) {
+          my $specimen_id = $specimen_href->{SpecimenId};
+          if (exists $gis_href->{$specimen_id}) {
+            $specimen_href->{specimenlocdt} = $gis_href->{$specimen_id}->{specimenlocdt};
+            $specimen_href->{specimenlocdescription} = $gis_href->{$specimen_id}->{description};
+            $specimen_href->{specimenlocation} = $gis_href->{$specimen_id}->{specimenlocation};
+          } else {
+            $specimen_href->{specimenlocdt} = undef;
+            $specimen_href->{specimenlocdescription} = undef;
+            $specimen_href->{specimenlocation} = undef;
+          }
+        }
+      }
+    }
+
+    $gis_read->disconnect();
+  }
+
   $dbh->disconnect();
 
   # max_nb_genotype is used by the export specimen runmode so that it knows how many genotype columns to create
@@ -2064,8 +2136,8 @@ sub list_specimen_advanced_runmode {
 "GroupAdminRequired": 0,
 "SignatureRequired": 0,
 "AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "FILTERING"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Pagination NumOfRecords='6411788' NumOfPages='3205894' Page='1' NumPerPage='2' /><Specimen Pedigree='Unknown' SpecimenName='Import_specimen2_9039730' BreedingMethodName='BreedMethod_9461929' BreedingMethodId='61' SpecimenBarcode='SPEC5004923' FilialGeneration='0' IsActive='1' SelectionHistory='Unknown' delete='delete/specimen/7247271' addGenotype='specimen/7247271/add/genotype' update='update/specimen/7247271' SpecimenId='7247271'><Genotype removeGenotype='specimen/7247271/remove/genotype/7247924' GenotypeName='Geno_9981601' GenotypeId='7247924' GenusName='Wheat' GenusId='1' /></Specimen><Specimen Pedigree='Unknown' SpecimenName='Import_specimen1_9039730' BreedingMethodName='BreedMethod_9461929' BreedingMethodId='61' SpecimenBarcode='SPEC5465477' FilialGeneration='0' IsActive='1' SelectionHistory='Unknown' delete='delete/specimen/7247270' addGenotype='specimen/7247270/add/genotype' update='update/specimen/7247270' SpecimenId='7247270'><Genotype removeGenotype='specimen/7247270/remove/genotype/7247923' GenotypeName='Geno_0912290' GenotypeId='7247923' /></Specimen><RecordMeta TagName='Specimen' /></DATA>",
-"SuccessMessageJSON": "{ 'Pagination' : [{ 'NumOfRecords' : '6411788', 'NumOfPages' : 3205894, 'NumPerPage' : '2', 'Page' : '1'} ], 'Specimen' : [{ 'SpecimenName' : 'Import_specimen2_9039730', 'Pedigree' : 'Unknown', 'BreedingMethodName' : 'BreedMethod_9461929', 'BreedingMethodId' : '61', 'SpecimenBarcode' : 'SPEC5004923', 'IsActive' : '1', 'FilialGeneration' : '0', 'SelectionHistory' : 'Unknown', 'delete' : 'delete/specimen/7247271', 'Genotype' : [{ 'removeGenotype' : 'specimen/7247271/remove/genotype/7247924', 'GenotypeId' : '7247924', 'GenotypeName' : 'Geno_9981601', 'GenusId': 1, 'GenusName': 'Wheat'} ], 'addGenotype' : 'specimen/7247271/add/genotype', 'update' : 'update/specimen/7247271', 'SpecimenId' : '7247271'},{ 'SpecimenName' : 'Import_specimen1_9039730', 'Pedigree' : 'Unknown', 'BreedingMethodName' : 'BreedMethod_9461929', 'BreedingMethodId' : '61', 'SpecimenBarcode' : 'SPEC5465477', 'IsActive' : '1', 'FilialGeneration' : '0', 'SelectionHistory' : 'Unknown', 'delete' : 'delete/specimen/7247270', 'Genotype' : [{ 'removeGenotype' : 'specimen/7247270/remove/genotype/7247923', 'GenotypeId' : '7247923', 'GenotypeName' : 'Geno_0912290'} ], 'addGenotype' : 'specimen/7247270/add/genotype', 'update' : 'update/specimen/7247270', 'SpecimenId' : '7247270'} ], 'VCol' : [], 'RecordMeta' : [{ 'TagName' : 'Specimen'} ]}",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><StatInfo Unit='second' ServerElapsedTime='0.183'/><Pagination Page='1' NumOfPages='1' NumOfRecords='1' NumPerPage='50'/><Specimen SelectionHistory='Unknown' OwnGroupPerm='7' OtherPerm='0' Pedigree='Unknown' specimenlocdescription='' SpecimenName='Import_specimen2_22172874723' SourceCrossingId='' AccessGroupId='0' addGenotype='specimen/73/add/genotype' FilialGeneration='0' SpecimenBarcode='SPEC71235436161' OwnGroupId='0' SpecimenId='73' SpecimenNote='' AccessGroupPerm='5' BreedingMethodName='Updated BreedMethod_85131944473' update='update/specimen/73' IsActive='1' specimenlocation='GEOMETRYCOLLECTION(POINT(179.1057021617679 -38.317184619919445))' delete='delete/specimen/73' BreedingMethodId='7' specimenlocdt='2023-04-11 01:18:14'><Genotype removeGenotype='specimen/73/remove/genotype/580' GenusName='Genus_55261373609' GenotypeName='Geno_76016027367' GenotypeSpecimenType='' GenusId='4' GenotypeId='580'/><Genotype GenotypeSpecimenType='' GenotypeId='348' GenusId='4' GenotypeName='Geno_09720376369' GenusName='Genus_55261373609' removeGenotype='specimen/73/remove/genotype/348'/></Specimen><RecordMeta TagName='Specimen'/></DATA>",
+"SuccessMessageJSON": "{'Specimen':[{'AccessGroupId':0,'SpecimenNote':'','AccessGroupPerm':5,'delete':'delete/specimen/73','OtherPerm':0,'IsActive':1,'OwnGroupPerm':7,'specimenlocation':'GEOMETRYCOLLECTION(POINT(179.1057021617679-38.317184619919445))','specimenlocdescription':'','Pedigree':'Unknown','specimenlocdt':'2023-04-1101:18:14','BreedingMethodId':'7','SpecimenBarcode':'SPEC71235436161','Genotype':[{'removeGenotype':'specimen/73/remove/genotype/580','GenusName':'Genus_55261373609','GenotypeName':'Geno_76016027367','GenusId':4,'GenotypeSpecimenType':null,'GenotypeId':580},{'GenusName':'Genus_55261373609','removeGenotype':'specimen/73/remove/genotype/348','GenotypeSpecimenType':null,'GenotypeId':348,'GenusId':4,'GenotypeName':'Geno_09720376369'}],'SourceCrossingId':null,'addGenotype':'specimen/73/add/genotype','FilialGeneration':0,'SpecimenId':73,'update':'update/specimen/73','OwnGroupId':0,'SpecimenName':'Import_specimen2_22172874723','SelectionHistory':'Unknown','BreedingMethodName':'UpdatedBreedMethod_85131944473'}],'Pagination':[{'NumPerPage':'50','Page':'1','NumOfPages':1,'NumOfRecords':1}],'VCol':[],'RecordMeta':[{'TagName':'Specimen'}]}",
 "ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
 "ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
 "URLParameter": [{"ParameterName": "nperpage", "Description": "Number of records in a page for pagination"}, {"ParameterName": "num", "Description": "The page number of the pagination"}],
@@ -2214,6 +2286,8 @@ sub list_specimen_advanced_runmode {
 
   my $final_field_list = \@field_list_all;
 
+  my $sql_field_list   = [];
+
   if (length($field_list_csv) > 0) {
 
     my ($sel_field_err, $sel_field_msg, $sel_field_list) = parse_selected_field($field_list_csv,
@@ -2229,6 +2303,25 @@ sub list_specimen_advanced_runmode {
     }
 
     $final_field_list = $sel_field_list;
+
+    for my $fd_name (@{$final_field_list}) {
+
+      # need to remove location field because generate_factor_sql does not understand these field
+      if ( (!($fd_name =~ /specimenlocation/)) && (!($fd_name =~ /specimenlocdt/)) && (!($fd_name =~ /specimenlocdescription/))) {
+        
+        push(@{$sql_field_list}, $fd_name);
+      }
+    }
+
+  } else {
+    for my $fd_name (@{$final_field_list}) {
+
+      # need to remove location field because generate_factor_sql does not understand these field
+      if ( (!($fd_name =~ /specimenlocation/)) && (!($fd_name =~ /specimenlocdt/)) && (!($fd_name =~ /specimenlocdescription/))) {
+        
+        push(@{$sql_field_list}, $fd_name);
+      }
+    }
   }
 
   my $group_id = $self->authen->group_id();
@@ -2238,7 +2331,7 @@ sub list_specimen_advanced_runmode {
   my $other_join = ' ';
 
   #change back to generate_factor_sql for normal use
-  ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_sql_v3($dbh, $final_field_list, 'specimen',
+  ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_sql_v3($dbh, $sql_field_list, 'specimen',
                                                                      'SpecimenId', $other_join);
 
   #change this back to if ($vcol_err) { if you want normal use
@@ -2414,8 +2507,8 @@ sub get_specimen_runmode {
 "GroupAdminRequired": 0,
 "SignatureRequired": 0,
 "AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Specimen Pedigree='Unknown' SpecimenName='Import_specimen2_9039730' BreedingMethodName='BreedMethod_9461929' BreedingMethodId='61' SpecimenBarcode='SPEC5004923' FilialGeneration='0' IsActive='1' SelectionHistory='Unknown' delete='delete/specimen/7247271' addGenotype='specimen/7247271/add/genotype' update='update/specimen/7247271' SpecimenId='7247271'><Genotype removeGenotype='specimen/7247271/remove/genotype/7247924' GenotypeName='Geno_9981601' GenotypeId='7247924' /></Specimen><RecordMeta TagName='Specimen' /></DATA>",
-"SuccessMessageJSON": "{ 'Specimen' : [{ 'SpecimenName' : 'Import_specimen2_9039730', 'Pedigree' : 'Unknown', 'BreedingMethodName' : 'BreedMethod_9461929', 'BreedingMethodId' : '61', 'SpecimenBarcode' : 'SPEC5004923', 'IsActive' : '1', 'FilialGeneration' : '0', 'SelectionHistory' : 'Unknown', 'delete' : 'delete/specimen/7247271', 'Genotype' : [{ 'removeGenotype' : 'specimen/7247271/remove/genotype/7247924', 'GenotypeId' : '7247924', 'GenotypeName' : 'Geno_9981601'} ], 'addGenotype' : 'specimen/7247271/add/genotype', 'update' : 'update/specimen/7247271', 'SpecimenId' : '7247271'} ], 'VCol' : [], 'RecordMeta' : [{ 'TagName' : 'Specimen'} ]}",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Specimen SelectionHistory='Unknown' OwnGroupPerm='7' OtherPerm='0' Pedigree='Unknown' specimenlocdescription='' SpecimenName='Import_specimen2_22172874723' SourceCrossingId='' AccessGroupId='0' addGenotype='specimen/73/add/genotype' FilialGeneration='0' SpecimenBarcode='SPEC71235436161' OwnGroupId='0' SpecimenId='73' SpecimenNote='' AccessGroupPerm='5' BreedingMethodName='Updated BreedMethod_85131944473' update='update/specimen/73' IsActive='1' specimenlocation='GEOMETRYCOLLECTION(POINT(179.1057021617679 -38.317184619919445))' delete='delete/specimen/73' BreedingMethodId='7' specimenlocdt='2023-04-11 01:18:14'><Genotype removeGenotype='specimen/73/remove/genotype/580' GenusName='Genus_55261373609' GenotypeName='Geno_76016027367' GenotypeSpecimenType='' GenusId='4' GenotypeId='580'/><Genotype GenotypeSpecimenType='' GenotypeId='348' GenusId='4' GenotypeName='Geno_09720376369' GenusName='Genus_55261373609' removeGenotype='specimen/73/remove/genotype/348'/></Specimen><RecordMeta TagName='Specimen'/></DATA>",
+"SuccessMessageJSON": "{ 'Specimen' : [{'AccessGroupId':0,'SpecimenNote':'','AccessGroupPerm':5,'delete':'delete/specimen/73','OtherPerm':0,'IsActive':1,'OwnGroupPerm':7,'specimenlocation':'GEOMETRYCOLLECTION(POINT(179.1057021617679-38.317184619919445))','specimenlocdescription':'','Pedigree':'Unknown','specimenlocdt':'2023-04-1101:18:14','BreedingMethodId':'7','SpecimenBarcode':'SPEC71235436161','Genotype':[{'removeGenotype':'specimen/73/remove/genotype/580','GenusName':'Genus_55261373609','GenotypeName':'Geno_76016027367','GenusId':4,'GenotypeSpecimenType':null,'GenotypeId':580}] } ], 'VCol' : [], 'RecordMeta' : [{ 'TagName' : 'Specimen'} ]}",
 "ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Specimen (123) not found.' /></DATA>"}],
 "ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Specimen (123) not found.' }]}"}],
 "URLParameter": [{"ParameterName": "id", "Description": "Existing SpecimenId"}],
@@ -8004,6 +8097,17 @@ sub del_specimen_runmode {
 
   $sth->finish();
 
+  my $dbh_gis_write = connect_gis_write();
+  $sql = 'DELETE FROM specimenloc WHERE specimenid=?';
+  $sth = $dbh_gis_write->prepare($sql);
+  $sth->execute($specimen_id);
+  if ($dbh_gis_write->err()) {
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+    return $data_for_postrun_href;
+  }
+  $dbh_gis_write->disconnect();
+
   $sql = 'DELETE FROM specimen WHERE SpecimenId=?';
   $sth = $dbh_k_write->prepare($sql);
 
@@ -9427,6 +9531,35 @@ sub import_specimen_csv_runmode {
     $matched_col->{$sourceCrossing_col} = 'SourceCrossingId';
   }
 
+  my $geograph_provided = 0;
+
+  if (defined $query->param('specimenlocation')) {
+    
+    my $specimenLocation_col = $query->param('specimenlocation');
+    $chk_col_def_data->{'specimenlocation'} = $specimenLocation_col;
+    $matched_col->{$specimenLocation_col} = 'specimenlocation';
+
+    if (defined $query->param('specimenlocdt')) {
+        my $locdt_col = $query->param('specimenlocdt');
+        $chk_col_def_data->{'specimenlocdt'} = $locdt_col;
+        $matched_col->{$locdt_col} = 'specimenlocdt';
+    }
+
+    if (defined $query->param('currentloc')) {
+        my $iscur_col = $query->param('currentloc');
+        $chk_col_def_data->{'currentloc'} = $iscur_col;
+        $matched_col->{$iscur_col} = 'currentloc';
+    }
+
+    if (defined $query->param('description')) {
+        my $des_col = $query->param('description');
+        $chk_col_def_data->{'description'} = $des_col;
+        $matched_col->{$des_col} = 'description';
+    }
+
+    $geograph_provided = 1;
+  }
+
   my $geno_i = 1;
   my $geno_break_flag = 0;
 
@@ -9554,6 +9687,8 @@ sub import_specimen_csv_runmode {
   my $inherit_perm_info_lookup = {};
 
   my $inner_loop_max_j = 0;
+
+  my $gis_read = connect_gis_read();
 
   while( $i < $num_of_rows ) {
 
@@ -9752,6 +9887,34 @@ sub import_specimen_csv_runmode {
 
       $specimen_name = $dbh_write->quote(trim($specimen_name));
       $specimen_name_where .= "$specimen_name,";
+
+      if ($geograph_provided) {
+        my $location = $data_row->{'specimenlocation'};
+        if (length $location) {
+            my ($is_wkt_err, $wkt_err_href) = is_valid_wkt_href($gis_read, {"specimenlocation" => $location}, ['POINT']);
+            if ($is_wkt_err) {
+                return $self->_set_error("Row ($row_counter): invalid specimenlocation.");
+            }
+            $data_row->{'specimenlocation'} = "ST_ForceCollection(ST_GeomFromText('$location', -1))";
+            my $locdt = $data_row->{'specimenlocdt'};
+            if (!length $locdt) {
+              $data_row->{'specimenlocdt'} = DateTime::Format::Pg->parse_datetime(DateTime->now());
+            } else {
+              my ($date_err, $date_href) = check_dt_href({"specimenlocdt" => $locdt});
+              if ($date_err) {
+                  return $self->_set_error("Row ($row_counter): invalid specimenlocdt.");
+              }
+            }
+            my $currentloc = $data_row->{'currentloc'};
+            if (!length $currentloc) {
+              $data_row->{'currentloc'} = 1;
+            } elsif ($currentloc !~ /^\s*([01])\s*$/) {
+              return $self->_set_error("Row ($row_counter): currentloc can only be 0 or 1.");
+            } else {
+              $data_row->{'currentloc'} = $1 + 0;
+            }
+        }
+      }
 
       $j += 1;
       $row_counter += 1;
@@ -9952,6 +10115,8 @@ sub import_specimen_csv_runmode {
     #$self->logger->debug("I: $i");
   }
 
+  $gis_read->disconnect;
+
   if (scalar(keys(%{$unique_bmeth_id_href}))) {
 
     my $check_bmeth_sql = 'SELECT BreedingMethodId FROM breedingmethod ';
@@ -10130,6 +10295,55 @@ sub import_specimen_csv_runmode {
     $sth->execute();
     my $spec_name2id_href = $sth->fetchall_hashref('SpecimenName');
     $sth->finish();
+
+    if ($geograph_provided) {
+        my $insert_geo_bulk_sql = 'INSERT INTO specimenloc ';
+        $insert_geo_bulk_sql .= '(specimenid, specimenlocation, specimenlocdt, currentloc, description) ';
+        $insert_geo_bulk_sql .= 'VALUES ';
+
+        my $specimenloc_values = [];
+        my $specimen_id_where = [];
+
+        for ($j = $i; $j < $smallest_num; $j++) {
+            my $data_row = $data_aref->[$j];
+            my $specimen_name = $data_row->{'SpecimenName'};
+            my $specimen_id   = $spec_name2id_href->{$specimen_name}->{'SpecimenId'};
+            my $location = $data_row->{'specimenlocation'};
+            if (length $location) {
+                my $lodct = $data_row->{'specimenlocdt'};
+                my $is_cur = $data_row->{'currentloc'};
+                if ($is_cur) { push(@$specimen_id_where, $specimen_id); }
+                my $description = $data_row->{'description'} // "";
+                push(@$specimenloc_values, qq|('$specimen_id', $location, '$lodct', '$is_cur', '$description')|);
+            }
+        }
+
+        if (scalar @$specimenloc_values) {
+          my $gis_write = connect_gis_write(1);
+          my $err = 0;
+          eval {
+              if (scalar @$specimen_id_where) {
+                  my $unset_cur_bulk_sql = "UPDATE specimenloc SET currentloc=0 WHERE specimenid IN (";
+                  $unset_cur_bulk_sql .= join(",", @$specimen_id_where);
+                  $unset_cur_bulk_sql .= ")";
+                  $self->logger->debug("Update GIS query: $unset_cur_bulk_sql");
+                  my $sth = $gis_write->prepare($unset_cur_bulk_sql);
+                  $sth->execute();
+              }
+              $insert_geo_bulk_sql .= join(',', @$specimenloc_values);
+              $self->logger->debug("GIS query: $insert_geo_bulk_sql");
+              my $sth = $gis_write->prepare($insert_geo_bulk_sql);
+              $sth->execute();
+              $gis_write->commit;
+              1;
+          } or do {
+              $err = 1;
+              eval {$gis_write->rollback;};
+          };
+          if ($err) { return $self->_set_error(); }
+          $gis_write->disconnect;
+        }
+    }
 
     my $insert_geno_spec_bulk_sql = 'INSERT INTO genotypespecimen ';
     $insert_geno_spec_bulk_sql   .= '(SpecimenId,GenotypeId,InheritanceFlag) ';
@@ -11843,6 +12057,8 @@ sub export_specimen_runmode {
 
   my @field_list_all = keys(%{$sample_specimen_aref->[0]});
 
+  my $sql_field_list = [];
+
   #no field return, it means no record. error prevention
   if (scalar(@field_list_all) == 0) {
 
@@ -11866,11 +12082,29 @@ sub export_specimen_runmode {
     }
 
     $final_field_list = $sel_field_list;
+
+    for my $fd_name (@{$final_field_list}) {
+
+      # need to remove location field because generate_factor_sql does not understand these field
+      if ( (!($fd_name =~ /specimenlocation/)) && (!($fd_name =~ /specimenlocdt/)) && (!($fd_name =~ /specimenlocdescription/))) {
+        
+        push(@{$sql_field_list}, $fd_name);
+      }
+    }
+  } else {
+    for my $fd_name (@{$final_field_list}) {
+
+      # need to remove location field because generate_factor_sql does not understand these field
+      if ( (!($fd_name =~ /specimenlocation/)) && (!($fd_name =~ /specimenlocdt/)) && (!($fd_name =~ /specimenlocdescription/))) {
+        
+        push(@{$sql_field_list}, $fd_name);
+      }
+    }
   }
 
   my $other_join = '';
 
-  ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_sql($dbh, $final_field_list, 'specimen',
+  ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_sql($dbh, $sql_field_list, 'specimen',
                                                                      'SpecimenId', $other_join);
   $dbh->disconnect();
 
@@ -16387,6 +16621,71 @@ sub logger {
 
   my $self = shift;
   return $self->{logger};
+}
+
+sub update_specimen_geography_runmode {
+
+=pod update_specimen_geography_HELP_START
+{
+"OperationName": "Update specimen location",
+"Description": "Update specimen's geographical location.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='Specimen (1) location has been updated successfully.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'Specimen (1) location has been updated successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Specimen (20) not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Specimen (20) not found.'}]}"}],
+"HTTPParameter": [{"Name": "specimenlocation", "DataType": "polygon_wkt", "Description": "GIS field defining the polygon geometry object of the specimen in a standard GIS well-known text.", "Type": "LCol", "Required": "1"},{"Name": "specimenlocdt", "DataType": "timestamp", "Description": "DateTime of specimen location", "Type": "LCol", "Required": "0"},{"Name": "currentloc", "DataType": "tinyint", "Description": "Flag to notify current location", "Type": "LCol", "Required": "0"},{"Name": "description", "DataType": "varchar", "Description": "Description for location", "Type": "LCol", "Required": "0"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing SpecimenId"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self        = shift;
+  my $specimen_id = $self->param('id');
+  my $query       = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  my $dbh_k_read = connect_kdb_read();
+  my $specimen_exist = record_existence($dbh_k_read, 'specimen', 'SpecimenId', $specimen_id);
+  $dbh_k_read->disconnect();
+
+  if (!$specimen_exist) {
+
+    my $err_msg = "Specimen ($specimen_id) not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $sub_PGIS_val_builder = sub {
+    return "ST_ForceCollection(ST_GeomFromText(?, -1))";
+  };
+
+  my ($err, $err_msg) = append_geography_loc(
+                                              "specimen",
+                                              $specimen_id,
+                                              'POINT',
+                                              $query,
+                                              $sub_PGIS_val_builder,
+                                              $self->logger,
+                                            );
+
+  if ($err) {
+    $data_for_postrun_href = $self->_set_error($err_msg);
+  } else {
+    my $info_msg_aref = [{'Message' => "Specimen ($specimen_id) location has been updated successfully."}];
+    $data_for_postrun_href->{'Error'}     = 0;
+    $data_for_postrun_href->{'Data'}      = {'Info' => $info_msg_aref};
+    $data_for_postrun_href->{'ExtraData'} = 0;
+  }
+
+  return $data_for_postrun_href;
 }
 
 sub _set_error {

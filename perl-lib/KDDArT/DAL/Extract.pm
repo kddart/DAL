@@ -35,6 +35,8 @@ use Log::Log4perl qw(get_logger :levels);
 use XML::Checker::Parser;
 use Time::HiRes qw( tv_interval gettimeofday );
 use Crypt::Random qw( makerandom );
+use Digest::MD5 qw(md5 md5_hex md5_base64);
+use JSON::XS qw(decode_json);
 
 
 sub setup {
@@ -58,6 +60,8 @@ sub setup {
                                            'add_extract_analgroup',
                                            'import_plate_n_extract_gadmin',
                                            'del_analysisgroup_gadmin',
+                                           'add_extractdata',
+                                           'add_extractdata_file'
       );
   __PACKAGE__->authen->count_session_request_runmodes(':all');
 
@@ -85,6 +89,7 @@ sub setup {
                                                   'add_plate_n_extract_gadmin',
                                                   'add_plate_gadmin',
                                                   'import_plate_n_extract_gadmin',
+                                                  'add_extractdata_file'
       );
 
   $self->run_modes(
@@ -106,7 +111,14 @@ sub setup {
     'list_dataset'                  => 'list_dataset_runmode',
     'import_plate_n_extract_gadmin' => 'import_plate_n_extract_runmode',
     'del_analysisgroup_gadmin'      => 'del_analysisgroup_runmode',
-    'add_extract_analgroup'         => 'add_extract_analgroup_runmode'
+    'add_extract_analgroup'         => 'add_extract_analgroup_runmode',
+    'add_extractdata'               => 'add_extractdata_runmode',
+    'list_extractdata'              => 'list_extractdata_runmode',
+    'get_extractdata'               => 'get_extractdata_runmode',
+    'update_extractdata'            => 'update_extractdata_runmode',
+    'delete_extractdata'            => 'delete_extractdata_runmode',
+    'add_extractdata_file'          => 'add_extractdata_file_runmode',
+    'list_extractdata_file'         => 'list_extractdata_file_runmode'
       );
 
   my $logger = get_logger();
@@ -1560,7 +1572,7 @@ sub list_extract_advanced_runmode {
 
     if (!record_existence($dbh_m, 'analysisgroup', 'AnalysisGroupId', $anal_id)) {
 
-      my $err_msg = "AnalsysiGroup ($anal_id): not found.";
+      my $err_msg = "AnalsysisGroup ($anal_id): not found.";
 
       $data_for_postrun_href->{'Error'} = 1;
       $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
@@ -1574,7 +1586,7 @@ sub list_extract_advanced_runmode {
 
     if (!$is_anal_grp_ok) {
 
-      my $err_msg = "AnalsysiGroup ($anal_id): permission denied.";
+      my $err_msg = "AnalsysisGroup ($anal_id): permission denied.";
       $self->logger->debug($err_msg);
 
       $data_for_postrun_href->{'Error'} = 1;
@@ -1604,7 +1616,7 @@ sub list_extract_advanced_runmode {
 
     if (!$is_anal_grp_ok) {
 
-      my $err_msg = "AnalsysiGroup ($db_anal_id) for DataSet ($dataset_id): permission denied.";
+      my $err_msg = "AnalsysisGroup ($db_anal_id) for DataSet ($dataset_id): permission denied.";
       $self->logger->debug($err_msg);
 
       $data_for_postrun_href->{'Error'} = 1;
@@ -3863,6 +3875,24 @@ sub add_analysisgroup_runmode {
   my $AccessGroupPerm           = $query->param('AccessGroupPerm');
   my $OtherPerm                 = $query->param('OtherPerm');
 
+  my $cur_dt = DateTime->now( time_zone => $TIMEZONE );
+  $cur_dt = DateTime::Format::MySQL->format_datetime($cur_dt);
+
+  my $DateCreated = $cur_dt;
+
+  if (defined($query->param('DateCreated'))) {
+
+    $DateCreated = $query->param('DateCreated');
+  }
+
+  my $DateUpdated = undef;
+
+  if (defined($query->param('DateUpdated'))) {
+
+    $DateUpdated = $query->param('DateUpdated');
+  }
+
+
   my $AnalysisGroupDescription  = '';
 
   if (defined($query->param('AnalysisGroupDescription'))) {
@@ -4264,8 +4294,10 @@ sub add_analysisgroup_runmode {
   $sql   .= '"AccessGroupId", ';
   $sql   .= '"OwnGroupPerm", ';
   $sql   .= '"AccessGroupPerm", ';
-  $sql   .= '"OtherPerm") ';
-  $sql   .= 'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
+  $sql   .= '"OtherPerm", ';
+  $sql   .= '"DateCreated", ';
+  $sql   .= '"DateUpdated") ';
+  $sql   .= 'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
 
   my $sth = $dbh_m_write->prepare($sql);
   $sth->execute(
@@ -4278,7 +4310,9 @@ sub add_analysisgroup_runmode {
                 $AccessGroupId,
                 $OwnGroupPerm,
                 $AccessGroupPerm,
-                $OtherPerm
+                $OtherPerm,
+                $DateCreated,
+                $DateUpdated
    );
 
   my $AnalysisGroupId = -1;
@@ -4510,6 +4544,18 @@ sub update_analysisgroup_runmode {
   my $AnalysisGroupMetaData    = undef;
   my $ContactId                = undef;
 
+  my $cur_dt = DateTime->now( time_zone => $TIMEZONE );
+  $cur_dt = DateTime::Format::MySQL->format_datetime($cur_dt);
+
+  my $DateCreated = undef;
+
+  my $DateUpdated               = $cur_dt;
+
+  if (defined($query->param('DateUpdated'))) {
+
+    $DateUpdated = $query->param('DateUpdated');
+  }
+
   my $nb_df_val_rec    =  scalar(@{$anagroup_df_val_data});
 
   if ($nb_df_val_rec != 1)  {
@@ -4524,6 +4570,13 @@ sub update_analysisgroup_runmode {
   $AnalysisGroupDescription  = $anagroup_df_val_data->[0]->{'AnalysisGroupDescription'};
   $ContactId                 = $anagroup_df_val_data->[0]->{'ContactId'};
   $AnalysisGroupMetaData     = $anagroup_df_val_data->[0]->{'AnalysisGroupMetaData'};
+  $ContactId                 = $anagroup_df_val_data->[0]->{'ContactId'};
+  $DateCreated               = $anagroup_df_val_data->[0]->{'DateCreated'};
+
+  if (defined($query->param('DateCreated'))) {
+
+    $DateCreated = $query->param('DateCreated');
+  }
 
   if (defined($query->param('AnalysisGroupDescription'))) {
 
@@ -4631,15 +4684,19 @@ sub update_analysisgroup_runmode {
   $sql   .= '"AnalysisGroupName"=?, ';
   $sql   .= '"AnalysisGroupDescription"=?, ';
   $sql   .= '"AnalysisGroupMetaData"=?, ';
-  $sql   .= '"ContactId"=? ';
+  $sql   .= '"ContactId"=?, ';
+  $sql   .= '"DateCreated"=? ,';
+  $sql   .= '"DateUpdated"=? ';
   $sql   .= 'WHERE "AnalysisGroupId"=? ';
 
   my $sth = $dbh_m_write->prepare($sql);
      $sth->execute(
                 $AnalysisGroupName,
                 $AnalysisGroupDescription,
-	        $AnalysisGroupMetaData,
+	              $AnalysisGroupMetaData,
                 $ContactId,
+                $DateCreated,
+                $DateUpdated,
                 $AnalysisGroupId
      );
 
@@ -6105,7 +6162,7 @@ sub list_dataset_runmode {
 
   if (!record_existence($dbh_m, 'analysisgroup', 'AnalysisGroupId', $anal_id)) {
 
-    my $err_msg = "AnalsysiGroup ($anal_id): not found.";
+    my $err_msg = "AnalsysisGroup ($anal_id): not found.";
 
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
@@ -6122,7 +6179,7 @@ sub list_dataset_runmode {
 
   if (!$is_anal_grp_ok) {
 
-    my $err_msg = "AnalsysiGroup ($anal_id): permission denied.";
+    my $err_msg = "AnalsysisGroup ($anal_id): permission denied.";
     $self->logger->debug($err_msg);
 
     $data_for_postrun_href->{'Error'} = 1;
@@ -7406,13 +7463,15 @@ sub add_extract_analgroup_runmode {
 
   #add to analysis group extract table
   my $sql    = 'INSERT INTO "analgroupextract"(';
+  $sql   .= '"AnalGroupExtractId",';
   $sql   .= '"ExtractId", ';
   $sql   .= '"AnalysisGroupId") ';
-  $sql   .= 'VALUES (?, ?)';
+  $sql   .= 'VALUES (?, ?, ?)';
 
 
   my $sth = $dbh_m_write->prepare($sql);
      $sth->execute(
+                $AnalGroupExtractId,
                 $ExtractId,
                 $AnalysisGroupId,
      );
@@ -7439,6 +7498,950 @@ sub add_extract_analgroup_runmode {
 
   return $data_for_postrun_href;
 }
+
+sub add_extractdata_runmode {
+
+=pod add_extractdata_HELP_START
+{
+"OperationName": "Add extract data",
+"Description": "Add extract data to analysis group extract",
+"AuthRequired": 1,
+"GroupRequired": 0,
+"GroupAdminRequired": 0,
+"SignatureRequired": 1,
+"KDDArTModule": "marker",
+"KDDArTTable": "extractdata",
+"SkippedField": ["ExtractDataId","AnalGroupExtractId"],
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"KDDArTModule": "marker",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><ReturnId Value='10' ParaName='ExtractDataId' /><Info Message='ExtractData (10) has been added successfully.' /></DATA>",
+"SuccessMessageJSON": "{'ReturnId' : [{'Value' : '9','ParaName' : 'ExtractDataId'}],'Info' : [{'Message' : 'ExtractData (9) has been added successfully.'}]}",
+"URLParameter": [{"ParameterName": "_id","Description": "Id of Analysis Group Extract"} ],
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error AnalGroupExtractId='Analysis Group Extract (111) does not exist.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'AnalGroupExtractId' : 'Analysis Group Extract (111) does not exist.'}]}"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self            = shift;
+  my $query           = $self->query();
+
+  my $data_for_postrun_href    =  {};
+
+  my $field_name_translation = {};
+
+  my $skip_field = { 'DateCreated' => 1 };
+
+  my $dbh_read = connect_mdb_read();
+
+
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'extractdata', $skip_field,
+                                                                                $field_name_translation
+                                                                               );
+  if ($chk_sfield_err) {
+
+     $self->logger->debug($chk_sfield_msg);
+
+     return $for_postrun_href;
+  }
+
+  $dbh_read->disconnect();
+
+  my $AnalGroupExtractId = $self->param('id');
+
+  my $OperatorId              = $query->param('OperatorId');
+
+  my $ExternalId              = undef;
+  my $ExtractDataMeta         = undef;
+
+  if (defined $query->param('ExternalId')) {
+
+    if (length($query->param('ExternalId')) > 0) {
+
+      $ExternalId = $query->param('ExternalId');
+    }
+  }
+
+  if (defined $query->param('ExtractDataMeta')) {
+
+    if (length($query->param('ExtractDataMeta')) > 0) {
+
+      $ExtractDataMeta = $query->param('ExtractDataMeta');
+    }
+  }
+
+  my $cur_dt = DateTime->now( time_zone => $TIMEZONE );
+  $cur_dt = DateTime::Format::MySQL->format_datetime($cur_dt);
+
+  my $DateCreated             = $cur_dt;
+
+  if (defined $query->param('DateCreated')) {
+
+    if (length($query->param('DateCreated')) > 0) {
+
+      $DateCreated = $query->param('DateCreated');
+    }
+  }
+
+  my $missing_errors = [];
+
+  my $dbh_k_read = connect_kdb_read();
+
+  if (!record_existence($dbh_k_read, 'systemuser', 'UserId', $OperatorId)) {
+
+    my $err_msg = "OperatorId ($OperatorId) not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh_k_read->disconnect();
+
+  my $dbh_m_read = connect_mdb_read();
+
+
+  if (!record_existence($dbh_m_read, 'analgroupextract', 'AnalGroupExtractId', $AnalGroupExtractId)) {
+
+    my $err_msg = "Analysis Group Extract ($AnalGroupExtractId) not found.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'ExtractId' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh_m_read->disconnect();
+
+  my $dbh_m_write = connect_mdb_write();
+
+  my ($next_val_err, $next_val_msg, $ExtractDataId) = get_next_value_for($dbh_m_write, 'extractdata', 'ExtractDataId');
+
+  #add to analysis group extract table
+  my $sql = 'INSERT INTO "extractdata" (';
+  $sql   .= '"ExtractDataId", ';
+  $sql   .= '"AnalGroupExtractId", ';
+  $sql   .= '"OperatorId", ';
+  $sql   .= '"DateCreated", ';
+  $sql   .= '"ExternalId", ';
+  $sql   .= '"ExtractDataMeta") ';
+
+  $self->logger->debug($sql . "VALUES ($ExtractDataId, $AnalGroupExtractId, $OperatorId, $DateCreated, $ExternalId, $ExtractDataMeta);");
+
+  $sql   .= 'VALUES (?, ?, ?, ?, ?, ?)';
+
+  my $sth = $dbh_m_write->prepare($sql);
+    $sth->execute(
+              $ExtractDataId,
+              $AnalGroupExtractId,
+              $OperatorId,
+              $DateCreated,
+              $ExternalId,
+              $ExtractDataMeta,
+    );
+
+  if ($dbh_m_write->err()) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sth->finish();
+
+  $dbh_m_write->disconnect();
+
+
+  my $info_msg_aref = [{'Message' => "Extract ($ExtractDataId) added to Analysis Group Extract ($AnalGroupExtractId) successfully."}];
+  my $return_id_aref = [{'Value' => "$ExtractDataId", 'ParaName' => 'ExtractDataId'}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info' => $info_msg_aref,
+                                           'ReturnId' => $return_id_aref,
+  };
+
+  return $data_for_postrun_href;
+}
+
+sub list_extractdata_runmode {
+
+=pod list_extractdata_HELP_START
+{
+"OperationName": "List extract data",
+"Description": "List extract data for a specified analysis group",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><StatInfo ServerElapsedTime='0.114' Unit='second' /><RecordMeta TagName='ExtractData' /><ExtractData AnalGroupExtractId='168' ExternalId='Test1' ExtractDataId='24' OperatorId='0' ExtractDataMeta='Test' DateCreated='2023-03-27 16:39:28.000000'><Datafile FileType='241' url='http://kddartupgrade1.diversityarrays.com/storage/extractdata/0f5c202b4b073651cf1469462c8b6719' unreadable='0' OperatorId='0' ExtractDataFileId='17' UploadTime='2023-03-27 16:39:29.000000' /></ExtractData></DATA>",
+"SuccessMessageJSON": "{'StatInfo':[{'Unit':'second','ServerElapsedTime':'0.048'}],'RecordMeta':[{'TagName':'DataSet'}],'ExtractData':[{'ExtractDataMeta':'Test','DateCreated':'2023-03-2716:39:28.000000','OperatorId':'0','ExtractDataId':'24','ExternalId':'Test1','AnalGroupExtractId':'168'}]}",
+"ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='AnalGroupExtract (11) not found.' /></DATA>"}],
+"URLParameter": [{"ParameterName": "_id","Description": "Id of Analysis Group Extract"} ],
+"ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'AnalGroupExtract (11) not found.' }]}"}]
+}
+=cut
+
+  my $self  = shift;
+
+  my $data_for_postrun_href = {};
+
+  my $analgroupextract_id = $self->param('id');
+
+  my $dbh_m = connect_mdb_read();
+
+  if (!record_existence($dbh_m, 'analgroupextract', 'AnalGroupExtractId', $analgroupextract_id)) {
+
+    my $err_msg = "AnalGroupExtract ($analgroupextract_id): not found.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  #check permission based on the AnalysisGroup
+
+  my $read_sql  = 'SELECT "AnalysisGroupId" ';
+  $read_sql    .= 'FROM analgroupextract WHERE "AnalGroupExtractId"=? ';
+
+  my $dbh_m_read = connect_mdb_read();
+
+  $self->logger->debug("Looking for Analysis Group of AGE Id : $analgroupextract_id");
+
+  my ($r_df_val_err, $r_df_val_msg, $analgroup_df_val_data) = read_data($dbh_m_read, $read_sql, [$analgroupextract_id]);
+
+  my $anal_id = $analgroup_df_val_data->[0]->{'AnalysisGroupId'};
+
+  $self->logger->debug("Looking for Analysis Group of AGE Id : $analgroupextract_id => $anal_id");
+
+  my $group_id  = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  my ($is_anal_grp_ok, $trouble_anal_id_aref) = check_permission($dbh_m_read, 'analysisgroup', 'AnalysisGroupId',
+                                                                 [$anal_id], $group_id, $gadmin_status,
+                                                                 $READ_PERM);
+
+  if (!$is_anal_grp_ok) {
+
+    my $err_msg = "AnalsysiGroup ($anal_id): permission denied.";
+    $self->logger->debug($err_msg);
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh_m_read->disconnect();
+
+  my $sql = 'SELECT * from "extractdata" WHERE "extractdata"."AnalGroupExtractId"=? ORDER BY "extractdata"."ExtractDataId" DESC';
+
+  $self->logger->debug("SQL: $sql");
+
+  my ($read_extractdata_err, $read_extractdata_msg, $extractdata_data) = $self->list_extractdata(1, $sql, [$analgroupextract_id]);
+
+  if ($read_extractdata_err) {
+
+    $self->logger->debug($read_extractdata_msg);
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'ExtractData' => $extractdata_data,
+                                           'RecordMeta'   => [{'TagName' => 'DataSet'}]
+  };
+
+  return $data_for_postrun_href;
+}
+
+sub get_extractdata_runmode {
+
+=pod get_extractdata_HELP_START
+{
+"OperationName": "Get extract data",
+"Description": "Get extract data from ExtractDataId",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><RecordMeta TagName='DataSet'/><DATA><ExtractData OperatorId='0' DateCreated='2023-03-30 16:12:36.000000' ExtractDataMeta='Test' AnalGroupExtractId='95' ExtractDataId='5' ExternalId='Test1'/></DATA>",
+"SuccessMessageJSON": "{'RecordMeta':[{'TagName':'DataSet'}],'ExtractData':[{'ExtractDataMeta':'Test','DateCreated':'2023-03-2716:39:28.000000','OperatorId':'0','ExtractDataId':'24','ExternalId':'Test1','AnalGroupExtractId':'168'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='ExtractDataId (3) not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'ExtractDataId (3) not found.'}]}"}],
+"URLParameter": [{"ParameterName": "_id", "Description": "Id of existing Extract Data"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self  = shift;
+
+  my $data_for_postrun_href = {};
+
+  my $extractdata_id = $self->param('id');
+
+  my $dbh_m = connect_mdb_read();
+
+  if (!record_existence($dbh_m, 'extractdata', 'ExtractDataId', $extractdata_id)) {
+
+    my $err_msg = "ExtractData ($extractdata_id): not found.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  #check permission based on the AnalysisGroup by joining AnalGroupExtract
+
+  my $read_sql  = 'select analgroupextract."AnalysisGroupId" ';
+  $read_sql    .= 'from "extractdata" ';
+  $read_sql    .= 'inner join "analgroupextract" on "analgroupextract"."AnalGroupExtractId" = "extractdata"."AnalGroupExtractId" ';
+  $read_sql    .= ' where "extractdata"."ExtractDataId"=? ';
+
+  my $dbh_m_read = connect_mdb_read();
+
+  $self->logger->debug("Looking for Analysis Group of ExtractData Id : $extractdata_id");
+
+  my ($r_df_val_err, $r_df_val_msg, $analgroup_df_val_data) = read_data($dbh_m_read, $read_sql, [$extractdata_id]);
+
+  my $anal_id = $analgroup_df_val_data->[0]->{'AnalysisGroupId'};
+
+  $self->logger->debug("Looking for Analysis Group of AGE Id : $extractdata_id => $anal_id");
+
+  my $group_id  = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  my ($is_anal_grp_ok, $trouble_anal_id_aref) = check_permission($dbh_m_read, 'analysisgroup', 'AnalysisGroupId',
+                                                                 [$anal_id], $group_id, $gadmin_status,
+                                                                 $READ_PERM);
+
+  if (!$is_anal_grp_ok) {
+
+    my $err_msg = "AnalsysiGroup ($anal_id): permission denied.";
+    $self->logger->debug($err_msg);
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh_m_read->disconnect();
+
+  my $sql = 'SELECT * from "extractdata" WHERE "extractdata"."ExtractDataId"=? ORDER BY "extractdata"."ExtractDataId" DESC';
+
+  $self->logger->debug("SQL: $sql");
+
+  my ($read_extractdata_err, $read_extractdata_msg, $extractdata_data) = $self->list_extractdata(1, $sql, [$extractdata_id]);
+
+  if ($read_extractdata_err) {
+
+    $self->logger->debug($read_extractdata_msg);
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'ExtractData' => $extractdata_data,
+                                           'RecordMeta'   => [{'TagName' => 'DataSet'}]
+  };
+
+  return $data_for_postrun_href;
+
+}
+
+sub list_extractdata {
+  my $self              = $_[0];
+  my $extra_attr_yes    = $_[1];
+  my $sql               = $_[2];
+  my $where_para_aref   = $_[3];
+
+  #initialise variables
+  my $err = 0;
+  my $msg = '';
+  my $data_aref = [];
+
+  #get marker db handle
+  my $dbh_m = connect_mdb_read();
+
+  ($err, $msg, $data_aref) = read_data($dbh_m, $sql, $where_para_aref);
+
+  if ($err) {
+
+    return ($err, $msg, []);
+  }
+
+  my $extractdata_id_aref     = [];
+
+  my @extra_attr_extractdata_data;
+
+  for my $extractdata_row (@{$data_aref}) {
+
+    push(@extra_attr_extractdata_data, $extractdata_row);
+
+  }
+
+  return ($err, $msg, \@extra_attr_extractdata_data);
+
+  $dbh_m->disconnect();
+}
+
+sub add_extractdata_file_runmode {
+
+=pod add_extractdata_file_HELP_START
+{
+"OperationName": "Add Extract Data File",
+"Description": "Attach extract data file to extract data entry.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 1,
+"KDDArTModule": "marker",
+"KDDArTTable": "extractdatafile",
+"SkippedField": ["ExtractDataFileId","ExtractDataId", "FileMeta", "UploadTime", "FileExtension","AnalGroupExtractId"],
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='Extract Data File (27) added to Extract Data (210) successfully.' /><StatInfo ServerElapsedTime='0.125' Unit='second' /><ReturnId ParaName='ExtractDataFileId' Value='27' /></DATA>",
+"SuccessMessageJSON": "{'ReturnId' : [{'Value' : '9','ParaName' : 'ExtractDataId'}],'Info' : [{'Message' : 'Extract Data File (9) has been added to Extract Data (210) successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error ExtractDataId='Extract Data (111) does not exist.' /></DATA>"}],
+"URLParameter": [{"ParameterName": "_id","Description": "Id of Extract Data where file will be attached to."} ],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'ExtractDataId' : 'Extract Data Id(111) does not exist.'}]}"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self   = shift;
+  my $query  = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  my $upload_file   = $query->param('uploadfile');
+  my $content_type  = $query->uploadInfo($upload_file)->{'Content-Type'};
+
+  my $file_type = $query->param('FileType');
+  my $OperatorId = $query->param('OperatorId');
+
+  my $extractdata_id = $self->param('id');
+
+  $self->logger->debug( $query->uploadInfo($upload_file) );
+
+  my ($missing_err, $missing_href) = check_missing_href( {'FileType' => $file_type, 'OperatorId' => $OperatorId } );
+
+  if ($missing_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$missing_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $org_up_fname  = "$upload_file";
+
+  $self->logger->debug("Original upload filename: $org_up_fname");
+
+  my $dbh_m = connect_mdb_read();
+
+  if (!record_existence($dbh_m, 'extractdata', 'ExtractDataId', $extractdata_id)) {
+
+    my $err_msg = "ExtractData ($extractdata_id): not found.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  #check permission based on the AnalysisGroup by joining AnalGroupExtract
+
+  my $read_sql  = 'select analgroupextract."AnalysisGroupId" ';
+  $read_sql    .= 'from "extractdata" ';
+  $read_sql    .= 'inner join "analgroupextract" on "analgroupextract"."AnalGroupExtractId" = "extractdata"."AnalGroupExtractId" ';
+  $read_sql    .= ' where "extractdata"."ExtractDataId"=? ';
+
+  my $dbh_m_read = connect_mdb_read();
+
+  $self->logger->debug("Looking for Analysis Group of ExtractData Id : $extractdata_id");
+
+  my ($r_df_val_err, $r_df_val_msg, $analgroup_df_val_data) = read_data($dbh_m_read, $read_sql, [$extractdata_id]);
+
+  my $anal_id = $analgroup_df_val_data->[0]->{'AnalysisGroupId'};
+
+  $self->logger->debug("Looking for Analysis Group of AGE Id : $extractdata_id => $anal_id");
+
+  my $group_id  = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  my ($is_anal_grp_ok, $trouble_anal_id_aref) = check_permission($dbh_m_read, 'analysisgroup', 'AnalysisGroupId',
+                                                                 [$anal_id], $group_id, $gadmin_status,
+                                                                 $READ_PERM);
+
+  if (!$is_anal_grp_ok) {
+
+    my $err_msg = "AnalsysiGroup ($anal_id): permission denied.";
+    $self->logger->debug($err_msg);
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh_m_read->disconnect();
+
+  my $cur_dt = DateTime->now( time_zone => $TIMEZONE );
+  my $upload_time = DateTime::Format::MySQL->format_datetime($cur_dt);
+
+  my $user_id = $self->authen->user_id();
+
+  my $rand = makerandom(Size => 8, Strength => 0);
+
+  my $hash_filename_msg = "$user_id";
+  $hash_filename_msg   .= "extractdatafile";
+  $hash_filename_msg   .= "${extractdata_id}-";
+  $hash_filename_msg   .= "$cur_dt";
+  $hash_filename_msg   .= "$rand";
+
+  $self->logger->debug("Hash FileName Msg: $hash_filename_msg");
+
+  my $file_extension = '';
+
+  if ($org_up_fname =~ /\.([a-zA-Z]{3,4})$/) {
+
+    $file_extension = $1;
+  }
+
+  my $hash_filename = md5_hex($hash_filename_msg);
+
+  if (length($file_extension) == 0) {
+
+    $file_extension = undef;
+  }
+  else {
+
+    $hash_filename .= ".$file_extension";
+  }
+
+  $self->logger->debug("Hash FileName: $hash_filename");
+
+  my $dbh_m_write = connect_mdb_write();
+
+  my ($next_val_err, $next_val_msg, $ExtractDataFileId) = get_next_value_for($dbh_m_write, 'extractdatafile', 'ExtractDataFileId');
+
+  my $FileMeta = qq|{"OrigFileName": "$org_up_fname", "HashFileName": "$hash_filename","FileExtension": "$file_extension"}|;
+
+  my $sql = 'INSERT INTO "extractdatafile" (';
+  $sql   .= '"ExtractDataFileId", ';
+  $sql   .= '"ExtractDataId", ';
+  $sql   .= '"OperatorId", ';
+  $sql   .= '"FileType", ';
+  $sql   .= '"UploadTime", ';
+  $sql   .= '"FileExtension", ';
+  $sql   .= '"FileMeta") ';
+
+  $sql   .= 'VALUES (?, ?, ?, ?, ?, ?, ?)';
+
+  $self->logger->debug("SQL: $sql");
+
+  my $sth = $dbh_m_write->prepare($sql);
+  $sth->execute($ExtractDataFileId, $extractdata_id, $OperatorId, $file_type, $upload_time,
+                $file_extension, $FileMeta);
+
+  if ($dbh_m_write->err()) {
+    my $err_msg = 'Unexpected Error';
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sth->finish();
+
+  my $dest_storage_path = $ENV{DOCUMENT_ROOT} . '/' . $EXTRACTDATAFILE_STORAGE_PATH;
+
+  $self->logger->debug("Dest Storage PATH: $dest_storage_path");
+
+  if ( !(-e $dest_storage_path) ) {
+
+    mkdir($dest_storage_path);
+  }
+
+  my $stored_extractdata_file = "${dest_storage_path}/$hash_filename";
+  my $tmp_extractdata_file = $self->authen->get_upload_file();
+
+  $self->logger->debug("Copying $tmp_extractdata_file to $stored_extractdata_file");
+
+  copy_file($tmp_extractdata_file, $stored_extractdata_file, 1);
+
+  if ( !(-e $stored_extractdata_file) ) {
+
+    $self->logger->debug('File not copied');
+
+    my $del_sql = 'DELETE FROM "extractdatafile" WHERE "ExtractDataFileId"=?';
+    my $del_sth = $dbh_m_write->prepare($del_sql);
+    $del_sth->execute($ExtractDataFileId);
+
+    if ($dbh_m_write->err()) {
+
+      $self->logger->debug("Delete Extract Data File Failed: " . $dbh_m_write->errstr());
+
+      my $err_msg = 'Unexpected Error';
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+    $del_sth->finish();
+
+    my $err_msg = 'Unexpected Error';
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh_m_write->disconnect();
+
+  my $info_msg_aref  = [{'Message' => "Extract Data File ($ExtractDataFileId) has been added successfully."}];
+  my $return_id_aref = [{'Value' => "$ExtractDataFileId", 'ParaName' => 'ExtractDataFileId'}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'      => $info_msg_aref,
+                                           'ReturnId'  => $return_id_aref,
+  };
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+
+}
+
+sub list_extractdata_file_runmode {
+=pod list_extractdata_file_HELP_START
+{
+"OperationName": "List extract data file",
+"Description": "List extract data files from Analysis Group Extract",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><StatInfoUnit='second'ServerElapsedTime='0.089'/><RecordMetaTagName='ExtractData'/><ExtractData ExtractDataId='23'ExternalId='Test1'OperatorId='0'DateCreated='2023-03-2415:23:26.000000' ExtractDataMeta='Test' AnalGroupExtractId='161'><Datafile FileType='233' unreadable='0' UploadTime='2023-03-2415:23:26.000000' ExtractDataFileId='16' url='http://kddart.example.com/storage/extractdata/f0eaeb961ec1113e3baaa2acc3d2fa5b 'OperatorId='0'/></ExtractData></DATA>",
+"SuccessMessageJSON": "{'RecordMeta':[{'TagName':'ExtractData'}],'StatInfo':[{'Unit':'second','ServerElapsedTime':'0.050'}],'ExtractData':[{'ExternalId':'Test1','ExtractDataId':'23','Datafile':[{'unreadable':0,'FileType':'233','OperatorId':'0','url':'http://kddart.example.com/storage/extractdata/f0eaeb961ec1113e3baaa2acc3d2fa5b','ExtractDataFileId':'16','UploadTime':'2023-03-2415:23:26.000000'}],'OperatorId':'0','DateCreated':'2023-03-2415:23:26.000000','ExtractDataMeta':'Test','AnalGroupExtractId':'161'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error AnalGroupExtractId='Analysis Group Extract (111) not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'AnalGroupExtractId' : 'Analysis Group Extract (111) not found.'}]}"}],
+"URLParameter": [{"ParameterName": "_id","Description": "Id of Analysis Group Extract"} ],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self   = shift;
+  my $query  = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  my $AnalGroupExtractId = $self->param('id');
+
+  my $dbh_m_read = connect_mdb_read();
+
+  if (!record_existence($dbh_m_read, 'analgroupextract', 'AnalGroupExtractId', $AnalGroupExtractId)) {
+
+    my $err_msg = "Analysis Group Extract  ($AnalGroupExtractId): not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  #check permission based on the AnalysisGroup by joining AnalGroupExtract
+
+  my $read_sql  = 'select "AnalysisGroupId" ';
+  $read_sql    .= 'from "analgroupextract" ';
+  $read_sql    .= 'where "AnalGroupExtractId"=? ';
+
+
+  my ($r_df_val_err, $r_df_val_msg, $analgroup_df_val_data) = read_data($dbh_m_read, $read_sql, [$AnalGroupExtractId]);
+
+  my $anal_id = $analgroup_df_val_data->[0]->{'AnalysisGroupId'};
+
+  $self->logger->debug("Looking for Analysis Group of AGE Id : $AnalGroupExtractId => $anal_id");
+
+  my $group_id  = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  my ($is_anal_grp_ok, $trouble_anal_id_aref) = check_permission($dbh_m_read, 'analysisgroup', 'AnalysisGroupId',
+                                                                 [$anal_id], $group_id, $gadmin_status,
+                                                                 $READ_PERM);
+
+  if (!$is_anal_grp_ok) {
+
+    my $err_msg = "AnalsysiGroup ($anal_id): permission denied.";
+    $self->logger->debug($err_msg);
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  #get all the extractdata connect to analgroupextract so we can get all the data
+
+  my $read_extractdata_sql = 'SELECT * from "extractdata" WHERE "extractdata"."AnalGroupExtractId"=? ORDER BY "extractdata"."ExtractDataId" DESC';
+
+  $self->logger->debug("SQL: $read_extractdata_sql");
+
+  my ($read_extractdata_err, $read_extractdata_msg, $extractdata_data) = $self->list_extractdata(1, $read_extractdata_sql, [$AnalGroupExtractId]);
+
+  if ($read_extractdata_err) {
+
+    $self->logger->debug($read_extractdata_msg);
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $new_extractdata_data = [];
+
+  for my $row (@{$extractdata_data}) {
+
+    my $ExtractDataId = $row->{'ExtractDataId'};
+
+    my $read_extractdatafile_sql = 'SELECT * from "extractdatafile" where "ExtractDataId"=? order by "UploadTime"';
+
+    $self->logger->debug("SQL: $read_extractdatafile_sql with ExtractDataId=$ExtractDataId");
+
+    my ($read_extractdatafile_err, $read_extractdatafile_msg, $extractdatafile_data) = $self->list_extractdatafile(1, $read_extractdatafile_sql, [$ExtractDataId]);
+
+    for my $file_row (@{$extractdatafile_data}) {
+      $self->logger->debug("Found Data file: " .$file_row->{"ExtractDataFileId"});
+    }
+
+    $row->{"Datafile"} = $extractdatafile_data;
+
+    push(@{$new_extractdata_data},$row);
+
+  }
+
+
+  $dbh_m_read->disconnect();
+
+  my $dest_storage_path = $ENV{DOCUMENT_ROOT} . '/' . $EXTRACTDATAFILE_STORAGE_PATH;
+
+  if ( !(-e $dest_storage_path) ) {
+
+    $data_for_postrun_href->{'Error'}     = 0;
+    $data_for_postrun_href->{'Data'}      = {'OutputFile'     => [],
+                                             'RecordMeta'     => [{'TagName' => 'OutputFile'}]
+    };
+
+    $data_for_postrun_href->{'ExtraData'} = 0;
+
+    return $data_for_postrun_href;
+  }
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'ExtractData' => $extractdata_data,
+                                           'RecordMeta'   => [{'TagName' => 'ExtractData'}]
+  };
+  return $data_for_postrun_href;
+}
+
+sub list_extractdatafile {
+
+  my $self            = $_[0];
+  my $table_name      = $_[1];
+  my $sql             = $_[2];
+  my $where_para_aref = $_[3];
+
+  my $err = 0;
+  my $msg = '';
+
+  my $data_aref = [];
+
+  my $dbh = connect_mdb_read();
+
+  ($err, $msg, $data_aref) = read_data($dbh, $sql, $where_para_aref);
+
+  if ($err) {
+
+    return ($err, $msg, []);
+  }
+
+  $dbh->disconnect();
+
+  my $url = reconstruct_server_url();
+
+  my $dest_storage_path = $ENV{DOCUMENT_ROOT} . '/' . $EXTRACTDATAFILE_STORAGE_PATH ;
+
+  my $output_file_aref = [];
+
+  for my $extractdatafile_rec (@{$data_aref}) {
+
+    my $datasetfile_href = {};
+
+    $datasetfile_href->{'ExtractDataFileId'} = $extractdatafile_rec->{'ExtractDataFileId'};
+    $datasetfile_href->{'FileType'} = $extractdatafile_rec->{'FileType'};
+    $datasetfile_href->{'UploadTime'} = $extractdatafile_rec->{'UploadTime'};
+    $datasetfile_href->{'OperatorId'} = $extractdatafile_rec->{'OperatorId'};
+
+    my $extractdata_metadata = $extractdatafile_rec->{'FileMeta'};
+
+    $self->logger->debug("Found Data file: " .$extractdata_metadata);
+
+    my $extractdata_json = eval{ decode_json($extractdata_metadata); };
+
+    if ( ! (defined $extractdata_json) ) {
+      $datasetfile_href->{'unreadable'} = 1;
+      $datasetfile_href->{'url'} = "";
+    }
+    else {
+      my $hash_filename = $extractdata_json->{'HashFileName'};
+
+      $self->logger->debug("Found hash filename: " .$hash_filename );
+
+      if ( (-e "${dest_storage_path}/$hash_filename") ) {
+
+        $datasetfile_href->{'unreadable'} = 0;
+        $datasetfile_href->{'url'} = "$url/storage/extractdata/$hash_filename";
+      }
+
+    }
+
+
+    push(@{$output_file_aref}, $datasetfile_href);
+  }
+
+  return ($err, $msg, $output_file_aref);
+}
+
+sub update_extractdata_runmode {
+
+=pod update_extractdata_HELP_START
+{
+"OperationName": "Update extract data",
+"Description": "Update an extract data of an Analysis Group Extract",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"KDDArTModule": "marker",
+"KDDArTTable": "extractdata",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><ReturnId Value='21' ParaName='ExtractId' /><Info Message='Extract (21) has been added to Analysis Group 1 successfully' /></DATA>",
+"SuccessMessageJSON": "{'ReturnId' : [{'Value' : '22','ParaName' : 'ExtractId'}],'Info' : [{'Message' : 'Extract (21) has been added to Analysis Group 1 successfully'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error GenotypeId='Genotype (460) not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'ExtractId' : 'Extract (21) not found.'}]}"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self            = shift;
+  my $ExtractDataId = $self->param('id');
+  my $query           = $self->query();
+
+  my $data_for_postrun_href    =  {};
+
+  my $info_msg_aref = "Test";
+  my $return_id_aref = [];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info' => $info_msg_aref,
+                                           'ReturnId' => $return_id_aref,
+  };
+
+  return $data_for_postrun_href;
+}
+
+sub delete_extractdata_runmode {
+
+=pod delete_extractdata_HELP_START
+{
+"OperationName": "Delete extract data",
+"Description": "Delete an extract data of an Analysis Group Extract",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 1,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><ReturnId Value='21' ParaName='ExtractId' /><Info Message='Extract Data (21) has been deleted successfully.' /></DATA>",
+"SuccessMessageJSON": "{'ReturnId' : [{'Value' : '22','ParaName' : 'ExtractId'}],'Info' : [{'Message' : 'Extract  Data(21) has been deleted successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error ExtractDataId='Extract Data (460) not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'ExtractId' : 'Extract Data (21) not found.'}]}"}],
+"URLParameter": [{"ParameterName": "_id","Description": "Id of Extract Data"} ],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self       = shift;
+  my $ExtractDataId = $self->param('id');
+
+  my $data_for_postrun_href = {};
+
+  my $dbh_m_read = connect_mdb_read();
+
+  my $extractdata_exist = record_existence($dbh_m_read, 'extractdata', 'ExtractDataId', $ExtractDataId);
+
+  if (!$extractdata_exist) {
+
+    my $err_msg = "ExtractData ($ExtractDataId) not found.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $extractdatafile_id = record_existence($dbh_m_read, 'extractdatafile', 'ExtractDataId', $ExtractDataId);
+
+  if ($extractdatafile_id) {
+
+    my $err_msg = "Extract Data ($ExtractDataId) has Data Files.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh_m_read->disconnect();
+
+  my $dbh_m_write = connect_mdb_write();
+
+  my $sql = 'DELETE FROM "extractdata" WHERE "ExtractDataId"=?';
+  my $sth = $dbh_m_write->prepare($sql);
+
+  $sth->execute($ExtractDataId);
+
+  if ($dbh_m_write->err()) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sth->finish();
+
+  $dbh_m_write->disconnect();
+
+  my $info_msg_aref = [{'Message' => "ExtractData ($ExtractDataId) has been deleted successfully."}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info' => $info_msg_aref};
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+
+}
+
+
 
 
 sub get_extract_dtd_file {
