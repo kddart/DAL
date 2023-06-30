@@ -1,11 +1,11 @@
 #
-# DAL upgrade script for Opensuse
+# DAL upgrade script for OpenSUSE 15.4
 # Copyright (c) 2023, Diversity Arrays Technology, All rights reserved.
 #
-# Author: Puthick Hok, Yu Qiu, George Xiyue Huang
-# Date: 25/01/2021
-# Usage: ansible-playbook kddart_dal_upgrade_minor_from_file.yml
-# Description: By running the usage command, ansible will simply copy the code base
+# Author: George Xiyue Huang
+# Date: 25/06/2023
+# Usage: ansible-playbook kddart_dal_upgrade_minor_from_file_with_solr.yml
+# Description: By running the usage command, ansible will prepare an upgrade to remove old version of SOLR and install the latest version
 #
 
 - hosts: kddartserver
@@ -34,6 +34,14 @@
     backup_dir: /root/dal_upgrade_db_backup
     apache_base_dir: /srv/www
     force_tasks: True
+    solr_workspace: /root/tmp_install_solr
+    solr_config_file: /etc/default/solr.in.sh
+    solr_install_dir: /opt
+    solr_home: /var/solr
+    solr_version: "8.11.1"
+    mysql_jdbc_jar: mysql-connector-java-*-bin.jar
+    monetdb_jdbc_jar: monetdb-jdbc-*.jar
+    config_cron_job: False
 
   tasks:
     - name: Copy the tar.gz file

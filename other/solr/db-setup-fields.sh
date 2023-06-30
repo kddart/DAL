@@ -18,22 +18,22 @@ curl -X POST -H 'Content-type:application/json' --data-binary '{
 
 
 curl -X POST -H 'Content-type:application/json' --data-binary '{
-"add-field": {'stored': 'true', 'name': 'TrialId', 'indexed': 'true', 'required': 'false', 'type': 'long', 'multiValued': 'false'}
+"add-field": {'stored': 'true', 'name': 'TrialId', 'indexed': 'true', 'required': 'false', 'type': 'plong', 'multiValued': 'false'}
 }' "${SOLRURL}/solr/db/schema"
 
 
 curl -X POST -H 'Content-type:application/json' --data-binary '{
-"add-field": {'stored': 'true', 'name': 'TraitId', 'indexed': 'true', 'required': 'false', 'type': 'long', 'multiValued': 'false'}
+"add-field": {'stored': 'true', 'name': 'TraitId', 'indexed': 'true', 'required': 'false', 'type': 'plong', 'multiValued': 'false'}
 }' "${SOLRURL}/solr/db/schema"
 
 
 curl -X POST -H 'Content-type:application/json' --data-binary '{
-"add-field": {'stored': 'true', 'name': 'TrialStartDate', 'indexed': 'true', 'required': 'false', 'type': 'date', 'multiValued': 'false'}
+"add-field": {'stored': 'true', 'name': 'TrialStartDate', 'indexed': 'true', 'required': 'false', 'type': 'pdate', 'multiValued': 'false'}
 }' "${SOLRURL}/solr/db/schema"
 
 
 curl -X POST -H 'Content-type:application/json' --data-binary '{
-"add-field": {'stored': 'true', 'name': 'TrialEndDate', 'indexed': 'true', 'required': 'false', 'type': 'date', 'multiValued': 'false'}
+"add-field": {'stored': 'true', 'name': 'TrialEndDate', 'indexed': 'true', 'required': 'false', 'type': 'pdate', 'multiValued': 'false'}
 }' "${SOLRURL}/solr/db/schema"
 
 
@@ -43,7 +43,7 @@ curl -X POST -H 'Content-type:application/json' --data-binary '{
 
 
 curl -X POST -H 'Content-type:application/json' --data-binary '{
-"add-field": {'stored': 'true', 'name': 'GenotypeId', 'indexed': 'true', 'required': 'false', 'type': 'long', 'multiValued': 'false'}
+"add-field": {'stored': 'true', 'name': 'GenotypeId', 'indexed': 'true', 'required': 'false', 'type': 'plong', 'multiValued': 'false'}
 }' "${SOLRURL}/solr/db/schema"
 
 
@@ -63,7 +63,7 @@ curl -X POST -H 'Content-type:application/json' --data-binary '{
 
 
 curl -X POST -H 'Content-type:application/json' --data-binary '{
-"add-field": {'stored': 'true', 'name': 'AVG_TraitValue', 'indexed': 'true', 'required': 'false', 'type': 'float', 'multiValued': 'false'}
+"add-field": {'stored': 'true', 'name': 'AVG_TraitValue', 'indexed': 'true', 'required': 'false', 'type': 'pfloat', 'multiValued': 'false'}
 }' "${SOLRURL}/solr/db/schema"
 
 
@@ -83,7 +83,7 @@ curl -X POST -H 'Content-type:application/json' --data-binary '{
 
 
 curl -X POST -H 'Content-type:application/json' --data-binary '{
-"add-field": {'stored': 'true', 'name': 'SpecimenId', 'indexed': 'true', 'required': 'false', 'type': 'long', 'multiValued': 'false'}
+"add-field": {'stored': 'true', 'name': 'SpecimenId', 'indexed': 'true', 'required': 'false', 'type': 'plong', 'multiValued': 'false'}
 }' "${SOLRURL}/solr/db/schema"
 
 
@@ -108,12 +108,12 @@ curl -X POST -H 'Content-type:application/json' --data-binary '{
 
 
 curl -X POST -H 'Content-type:application/json' --data-binary '{
-"add-field": {'stored': 'true', 'name': 'GenotypeAliasType', 'indexed': 'true', 'required': 'false', 'type': 'int', 'multiValued': 'false'}
+"add-field": {'stored': 'true', 'name': 'GenotypeAliasType', 'indexed': 'true', 'required': 'false', 'type': 'pint', 'multiValued': 'false'}
 }' "${SOLRURL}/solr/db/schema"
 
 
 curl -X POST -H 'Content-type:application/json' --data-binary '{
-"add-field": {'stored': 'true', 'name': 'GenotypeAliasStatus', 'indexed': 'true', 'required': 'false', 'type': 'int', 'multiValued': 'false'}
+"add-field": {'stored': 'true', 'name': 'GenotypeAliasStatus', 'indexed': 'true', 'required': 'false', 'type': 'pint', 'multiValued': 'false'}
 }' "${SOLRURL}/solr/db/schema"
 
 
@@ -148,7 +148,7 @@ curl -X POST -H 'Content-type:application/json' --data-binary '{
 
 
 curl -X POST -H 'Content-type:application/json' --data-binary '{
-"add-field": {'stored': 'true', 'name': 'BreedingMethodId', 'indexed': 'true', 'required': 'false', 'type': 'long', 'multiValued': 'false'}
+"add-field": {'stored': 'true', 'name': 'BreedingMethodId', 'indexed': 'true', 'required': 'false', 'type': 'plong', 'multiValued': 'false'}
 }' "${SOLRURL}/solr/db/schema"
 
 
@@ -173,12 +173,12 @@ curl -X POST -H 'Content-type:application/json' --data-binary '{
 
 
 curl -X POST -H 'Content-type:application/json' --data-binary '{
-"add-field": {'stored': 'true', 'name': 'FilialGeneration', 'indexed': 'true', 'required': 'false', 'type': 'int', 'multiValued': 'false'}
+"add-field": {'stored': 'true', 'name': 'FilialGeneration', 'indexed': 'true', 'required': 'false', 'type': 'pint', 'multiValued': 'false'}
 }' "${SOLRURL}/solr/db/schema"
 
 
 curl -X POST -H 'Content-type:application/json' --data-binary '{
-"add-field": {'stored': 'true', 'name': 'GenusId', 'indexed': 'true', 'required': 'false', 'type': 'int', 'multiValued': 'false'}
+"add-field": {'stored': 'true', 'name': 'GenusId', 'indexed': 'true', 'required': 'false', 'type': 'pint', 'multiValued': 'false'}
 }' "${SOLRURL}/solr/db/schema"
 
 
@@ -198,47 +198,47 @@ curl -X POST -H 'Content-type:application/json' --data-binary '{
 
 
 curl -X POST -H 'Content-type:application/json' --data-binary '{
-"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'long', 'name': 'TraitUnitId', 'required': 'false', 'multiValued': 'false'}
+"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'plong', 'name': 'TraitUnitId', 'required': 'false', 'multiValued': 'false'}
 }' "${SOLRURL}/solr/db/schema"
 
 
 curl -X POST -H 'Content-type:application/json' --data-binary '{
-"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'int', 'name': 'ItemUnitId', 'required': 'false', 'multiValued': 'false'}
+"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'pint', 'name': 'ItemUnitId', 'required': 'false', 'multiValued': 'false'}
 }' "${SOLRURL}/solr/db/schema"
 
 
 curl -X POST -H 'Content-type:application/json' --data-binary '{
-"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'long', 'name': 'TrialUnitSpecimenId', 'required': 'false', 'multiValued': 'false'}
+"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'plong', 'name': 'TrialUnitSpecimenId', 'required': 'false', 'multiValued': 'false'}
 }' "${SOLRURL}/solr/db/schema"
 
 
 curl -X POST -H 'Content-type:application/json' --data-binary '{
-"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'int', 'name': 'ItemSourceId', 'required': 'false', 'multiValued': 'false'}
+"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'pint', 'name': 'ItemSourceId', 'required': 'false', 'multiValued': 'false'}
 }' "${SOLRURL}/solr/db/schema"
 
 
 curl -X POST -H 'Content-type:application/json' --data-binary '{
-"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'int', 'name': 'ContainerTypeId', 'required': 'false', 'multiValued': 'false'}
+"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'pint', 'name': 'ContainerTypeId', 'required': 'false', 'multiValued': 'false'}
 }' "${SOLRURL}/solr/db/schema"
 
 
 curl -X POST -H 'Content-type:application/json' --data-binary '{
-"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'int', 'name': 'ScaleId', 'required': 'false', 'multiValued': 'false'}
+"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'pint', 'name': 'ScaleId', 'required': 'false', 'multiValued': 'false'}
 }' "${SOLRURL}/solr/db/schema"
 
 
 curl -X POST -H 'Content-type:application/json' --data-binary '{
-"add-field": {'indexed': 'true', 'stored': 'ture', 'type': 'int', 'name': 'StorageId', 'required': 'false', 'multiValued': 'false'}
+"add-field": {'indexed': 'true', 'stored': 'ture', 'type': 'pint', 'name': 'StorageId', 'required': 'false', 'multiValued': 'false'}
 }' "${SOLRURL}/solr/db/schema"
 
 
 curl -X POST -H 'Content-type:application/json' --data-binary '{
-"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'int', 'name': 'ItemTypeId', 'required': 'false', 'multiValued': 'false'}
+"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'pint', 'name': 'ItemTypeId', 'required': 'false', 'multiValued': 'false'}
 }' "${SOLRURL}/solr/db/schema"
 
 
 curl -X POST -H 'Content-type:application/json' --data-binary '{
-"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'int', 'name': 'ItemStateId', 'required': 'false', 'multiValued': 'false'}
+"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'pint', 'name': 'ItemStateId', 'required': 'false', 'multiValued': 'false'}
 }' "${SOLRURL}/solr/db/schema"
 
 
@@ -248,27 +248,27 @@ curl -X POST -H 'Content-type:application/json' --data-binary '{
 
 
 curl -X POST -H 'Content-type:application/json' --data-binary '{
-"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'float', 'name': 'Amount', 'required': 'false', 'multiValued': 'false'}
+"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'pfloat', 'name': 'Amount', 'required': 'false', 'multiValued': 'false'}
 }' "${SOLRURL}/solr/db/schema"
 
 
 curl -X POST -H 'Content-type:application/json' --data-binary '{
-"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'date', 'name': 'DateAdded', 'required': 'false', 'multiValued': 'false'}
+"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'pdate', 'name': 'DateAdded', 'required': 'false', 'multiValued': 'false'}
 }' "${SOLRURL}/solr/db/schema"
 
 
 curl -X POST -H 'Content-type:application/json' --data-binary '{
-"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'int', 'name': 'AddedByUserId', 'required': 'false', 'multiValued': 'false'}
+"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'pint', 'name': 'AddedByUserId', 'required': 'false', 'multiValued': 'false'}
 }' "${SOLRURL}/solr/db/schema"
 
 
 curl -X POST -H 'Content-type:application/json' --data-binary '{
-"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'date', 'name': 'LastMeasuredDate', 'required': 'false', 'multiValued': 'false'}
+"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'pdate', 'name': 'LastMeasuredDate', 'required': 'false', 'multiValued': 'false'}
 }' "${SOLRURL}/solr/db/schema"
 
 
 curl -X POST -H 'Content-type:application/json' --data-binary '{
-"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'int', 'name': 'LastMeasuredUserId', 'required': 'false', 'multiValued': 'false'}
+"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'pint', 'name': 'LastMeasuredUserId', 'required': 'false', 'multiValued': 'false'}
 }' "${SOLRURL}/solr/db/schema"
 
 
@@ -285,32 +285,32 @@ curl -X POST -H 'Content-type:application/json' --data-binary '{
 
 
 curl -X POST -H 'Content-type:application/json' --data-binary '{
-"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'int', 'name': 'GenotypeList', 'required': 'false', 'multiValued': 'true'}
+"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'pint', 'name': 'GenotypeList', 'required': 'false', 'multiValued': 'true'}
 }' "${SOLRURL}/solr/db/schema"
 
 
 curl -X POST -H 'Content-type:application/json' --data-binary '{
-"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'int', 'name': 'SpecimenList', 'required': 'false', 'multiValued': 'true'}
+"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'pint', 'name': 'SpecimenList', 'required': 'false', 'multiValued': 'true'}
 }' "${SOLRURL}/solr/db/schema"
 
 curl -X POST -H 'Content-type:application/json' --data-binary '{
-"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'int', 'name': 'GenotypeAnalysisGroupList', 'required': 'false', 'multiValued': 'true'}
+"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'pint', 'name': 'GenotypeAnalysisGroupList', 'required': 'false', 'multiValued': 'true'}
 }' "${SOLRURL}/solr/db/schema"
 
 curl -X POST -H 'Content-type:application/json' --data-binary '{
-"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'int', 'name': 'GenotypeDataSetList', 'required': 'false', 'multiValued': 'true'}
+"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'pint', 'name': 'GenotypeDataSetList', 'required': 'false', 'multiValued': 'true'}
 }' "${SOLRURL}/solr/db/schema"
 
 curl -X POST -H 'Content-type:application/json' --data-binary '{
-"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'int', 'name': 'ItemGroupList', 'required': 'false', 'multiValued': 'true'}
+"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'pint', 'name': 'ItemGroupList', 'required': 'false', 'multiValued': 'true'}
 }' "${SOLRURL}/solr/db/schema"
 
 curl -X POST -H 'Content-type:application/json' --data-binary '{
-"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'int', 'name': 'ItemGroupAnalysisGroupList', 'required': 'false', 'multiValued': 'true'}
+"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'pint', 'name': 'ItemGroupAnalysisGroupList', 'required': 'false', 'multiValued': 'true'}
 }' "${SOLRURL}/solr/db/schema"
 
 curl -X POST -H 'Content-type:application/json' --data-binary '{
-"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'int', 'name': 'ItemGroupDataSetList', 'required': 'false', 'multiValued': 'true'}
+"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'pint', 'name': 'ItemGroupDataSetList', 'required': 'false', 'multiValued': 'true'}
 }' "${SOLRURL}/solr/db/schema"
 
 #
@@ -364,6 +364,6 @@ curl -X POST -H 'Content-type:application/json' --data-binary '{
 "add-copy-field": {'dest': 'text', 'source': 'entity_name'}
 }' "${SOLRURL}/solr/db/schema"
 
-curl -X POST -H 'Content-type:application/json' --data-binary '{
-"delete-field": { "name":"id" }
-}' "${SOLRURL}/solr/db/schema"
+# curl -X POST -H 'Content-type:application/json' --data-binary '{
+# "delete-field": { "name":"id" }
+# }' "${SOLRURL}/solr/db/schema"

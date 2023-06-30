@@ -1,9 +1,9 @@
 #
 # DAL Deployment script for CentOS 7
-# Copyright (c) 2016, Diversity Arrays Technology, All rights reserved.
+# Copyright (c) 2023, Diversity Arrays Technology, All rights reserved.
 #
-# Author: Puthick Hok
-# Date: 08/08/2016
+# Author: Yu Qiu, George Xiyue Huang, Thao Vu
+# Date:02/03/2023
 # Description: Supporting ansible playbook script
 #
 

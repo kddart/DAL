@@ -235,6 +235,7 @@ sub setup {
     'list_taxonomy'                             => 'list_taxonomy_runmode',
     'update_taxonomy'                           => 'update_taxonomy_runmode',
     'del_taxonomy_gadmin'                       => 'del_taxonomy_gadmin_runmode',
+    'list_taxonomy_ancestor'                    => 'list_taxonomy_ancestor_runmode',
     'update_specimen_geography'                 => 'update_specimen_geography_runmode',
     );
 
@@ -411,7 +412,7 @@ sub add_genotype_runmode {
 
   my $taxonomy_id = undef;
 
-  if (defined $query->param('TaxonomyId')) {
+  if (defined $query->param('TaxonomyId') && length($query->param('TaxonomyId')) > 0) {
 
     $taxonomy_id = $query->param('TaxonomyId');
 
@@ -822,10 +823,12 @@ sub list_genotype {
     my $group_id_href = {};
     my $geno_id_aref  = [];
     my $genus_id_href = {};
+    my $taxonomy_id_href = {};
 
     my $genus_lookup      = {};
     my $group_lookup      = {};
     my $geno_alias_lookup = {};
+    my $taxonomy_lookup   = {};
 
     my $chk_id_err        = 0;
     my $chk_id_msg        = '';
@@ -841,6 +844,11 @@ sub list_genotype {
       if (defined $row->{'GenusId'}) {
 
         $genus_id_href->{$row->{'GenusId'}} = 1;
+      }
+
+      if (defined $row->{'TaxonomyId'}) {
+
+        $taxonomy_id_href->{$row->{'TaxonomyId'}} = 1;
       }
 
       if (defined $row->{'OwnGroupId'}) {
@@ -860,6 +868,14 @@ sub list_genotype {
 
       $self->logger->debug("GENUS_SQL: $genus_sql");
       $genus_lookup = $dbh->selectall_hashref($genus_sql, 'GenusId');
+    }
+
+    if (scalar(keys(%{$taxonomy_id_href})) > 0) {
+
+      my $taxonomy_sql = 'SELECT * FROM taxonomy WHERE TaxonomyId IN (' . join(',', keys(%{$taxonomy_id_href})) . ')';
+
+      $self->logger->debug("TAXONOMY_SQL: $taxonomy_sql");
+      $taxonomy_lookup = $dbh->selectall_hashref($taxonomy_sql, 'TaxonomyId');
     }
 
     if (scalar(keys(%{$group_id_href})) > 0) {
@@ -966,6 +982,11 @@ sub list_genotype {
         $row->{'GenusName'} = $genus_lookup->{$genus_id}->{'GenusName'};
       }
 
+      my $taxonomy_id = $row->{'TaxonomyId'};
+      if (defined $taxonomy_lookup->{$taxonomy_id}) {
+        $row->{'TaxonomyName'} = $taxonomy_lookup->{$taxonomy_id}->{'TaxonomyName'};
+      }
+
       $row->{'OwnGroupName'}          = $group_lookup->{$own_grp_id}->{'SystemGroupName'};
       $row->{'AccessGroupName'}       = $group_lookup->{$acc_grp_id}->{'SystemGroupName'};
       $row->{'OwnGroupPermission'}    = $perm_lookup->{$own_perm};
@@ -1024,8 +1045,8 @@ sub get_genotype_runmode {
 "GroupAdminRequired": 0,
 "SignatureRequired": 0,
 "AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><RecordMeta TagName='Genotype' /><Genotype AccessGroupPerm='5' AccessGroupId='0' GenotypeName='Geno_9981601' GenotypeId='7247924' AccessGroupPermission='Read/Link' OtherPermission='None' addAlias='genotype/7247924/add/alias' chgPerm='genotype/7247924/change/permission' OtherPerm='0' OwnGroupPerm='7' CanPublishGenotype='0' OriginId='0' GenotypeNote='none' SpeciesName='Testing' GenotypeColor='black' OwnGroupPermission='Read/Write/Link' OwnGroupName='admin' GenusName='Genus_5477708' GenusId='30' AccessGroupName='admin' GenotypeAcronym='T' chgOwner='genotype/7247924/change/owner' UltimatePermission='Read/Write/Link' OwnGroupId='0' update='update/genotype/7247924' UltimatePerm='7' /></DATA>",
-"SuccessMessageJSON": "{'VCol' : [], 'RecordMeta' : [{ 'TagName' : 'Genotype' } ], 'Genotype' : [ {'AccessGroupPerm' : '5', 'AccessGroupId' : '0', 'GenotypeId' : '7247924', 'GenotypeName' : 'Geno_9981601', 'addAlias' : 'genotype/7247924/add/alias', 'OtherPermission' : 'None', 'AccessGroupPermission' : 'Read/Link', 'chgPerm' : 'genotype/7247924/change/permission', 'OtherPerm' : '0', 'OwnGroupPerm' : '7', 'CanPublishGenotype' : '0', 'OriginId' : '0', 'SpeciesName' : 'Testing', 'GenotypeNote' : 'none', 'GenotypeColor' : 'black', 'OwnGroupPermission' : 'Read/Write/Link', 'OwnGroupName' : 'admin', 'GenusId' : '30', 'GenusName' : 'Genus_5477708', 'AccessGroupName' : 'admin', 'GenotypeAcronym' : 'T', 'chgOwner' : 'genotype/7247924/change/owner', 'UltimatePermission' : 'Read/Write/Link', 'update' : 'update/genotype/7247924', 'OwnGroupId' : '0', 'UltimatePerm' : '7'}] }",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><RecordMeta TagName='Genotype' /><Genotype AccessGroupPerm='5' AccessGroupId='0' GenotypeName='Geno_9981601' GenotypeId='7247924' AccessGroupPermission='Read/Link' OtherPermission='None' addAlias='genotype/7247924/add/alias' chgPerm='genotype/7247924/change/permission' OtherPerm='0' OwnGroupPerm='7' CanPublishGenotype='0' OriginId='0' GenotypeNote='none' SpeciesName='Testing' GenotypeColor='black' OwnGroupPermission='Read/Write/Link' OwnGroupName='admin' GenusName='Genus_5477708' GenusId='30' TaxonomyId='40' TaxonomyName='Taxonomy - 93039281836' AccessGroupName='admin' GenotypeAcronym='T' chgOwner='genotype/7247924/change/owner' UltimatePermission='Read/Write/Link' OwnGroupId='0' update='update/genotype/7247924' UltimatePerm='7' /></DATA>",
+"SuccessMessageJSON": "{'VCol' : [], 'RecordMeta' : [{ 'TagName' : 'Genotype' } ], 'Genotype' : [ {'AccessGroupPerm' : '5', 'AccessGroupId' : '0', 'GenotypeId' : '7247924', 'GenotypeName' : 'Geno_9981601', 'addAlias' : 'genotype/7247924/add/alias', 'OtherPermission' : 'None', 'AccessGroupPermission' : 'Read/Link', 'chgPerm' : 'genotype/7247924/change/permission', 'OtherPerm' : '0', 'OwnGroupPerm' : '7', 'CanPublishGenotype' : '0', 'OriginId' : '0', 'SpeciesName' : 'Testing', 'GenotypeNote' : 'none', 'GenotypeColor' : 'black', 'OwnGroupPermission' : 'Read/Write/Link', 'OwnGroupName' : 'admin', 'GenusId' : '30', 'GenusName' : 'Genus_5477708', 'TaxonomyId' : '40', 'TaxonomyName' : 'Taxonomy - 93039281836', 'AccessGroupName' : 'admin', 'GenotypeAcronym' : 'T', 'chgOwner' : 'genotype/7247924/change/owner', 'UltimatePermission' : 'Read/Write/Link', 'update' : 'update/genotype/7247924', 'OwnGroupId' : '0', 'UltimatePerm' : '7'}] }",
 "ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Genotype (724792443) not found.' /></DATA>"}],
 "ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Genotype (724792443) not found.' }]}"}],
 "URLParameter": [{"ParameterName": "id", "Description": "Existing GenotypeId"}],
@@ -2070,7 +2091,7 @@ sub list_specimen {
 
   if (scalar(@extra_attr_specimen_data)) {
     my $gis_read = connect_gis_read();
-    
+
     my $specimen_ids = [];
 
     foreach my $specimen_href (@extra_attr_specimen_data) {
@@ -2308,7 +2329,7 @@ sub list_specimen_advanced_runmode {
 
       # need to remove location field because generate_factor_sql does not understand these field
       if ( (!($fd_name =~ /specimenlocation/)) && (!($fd_name =~ /specimenlocdt/)) && (!($fd_name =~ /specimenlocdescription/))) {
-        
+
         push(@{$sql_field_list}, $fd_name);
       }
     }
@@ -2318,7 +2339,7 @@ sub list_specimen_advanced_runmode {
 
       # need to remove location field because generate_factor_sql does not understand these field
       if ( (!($fd_name =~ /specimenlocation/)) && (!($fd_name =~ /specimenlocdt/)) && (!($fd_name =~ /specimenlocdescription/))) {
-        
+
         push(@{$sql_field_list}, $fd_name);
       }
     }
@@ -4257,9 +4278,7 @@ sub delete_genotype_alias_runmode {
      return $data_for_postrun_href;
    }
 
-   my $dbh_write = connect_kdb_write();
-
-   $self->logger->debug("Deleting Genotype ALias $geno_alias_id");
+   $self->logger->debug("Deleting Genotype Alias $geno_alias_id");
 
    my $sql = 'DELETE FROM genotypealias where GenotypeAliasId=?';
 
@@ -7103,8 +7122,8 @@ sub list_genotype_advanced_runmode {
 "GroupAdminRequired": 0,
 "SignatureRequired": 0,
 "AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "FILTERING"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Pagination NumOfRecords='673' NumOfPages='673' Page='1' NumPerPage='1' /><RecordMeta TagName='Genotype' /><Genotype AccessGroupPerm='5' AccessGroupId='0' GenotypeName='Geno_9005297' GenotypeId='675' AccessGroupPermission='Read/Link' OtherPermission='None' addAlias='genotype/675/add/alias' chgPerm='genotype/675/change/permission' OwnGroupPerm='7' OtherPerm='0' CanPublishGenotype='0' OriginId='0' GenotypeNote='none' SpeciesName='Testing' GenotypeColor='black' OwnGroupPermission='Read/Write/Link' OwnGroupName='admin' GenusName='Genus_7695634' GenusId='10' AccessGroupName='admin' GenotypeAcronym='T' chgOwner='genotype/675/change/owner' UltimatePermission='Read/Write/Link' OwnGroupId='0' update='update/genotype/675' UltimatePerm='7' /></DATA>",
-"SuccessMessageJSON": "{'Pagination' : [{'NumOfRecords' : '673','NumOfPages' : 673,'NumPerPage' : '1','Page' : '1'}],'VCol' : [],'RecordMeta' : [{'TagName' : 'Genotype'}],'Genotype' : [{'AccessGroupPerm' : '5','AccessGroupId' : '0','GenotypeId' : '675','GenotypeName' : 'Geno_9005297','addAlias' : 'genotype/675/add/alias','OtherPermission' : 'None','AccessGroupPermission' : 'Read/Link','chgPerm' : 'genotype/675/change/permission','OwnGroupPerm' : '7','OtherPerm' : '0','CanPublishGenotype' : '0','OriginId' : '0','SpeciesName' : 'Testing','GenotypeNote' : 'none','GenotypeColor' : 'black','OwnGroupPermission' : 'Read/Write/Link','OwnGroupName' : 'admin','GenusId' : '10','GenusName' : 'Genus_7695634','AccessGroupName' : 'admin','GenotypeAcronym' : 'T','chgOwner' : 'genotype/675/change/owner','UltimatePermission' : 'Read/Write/Link','update' : 'update/genotype/675','OwnGroupId' : '0','UltimatePerm' : '7'}]}",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Pagination NumOfRecords='673' NumOfPages='673' Page='1' NumPerPage='1' /><RecordMeta TagName='Genotype' /><Genotype AccessGroupPerm='5' AccessGroupId='0' GenotypeName='Geno_9005297' GenotypeId='675' AccessGroupPermission='Read/Link' OtherPermission='None' addAlias='genotype/675/add/alias' chgPerm='genotype/675/change/permission' OwnGroupPerm='7' OtherPerm='0' CanPublishGenotype='0' OriginId='0' GenotypeNote='none' SpeciesName='Testing' GenotypeColor='black' TaxonomyId='40' TaxonomyName='Taxonomy - 93039281836' OwnGroupPermission='Read/Write/Link' OwnGroupName='admin' GenusName='Genus_7695634' GenusId='10' AccessGroupName='admin' GenotypeAcronym='T' chgOwner='genotype/675/change/owner' UltimatePermission='Read/Write/Link' OwnGroupId='0' update='update/genotype/675' UltimatePerm='7' /></DATA>",
+"SuccessMessageJSON": "{'Pagination' : [{'NumOfRecords' : '673','NumOfPages' : 673,'NumPerPage' : '1','Page' : '1'}],'VCol' : [],'RecordMeta' : [{'TagName' : 'Genotype'}],'Genotype' : [{'AccessGroupPerm' : '5','AccessGroupId' : '0','GenotypeId' : '675','GenotypeName' : 'Geno_9005297','addAlias' : 'genotype/675/add/alias','OtherPermission' : 'None','AccessGroupPermission' : 'Read/Link','chgPerm' : 'genotype/675/change/permission','OwnGroupPerm' : '7','OtherPerm' : '0','CanPublishGenotype' : '0','OriginId' : '0','SpeciesName' : 'Testing','GenotypeNote' : 'none','GenotypeColor' : 'black','TaxonomyId' : '40', 'TaxonomyName' : 'Taxonomy - 93039281836', 'OwnGroupPermission' : 'Read/Write/Link','OwnGroupName' : 'admin','GenusId' : '10','GenusName' : 'Genus_7695634','AccessGroupName' : 'admin','GenotypeAcronym' : 'T','chgOwner' : 'genotype/675/change/owner','UltimatePermission' : 'Read/Write/Link','update' : 'update/genotype/675','OwnGroupId' : '0','UltimatePerm' : '7'}]}",
 "ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
 "ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
 "URLParameter": [{"ParameterName": "nperpage", "Description": "Number of records in a page for pagination"}, {"ParameterName": "num", "Description": "The page number of the pagination"}],
@@ -9534,7 +9553,7 @@ sub import_specimen_csv_runmode {
   my $geograph_provided = 0;
 
   if (defined $query->param('specimenlocation')) {
-    
+
     my $specimenLocation_col = $query->param('specimenlocation');
     $chk_col_def_data->{'specimenlocation'} = $specimenLocation_col;
     $matched_col->{$specimenLocation_col} = 'specimenlocation';
@@ -12087,7 +12106,7 @@ sub export_specimen_runmode {
 
       # need to remove location field because generate_factor_sql does not understand these field
       if ( (!($fd_name =~ /specimenlocation/)) && (!($fd_name =~ /specimenlocdt/)) && (!($fd_name =~ /specimenlocdescription/))) {
-        
+
         push(@{$sql_field_list}, $fd_name);
       }
     }
@@ -12096,7 +12115,7 @@ sub export_specimen_runmode {
 
       # need to remove location field because generate_factor_sql does not understand these field
       if ( (!($fd_name =~ /specimenlocation/)) && (!($fd_name =~ /specimenlocdt/)) && (!($fd_name =~ /specimenlocdescription/))) {
-        
+
         push(@{$sql_field_list}, $fd_name);
       }
     }
@@ -12650,7 +12669,7 @@ sub add_pedigree_runmode {
 
     return $data_for_postrun_href;
   }
-  
+
   my $group_id  = $self->authen->group_id();
   my $gadmin_status = $self->authen->gadmin_status();
   my $perm_str = permission_phrase($group_id, 0, $gadmin_status, 'genotype');
@@ -16079,22 +16098,22 @@ sub get_taxonomy_runmode {
 
     return $data_for_postrun_href;
   }
+  my $sql = "SELECT * from taxonomy where taxonomy.TaxonomyId=?";
 
-  my $where_clause = 'WHERE TaxonomyId=?';
+  my ($taxonomy_err, $taxonomy_msg, $taxonomy_data)  = $self->list_taxonomy(1, $sql, [$taxonomy_id]);
 
-  my ($taxonomy_err, $taxonomy_msg, $taxonomy_data) = $self->list_taxonomy(1, $where_clause, $taxonomy_id);
 
   if ($taxonomy_err) {
 
     $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.' . $taxonomy_msg}]};
 
     return $data_for_postrun_href;
   }
 
   $data_for_postrun_href->{'Error'}     = 0;
   $data_for_postrun_href->{'Data'}      = {'Taxonomy'      => $taxonomy_data,
-                                           'RecordMeta' => [{'TagName' => 'Genus'}],
+                                           'RecordMeta' => [{'TagName' => 'Taxonomy'}],
   };
 
   return $data_for_postrun_href;
@@ -16106,8 +16125,14 @@ sub list_taxonomy {
 
   my $self            = shift;
   my $extra_attr_yes  = shift;
+  my $sql             = shift;
   my $where_clause    = qq{};
   $where_clause       = shift;
+
+  my $err = 0;
+  my $msg = '';
+
+  my $taxonomy_data = [];
 
   if (length($where_clause) > 0) {
 
@@ -16127,42 +16152,12 @@ sub list_taxonomy {
 
   my $dbh = connect_kdb_read();
 
-  my $sql = 'SELECT * FROM taxonomy ';
-  $sql   .= $where_clause;
-  $sql   .= ' ORDER BY TaxonomyId DESC';
+  ($err, $msg, $taxonomy_data) = read_data($dbh, $sql, $where_clause);
 
-  my $sth = $dbh->prepare($sql);
-  # parameters provided by the caller
-  # for example, ('WHERE FieldA=?', '1')
-  $sth->execute(@_);
+  if ($err) {
 
-  my $err = 0;
-  my $msg = '';
-  my $taxonomy_data = [];
-
-  if ( !$dbh->err() ) {
-
-    my $array_ref = $sth->fetchall_arrayref({});
-
-    if ( !$sth->err() ) {
-
-      $taxonomy_data = $array_ref;
-    }
-    else {
-
-      $err = 1;
-      $msg = 'Unexpected error';
-      $self->logger->debug('Err: ' . $dbh->errstr());
-    }
+    return ($err, $msg, []);
   }
-  else {
-
-    $err = 1;
-    $msg = 'Unexpected error';
-    $self->logger->debug('Err: ' . $dbh->errstr());
-  }
-
-  $sth->finish();
 
   my $gadmin_status = $self->authen->gadmin_status();
 
@@ -16213,9 +16208,6 @@ sub list_taxonomy {
 
   return ($err, $msg, $extra_attr_taxonomy_data);
 }
-
-
-
 
 sub update_taxonomy_runmode {
 
@@ -16480,12 +16472,43 @@ sub list_taxonomy_runmode {
 =cut
 
   my $self = shift;
+  my $query = $self->query();
 
   my $data_for_postrun_href = {};
 
   my $msg = '';
 
-  my ($taxonomy_err, $taxonomy_msg, $taxonomy_data) = $self->list_taxonomy(1, '');
+  my $field_list_csv = '';
+
+  if (defined $query->param('FieldList')) {
+
+    $field_list_csv = $query->param('FieldList');
+  }
+
+  my $filtering_csv = '';
+
+  if (defined $query->param('Filtering')) {
+
+    $filtering_csv = $query->param('Filtering');
+  }
+
+  $self->logger->debug("Filtering csv: $filtering_csv");
+
+  my $sorting = '';
+
+  if (defined $query->param('Sorting')) {
+
+    $sorting = $query->param('Sorting');
+  }
+
+  my $group_id = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+  my $perm_str = permission_phrase($group_id, 0, $gadmin_status);
+
+  my $sql = 'SELECT * from taxonomy ';
+  $sql   .= 'LIMIT 1';
+
+  my ($taxonomy_err, $taxonomy_msg, $taxonomy_data) = $self->list_taxonomy(0, $sql);
 
   if ($taxonomy_err) {
 
@@ -16494,6 +16517,133 @@ sub list_taxonomy_runmode {
     $msg = 'Unexpected error';
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $dbh = connect_kdb_read();
+
+  my $taxonomy_data_aref = $taxonomy_data;
+
+  my @field_list_all;
+
+  if (scalar(@{$taxonomy_data_aref}) == 1) {
+
+    @field_list_all = keys(%{$taxonomy_data_aref->[0]});
+  }
+  else {
+
+    my ($sfield_err, $sfield_msg, $sfield_data, $pkey_data) = get_static_field($dbh, 'taxonomy');
+
+    if ($sfield_err) {
+
+      $self->logger->debug("Get static field failed: $sfield_msg");
+      return $self->_set_error();
+    }
+
+    for my $sfield_rec (@{$sfield_data}) {
+
+      push(@field_list_all, $sfield_rec->{'Name'});
+    }
+
+    for my $pkey_field (@{$pkey_data}) {
+
+      push(@field_list_all, $pkey_field);
+    }
+  }
+
+  $self->logger->debug("Field list all: " . join(',', @field_list_all));
+
+  my $final_field_list = \@field_list_all;
+
+  if (length($field_list_csv) > 0) {
+
+    my ($sel_field_err, $sel_field_msg, $sel_field_list) = parse_selected_field($field_list_csv,
+                                                                                $final_field_list,
+                                                                                'TaxonomyId');
+
+    if ($sel_field_err) {
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $sel_field_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    $final_field_list = $sel_field_list;
+  }
+
+  my $field_lookup = {};
+  my $field_idx = 0;
+  for my $fd_name (@{$final_field_list}) {
+
+    $field_lookup->{$fd_name} = $field_idx;
+    $field_idx += 1;
+  }
+
+  my $other_join = '';
+
+  my ($filter_err, $filter_msg, $filter_phrase, $where_arg) = parse_filtering('TaxonomyId',
+                                                                              'taxonomy',
+                                                                              $filtering_csv,
+                                                                              $final_field_list);
+
+  $self->logger->debug("Filter phrase: $filter_phrase");
+
+  if ($filter_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $filter_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $final_field_list_str = join(',', @{$final_field_list});
+
+  my $filter_where_phrase = '';
+  if (length($filter_phrase) > 0) {
+
+    $filter_where_phrase = " WHERE $filter_phrase ";
+  }
+
+  my $filtering_exp = " $filter_where_phrase ";
+
+  $sql  = "SELECT $final_field_list_str ";
+  $sql .= "FROM taxonomy ";
+  $sql .= "$filtering_exp ";
+
+  $self->logger->debug("SQL: $sql");
+
+  $dbh->disconnect();
+
+  my ($sort_err, $sort_msg, $sort_sql) = parse_sorting($sorting, $final_field_list);
+
+  if ($sort_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $sort_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (length($sort_sql) > 0) {
+
+    $sql .= " ORDER BY $sort_sql ";
+  }
+  else {
+
+    $sql .= ' ORDER BY TaxonomyId DESC';
+  }
+
+  $self->logger->debug("SQL: $sql");
+
+  my ($read_taxonomy_err, $read_taxonomy_msg, $taxonomy_data) = $self->list_taxonomy(1, $sql, $where_arg);
+
+  if ($read_taxonomy_err) {
+
+    $self->logger->debug($read_taxonomy_msg);
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
     return $data_for_postrun_href;
   }
@@ -16596,11 +16746,6 @@ sub del_taxonomy_gadmin_runmode {
   $data_for_postrun_href->{'ExtraData'} = 0;
 
   return $data_for_postrun_href;
-
-
-  my $data_for_postrun_href = {};
-
-  return $data_for_postrun_href;
 }
 
 sub get_specimen_group_dtd_file {
@@ -16695,6 +16840,75 @@ sub _set_error {
 				'Error' => 1,
 				'Data'	=> { 'Error' => [{'Message' => $error_message || 'Unexpected error.'}] }
 		};
+}
+
+sub list_taxonomy_ancestor_runmode {
+
+=pod list_taxonomy_ancestor_HELP_START
+{
+"OperationName": "List taxonomy ancestors",
+"Description": "List all ancestors of the taxonomy.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><RecordMeta TagName='Ancestor' /><Ancestor TaxonomyId='40' TaxonomyNote='none' TaxonomyURL='' TaxonomyName='Taxonomy - 93039281836' TaxonomyExtId='' TaxonomyClass='Class - 75988590019' ParentTaxonomyId='35' TaxonomySource='' /></DATA>",
+"SuccessMessageJSON": "{'RecordMeta' : [{'TagName' : 'Ancestor'}],'Ancestor' : [{'TaxonomyId' : '40','TaxonomyNote' : 'none','TaxonomyURL' : null,'TaxonomyName' : 'Taxonomy - 93039281836','TaxonomyExtId' : null,'TaxonomyClass' : 'Class - 75988590019','ParentTaxonomyId' : '35','TaxonomySource' : null}]}",
+"ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
+"ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
+"URLParameter": [{"ParameterName": "taxonomyid", "Description": "Existing TaxonomyId"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self  = shift;
+  my $query = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  my $taxonomy_id = $self->param('taxonomyid');
+
+  my $dbh = connect_kdb_read();
+
+  if (!record_existence($dbh, 'taxonomy', 'TaxonomyId', $taxonomy_id)) {
+
+    my $err_msg = "TaxonomyId ($taxonomy_id): not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $taxonomy_sql = 'SELECT taxonomy.*';
+  $taxonomy_sql   .= 'FROM taxonomy ';
+  $taxonomy_sql   .= 'WHERE TaxonomyId=?';
+
+  my ($read_tax_err, $read_tax_msg, $ancestor_data, $number_level) = recurse_read_v2($dbh, $taxonomy_sql, [$taxonomy_id], 'ParentTaxonomyId',0);
+
+  if ($read_tax_err) {
+
+    $self->logger->debug("Recurse read failed: $read_tax_msg.");
+
+    my $err_msg = "Unexpected Error.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  # Remove itself and only return list of ancestors of targeted TaxonomyId
+  $ancestor_data = [ grep { $_->{'TaxonomyId'} ne $taxonomy_id } @$ancestor_data ];
+
+  $dbh->disconnect();
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Ancestor'    => $ancestor_data,
+                                           'Number'      => $number_level,
+                                           'RecordMeta'  => [{'TagName' => 'Ancestor'}],
+                                          };
+
+  return $data_for_postrun_href;
 }
 
 1;

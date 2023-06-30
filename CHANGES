@@ -1,3 +1,23 @@
+Version 2.7.3
+Date: 30/06/2023
+Description: Bug Fixing Patch and Improvements
+
++ SOLR dependencies upgraded to use the latest version of SOLR
+
++ New Endpoint added to display taxonomy ancestors.
+
++ Bug related to Add Genotype that mistakenly assigned Taxonomy to be compulsory fixed.
+
++ Bug that showed TagName for Get Taxonomy incorrectly fixed.
+
++ Delete Trial Unit now deletes linked Trial Unit Treatments.
+
++ Get and List Genotype now shows Taxonomy Names.
+
++ Docker Deployment of DAL now available.
+
++ Ansible Scripts' dates have been updated to reflect the last meaningful work on them was done.
+
 Version 2.7.2
 Date: 12/04/2023
 Description: New Features and Improvements

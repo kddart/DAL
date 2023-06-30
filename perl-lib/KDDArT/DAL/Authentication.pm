@@ -74,6 +74,8 @@ sub setup {
   __PACKAGE__->authen->count_session_request_runmodes(':all');
   __PACKAGE__->authen->ignore_group_assignment_runmodes('switch_to_group');
 
+  __PACKAGE__->authen->check_rand_runmodes('login');
+
   $self->run_modes(
     # DO TO: need to find out why login is not listed.
     'login'                     => 'login_runmode',

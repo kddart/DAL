@@ -1,6 +1,6 @@
 README file for KDDart deployment using ansible on RedHat 7 based distribution
 ==============================================================================
-This document provides a basic explanation on how to run a Ansible playbook script to deploy KDDart DAL in RedHat 7 based distribution. It also lists the basic requirements to run the Ansible playbook script. This deployment script has been tested on OpenSuse Leap 15.2 and Scientific Linux 7.
+This document provides a basic explanation on how to run a Ansible playbook script to deploy KDDart DAL in RedHat 7 based distribution. It also lists the basic requirements to run the Ansible playbook script. This deployment script has been tested on OpenSuse Leap 15.4.
 
 The main Ansible playbook script is kddart_dal_v2_6_0_server_deployment_leap15.yml in this directory.
 
@@ -23,7 +23,7 @@ Basic Requirements
 
 4. Operating System on target machine: The target machine requires:
 
-   * OpenSuse 15.2 or Scientific Linux 7
+   * OpenSuse 15.4 or Scientific Linux 7
 
    * Software package selection: Minimum or Compute Node
 
@@ -32,7 +32,7 @@ Step-by-step Instructions
 
 The following instructions will deploy DAL for testing:
 
-1. Install OpenSuse 15.2 or Scientific Linux 7 on the target machine:
+1. Install OpenSuse 15.4 on the target machine:
 
    * Turn on network
 
@@ -60,15 +60,37 @@ and replace x.x.x.x with the IP address of the target machine
 
 ansible-playbook kddart_dal_v2_7_0_server_deployment_leap.yml --extra-vars="local_tar_gz_file='dal.tar.gz' dbpass='securepassword2023$' ip_network='192.18.18.18/23' dal_address_name='kddart.example.com'"
 
-9. Login as root to the target machine and execute /root/KDDArT-DAL-v2.6.0/other/run_create_dbs.sh
+9. Login as root to the target machine and execute /root/KDDArT-DAL-v2.7.0/other/run_create_dbs.sh
 
-10. Restart target machine. It must be done before proceeding to the next instruction due SELinux.
+10. Restart target machine. It must be done before proceeding to the next instruction.
 
 11. Check services on the target machine:
 
-    * Check MySQL service command: systemctl status mysql
-    * Check PostgreSQL service command: systemctl status postgresql
-    * Check MonetDB service: ps aux | grep 'monetdbd' if there are two processes matched, MonetDB service is running. If there is only one process match, then run /usr/local/bin/monetdbd start /var/lib/monetdb/dbfarm;    
+    * Check MySQL service command: `systemctl status mysql`
+    * Check PostgreSQL service command: `systemctl status postgresql`
+    * Check MonetDB service: `ps aux | grep 'monetdbd'` if there are two processes matched, MonetDB service is running. If there is only one process match, then run `/usr/local/bin/monetdbd start /var/lib/monetdb/dbfarm;`    
+      * MonetDB can be made to start on reboot after installation process is done with the following
+         1. Adding this to `/etc/systemd/system/monetdbd.service`
+             
+             [Unit]
+             Description=MonetDB daemon
+             After=mysql.service
+
+             [Service]
+             User=root
+             Type=forking
+             ExecStart=/usr/local/bin/monetdbd start /var/lib/monetdb/dbfarm
+             ExecStop=/usr/local/bin/monetdbd stop /var/lib/monetdb/dbfarm
+
+             [Install]
+             WantedBy=multi-user.target
+
+         2. `systemctl --system daemon-reload;`
+         3. `systemctl enable monetdbd.service;`
+         4. `systemctl start monetdbd.service;`
+   * Check SOLR service command: `systemctl status solr`
+      * SOLR service can be run with the command: `systemctl start solr`    
+
 
 12. As root on the target machine, run:
 

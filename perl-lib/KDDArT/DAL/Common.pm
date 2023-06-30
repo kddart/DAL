@@ -91,7 +91,7 @@ our @EXPORT   = qw($DTD_PATH $RPOSTGRES_UP_FILE $GIS_BUFFER_DISTANCE
                    filter_csv_aref parse_marker_sorting get_sorting_function check_static_field
                    get_next_value_for check_bool_href check_email_href check_value_href load_config read_cookies
                    record_existence_bulk get_solr_cores get_solr_fields get_solr_entities
-                   validate_trait_db_bulk get_filtering_parts minute_diff append_geography_loc
+                   validate_trait_db_bulk get_filtering_parts minute_diff append_geography_loc recurse_read_v2
                  );
 
 our $COOKIE_DOMAIN            = {};
@@ -179,7 +179,7 @@ our $ACCEPT_HEADER_LOOKUP   = { 'application/json' => 'JSON',
 
 our $VALID_CTYPE            = {'xml' => 1, 'json' => 1, 'geojson' => 1};
 
-our $DAL_VERSION            = '2.7.2';
+our $DAL_VERSION            = '2.7.3';
 our $DAL_COPYRIGHT          = 'Copyright (c) 2023, Diversity Arrays Technology, All rights reserved.';
 our $DAL_ABOUT              = 'Data Access Layer';
 
@@ -201,6 +201,7 @@ our $SECRETKEY_CFG = "FROM_CFG_FILE";
 
 our $MAX_RECURSIVE_ANCESTOR_LEVEL     = "FROM CFG_FILE";
 our $MAX_RECURSIVE_DESCENDANT_LEVEL   = "FROM CFG_FILE";
+our $MAX_RECURSIVE_GENERAL_LEVEL      = "FROM CFG_FILE";
 
 our $M2M_RELATION                = {};
 
@@ -8016,7 +8017,7 @@ sub append_geography_loc {
   if ($missing_err) {
     die 'Missing input(s)';
   }
-  
+
   if (ref \$geotypes eq "SCALAR") {
     $geotypes = [$geotypes];
   } elsif (ref $geotypes ne "ARRAY") {
@@ -8120,6 +8121,60 @@ sub append_geography_loc {
 
   $gis_write->disconnect;
   return ($err, $err_msg);
+}
+
+sub recurse_read_v2 {
+
+  my $dbh              = $_[0];
+  my $sql              = $_[1];
+  my $where_para_aref  = $_[2];
+  my $seeking_id_field = $_[3];
+  my $recursive_count  = $_[4];
+
+  my $err  = 0;
+  my $msg  = '';
+  my $data = [];
+
+  my ($read_err, $read_msg, $read_data_aref) = read_data($dbh, $sql, $where_para_aref);
+
+  if ($read_err) {
+
+    $err = $read_err;
+    $msg = $read_msg;
+
+    return ($err, $msg, $data);
+  }
+
+  for my $read_data_rec (@{$read_data_aref}) {
+
+    my $targeted_id = $read_data_rec->{$seeking_id_field};
+
+    if (defined $targeted_id && $targeted_id != 'NULL') {
+
+      $recursive_count++;
+
+      if ($recursive_count <= $MAX_RECURSIVE_GENERAL_LEVEL) {
+        my ($read_recurse_err, $read_recurse_msg, $read_recurse_data) = recurse_read_v2($dbh, $sql, [$targeted_id], $seeking_id_field, $recursive_count);
+
+        if ($read_recurse_err) {
+
+          $err = $read_recurse_err;
+          $msg = $read_recurse_msg;
+
+          return ($err, $msg, $data, $recursive_count);
+        }
+        for my $read_recurse_rec (@{$read_recurse_data}) {
+          push(@{$data}, $read_recurse_rec);
+        }
+      }
+      
+    }
+
+    push(@{$data}, $read_data_rec);
+
+  }
+
+  return ($err, $msg, $data, $recursive_count);
 }
 
 1;

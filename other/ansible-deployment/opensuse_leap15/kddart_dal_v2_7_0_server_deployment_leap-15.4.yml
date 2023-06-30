@@ -1,9 +1,9 @@
 #
 # DAL Deployment script for openSuSe Leap 15.4
-# Copyright (c) 2018, Diversity Arrays Technology, All rights reserved.
+# Copyright (c) 2023, Diversity Arrays Technology, All rights reserved.
 #
-# Author: Puthick Hok
-# Date: 08/08/2016
+# Author: Puthick Hok, George Huang, Yu Qiu
+# Date: 22/06/2023
 # Usage: Usage: ansible-playbook kddart_dal_v2_7_0_server_deployment_leap-15.4.yml
 # Description: By running the usage command, ansible will install and configure DAL
 #              according the instructions in kddart_server_deployment_centos7.yml.
@@ -53,7 +53,7 @@
     solr_config_file: /etc/default/solr.in.sh
     solr_install_dir: /opt
     solr_home: /var/solr
-    solr_version: "6.2.1"
+    solr_version: "8.11.1"
     mysql_jdbc_jar: mysql-connector-java-*-bin.jar
     monetdb_jdbc_jar: monetdb-jdbc-*.jar
     config_cron_job: False
@@ -65,7 +65,8 @@
              After=mysql.service
 
              [Service]
-             User=monetdb
+             User=root
+             Type=forking
              ExecStart=/usr/local/bin/monetdbd start /var/lib/monetdb/dbfarm
              ExecStop=/usr/local/bin/monetdbd stop /var/lib/monetdb/dbfarm
 
@@ -145,6 +146,7 @@
         - bzip2
         - perl-LWP-Protocol-https
         - sysvinit-tools
+        - insserv
 
     - name: Remove nagios-www (its apache config is not Apache 2.4 ready)
       zypper: pkg=nagios-www state=absent
@@ -221,7 +223,7 @@
         - String::Escape
         - XML::XSLT
         - UNIVERSAL::require
-        - Apache::Solr
+        #- Apache::Solr Current Code base requires version Apache-Solr-1.01
         - MCE
         - MCE::Shared
         - Moo
@@ -257,6 +259,12 @@
         make;
         make install;
         rm -rf /tmp/XML-Checker-0.13
+
+    - name: Install Apache-Solr-1.01 manually
+      shell: >
+        cd /tmp;
+        wget https://cpan.metacpan.org/authors/id/M/MA/MARKOV/Apache-Solr-1.01.tar.gz;
+        cpanm install -f Apache-Solr-1.01.tar.gz;
 
     - name: Install monetdb manually
       shell: >
@@ -307,6 +315,12 @@
 
     - name: Create KDDart Databases
       shell: "/bin/bash {{ local_dir }}/other/create_dbs.sh 1 kddart_gis_enviro_{{ dal_db_version }} {{ local_dir }}/other/db_files/kddart_gis_enviro_dal_{{ dal_version }}_postgis2.sql kddart_{{ dal_db_version }} {{ local_dir }}/other/db_files/kddart_dal_{{ dal_version }}.sql kddart_marker_{{ dal_db_version }} {{ local_dir }}/other/db_files/kddart_marker_dal_{{ dal_version }}.sql 1"
+
+    - name: Save create dbs command for demo databases
+      shell: echo "{{ local_dir }}/other/create_dbs.sh 2 kddart_gis_enviro_{{ dal_db_version }} {{ local_dir }}/other/db_files/demo/kddart_gis_enviro_demo_{{ dal_db_version }}.sql kddart_{{ dal_db_version }} {{ local_dir }}/other/db_files/demo/kddart_demo_{{ dal_db_version }}.sql kddart_marker_{{ dal_db_version }} {{ local_dir }}/other/db_files/demo/kddart_marker_demo_{{ dal_db_version }}.sql 1" > {{ local_dir }}/other/run_create_demo_dbs.sh; chmod 755 {{ local_dir }}/other/run_create_demo_dbs.sh;
+
+    - name: Save create dbs command for blank databases
+      shell: echo "{{ local_dir }}/other/create_dbs.sh 2 kddart_gis_enviro_{{ dal_db_version }} {{ local_dir }}/other/db_files/kddart_gis_enviro_dal_{{ dal_version }}_postgis2.sql kddart_{{ dal_db_version }} {{ local_dir }}/other/db_files/kddart_dal_{{ dal_version }}.sql kddart_marker_{{ dal_db_version }} {{ local_dir }}/other/db_files/kddart_marker_dal_{{ dal_version }}.sql 1"  > {{ local_dir }}/other/run_create_empty_dbs.sh; chmod 755 {{ local_dir }}/other/run_create_empty_dbs.sh;
 
     - name: Make host entry
       shell: |
@@ -384,6 +398,10 @@
         setfacl -d -m o::rx {{ apache_base_dir }}/tmp/kddart;
         setfacl -d -m g::rwx {{ apache_base_dir }}/tmp/kddart;
 
+    - name: Update kddart_dal.cfg file
+      shell: |
+        sed -i "s/kddart.example.com/{{ dal_address_name }}/g" {{ apache_base_dir }}/secure/kddart_dal.cfg
+
     - name: Restart mysql
       shell: systemctl restart mysql
 
@@ -395,15 +413,6 @@
         [[ `pidof /usr/local/bin/monetdbd` -gt 1 ]] && /usr/local/bin/monetdbd stop /var/lib/monetdb/dbfarm;
         sleep 30s;
         /usr/local/bin/monetdbd start /var/lib/monetdb/dbfarm;
-
-    - name: Make MonetDB start by default at boot time
-      shell: >
-        if [ ! -e /etc/systemd/system/monetdbd.service ]; then
-        echo "{{ monetdb_systemd_config }}" > /etc/systemd/system/monetdbd.service;
-        systemctl --system daemon-reload;
-        systemctl enable monetdbd.service;
-        systemctl start monetdbd.service;
-        fi;
 
     - name: Restart apache
       shell: systemctl restart apache2
@@ -524,13 +533,36 @@
         - dal
 
     - name: Put the password into db-data-config.xml
-      replace: dest={{ solr_home }}/data/db/conf/db-data-config.xml regexp='yourSecurePassword' replace="{{ dbpass }}"
+      replace: dest={{ solr_home }}/data/{{ item }}/conf/{{ item }}-data-config.xml regexp='yourSecurePassword' replace="{{ dbpass }}"
+      with_items:
+        - db
+        - monetdb
+
     - name: Change unique key from id to SolrId
       replace: dest={{ solr_home }}/data/{{ item }}/conf/managed-schema regexp='<uniqueKey>id</uniqueKey>' replace="<uniqueKey>SolrId</uniqueKey>"
       with_items:
         - db
         - monetdb
         - dal
+    
+    - name: Remove id field
+      replace:
+        path: "/var/solr/data/{{ item }}/conf/managed-schema"
+        regexp: '<field name="id"*'
+        replace: ""
+      with_items:
+        - db
+        - monetdb
+        - dal
+    
+    - name: Update type of field _root_ to that of SolrId (Solr requires them to be the same)
+      replace:
+        path: "/var/solr/data/{{ item }}/conf/managed-schema"
+        regexp: '<field name="_root_" type="string"'
+        replace: '<field name="_root_" type="text_general"'
+      with_items:
+        - db
+        - monetdb
 
     - name: Restart solr
       shell: /etc/init.d/solr restart
@@ -540,7 +572,3 @@
         minute: "*/15"
         job: "/usr/bin/perl -w {{ local_dir }}/other/solr/reindex_solr.pl --dalbaseurl 'http://{{ dal_address_name }}/dal' --workingdir '/tmp' --username 'admin' --password 'kddartadmin' --kddartgroup 0 --solrhost 'http://localhost' --solrport '8983' --solrcorecsv 'dal,db,monetdb' > /root/reindex_solr.log 2>&1"
       when: config_cron_job == True
-
-    - name: Update kddart_dal.cfg file
-      shell: |
-        sed -i "s/kddart.example.com/{{ dal_address_name }}/g" {{ apache_base_dir }}/secure/kddart_dal.cfg

@@ -325,9 +325,11 @@ CGI::Application::Dispatch->dispatch(
     'delete/taxonomy/:id'                               => { app => 'KDDArT::DAL::Genotype',
                                                              rm  => 'del_taxonomy_gadmin' },
 
-
-    'list/taxonomy'                                       => { app => 'KDDArT::DAL::Genotype',
+    'list/taxonomy'                                     => { app => 'KDDArT::DAL::Genotype',
                                                              rm  => 'list_taxonomy' },
+
+    'taxonomy/:taxonomyid/list/ancestor'                => { app => 'KDDArT::DAL::Genotype',
+                                                             rm  => 'list_taxonomy_ancestor' },
 
     'add/genus'                                         => { app => 'KDDArT::DAL::Genotype',
                                                              rm  => 'add_genus_gadmin' },
@@ -845,7 +847,7 @@ CGI::Application::Dispatch->dispatch(
 
     'delete/extractdata/:id'                           => { app => 'KDDArT::DAL::Extract',
                                                             rm  => 'delete_extractdata' },
-    
+
     #'delete/extractdatafile/:id'                       => { app => 'KDDArT::DAL::Extract',
     #                                                        rm  => 'delete_extractdatafile' },
     # TO come in 2.7.3

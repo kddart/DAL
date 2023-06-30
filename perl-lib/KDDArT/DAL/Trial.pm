@@ -10092,6 +10092,20 @@ sub del_trial_unit_runmode {
     return $data_for_postrun_href;
   }
 
+  $sql = "DELETE FROM trialunittreatment WHERE TrialUnitId=?";
+  $sth = $dbh_k_write->prepare($sql);
+
+  $sth->execute($tunit_id);
+
+  if ($dbh_k_write->err()) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+
   $sth->finish();
 
   $sql = "DELETE FROM trialunit WHERE TrialUnitId=?";

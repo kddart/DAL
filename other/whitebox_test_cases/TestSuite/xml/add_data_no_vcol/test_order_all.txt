@@ -40,6 +40,7 @@ xml/add_data_no_vcol/case_00649_get_taxonomy.xml
 xml/add_data_no_vcol/case_00650_update_taxonomy.xml
 xml/add_data_no_vcol/case_00652_list_taxonomy.xml
 xml/add_data_no_vcol/case_10400_import_genotype_taxonomy.xml
+xml/add_data_no_vcol/case_10633_list_taxonomy_ancestor.xml
 xml/add_data_no_vcol/case_00627_update_trialunit_bulk.xml
 xml/add_data_no_vcol/case_10173_get_parent_type.xml
 xml/add_data_no_vcol/case_10188_list_parent_type.xml

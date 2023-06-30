@@ -1,9 +1,9 @@
 #
 # DAL Deployment script for CentOS 7
-# Copyright (c) 2016, Diversity Arrays Technology, All rights reserved.
+# Copyright (c) 2023, Diversity Arrays Technology, All rights reserved.
 #
-# Author: Puthick Hok
-# Date: 08/08/2016
+# Author: Puthick Hok, George Xiyue Huang
+# Date: 21/07/2022
 # Usage: ansible-playbook kddart_server_deployment_centos7.yml
 # Description: By running the usage command, ansible will install and configure DAL
 #              according the instructions in kddart_server_deployment_centos7.yml.

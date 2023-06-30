@@ -1,6 +1,18 @@
 # KDDart Data Access Layer (DAL) project
 
-## DAL introduction
+## KDDart Introduction
+
+The KDDart Knowledge Discovery System provides users with the ability to securely and efficiently integrate three diverse types of data:
+
+* Phenotypic;
+* Genetic;
+* Environmental.
+
+While KDDart has much of its roots in breeding and agricultural purposes, it has evolved to include multidisciplinary, agro-ecological and environmental research undertakings.
+
+Offering KDDart as an Open Source platform is intended to pave the way for a collaborative environment to develop software applications that address current and future research needs.
+
+## DAL Introduction
 
 DAL is a REST web service data access gateway to KDDart databases.
 
@@ -8,3 +20,32 @@ DAL can be deployed using Ansible deployment script. Documentation for deploying
 
 More information about KDDart system can be found at: http://www.kddart.org
 
+
+## Supported Operating Systems 
+
+Currently DAL can be deployed on CentOS07 and openSUSE 15. However, to prepare for Cent0S7 end of life in June 30 2024, it is recommended that DAL only be install on openSUSE 15. As of June 2023, plans are underway to support a Debian deployment of DAL.
+
+## Supporting Documentations
+
+A full API specifications can be found at https://www.kddart.org/reference.html
+
+General information and guides for developers can be found at https://www.kddart.org/ under Developers
+
+General information about use cases and overview can be found at https://www.kddart.org/introduction.html
+
+## Contributors
+
+KDDart has had the privilege of having many contributors to it's development and evolution. Specific to to DAL, we have see contributions and development work done by: 
+
+* Grzegorz Uszynski
+* Puthick Hok
+* George Xiyue Huang
+* Yu Qiu
+* Sze Shan (Joan) Yap
+* Thao (Greene) Vu 
+
+KDDart began its roots with Katmandoo system, so we would like to acknowledge the efforts of the following people, who initially contributed:
+
+* Avishesh Shrestha
+* Michael Hassall
+* Scott Brady

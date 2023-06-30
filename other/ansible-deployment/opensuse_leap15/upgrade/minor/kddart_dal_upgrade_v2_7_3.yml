@@ -1,0 +1,186 @@
+#
+# DAL upgrade script for Opensuse
+# Copyright (c) 2023, Diversity Arrays Technology, All rights reserved.
+#
+# Author: George Xiyue Huang
+# Date: 25/06/2023
+# Description: DAL upgrade script from 2.7.2 to 2.7.3
+#
+
+- name: Remove Old Solr
+  shell: >
+    systemctl stop solr;
+    rm -rf /var/solr;
+    rm -rf /opt/solr;
+    rm -rf /opt/solr-6.2.1;
+    userdel -r solr;
+    groupdel solr;
+
+- name: Retrieve MySQL password
+  shell: grep 'password' {{ apache_base_dir }}/secure/mysql_user.txt | gawk 'BEGIN{FS="="}{print $2}END{}' | sed 's| ||g'
+  register: dbpass
+
+- name: Retrieve Monetdb password
+  shell: grep 'password' {{ apache_base_dir }}/secure/monetdb_user.txt | gawk 'BEGIN{FS="="}{print $2}END{}' | sed 's| ||g'
+  register: monetdbpass
+
+- name: Ensuring the correct Perl Solr Library is installed
+  shell: >
+    cpanm --uninstall -f Apache::Solr;
+    cd {{ local_dir }};
+    wget https://cpan.metacpan.org/authors/id/M/MA/MARKOV/Apache-Solr-1.01.tar.gz;
+    cpanm install -f Apache-Solr-1.01.tar.gz;
+
+- name: Create JAVA Home environment variable
+  shell: "[[ `grep 'export JAVA_HOME' /etc/bash.bashrc` ]] || echo 'export JAVA_HOME=/usr/lib64/jvm/java-1.8.0-openjdk-1.8.0/jre' >> /etc/bash.bashrc"
+
+- name: Run export for JAVA Home for this session
+  shell: export JAVA_HOME=/usr/lib64/jvm/java-1.8.0-openjdk-1.8.0/jre
+
+- name: Create Java Classpath environment variable
+  shell: "[[ `grep 'export CLASSPATH' /etc/bash.bashrc` ]] || echo 'export CLASSPATH=$JAVA_HOME/lib' >> /etc/bash.bashrc"
+
+- name: Run export for Java Classpath for this session
+  shell: export CLASSPATH=$JAVA_HOME/lib
+
+- name: Create Solr working directory
+  file: path={{ solr_workspace }} state=directory
+
+- name: Download Solr
+  get_url:
+    url: "http://archive.apache.org/dist/lucene/solr/{{ solr_version }}/solr-{{ solr_version }}.tgz"
+    dest: "{{ solr_workspace }}/solr-{{ solr_version }}.tgz"
+    force: no
+
+- name: Expand Solr
+  unarchive:
+    src: "{{ solr_workspace }}/solr-{{ solr_version }}.tgz"
+    dest: "{{ solr_workspace }}"
+    creates: "{{ solr_workspace }}/solr-{{ solr_version }}/CHANGES.txt"
+    copy: no
+
+- name: Run Solr installation script
+  shell: >
+    {{ solr_workspace }}/solr-{{ solr_version }}/bin/install_solr_service.sh
+    {{ solr_workspace }}/solr-{{ solr_version }}.tgz
+    -i {{ solr_install_dir }}
+    -d {{ solr_home }} -f
+    creates={{ solr_install_dir }}/solr/bin/solr
+
+- name: Start solr
+  shell: >
+    [[ `grep 'solr' /etc/passwd` ]] || useradd -m solr;
+    chown solr:root -R /var/solr;
+    [[ -e /var/solr/solr-8983.pid ]] || /etc/init.d/solr start;
+
+- name: Check current list of Solr cores
+  uri:
+    url: http://localhost:8983/solr/admin/cores
+    return_content: yes
+  register: solr_cores_current
+
+- name: List Solr cores
+  debug:
+    var: solr_cores_current.content
+
+- name: Create configured cores.
+  shell: "su solr -c '{{ solr_install_dir }}/solr/bin/solr create_core -c {{ item }}'"
+  when: item not in solr_cores_current.content
+  with_items:
+    - db
+    - monetdb
+    - dal
+
+- name: Insert config into db core solrconfig.xml
+  blockinfile:
+    dest: "{{ solr_home }}/data/db/conf/solrconfig.xml"
+    marker: "<!-- {mark} DART ANSIBLE MANAGED BLOCK -->"
+    insertafter: "<config>"
+    content: |
+        <lib dir="${solr.install.dir}/dist/" regex="solr-dataimporthandler-.*\.jar" />
+        <lib dir="${solr.install.dir:../../../..}/contrib/dataimporthandler-extras/lib/" regex=".*\.jar" />
+        <requestHandler name="/dataimport" class="org.apache.solr.handler.dataimport.DataImportHandler">
+          <lst name="defaults">
+            <str name="config">db-data-config.xml</str>
+          </lst>
+        </requestHandler>
+
+- name: Insert config into monetdb core solrconfig.xml
+  blockinfile:
+    dest: "{{ solr_home }}/data/monetdb/conf/solrconfig.xml"
+    marker: "<!-- {mark} DART ANSIBLE MANAGED BLOCK -->"
+    insertafter: "<config>"
+    content: |
+        <lib dir="${solr.install.dir}/dist/" regex="solr-dataimporthandler-.*\.jar" />
+        <lib dir="${solr.install.dir:../../../..}/contrib/dataimporthandler-extras/lib/" regex=".*\.jar" />
+        <requestHandler name="/dataimport" class="org.apache.solr.handler.dataimport.DataImportHandler">
+          <lst name="defaults">
+            <str name="config">monetdb-data-config.xml</str>
+          </lst>
+        </requestHandler>
+
+- name: copy data-config.xml for each core
+  shell: cp {{ local_dir }}/other/solr/config/{{ item }}/conf/{{ item }}-data-config.xml {{ solr_home }}/data/{{ item }}/conf
+  with_items:
+    - db
+    - monetdb
+    - dal
+
+- name: Copy MySQL jdbc jar files
+  shell: cp -f {{ local_dir }}/other/solr/dataimporthandler/*.jar {{ solr_install_dir }}/solr/contrib/dataimporthandler-extras/lib
+
+- name: Configure core db
+  shell: >
+    {{ local_dir }}/other/solr/{{ item }}-setup-fields.sh 1>{{ local_dir }}/{{ item }}-setup-fields.log 2>&1
+  with_items:
+    - db
+    - monetdb
+    - dal
+
+- name: Put the password into db-data-config.xml
+  replace: dest={{ solr_home }}/data/{{ item }}/conf/{{ item }}-data-config.xml regexp='yourSecurePassword' replace="{{ dbpass.stdout }}"
+  with_items:
+    - db
+    - monetdb
+
+- name: Change unique key from id to SolrId
+  replace: dest={{ solr_home }}/data/{{ item }}/conf/managed-schema regexp='<uniqueKey>id</uniqueKey>' replace="<uniqueKey>SolrId</uniqueKey>"
+  with_items:
+    - db
+    - monetdb
+    - dal
+
+- name: Remove id field
+  replace:
+    path: "/var/solr/data/{{ item }}/conf/managed-schema"
+    regexp: '<field name="id"*'
+    replace: ""
+  with_items:
+    - db
+    - monetdb
+    - dal
+
+- name: Update type of field _root_ to that of SolrId (Solr requires them to be the same)
+  replace:
+    path: "/var/solr/data/{{ item }}/conf/managed-schema"
+    regexp: '<field name="_root_" type="string"'
+    replace: '<field name="_root_" type="text_general"'
+  with_items:
+    - db
+    - monetdb
+
+- name: Restart solr
+  shell: /etc/init.d/solr restart
+
+- name: Restart Apache2
+  shell: systemctl restart apache2
+
+- name: Reindex Solr Cron job
+  cron:
+    minute: "*/15"
+    job: "/usr/bin/perl -w {{ local_dir }}/other/solr/reindex_solr.pl --dalbaseurl 'http://{{ dal_address_name }}/dal' --workingdir '/tmp' --username 'admin' --password 'kddartadmin' --kddartgroup 0 --solrhost 'http://localhost' --solrport '8983' --solrcorecsv 'dal,db,monetdb' > /root/reindex_solr.log 2>&1"
+  when: config_cron_job == True
+
+
+- name: Add MAX_RECURSIVE_GENERAL_LEVEL for recusrive limits.
+  shell: echo '[MAX_RECURSIVE_GENERAL_LEVEL]' >> {{ apache_base_dir }}/secure/kddart_dal.cfg; echo 'MAX_RECURSIVE_GENERAL_LEVEL=10' >> {{ apache_base_dir }}/secure/kddart_dal.cfg;

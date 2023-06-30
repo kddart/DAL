@@ -1,9 +1,9 @@
 #
 # DAL upgrade script for Opensuse
-# Copyright (c) 2017, Diversity Arrays Technology, All rights reserved.
+# Copyright (c) 2023, Diversity Arrays Technology, All rights reserved.
 #
-# Author:
-# Date: 06/03/2023
+# Author: George Xiyue Huang
+# Date: 14/04/2023
 # Description: DAL upgrade script from 2.7.1 to 2.7.2
 #
 

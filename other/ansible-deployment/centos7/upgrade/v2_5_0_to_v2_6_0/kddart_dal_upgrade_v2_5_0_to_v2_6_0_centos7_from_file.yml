@@ -3,7 +3,7 @@
 # Copyright (c) 2018, Diversity Arrays Technology, All rights reserved.
 #
 # Author: Puthick Hok
-# Date: 16/03/2018
+# Date: 27/02/2020
 # Usage: ansible-playbook kddart_dal_upgrade_v2_4_0_to_v2_5_0_centos7_from_file.yml
 # Description: By running the usage command, ansible will install and configure DAL
 #              according the instructions in kddart_dal_upgrade_v2_4_0_to_v2_5_0_centos7.yml.

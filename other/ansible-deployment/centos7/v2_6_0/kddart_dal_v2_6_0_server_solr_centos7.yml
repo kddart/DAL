@@ -1,5 +1,0 @@
-
-- cron:
-    name: Reindex Solr
-    minute: "*/15"
-    job: "/usr/bin/perl -w {{ local_dir }}/other/solr/reindex_solr.pl --dalbaseurl 'https://{{ dal_address_name }}/dal' --workingdir '/tmp' --username 'admin' --password '' --kddartgroup 0 --solrhost 'http://localhost' --solrport '8983' --solrcorecsv 'dal,db,monetdb' > /root/reindex_solr.log 2>&1"     

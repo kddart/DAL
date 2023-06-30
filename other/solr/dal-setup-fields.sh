@@ -12,17 +12,17 @@ curl -X POST -H 'Content-type:application/json' --data-binary '{
 }' "${SOLRURL}/solr/dal/schema"
 
 curl -X POST -H 'Content-type:application/json' --data-binary '{
-"add-field": {'stored': 'true', 'name': 'NumberOfGenotypes', 'indexed': 'true', 'required': 'false', 'type': 'int', 'multiValued': 'false'}
+"add-field": {'stored': 'true', 'name': 'NumberOfGenotypes', 'indexed': 'true', 'required': 'false', 'type': 'pint', 'multiValued': 'false'}
 }' "${SOLRURL}/solr/dal/schema"
 
 
 curl -X POST -H 'Content-type:application/json' --data-binary '{
-"add-field": {'stored': 'true', 'name': 'GenotypeId', 'indexed': 'true', 'required': 'false', 'type': 'long', 'multiValued': 'false'}
+"add-field": {'stored': 'true', 'name': 'GenotypeId', 'indexed': 'true', 'required': 'false', 'type': 'plong', 'multiValued': 'false'}
 }' "${SOLRURL}/solr/dal/schema"
 
 
 curl -X POST -H 'Content-type:application/json' --data-binary '{
-"add-field": {'stored': 'true', 'name': 'Level', 'indexed': 'true', 'required': 'false', 'type': 'int', 'multiValued': 'false'}
+"add-field": {'stored': 'true', 'name': 'Level', 'indexed': 'true', 'required': 'false', 'type': 'pint', 'multiValued': 'false'}
 }' "${SOLRURL}/solr/dal/schema"
 
 
@@ -37,7 +37,7 @@ curl -X POST -H 'Content-type:application/json' --data-binary '{
 
 
 curl -X POST -H 'Content-type:application/json' --data-binary '{
-"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'long', 'name': 'AncestorId', 'required': 'false', 'multiValued': 'false'}
+"add-field": {'indexed': 'true', 'stored': 'true', 'type': 'plong', 'name': 'AncestorId', 'required': 'false', 'multiValued': 'false'}
 }' "${SOLRURL}/solr/dal/schema"
 
 
@@ -93,6 +93,6 @@ curl -X POST -H 'Content-type:application/json' --data-binary '{
 "add-copy-field": {'dest': 'text', 'source': 'GenotypeName'}
 }' "${SOLRURL}/solr/dal/schema"
 
-curl -X POST -H 'Content-type:application/json' --data-binary '{
-"delete-field": { "name":"id" }
-}' "${SOLRURL}/solr/dal/schema"
+# curl -X POST -H 'Content-type:application/json' --data-binary '{
+# "delete-field": { "name":"id" }
+# }' "${SOLRURL}/solr/dal/schema"

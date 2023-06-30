@@ -1,10 +1,10 @@
 #
-# DAL Deployment script for openSuSe Leap 42.2
-# Copyright (c) 2018, Diversity Arrays Technology, All rights reserved.
+# DAL Deployment script for openSuSe Leap 15
+# Copyright (c) 2023, Diversity Arrays Technology, All rights reserved.
 #
-# Author: Puthick Hok
-# Date: 08/08/2016
-# Usage: ansible-playbook kddart_dal_v2_5_0_server_deployment_leap-42.2.yml
+# Author: Puthick Hok, George Huang, Sze Shan Yap, Thao Vu
+# Date: 08/01/2023
+# Usage: ansible-playbook kddart_dal_v2_6_0_server_deployment_leap15.yml
 # Description: By running the usage command, ansible will install and configure DAL
 #              according the instructions in kddart_server_deployment_centos7.yml.
 #              This script needs to be run by root.

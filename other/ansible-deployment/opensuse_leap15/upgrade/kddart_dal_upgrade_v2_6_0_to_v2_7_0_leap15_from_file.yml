@@ -1,10 +1,10 @@
 #
-# DAL upgrade script for OpenSUSE Leap 42.2
-# Copyright (c) 2017, Diversity Arrays Technology, All rights reserved.
+# DAL upgrade script for OpenSUSE Leap 15.4
+# Copyright (c) 2023, Diversity Arrays Technology, All rights reserved.
 #
-# Author: Puthick Hok
-# Date: 23/06/2011
-# Usage: ansible-playbook kddart_dal_upgrade_v2_4_0_to_v2_5_0_leap42_2_from_file.yml
+# Author: Yu Qiu and George Huang
+# Date: 10/03/2023
+# Usage: ansible-playbook kddart_dal_upgrade_v2_6_0_to_v2_7_0_leap42_2_from_file.yml
 # Description: By running the usage command, ansible will upgrade DAL.
 #              This script can be run by root.
 #              For more information about how to read and write an ansible playbook,
@@ -19,16 +19,16 @@
       raw: zypper --non-interactive --no-gpg-checks install sudo
     - setup: # does gather_facts
   
-  vars_prompt:
+  vars_prompt:  
     - name: "local_tar_gz_file"
       prompt: "Enter the source tar.gz file of KDDart wih either relative or full path."
       private: no
 
   vars:
-    dal_version: v2.7.0
-    dal_db_version: v2_7_0
+    dal_version: v2.6.0
+    dal_db_version: v2_6_0
     src_file: /root/KDDArT-DAL-{{ dal_version }}.tar.gz
-    old_dal_db_version: v2_6_0
+    old_dal_db_version: v2_5_0
     local_dir: /root/KDDArT-DAL-{{ dal_version }}
     backup_dir: /root/dal_upgrade_db_backup
     apache_base_dir: /srv/www
@@ -77,6 +77,19 @@
         - HTTP::CookieJar::LWP
         - File::Copy::Recursive
 
+    - name: Install sentinel package
+      shell: >
+        cp {{ local_dir }}/other/DArT-Sentinal.tar.gz /tmp;
+        cd /tmp;
+        tar -xvzf ./DArT-Sentinal.tar.gz sentinel;
+        cd ./sentinel;
+        perl Makefile.PL;
+        make;
+        make test;
+        make install;
+        rm -rf /tmp/sentinel;
+        rm -rf /tmp/DArT-Sentinal.tar.gz;
+
     - name: Copy Perl packages
       shell: >
         cp -rp {{ local_dir }}/perl-lib/* {{ apache_base_dir }}/perl-lib;
@@ -117,15 +130,7 @@
 
     - name: Recreating databases from backup file into a new version for upgrade
       shell: >
-        {{ local_dir }}/other/create_dbs.sh 2 kddart_gis_enviro_{{ dal_db_version }} {{ backup_dir }}/kddart_gis_enviro_{{ old_dal_db_version }}-`date +"%Y%m%d"`.sql kddart_{{ dal_db_version }} {{ backup_dir }}/kddart_{{ old_dal_db_version }}-`date +"%Y%m%d"`.sql kddart_marker_{{ dal_db_version }} {{ backup_dir }}/kddart_marker_{{ old_dal_db_version }}-`date +"%Y%m%d"`.sql 1 > /root/recreate_dbs.log 2>&1;        
-
-    - name: Remove column TreatmentId constraints
-      shell: >
-        res=$(mysql kddart_{{ dal_db_version }} -u root --password={{ mysqlrootpass.stdout }} -se "select CONSTRAINT_NAME from INFORMATION_SCHEMA.KEY_COLUMN_USAGE where TABLE_NAME = 'trialunit' AND COLUMN_NAME = 'TreatmentId' AND CONSTRAINT_SCHEMA = 'kddart_{{ dal_db_version }}'");
-        cons=(${res//\s/});
-        for con in "${cons[@]}"; do
-          mysql kddart_{{ dal_db_version }} -u root --password={{ mysqlrootpass.stdout }} -se "ALTER TABLE trialunit DROP FOREIGN KEY ${con}"
-        done
+        {{ local_dir }}/other/create_dbs.sh 2 kddart_gis_enviro_{{ dal_db_version }} {{ backup_dir }}/kddart_gis_enviro_{{ old_dal_db_version }}-`date +"%Y%m%d"`.sql kddart_{{ dal_db_version }} {{ backup_dir }}/kddart_{{ old_dal_db_version }}-`date +"%Y%m%d"`.sql kddart_marker_{{ dal_db_version }} {{ backup_dir }}/kddart_marker_{{ old_dal_db_version }}-`date +"%Y%m%d"`.sql 1 > /root/recreate_dbs.log 2>&1;
         
     - name: Upgrade database structures
       shell: >
@@ -145,5 +150,4 @@
       shell: systemctl restart apache2
 
     - name: Restart solr
-      shell: >
-        [[ ! -e /etc/init.d/solr ]] || /etc/init.d/solr restart;
+      shell: /etc/init.d/solr restart
