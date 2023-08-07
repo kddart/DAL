@@ -1,3 +1,23 @@
+Version 2.7.4
+Date: 07/08/2023
+Description: Bug Fixing Patch and Improvements
+
++ Support for Trial Unit Factors/Virtual Columns added, allowing it to be included in add, update, bulk add, bulk update and filtering in lists.
+
++ Update Trial Unit Bulk revamped to no longer remove trial units to be updated
+
++ Permissions in Inventory Module overhauled. Admin access no longer required for storage, item parent, item and item group opreations
+
++ Deleting trial units will now delete relevant trial unit location entries in the PostgreSQL database
+
+Databse Update
+
++ FactorName changed to VARCHAR(255) data type.
+
+Instance Testing 
+
++ A number of new whitebox tests have been added. This takes the number of tests that can be run at the start of deployment to 466. VCol related tests will be 19.
+
 Version 2.7.3
 Date: 30/06/2023
 Description: Bug Fixing Patch and Improvements
