@@ -51,6 +51,9 @@ CGI::Application::Dispatch->dispatch(
     'clone/session'                                     => { app => 'KDDArT::DAL::Authentication',
                                                              rm  => 'clone' },
 
+    ''                                                  => { app => 'KDDArT::DAL::Authentication',
+                                                             rm  => 'get_login_status' },
+
     'get/login/status'                                  => { app => 'KDDArT::DAL::Authentication',
                                                              rm  => 'get_login_status' },
 
@@ -553,7 +556,7 @@ CGI::Application::Dispatch->dispatch(
                                                              rm  => 'add_trial_unit_bulk' },
 
     'trial/:id/update/trialunit/bulk'                   => { app => 'KDDArT::DAL::Trial',
-                                                             rm  => 'update_trial_unit_bulk' },
+                                                             rm  => 'update_trial_unit_bulk' },                                                        
 
     'trial/:id/add/trait'                               => { app => 'KDDArT::DAL::Trial',
                                                              rm  => 'add_trial_trait' },
@@ -950,10 +953,10 @@ CGI::Application::Dispatch->dispatch(
                                                              rm  => 'get_analysisgroup' },
 
     'add/storage'                                       => { app => 'KDDArT::DAL::Inventory',
-                                                             rm  => 'add_storage_gadmin' },
+                                                             rm  => 'add_storage' },
 
     'update/storage/:id'                                => { app => 'KDDArT::DAL::Inventory',
-                                                             rm  => 'update_storage_gadmin' },
+                                                             rm  => 'update_storage' },
 
     'list/storage'                                      => { app => 'KDDArT::DAL::Inventory',
                                                              rm  => 'list_storage' },
@@ -962,7 +965,7 @@ CGI::Application::Dispatch->dispatch(
                                                              rm  => 'get_storage' },
 
     'delete/storage/:id'                                => { app => 'KDDArT::DAL::Inventory',
-                                                             rm  => 'del_storage_gadmin' },
+                                                             rm  => 'del_storage' },
 
     'storage/:id/update/geography'                      => { app => 'KDDArT::DAL::Inventory',
                                                              rm  => 'update_storage_geography' },
@@ -998,7 +1001,7 @@ CGI::Application::Dispatch->dispatch(
                                                              rm  => 'get_conversionrule' },
 
     'item/:id/add/parent'                               => { app => 'KDDArT::DAL::Inventory',
-                                                             rm  => 'add_itemparent_gadmin' },
+                                                             rm  => 'add_itemparent' },
 
     'item/:id/log'                                      => { app => 'KDDArT::DAL::Inventory',
                                                              rm  => 'add_item_log' },
@@ -1013,25 +1016,25 @@ CGI::Application::Dispatch->dispatch(
                                                              rm  => 'get_itemparent' },
 
     'delete/itemparent/:id'                             => { app => 'KDDArT::DAL::Inventory',
-                                                             rm  => 'del_itemparent_gadmin' },
+                                                             rm  => 'del_itemparent' },
 
     'itemgroup/:groupid/add/item'                       => { app => 'KDDArT::DAL::Inventory',
-                                                             rm  => 'add_item_to_group_gadmin' },
+                                                             rm  => 'add_item_to_group' },
 
     'import/itemgroup/xml'                              => { app => 'KDDArT::DAL::Inventory',
-                                                             rm  => 'import_itemgroup_xml_gadmin' },
+                                                             rm  => 'import_itemgroup_xml' },
 
     'itemgroup/:groupid/remove/item/:itemid'            => { app => 'KDDArT::DAL::Inventory',
-                                                             rm  => 'remove_item_from_group_gadmin' },
+                                                             rm  => 'remove_item_from_group' },
 
     'add/itemgroup'                                     => { app => 'KDDArT::DAL::Inventory',
-                                                             rm  => 'add_itemgroup_gadmin' },
+                                                             rm  => 'add_itemgroup' },
 
     'update/itemgroup/:id'                              => { app => 'KDDArT::DAL::Inventory',
-                                                             rm  => 'update_itemgroup_gadmin' },
+                                                             rm  => 'update_itemgroup' },
 
     'delete/itemgroup/:id'                              => { app => 'KDDArT::DAL::Inventory',
-                                                             rm  => 'del_itemgroup_gadmin' },
+                                                             rm  => 'del_itemgroup' },
 
     'get/itemgroup/:id'                                 => { app => 'KDDArT::DAL::Inventory',
                                                              rm  => 'get_itemgroup' },
@@ -1043,13 +1046,13 @@ CGI::Application::Dispatch->dispatch(
                                                              rm  => 'add_item' },
 
     'update/item/:id'                                   => { app => 'KDDArT::DAL::Inventory',
-                                                             rm  => 'update_item_gadmin' },
+                                                             rm  => 'update_item' },
 
     'update/itembulk/json'                              => { app => 'KDDArT::DAL::Inventory',
-                                                             rm  => 'update_item_bulk_gadmin' },
+                                                             rm  => 'update_item_bulk' },
 
     'delete/item/:id'                                   => { app => 'KDDArT::DAL::Inventory',
-                                                             rm  => 'del_item_gadmin' },
+                                                             rm  => 'del_item' },
 
     'get/item/:id'                                      => { app => 'KDDArT::DAL::Inventory',
                                                              rm  => 'get_item' },
