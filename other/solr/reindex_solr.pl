@@ -109,6 +109,8 @@ my $inside_req_res;
 
 my $inside_req;
 
+my $logout_url = $dalbaseurl . "/logout";
+
 if ($core_href->{'db'}) {
 
   my $reindex_url = "${solrurl}/solr/db/dataimport?command=full-import&clean=true&commit=true&wt=json";
@@ -267,6 +269,11 @@ if ($core_href->{'dal'}) {
   if ( $inside_req->status_line ne '200 OK' ) {
 
     die "DAL $url failed: " . $inside_req->content() . "\n";
+
+    $inside_req_res = POST($logout_url, []);
+
+    $inside_req = $browser->request($inside_req_res);
+
   }
 
   $output_file_xml  = $inside_req->content();
@@ -314,6 +321,11 @@ if ($core_href->{'dal'}) {
   if (scalar(@all_uniq_geno_id_list) == 0) {
 
     print "No pedigree record\n";
+
+    $inside_req_res = POST($logout_url, []);
+
+    $inside_req = $browser->request($inside_req_res);
+
     exit 1;
   }
 
@@ -332,6 +344,11 @@ if ($core_href->{'dal'}) {
     # in every run
 
     print "Nothing to add to Solr index\n";
+
+    $inside_req_res = POST($logout_url, []);
+
+    $inside_req = $browser->request($inside_req_res);
+
     exit 1;
   }
 
@@ -431,6 +448,11 @@ if ($core_href->{'dal'}) {
       if ($@) {
 
         print "Decode JSON for genotype error: $@\n";
+
+        $inside_req_res = POST($logout_url, []);
+
+        $inside_req = $browser->request($inside_req_res);
+
         exit;
       }
 
@@ -479,6 +501,11 @@ if ($core_href->{'dal'}) {
         if ($@) {
 
           print "Decode JSON error: $@\n";
+
+          $inside_req_res = POST($logout_url, []);
+
+          $inside_req = $browser->request($inside_req_res);
+
           exit;
         }
 

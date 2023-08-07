@@ -2465,6 +2465,7 @@ sub list_specimen_advanced_runmode {
 
   $sql  =~ s/SELECT/SELECT DISTINCT /;
   $sql  =~ s/WHEREREPLACE GROUP BY/ $filtering_exp GROUP BY /;
+  $sql  =~ s/FACTORHAVING//;
 
   my ($sort_err, $sort_msg, $sort_sql) = parse_sorting($sorting, $final_field_list);
 
@@ -7342,18 +7343,8 @@ sub list_genotype_advanced_runmode {
 
   my @filtering_exp = split(/&/, $filtering_csv);
 
-  my $seen_expression_lookup = {};
-
-  my $factor_filtering_flag = test_filtering_factor($filtering_csv);
-
-  if (!$factor_filtering_flag) {
-    ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_sql_v3($dbh, $sql_field_list, 'genotype',
-                                                                       'GenotypeId', $other_join);
-  }
-  else {
-    ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_sql_v2($dbh, $sql_field_list, 'genotype',
-                                                                          'GenotypeId', $other_join);
-  }
+  ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_sql_v3($dbh, $sql_field_list, 'genotype',
+                                                                     'GenotypeId', $other_join);
 
   if ($vcol_err) {
 
@@ -7379,7 +7370,6 @@ sub list_genotype_advanced_runmode {
                                                 $final_field_list,
                                                 $vcol_list,
                                                 );
-
   }
   else {
     ($filter_err, $filter_msg, $filter_phrase, $where_arg) = parse_filtering('GenotypeId',
@@ -7414,6 +7404,8 @@ sub list_genotype_advanced_runmode {
     $sql  =~ s/WHEREREPLACE GROUP BY/ $filtering_exp GROUP BY /;
   }
   else {
+
+    $sql =~ s/FACTORHAVING//;
 
     $sql  =~ s/WHEREREPLACE GROUP BY/ $filtering_exp GROUP BY /;
   }

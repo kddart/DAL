@@ -1,16 +1,18 @@
-<!ELEMENT DATA ( trialunit+ ) >
+<!ELEMENT DATA (trialunit+) >
 
-<!ELEMENT trialunit ( trialunitfactor*, trialunitspecimen+ )>
+<!ELEMENT trialunit ( trialunitfactor*, trialunitspecimen* ) >
+<!ATTLIST trialunit TrialUnitId NMTOKEN #REQUIRED >
 <!ATTLIST trialunit ReplicateNumber NMTOKEN #REQUIRED >
-<!ATTLIST trialunit SampleSupplierId NMTOKEN #IMPLIED >
-<!ATTLIST trialunit SourceTrialUnitId NMTOKEN #IMPLIED >
-<!ATTLIST trialunit TreatmentId NMTOKEN #IMPLIED >
+<!ATTLIST trialunit SampleSupplierId CDATA #IMPLIED >
+<!ATTLIST trialunit SourceTrialUnitId CDATA #IMPLIED >
+<!ATTLIST trialunit TrialUnitTypeId CDATA #IMPLIED >
+<!ATTLIST trialunit TreatmentId CDATA #IMPLIED >
 <!ATTLIST trialunit TrialUnitBarcode CDATA #IMPLIED >
 <!ATTLIST trialunit TrialUnitPosition CDATA #IMPLIED >
-<!ATTLIST trialunit TrialUnitEntryId NMTOKEN #IMPLIED >
-<!ATTLIST trialunit TrialUnitX NMTOKEN #IMPLIED >
-<!ATTLIST trialunit TrialUnitY NMTOKEN #IMPLIED >
-<!ATTLIST trialunit TrialUnitZ NMTOKEN #IMPLIED >
+<!ATTLIST trialunit TrialUnitEntryId CDATA #IMPLIED >
+<!ATTLIST trialunit TrialUnitX CDATA #IMPLIED >
+<!ATTLIST trialunit TrialUnitY CDATA #IMPLIED >
+<!ATTLIST trialunit TrialUnitZ CDATA #IMPLIED >
 <!ATTLIST trialunit TrialUnitNote CDATA #IMPLIED >
 <!ATTLIST trialunit trialunitlocation CDATA #IMPLIED >
 

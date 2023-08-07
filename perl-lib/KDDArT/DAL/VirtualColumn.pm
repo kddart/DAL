@@ -618,14 +618,9 @@ sub list_field_runmode {
 
       my $lcol_href = {'Type'      => $loc_geo_type,
                        'Name'      => $loc_field,
-                       'Required'  => 1,
+                       'Required'  => 0,
                        'TableName' => $loc_table,
       };
-
-      if (lc($parent_table) eq 'contact') {
-
-        $lcol_href->{'Required'} = 0;
-      }
 
       push(@{$lcol_aref}, $lcol_href);
 
@@ -1560,6 +1555,7 @@ sub add_general_type_runmode {
                        'traitdatatype'        => 1,
                        'season'               => 1,
                        'survey'               => 1,
+                       'trialunit'            => 1,
   };
 
   if (!($class_lookup->{$class})) {
@@ -1792,7 +1788,7 @@ sub list_general_type {
       my $not_used_id_href  = {};
 
       if ( !(defined $class2chk_table_lookup->{$type_class}) ) {
-        
+
         $self->logger->debug("Type class -> $type_class");
 
 
@@ -3042,6 +3038,9 @@ sub count_groupby_runmode {
 
   return $data_for_postrun_href;
 }
+
+
+
 
 sub _set_error {
 

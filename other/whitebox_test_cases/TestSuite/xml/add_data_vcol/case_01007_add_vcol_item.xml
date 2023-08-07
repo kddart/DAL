@@ -1,5 +1,5 @@
 <TestCase>
-  <CaseInfo CustomMethod="add_record" Description="Add a virtual column to item" TargetURL="factor/table/itemfactor/add/vcolumn" Type="BLOCKING" />
+  <CaseInfo CustomMethod="add_record" Description="Add a virtual column to item" TargetURL="factortable/itemfactor/add/vcolumn" Type="BLOCKING" />
   <FactorName Value="ItemExtraCol_3493287" />
   <INPUT ParaName="FactorName" PrefixVal="ItemExtraCol_" Random="1" />
   <INPUT ParaName="FactorCaption" PrefixVal="ItemExtraCol_" Random="1" />

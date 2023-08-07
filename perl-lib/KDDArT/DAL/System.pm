@@ -1165,6 +1165,8 @@ sub list_user {
   my $sql             = $_[2];
   my $where_para_aref = $_[3];
 
+  my $user_id  = $self->authen->user_id();
+
   my $err = 0;
   my $msg = '';
 
@@ -1205,9 +1207,14 @@ sub list_user {
 
       my $username     = $row->{'UserName'};
       my $contact_id   = $row->{'ContactId'};
+      my $row_user_id  = $row->{'UserId'};
 
       $row->{'ContactName'}  = $contact_lookup->{$contact_id}->{'ContactName'};
-      $row->{'resetpass'}    = "user/$username/reset/password";
+
+      if ($user_id == 0 || $user_id == $row_user_id) {
+        $row->{'resetpass'}    = "user/$username/reset/password";
+
+      }
 
       push(@{$extra_attr_user_data}, $row);
     }
@@ -1251,9 +1258,13 @@ sub list_user_runmode {
   my $sql = 'SELECT DISTINCT systemuser.UserId, UserName, ContactId, UserType ';
   $sql   .= 'FROM systemuser LEFT JOIN authorisedsystemgroup ';
   $sql   .= 'ON systemuser.UserId = authorisedsystemgroup.UserId ';
-  $sql   .= 'ORDER BY systemuser.UserId DESC';
+  my $list_data_values = [];
 
-  my ($read_user_err, $read_user_msg, $user_data) = $self->list_user(1, $sql, []);
+  $sql   .= 'ORDER BY systemuser.UserId DESC ';
+
+  $self->logger->debug($sql);
+
+  my ($read_user_err, $read_user_msg, $user_data) = $self->list_user(1, $sql, $list_data_values);
 
   if ($read_user_err) {
 
@@ -1266,6 +1277,7 @@ sub list_user_runmode {
 
   $data_for_postrun_href->{'Error'}     = 0;
   $data_for_postrun_href->{'Data'}      = {'User'       => $user_data,
+                                           'GroupId'    => $group_id,
                                            'RecordMeta' => [{'TagName' => 'User'}],
   };
   $data_for_postrun_href->{'ExtraData'} = 0;
@@ -1387,6 +1399,7 @@ sub change_user_password_runmode {
 
   return $data_for_postrun_href;
 }
+
 
 sub remove_group_member_runmode {
 

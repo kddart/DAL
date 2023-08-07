@@ -664,6 +664,8 @@ sub update_organisation_runmode {
   my $query     = $self->query();
 
   my $data_for_postrun_href = {};
+  my $org_err = 0;
+  my $org_error_aref = [];
 
   # Generic required static field checking
 
@@ -689,7 +691,7 @@ sub update_organisation_runmode {
 
   my $dbh = connect_kdb_write();
 
-  my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength ";
+  my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength, FactorValidRuleErrMsg, FactorValidRule  ";
   $sql   .= "FROM factor ";
   $sql   .= "WHERE TableNameOfFactor='organisationfactor'";
 
@@ -698,6 +700,10 @@ sub update_organisation_runmode {
   my $vcol_param_data = {};
   my $vcol_len_info   = {};
   my $vcol_param_data_maxlen = {};
+
+  ##pre_validate_vcol -> { Rule -> [rule], RuleErrorMsg -> [msg], Value -> [value], FactorId -> [value] } 
+  my $pre_validate_vcol = {};
+
   for my $vcol_id (keys(%{$vcol_data})) {
 
     my $vcol_param_name = "VCol_${vcol_id}";
@@ -706,6 +712,14 @@ sub update_organisation_runmode {
 
       $vcol_param_data->{$vcol_param_name} = $vcol_value;
     }
+
+    $pre_validate_vcol->{$vcol_param_name} = {
+      'Rule' => $vcol_data->{$vcol_id}->{'FactorValidRule'},
+      'Value'=> $vcol_value,
+      'FactorId'=> $vcol_id,
+      'RuleErrorMsg'=> $vcol_data->{$vcol_id}->{'FactorValidRuleErrMsg'},
+      'CanFactorHaveNull' => $vcol_data->{$vcol_id}->{'CanFactorHaveNull'},
+    };
 
     $vcol_len_info->{$vcol_param_name} = $vcol_data->{$vcol_id}->{'FactorValueMaxLength'};
     $vcol_param_data_maxlen->{$vcol_param_name} = $vcol_value;
@@ -716,7 +730,16 @@ sub update_organisation_runmode {
   if ($vcol_missing_err) {
 
     $data_for_postrun_href->{'Error'}       = 1;
-    $data_for_postrun_href->{'Data'}        = {'Error' => [$vcol_missing_href]};
+    #$data_for_postrun_href->{'Data'}        = {'Error' => [$vcol_missing_href]};
+
+    #return $data_for_postrun_href;
+
+    push(@{$org_error_aref}, $vcol_missing_href);
+    $org_err = 1;
+  }
+
+  if ($org_err == 1) {
+    $data_for_postrun_href->{'Data'}        = {'Error' => $org_error_aref};
 
     return $data_for_postrun_href;
   }
@@ -756,101 +779,56 @@ sub update_organisation_runmode {
   if (length($db_org_id) > 0) {
 
     my $err_msg = "OrganisationName ($org_name): already exists.";
-    $data_for_postrun_href->{'Error'}       = 1;
-    $data_for_postrun_href->{'Data'}        = {'Error' => [{'OrganisationName' => $err_msg}]};
 
-    return $data_for_postrun_href;
+    push(@{$org_error_aref}, {'OrganisationName' => $err_msg});
+    $org_err = 1;
   }
 
-  $sql    = 'UPDATE organisation SET ';
-  $sql   .= 'OrganisationName=? ';
-  $sql   .= 'WHERE OrganisationId=?';
+  #prevalidate values to be finished in later version
 
-  my $sth = $dbh->prepare($sql);
-  $sth->execute($org_name, $org_id);
+  #my ($vcol_error, $vcol_error_aref) = validate_all_factor_input($pre_validate_vcol);
 
-  if ( $dbh->err() ) {
+  #if ($vcol_error) {
+  #  push(@{$org_error_aref}, @{$vcol_error_aref});
+  #  $org_err = 1;
+  #}
 
-    $data_for_postrun_href->{'Error'}       = 1;
-    $data_for_postrun_href->{'Data'}        = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
-    return $data_for_postrun_href;
-  }
+  if ($org_err == 0) {
+    $sql    = 'UPDATE organisation SET ';
+    $sql   .= 'OrganisationName=? ';
+    $sql   .= 'WHERE OrganisationId=?';
 
-  $sth->finish();
+    my $sth = $dbh->prepare($sql);
+    $sth->execute($org_name, $org_id);
 
-  for my $vcol_id (keys(%{$vcol_data})) {
+    if ( $dbh->err() ) {
 
-    if (defined $query->param('VCol_' . "$vcol_id")) {
+      $data_for_postrun_href->{'Error'}       = 1;
+      $data_for_postrun_href->{'Data'}        = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
-      my $factor_value = $query->param('VCol_' . "$vcol_id");
+      return $data_for_postrun_href;
+    }
 
-      $sql  = 'SELECT Count(*) ';
-      $sql .= 'FROM organisationfactor ';
-      $sql .= 'WHERE OrganisationId=? AND FactorId=?';
+    $sth->finish();
 
-      my ($read_err, $count) = read_cell($dbh, $sql, [$org_id, $vcol_id]);
+    my $vcol_error = [];
 
-      if (length($factor_value) > 0) {
+    for my $vcol_id (keys(%{$vcol_data})) {
 
-        if ($count > 0) {
+      if (defined $query->param('VCol_' . "$vcol_id")) {
 
-          $sql  = 'UPDATE organisationfactor SET ';
-          $sql .= 'FactorValue=? ';
-          $sql .= 'WHERE OrganisationId=? AND FactorId=?';
+        my $factor_value = $query->param('VCol_' . "$vcol_id");
 
-          my $factor_sth = $dbh->prepare($sql);
-          $factor_sth->execute($factor_value, $org_id, $vcol_id);
+        my ($vcol_err, $vcol_msg) = update_factor_value($dbh, $vcol_id, $factor_value, 'organisationfactor', 'OrganisationId', $org_id);
 
-          if ($dbh->err()) {
+        if ($vcol_err) {
 
-            $data_for_postrun_href->{'Error'} = 1;
-            $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+          $self->logger->debug("VCol_" . "$vcol_id => $vcol_msg" );
 
-            return $data_for_postrun_href;
-          }
+          push(@{$org_error_aref}, {'VCol_' . "$vcol_id" => $vcol_msg});
 
-          $factor_sth->finish();
-        }
-        else {
-
-          $sql  = 'INSERT INTO organisationfactor SET ';
-          $sql .= 'OrganisationId=?, ';
-          $sql .= 'FactorId=?, ';
-          $sql .= 'FactorValue=?';
-
-          my $factor_sth = $dbh->prepare($sql);
-          $factor_sth->execute($org_id, $vcol_id, $factor_value);
-
-          if ($dbh->err()) {
-
-            $data_for_postrun_href->{'Error'} = 1;
-            $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-            return $data_for_postrun_href;
-          }
-
-          $factor_sth->finish();
-        }
-      }
-      else {
-
-        if ($count > 0) {
-
-          $sql  = 'DELETE FROM organisationfactor ';
-          $sql .= 'WHERE OrganisationId=? AND FactorId=?';
-
-          my $factor_sth = $dbh->prepare($sql);
-          $factor_sth->execute($org_id, $vcol_id);
-
-          if ($dbh->err()) {
-
-            $data_for_postrun_href->{'Error'} = 1;
-            $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-            return $data_for_postrun_href;
-          }
-          $factor_sth->finish();
+          $org_err = 1;
         }
       }
     }
@@ -858,13 +836,23 @@ sub update_organisation_runmode {
 
   $dbh->disconnect();
 
-  my $info_msg = "Organisation ($org_id) has been updated successfully.";
+  if ($org_err == 1) {
+    $data_for_postrun_href->{'Error'} = $org_err;
+    $data_for_postrun_href->{'Data'}  = {'Error' => $org_error_aref};
 
-  $data_for_postrun_href->{'Error'}     = 0;
-  $data_for_postrun_href->{'Data'}      = {'Info' => [{'Message' => $info_msg}]};
-  $data_for_postrun_href->{'ExtraData'} = 0;
+    return $data_for_postrun_href;
+  }
+  else {
+    my $info_msg = "Organisation ($org_id) has been updated successfully.";
 
-  return $data_for_postrun_href;
+    $data_for_postrun_href->{'Error'}     = 0;
+    $data_for_postrun_href->{'Data'}      = {'Info' => [{'Message' => $info_msg}]};
+    $data_for_postrun_href->{'ExtraData'} = 0;
+
+    return $data_for_postrun_href;
+  }
+
+  
 }
 
 sub list_contact_advanced_runmode {
@@ -1472,6 +1460,8 @@ sub add_contact_runmode {
   my $query = $self->query();
 
   my $data_for_postrun_href = {};
+  my $contact_err = 0;
+  my $contact_err_aref = [];
 
   # Generic required static field checking
 
@@ -1540,20 +1530,24 @@ sub add_contact_runmode {
 
   $self->logger->debug("First name: $fname");
 
-  my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength ";
+  my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength, FactorValidRuleErrMsg, FactorValidRule  ";
   $sql   .= "FROM factor ";
   $sql   .= "WHERE TableNameOfFactor='contactfactor'";
-
-  my $dbh_k_read = connect_kdb_read();
-  my $vcol_data = $dbh_k_read->selectall_hashref($sql, 'FactorId');
 
   my $vcol_param_data = {};
   my $vcol_len_info   = {};
   my $vcol_param_data_maxlen = {};
+  ##pre_validate_vcol -> { Rule -> [rule], RuleErrorMsg -> [msg], Value -> [value], FactorId -> [value] } 
+  my $pre_validate_vcol = {};
+
+  my $dbh_k_read = connect_kdb_read();
+  my $vcol_data = $dbh_k_read->selectall_hashref($sql, 'FactorId');
+
   for my $vcol_id (keys(%{$vcol_data})) {
 
     my $vcol_param_name = "VCol_${vcol_id}";
     my $vcol_value      = $query->param($vcol_param_name);
+    
     if ($vcol_data->{$vcol_id}->{'CanFactorHaveNull'} != 1) {
 
       $vcol_param_data->{$vcol_param_name} = $vcol_value;
@@ -1561,6 +1555,14 @@ sub add_contact_runmode {
 
     $vcol_len_info->{$vcol_param_name} = $vcol_data->{$vcol_id}->{'FactorValueMaxLength'};
     $vcol_param_data_maxlen->{$vcol_param_name} = $vcol_value;
+
+    $pre_validate_vcol->{$vcol_param_name} = {
+      'Rule' => $vcol_data->{$vcol_id}->{'FactorValidRule'},
+      'Value'=> $vcol_value,
+      'FactorId'=> $vcol_id,
+      'RuleErrorMsg'=> $vcol_data->{$vcol_id}->{'FactorValidRuleErrMsg'},
+      'CanFactorHaveNull' => $vcol_data->{$vcol_id}->{'CanFactorHaveNull'},
+    };
   }
 
   my ($vcol_missing_err, $vcol_missing_href) = check_missing_href( $vcol_param_data );
@@ -1591,9 +1593,26 @@ sub add_contact_runmode {
 
   if (!$org_existence) {
 
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'OrganisationId' => "Organisation ($org_id) does not exist."}]};
+    #$data_for_postrun_href->{'Error'} = 1;
+    #$data_for_postrun_href->{'Data'}  = {'Error' => [{'OrganisationId' => "Organisation ($org_id) does not exist."}]};
 
+    push(@{$contact_err_aref}, {'OrganisationId' => "Organisation ($org_id) does not exist."});
+    $contact_err = 1;
+  }
+
+  #prevalidate values to be finished in later version
+
+  #my ($vcol_error, $vcol_error_aref) = validate_all_factor_input($pre_validate_vcol);
+
+  #if ($vcol_error) {
+  #  push(@{$contact_err_aref}, @{$vcol_error_aref});
+  #  $contact_err = 1;
+  #}
+
+
+  if ($contact_err != 0) {
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => $contact_err_aref};
     return $data_for_postrun_href;
   }
 
@@ -1673,6 +1692,7 @@ sub add_contact_runmode {
   return $data_for_postrun_href;
 }
 
+
 sub add_organisation_runmode {
 
 =pod add_organisation_gadmin_HELP_START
@@ -1699,6 +1719,8 @@ sub add_organisation_runmode {
   my $query = $self->query();
 
   my $data_for_postrun_href = {};
+  my $org_err = 0;
+  my $org_error_aref = [];
 
   # Generic required static field checking
 
@@ -1728,11 +1750,15 @@ sub add_organisation_runmode {
   $sql   .= "FROM factor ";
   $sql   .= "WHERE TableNameOfFactor='organisationfactor'";
 
-  my $vcol_data = $dbh_k_write->selectall_hashref($sql, 'FactorId');
+  my $vcol_data = $dbh_read->selectall_hashref($sql, 'FactorId');
 
   my $vcol_param_data = {};
   my $vcol_len_info   = {};
   my $vcol_param_data_maxlen = {};
+
+  #pre_validate_vcol -> { Rule -> [rule], RuleErrorMsg -> [msg], Value -> [value], FactorId -> [value] } 
+  my $pre_validate_vcol = {};
+
   for my $vcol_id (keys(%{$vcol_data})) {
 
     my $vcol_param_name = "VCol_${vcol_id}";
@@ -1741,6 +1767,15 @@ sub add_organisation_runmode {
 
       $vcol_param_data->{$vcol_param_name} = $vcol_value;
     }
+
+    $pre_validate_vcol->{$vcol_param_name} = {
+      'Rule' => $vcol_data->{$vcol_id}->{'FactorValidRule'},
+      'Value'=> $vcol_value,
+      'FactorId'=> $vcol_id,
+      'RuleErrorMsg'=> $vcol_data->{$vcol_id}->{'FactorValidRuleErrMsg'},
+      'CanFactorHaveNull' => $vcol_data->{$vcol_id}->{'CanFactorHaveNull'},
+    };
+
     $vcol_len_info->{$vcol_param_name} = $vcol_data->{$vcol_id}->{'FactorValueMaxLength'};
     $vcol_param_data_maxlen->{$vcol_param_name} = $vcol_value;
   }
@@ -1749,8 +1784,12 @@ sub add_organisation_runmode {
 
   if ($vcol_missing_err) {
 
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$vcol_missing_href]};
+    push(@{$org_error_aref}, $vcol_missing_href);
+    $org_err = 1;
+  }
+
+if ($org_err == 1) {
+    $data_for_postrun_href->{'Data'}        = {'Error' => $org_error_aref};
 
     return $data_for_postrun_href;
   }
@@ -1769,68 +1808,80 @@ sub add_organisation_runmode {
 
     my $err_msg = "OrganisationName ($org_name): already exists";
 
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'OrganisationName' => $err_msg}]};
-
-    return $data_for_postrun_href;
+    push(@{$org_error_aref}, {'OrganisationName' => $err_msg});
+    $org_err = 1;
   }
 
-  $sql    = 'INSERT INTO organisation SET ';
-  $sql   .= 'OrganisationName=?';
+  #prevalidate values to be finished in later version
 
-  my $sth = $dbh_k_write->prepare($sql);
-  $sth->execute($org_name);
+  #my ($vcol_error, $vcol_error_aref) = validate_all_factor_input($pre_validate_vcol);
 
-  my $org_id = -1;
-  if (!$dbh_k_write->err()) {
+  #if ($vcol_error) {
+  #  push(@{$org_error_aref}, @{$vcol_error_aref});
+  #  $org_err = 1;
+  #}
 
-    $org_id = $dbh_k_write->last_insert_id(undef, undef, 'organisation', 'OrganisationId');
-    $self->logger->debug("OrganisationId: $org_id");
-  }
-  else {
 
-    $data_for_postrun_href->{'Error'}       = 1;
-    $data_for_postrun_href->{'Data'}        = {'Error' => [{'Message' => 'Unexpected error.'}]};
+  if ($org_err == 0) {
 
-    return $data_for_postrun_href;
-  }
-  $sth->finish();
+    $sql    = 'INSERT INTO organisation SET ';
+    $sql   .= 'OrganisationName=?';
 
-  for my $vcol_id (keys(%{$vcol_data})) {
+    my $sth = $dbh_k_write->prepare($sql);
+    $sth->execute($org_name);
 
-    my $factor_value = $query->param('VCol_' . "$vcol_id");
+    my $org_id = -1;
+    if (!$dbh_k_write->err()) {
 
-    if (length($factor_value) > 0) {
+        $org_id = $dbh_k_write->last_insert_id(undef, undef, 'organisation', 'OrganisationId');
+        $self->logger->debug("OrganisationId: $org_id");
+    }
+    else {
 
-      $sql  = 'INSERT INTO organisationfactor SET ';
-      $sql .= 'OrganisationId=?, ';
-      $sql .= 'FactorId=?, ';
-      $sql .= 'FactorValue=?';
-      my $factor_sth = $dbh_k_write->prepare($sql);
-      $factor_sth->execute($org_id, $vcol_id, $factor_value);
-
-      if ($dbh_k_write->err()) {
-
-        $data_for_postrun_href->{'Error'} = 1;
-        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+        $data_for_postrun_href->{'Error'}       = 1;
+        $data_for_postrun_href->{'Data'}        = {'Error' => [{'Message' => 'Unexpected error.'}]};
 
         return $data_for_postrun_href;
-      }
-
-      $factor_sth->finish();
     }
+    $sth->finish();
+
+    for my $vcol_id (keys(%{$vcol_data})) {
+
+        if (defined $query->param('VCol_' . "$vcol_id")) {
+
+            my $factor_value = $query->param('VCol_' . "$vcol_id");
+
+            my ($vcol_err, $vcol_msg) = update_factor_value($dbh_k_write, $vcol_id, $factor_value, 'organisationfactor', 'OrganisationId', $org_id);
+
+            if ($vcol_err) {
+
+                    $data_for_postrun_href->{'Error'} = $vcol_err;
+                    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $vcol_msg}]};
+
+                    return $data_for_postrun_href;
+            }
+        }
+    }
+
+    $dbh_k_write->disconnect();
+
+    my $info_msg_aref  = [{'Message' => "Organisation ($org_id) has been added successfully."}];
+    my $return_id_aref = [{'Value' => "$org_id", 'ParaName' => 'OrganisationId'}];
+
+    $data_for_postrun_href->{'Error'}     = 0;
+    $data_for_postrun_href->{'Data'}      = {'Info'     => $info_msg_aref,
+                                            'ReturnId' => $return_id_aref,
+    };
+    $data_for_postrun_href->{'ExtraData'} = 0;
+  }
+  else {
+    $data_for_postrun_href->{'Error'} = $org_err;
+    $data_for_postrun_href->{'Data'}  = {'Error' => $org_error_aref};
+
+    return $data_for_postrun_href;
   }
 
-  $dbh_k_write->disconnect();
 
-  my $info_msg_aref  = [{'Message' => "Organisation ($org_id) has been added successfully."}];
-  my $return_id_aref = [{'Value' => "$org_id", 'ParaName' => 'OrganisationId'}];
-
-  $data_for_postrun_href->{'Error'}     = 0;
-  $data_for_postrun_href->{'Data'}      = {'Info'     => $info_msg_aref,
-                                           'ReturnId' => $return_id_aref,
-  };
-  $data_for_postrun_href->{'ExtraData'} = 0;
 
   return $data_for_postrun_href;
 }
@@ -2112,6 +2163,8 @@ sub update_contact_runmode {
   my $query      = $self->query();
 
   my $data_for_postrun_href = {};
+  my $contact_err = 0;
+  my $contact_err_aref = [];
 
   # Generic required static field checking
 
@@ -2239,7 +2292,7 @@ sub update_contact_runmode {
 
   $self->logger->debug("First name: $fname");
 
-  my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength ";
+  my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength, FactorValidRuleErrMsg, FactorValidRule  ";
   $sql   .= "FROM factor ";
   $sql   .= "WHERE TableNameOfFactor='contactfactor'";
 
@@ -2248,10 +2301,12 @@ sub update_contact_runmode {
   my $vcol_param_data = {};
   my $vcol_len_info   = {};
   my $vcol_param_data_maxlen = {};
+  my $pre_validate_vcol = {};
+
   for my $vcol_id (keys(%{$vcol_data})) {
 
     my $vcol_param_name = "VCol_${vcol_id}";
-    my $vcol_value      = $query->param($vcol_param_name);
+    my $vcol_value      = $query->param($vcol_param_name) ;
     if ($vcol_data->{$vcol_id}->{'CanFactorHaveNull'} != 1) {
 
       $vcol_param_data->{$vcol_param_name} = $vcol_value;
@@ -2259,8 +2314,15 @@ sub update_contact_runmode {
 
     $vcol_len_info->{$vcol_param_name} = $vcol_data->{$vcol_id}->{'FactorValueMaxLength'};
     $vcol_param_data_maxlen->{$vcol_param_name} = $vcol_value;
-  }
 
+    $pre_validate_vcol->{$vcol_param_name} = {
+      'Rule' => $vcol_data->{$vcol_id}->{'FactorValidRule'},
+      'Value'=> $vcol_value,
+      'FactorId'=> $vcol_id,
+      'RuleErrorMsg'=> $vcol_data->{$vcol_id}->{'FactorValidRuleErrMsg'},
+      'CanFactorHaveNull' => $vcol_data->{$vcol_id}->{'CanFactorHaveNull'},
+    };
+  }
   my ($vcol_missing_err, $vcol_missing_href) = check_missing_href( $vcol_param_data );
 
   if ($vcol_missing_err) {
@@ -2286,9 +2348,26 @@ sub update_contact_runmode {
 
   if (!$org_existence) {
 
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'OrganisationId' => "Organisation ($org_id) does not exist."}]};
+    #$data_for_postrun_href->{'Error'} = 1;
+    #$data_for_postrun_href->{'Data'}  = {'Error' => [{'OrganisationId' => "Organisation ($org_id) does not exist."}]};
 
+    push(@{$contact_err_aref}, {'OrganisationId' => "Organisation ($org_id) does not exist."});
+    $contact_err = 1;
+  }
+  
+  #prevalidate values to be finished in later version
+
+  #my ($vcol_error, $vcol_error_aref) = validate_all_factor_input($pre_validate_vcol);
+
+  #if ($vcol_error) {
+  #  push(@{$contact_err_aref}, @{$vcol_error_aref});
+  #  $contact_err = 1;
+  #}
+
+
+  if ($contact_err != 0) {
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => $contact_err_aref};
     return $data_for_postrun_href;
   }
 
@@ -2317,128 +2396,35 @@ sub update_contact_runmode {
   }
   $sth->finish();
 
+  my $vcol_error = [];
+
   for my $vcol_id (keys(%{$vcol_data})) {
 
     if (defined $query->param('VCol_' . "$vcol_id")) {
 
       my $factor_value = $query->param('VCol_' . "$vcol_id");
 
-      $sql  = 'SELECT Count(*) ';
-      $sql .= 'FROM contactfactor ';
-      $sql .= 'WHERE ContactId=? AND FactorId=?';
+      my ($vcol_err, $vcol_msg) = update_factor_value($dbh_k_write, $vcol_id, $factor_value, 'contactfactor', 'ContactId', $contact_id);
 
-      my ($read_err, $count) = read_cell($dbh_k_write, $sql, [$contact_id, $vcol_id]);
+      if ($vcol_err) {
 
-      if (length($factor_value) > 0) {
+        $self->logger->debug("VCol_" . "$vcol_id => $vcol_msg" );
 
-        if ($count > 0) {
+        push(@{$contact_err_aref}, {'VCol_' . "$vcol_id" => $vcol_msg});
 
-          $sql  = 'UPDATE contactfactor SET ';
-          $sql .= 'FactorValue=? ';
-          $sql .= 'WHERE ContactId=? AND FactorId=?';
-
-          my $factor_sth = $dbh_k_write->prepare($sql);
-          $factor_sth->execute($factor_value, $contact_id, $vcol_id);
-
-          if ($dbh_k_write->err()) {
-
-            $data_for_postrun_href->{'Error'} = 1;
-            $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-            return $data_for_postrun_href;
-          }
-
-          $factor_sth->finish();
-        }
-        else {
-
-          $sql  = 'INSERT INTO contactfactor SET ';
-          $sql .= 'ContactId=?, ';
-          $sql .= 'FactorId=?, ';
-          $sql .= 'FactorValue=?';
-
-          my $factor_sth = $dbh_k_write->prepare($sql);
-          $factor_sth->execute($contact_id, $vcol_id, $factor_value);
-
-          if ($dbh_k_write->err()) {
-
-            $data_for_postrun_href->{'Error'} = 1;
-            $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-            return $data_for_postrun_href;
-          }
-
-          $factor_sth->finish();
-        }
-      }
-      else {
-
-        if ($count > 0) {
-
-          $sql  = 'DELETE FROM contactfactor ';
-          $sql .= 'WHERE ContactId=? AND FactorId=?';
-
-          my $factor_sth = $dbh_k_write->prepare($sql);
-          $factor_sth->execute($contact_id, $vcol_id);
-
-          if ($dbh_k_write->err()) {
-
-            $data_for_postrun_href->{'Error'} = 1;
-            $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-            return $data_for_postrun_href;
-          }
-          $factor_sth->finish();
-        }
+        $contact_err = 1;
       }
     }
   }
 
   $dbh_k_write->disconnect();
 
-  my $dbh_gis_write = connect_gis_write();
-
-  if (length($contactlocation) > 0) {
-
-    $sql  = "UPDATE contactloc ";
-    $sql .= "SET contactlocation=ST_Multi(ST_GeomFromText(?, -1)) ";
-    $sql .= 'WHERE contactid=?';
-
-    my $gis_sth = $dbh_gis_write->prepare($sql);
-    $gis_sth->execute($contactlocation, $contact_id);
-
-    if ($dbh_gis_write->err()) {
-
-      $self->logger->debug("SQL err: " . $dbh_gis_write->errstr());
-
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-      return $data_for_postrun_href;
-    }
-
-    $gis_sth->finish();
-  }
-  else {
-
-    $sql = 'DELETE FROM contactloc WHERE contactid=?';
-    my $gis_sth = $dbh_gis_write->prepare($sql);
-    $gis_sth->execute($contact_id);
-
-    if ($dbh_gis_write->err()) {
-
-      $self->logger->debug("SQL err: " . $dbh_gis_write->errstr());
-
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-      return $data_for_postrun_href;
-    }
-
-    $gis_sth->finish();
+  if ($contact_err != 0) {
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => $contact_err_aref};
+    return $data_for_postrun_href;
   }
 
-  $dbh_gis_write->disconnect();
   my $info_msg_aref = [{'Message' => "Contact ($contact_id) has been updated successfully."}];
 
   $data_for_postrun_href->{'Error'}     = 0;

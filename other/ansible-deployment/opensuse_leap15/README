@@ -45,7 +45,7 @@ The following instructions will deploy DAL for testing:
 4. Generate root SSH public/private key on the staging machine.
 
 5. Copy the root public key on the staging machine to the root user in target machine by using ssh-copy-id command.
-For example: ssh-copy-id root@target_machine_ip_address.
+For example: ssh-copy-id root@target_machine_ip_address. You can use ssh-keygen to generate a new key.
 
 6. Test the SSH without password from root user on the staging machine to root user on the target machine.
 
@@ -56,11 +56,13 @@ x.x.x.x
 
 and replace x.x.x.x with the IP address of the target machine
 
-8. Run ansible-playbook kddart_dal_v2_7_0_server_deployment_leap15.yml. It is recommended you use --extra-vars flag to streamline some of the variables that need to be changed.
+8. Run ansible-playbook kddart_dal_v2_7_0_server_deployment_leap15.yml or kddart_dal_v2_7_0_server_deployment_leap1-15.4.yml (for OpenSuse 15.4 due to differences in Python) It is recommended you use --extra-vars flag to streamline some of the variables that need to be changed.
 
 ansible-playbook kddart_dal_v2_7_0_server_deployment_leap.yml --extra-vars="local_tar_gz_file='dal.tar.gz' dbpass='securepassword2023$' ip_network='192.18.18.18/23' dal_address_name='kddart.example.com'"
 
-9. Login as root to the target machine and execute /root/KDDArT-DAL-v2.7.0/other/run_create_dbs.sh
+Note: ip_network in the ansible script should include the subnet mask (e.g. 192.18.18.18/23)
+
+9. Login as root to the target machine and execute /root/KDDArT-DAL-v2.7.0/other/run_create_empty_dbs.sh
 
 10. Restart target machine. It must be done before proceeding to the next instruction.
 
@@ -95,6 +97,8 @@ ansible-playbook kddart_dal_v2_7_0_server_deployment_leap.yml --extra-vars="loca
 12. As root on the target machine, run:
 
 perl -w /root/KDDArT-DAL-v2.7.0/other/dal_access_test.pl "http://kddart.example.com/dal" admin kddartadmin 0
+
+Note: http://kddart.example.com/dal should be replaced with the URL of your new DAL installation. 
 
 13. As root on the target machine, run:
 

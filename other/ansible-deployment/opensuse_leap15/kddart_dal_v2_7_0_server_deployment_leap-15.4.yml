@@ -459,7 +459,7 @@
         {{ solr_workspace }}/solr-{{ solr_version }}/bin/install_solr_service.sh
         {{ solr_workspace }}/solr-{{ solr_version }}.tgz
         -i {{ solr_install_dir }}
-        -d {{ solr_home }} -f
+        -d {{ solr_home }} -f -n
         creates={{ solr_install_dir }}/solr/bin/solr
 
     - name: Start solr

@@ -473,7 +473,7 @@ DROP TABLE IF EXISTS `factor`;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `factor` (
   `FactorId` int(11) NOT NULL AUTO_INCREMENT COMMENT 'factor id',
-  `FactorName` varchar(32) NOT NULL COMMENT 'column name',
+  `FactorName` varchar(255) NOT NULL COMMENT 'column name',
   `FactorCaption` varchar(64) DEFAULT NULL COMMENT 'caption (shorter version of name)',
   `FactorDescription` varchar(255) DEFAULT NULL COMMENT 'what is stored in the column',
   `TableNameOfFactor` varchar(32) NOT NULL COMMENT 'which main table this factor refers to',

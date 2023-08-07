@@ -13,4 +13,7 @@ xml/add_data_vcol/case_00107_add_geno2_4_plant.xml
 xml/add_data_vcol/case_00118_add_designtype.xml
 xml/add_data_vcol/case_01004_add_vcol_trial.xml
 xml/add_data_vcol/case_00007_add_trial.xml
+xml/add_data_vcol/case_01103_add_trialunit.xml
+xml/add_data_vcol/case_01107_add_trial_unit_bulk.xml
+xml/add_data_vcol/case_01108_update_trial_unit_bulk.xml
 xml/add_data_vcol/case_01011_list_genotype_filter_vcol.xml

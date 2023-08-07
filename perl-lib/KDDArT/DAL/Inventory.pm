@@ -53,21 +53,21 @@ sub setup {
   __PACKAGE__->authen->init_config_parameters();
   __PACKAGE__->authen->check_login_runmodes(':all');
   __PACKAGE__->authen->check_content_type_runmodes(':all');
-  __PACKAGE__->authen->check_rand_runmodes('add_storage_gadmin',
-                                           'update_storage_gadmin',
-                                           'del_storage_gadmin',
+  __PACKAGE__->authen->check_rand_runmodes('add_storage',
+                                           'update_storage',
+                                           'del_storage',
                                            'add_item',
-                                           'update_item_gadmin',
-                                           'del_item_gadmin',
-                                           'add_itemparent_gadmin',
-                                           'del_itemparent_gadmin',
-                                           'add_itemgroup_gadmin',
-                                           'update_itemgroup_gadmin',
-                                           'del_itemgroup_gadmin',
-                                           'add_item_to_group_gadmin',
-                                           'remove_item_from_group_gadmin',
-                                           'import_item_csv_gadmin',
-                                           'import_itemgroup_xml_gadmin',
+                                           'update_item',
+                                           'del_item',
+                                           'add_itemparent',
+                                           'del_itemparent',
+                                           'add_itemgroup',
+                                           'update_itemgroup',
+                                           'del_itemgroup',
+                                           'add_item_to_group',
+                                           'remove_item_from_group',
+                                           'import_item_csv',
+                                           'import_itemgroup_xml',
                                            'add_item_log',
                                            'add_generalunit_gadmin',
                                            'update_generalunit_gadmin',
@@ -75,23 +75,23 @@ sub setup {
                                            'add_conversionrule_gadmin',
                                            'del_conversionrule_gadmin',
                                            'update_conversionrule_gadmin',
-                                           'update_item_bulk_gadmin',
+                                           'update_item_bulk',
                                            'update_storage_geography',
       );
   __PACKAGE__->authen->count_session_request_runmodes(':all');
 
-  __PACKAGE__->authen->check_signature_runmodes('add_storage_gadmin',
-                                                'update_storage_gadmin',
-                                                'del_storage_gadmin',
+  __PACKAGE__->authen->check_signature_runmodes('add_storage',
+                                                'update_storage',
+                                                'del_storage',
                                                 'add_item',
-                                                'update_item_gadmin',
-                                                'del_item_gadmin',
-                                                'add_itemparent_gadmin',
-                                                'del_itemparent_gadmin',
-                                                'update_itemgroup_gadmin',
-                                                'del_itemgroup_gadmin',
-                                                'add_item_to_group_gadmin',
-                                                'remove_item_from_group_gadmin',
+                                                'update_item',
+                                                'del_item',
+                                                'add_itemparent',
+                                                'del_itemparent',
+                                                'update_itemgroup',
+                                                'del_itemgroup',
+                                                'add_item_to_group',
+                                                'remove_item_from_group',
                                                 'add_item_log',
                                                 'add_generalunit_gadmin',
                                                 'update_generalunit_gadmin',
@@ -99,54 +99,54 @@ sub setup {
                                                 'add_conversionrule_gadmin',
                                                 'del_conversionrule_gadmin',
                                                 'update_conversionrule_gadmin',
-                                                'update_item_bulk_gadmin',
+                                                'update_item_bulk',
                                                 'update_storage_geography',
       );
-  __PACKAGE__->authen->check_gadmin_runmodes(#'add_storage_gadmin',
-                                             #'update_storage_gadmin',
-                                             'del_storage_gadmin',
-                                             #'update_item_gadmin',
-                                             'del_item_gadmin',
-                                             'add_itemparent_gadmin',
-                                             'del_itemparent_gadmin',
-                                             'add_itemgroup_gadmin',
-                                             'del_itemgroup_gadmin',
-                                             'add_item_to_group_gadmin',
-                                             'remove_item_from_group_gadmin',
-                                             'import_itemgroup_xml_gadmin',
-                                             #'import_item_csv_gadmin',
+  __PACKAGE__->authen->check_gadmin_runmodes(#'add_storage',
+                                             #'update_storage',
+                                             #'del_storage',
+                                             #'update_item',
+                                             #'del_item',
+                                             #'add_itemparent',
+                                             #'del_itemparent',
+                                             #'add_itemgroup',
+                                             #'del_itemgroup',
+                                             #'add_item_to_group',
+                                             #'remove_item_from_group',
+                                             #'import_itemgroup_xml',
+                                             #'import_item_csv',
                                              'update_generalunit_gadmin',
                                              'del_generalunit_gadmin',
                                              'add_generalunit_gadmin',
                                              'add_conversionrule_gadmin',
                                              'del_conversionrule_gadmin',
                                              'update_conversionrule_gadmin',
-                                             #'update_item_bulk_gadmin',
-                                             'update_storage_geography',
+                                             #'update_item_bulk',
+                                             #'update_storage_geography',
       );
-  __PACKAGE__->authen->check_sign_upload_runmodes('add_itemgroup_gadmin',
-                                                  'import_item_csv_gadmin',
-                                                  'import_itemgroup_xml_gadmin',
+  __PACKAGE__->authen->check_sign_upload_runmodes('add_itemgroup',
+                                                  'import_item_csv',
+                                                  'import_itemgroup_xml',
       );
 
   $self->run_modes(
 
     # Storage
-    'add_storage_gadmin'            => 'add_storage_runmode',
-    'update_storage_gadmin'         => 'update_storage_runmode',
-    'del_storage_gadmin'            => 'del_storage_runmode',
+    'add_storage'                   => 'add_storage_runmode',
+    'update_storage'                => 'update_storage_runmode',
+    'del_storage'                   => 'del_storage_runmode',
     'list_storage'                  => 'list_storage_runmode',
     'get_storage'                   => 'get_storage_runmode',
     'update_storage_geography'      => 'update_storage_geography_runmode',
 
     # Item
     'add_item'                      => 'add_item_runmode',
-    'update_item_gadmin'            => 'update_item_runmode',
-    'del_item_gadmin'               => 'del_item_runmode',
+    'update_item'                   => 'update_item_runmode',
+    'del_item'                      => 'del_item_runmode',
     'get_item'                      => 'get_item_runmode',
     'list_item_advanced'            => 'list_item_advanced_runmode',
-    'import_item_csv_gadmin'        => 'import_item_csv_runmode',
-    'update_item_bulk_gadmin'       => 'update_item_bulk_runmode',
+    'import_item_csv'               => 'import_item_csv_runmode',
+    'update_item_bulk'              => 'update_item_bulk_runmode',
 
     # Unit
     'add_generalunit_gadmin'        => 'add_general_unit_runmode',
@@ -156,20 +156,20 @@ sub setup {
     'list_generalunit_advanced'     => 'list_general_unit_advanced_runmode',
 
     # Item Group
-    'add_itemgroup_gadmin'          => 'add_itemgroup_runmode',
-    'update_itemgroup_gadmin'       => 'update_itemgroup_runmode',
-    'del_itemgroup_gadmin'          => 'del_itemgroup_runmode',
+    'add_itemgroup'                 => 'add_itemgroup_runmode',
+    'update_itemgroup'              => 'update_itemgroup_runmode',
+    'del_itemgroup'                 => 'del_itemgroup_runmode',
     'get_itemgroup'                 => 'get_itemgroup_runmode',
     'list_itemgroup_advanced'       => 'list_itemgroup_advanced_runmode',
-    'import_itemgroup_xml_gadmin'   => 'import_itemgroup_xml_runmode',
+    'import_itemgroup_xml'          => 'import_itemgroup_xml_runmode',
 
     # Group Item
-    'add_item_to_group_gadmin'      => 'add_item_to_group_runmode',
-    'remove_item_from_group_gadmin' => 'remove_item_from_group_runmode',
+    'add_item_to_group'             => 'add_item_to_group_runmode',
+    'remove_item_from_group'        => 'remove_item_from_group_runmode',
 
     # Item Parent
-    'add_itemparent_gadmin'         => 'add_itemparent_runmode',
-    'del_itemparent_gadmin'         => 'del_itemparent_runmode',
+    'add_itemparent'                => 'add_itemparent_runmode',
+    'del_itemparent'                => 'del_itemparent_runmode',
     'list_itemparent'               => 'list_itemparent_runmode',
     'get_itemparent'                => 'get_itemparent_runmode',
 
@@ -214,7 +214,7 @@ sub setup {
 
 sub del_itemparent_runmode {
 
-=pod del_itemparent_gadmin_HELP_START
+=pod del_itemparent_HELP_START
 {
 "OperationName": "Delete item parent",
 "Description": "Delete inventory item parent information specified by id. Record can not be deleted if it breaks inventory tree.",
@@ -270,7 +270,7 @@ sub del_itemparent_runmode {
 
 sub add_itemparent_runmode {
 
-=pod add_itemparent_gadmin_HELP_START
+=pod add_itemparent_HELP_START
 {
 "OperationName": "Add parent for item",
 "Description": "Define parent for inventory item specified by id.",
@@ -908,7 +908,7 @@ sub get_itemgroup_runmode {
 
 sub add_itemgroup_runmode {
 
-=pod add_itemgroup_gadmin_HELP_START
+=pod add_itemgroup_HELP_START
 {
 "OperationName": "Add item group",
 "Description": "Create an item group.",
@@ -1132,7 +1132,7 @@ sub add_itemgroup_runmode {
 
 sub update_itemgroup_runmode {
 
-=pod update_itemgroup_gadmin_HELP_START
+=pod update_itemgroup_HELP_START
 {
 "OperationName": "Update item group",
 "Description": "Update information about item group specified by id.",
@@ -1282,7 +1282,7 @@ sub update_itemgroup_runmode {
 
 sub del_itemgroup_runmode {
 
-=pod del_itemgroup_gadmin_HELP_START
+=pod del_itemgroup_HELP_START
 {
 "OperationName": "Delete item group",
 "Description": "Delete item group specified by it. Item group can be deleted only if not attached to any lower level related record.",
@@ -2704,7 +2704,7 @@ sub get_item_runmode {
 
 sub del_item_runmode {
 
-=pod del_item_gadmin_HELP_START
+=pod del_item_HELP_START
 {
 "OperationName": "Delete item",
 "Description": "Delete inventory item for specified id. Item can be deleted only if not attached to any lower level related record.",
@@ -3338,7 +3338,7 @@ sub add_item_runmode {
 
 sub update_item_runmode {
 
-=pod update_item_gadmin_HELP_START
+=pod update_item_HELP_START
 {
 "OperationName": "Update item",
 "Description": "Update inventory items for specified id.",
@@ -4051,7 +4051,7 @@ sub update_item_runmode {
 
 sub add_item_to_group_runmode {
 
-=pod add_item_to_group_gadmin_HELP_START
+=pod add_item_to_group_HELP_START
 {
 "OperationName": "Add item to item group",
 "Description": "Add a new inventory item to defined group of items.",
@@ -4146,7 +4146,7 @@ sub add_item_to_group_runmode {
 
 sub remove_item_from_group_runmode {
 
-=pod remove_item_from_group_gadmin_HELP_START
+=pod remove_item_from_group_HELP_START
 {
 "OperationName": "Remove item from item group",
 "Description": "Delete item from the item group.",
@@ -4248,7 +4248,7 @@ sub remove_item_from_group_runmode {
 
 sub add_storage_runmode {
 
-=pod add_storage_gadmin_HELP_START
+=pod add_storage_HELP_START
 {
 "OperationName": "Add storage",
 "Description": "Add a new storage location information into a storage areas tree.",
@@ -4392,7 +4392,7 @@ sub add_storage_runmode {
 
 sub update_storage_runmode {
 
-=pod update_storage_gadmin_HELP_START
+=pod update_storage_HELP_START
 {
 "OperationName": "Update storage",
 "Description": "Update storage area information specified by id.",
@@ -4599,7 +4599,7 @@ sub update_storage_runmode {
 
 sub del_storage_runmode {
 
-=pod del_storage_gadmin_HELP_START
+=pod del_storage_HELP_START
 {
 "OperationName": "Delete storage",
 "Description": "Delete storage location specified by id. Storage can be deleted only if not attached to any lower level related record. Deleting storage also can not break storage tree.",
@@ -5544,7 +5544,7 @@ sub get_itemparent_runmode {
 
 sub import_item_csv_runmode {
 
-=pod import_item_csv_gadmin_HELP_START
+=pod import_item_csv_HELP_START
 {
 "OperationName": "Import items",
 "Description": "Import items from a csv file formatted as a sparse matrix of item data.",
@@ -5553,8 +5553,8 @@ sub import_item_csv_runmode {
 "GroupAdminRequired": 1,
 "SignatureRequired": 1,
 "AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='3 records of items have been inserted successfully.' /><StatInfo Unit='second' ServerElapsedTime='0.053' /><ReturnOther Value='2017-04-24 16:29:41' ParaName='LastUpdateTimeStamp' /><ReturnIdFile xml='http://blackbox.diversityarrays.com/data/admin/import_item_csv_gadmin_return_id_182.xml' /></DATA>",
-"SuccessMessageJSON": "{'ReturnIdFile' : [{'json' : 'http://blackbox.diversityarrays.com/data/admin/import_item_csv_gadmin_return_id_206.json'}],'ReturnOther' : [{'Value' : '2017-04-24 16:36:21','ParaName' : 'LastUpdateTimeStamp'}],'StatInfo' : [{'ServerElapsedTime' : '0.064','Unit' : 'second'}],'Info' : [{'Message' : '3 records of items have been inserted successfully.'}]}",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='3 records of items have been inserted successfully.' /><StatInfo Unit='second' ServerElapsedTime='0.053' /><ReturnOther Value='2017-04-24 16:29:41' ParaName='LastUpdateTimeStamp' /><ReturnIdFile xml='http://blackbox.diversityarrays.com/data/admin/import_item_csv_return_id_182.xml' /></DATA>",
+"SuccessMessageJSON": "{'ReturnIdFile' : [{'json' : 'http://blackbox.diversityarrays.com/data/admin/import_item_csv_return_id_206.json'}],'ReturnOther' : [{'Value' : '2017-04-24 16:36:21','ParaName' : 'LastUpdateTimeStamp'}],'StatInfo' : [{'ServerElapsedTime' : '0.064','Unit' : 'second'}],'Info' : [{'Message' : '3 records of items have been inserted successfully.'}]}",
 "ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Row (1): SpecimenId (872) not found.' /></DATA>"}],
 "ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Row (1): SpecimenId (872) not found.'}]}"}],
 "RequiredUpload": 1,
@@ -7139,7 +7139,7 @@ sub import_item_csv_runmode {
 
 sub import_itemgroup_xml_runmode {
 
-=pod import_itemgroup_xml_gadmin_HELP_START
+=pod import_itemgroup_xml_HELP_START
 {
 "OperationName": "Import item group",
 "Description": "Import item group with a definition of items belonging to the group. This definition has to be in xml format.",
@@ -7148,8 +7148,8 @@ sub import_itemgroup_xml_runmode {
 "GroupAdminRequired": 1,
 "SignatureRequired": 1,
 "AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><ReturnIdFile xml='http://kddart-d.diversityarrays.com/data/admin/import_itemgroup_xml_gadmin_return_id_132.xml' /><Info Message='Number of ItemGroup imported: 1.' /></DATA>",
-"SuccessMessageJSON": "{'ReturnIdFile' : [{'json' : 'http://kddart-d.diversityarrays.com/data/admin/import_itemgroup_xml_gadmin_return_id_253.json'}], 'Info' : [{'Message' : 'Number of ItemGroup imported: 1.'}]}",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><ReturnIdFile xml='http://kddart-d.diversityarrays.com/data/admin/import_itemgroup_xml_return_id_132.xml' /><Info Message='Number of ItemGroup imported: 1.' /></DATA>",
+"SuccessMessageJSON": "{'ReturnIdFile' : [{'json' : 'http://kddart-d.diversityarrays.com/data/admin/import_itemgroup_xml_return_id_253.json'}], 'Info' : [{'Message' : 'Number of ItemGroup imported: 1.'}]}",
 "ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='SpecimenId (4927) not found.' /></DATA>"}],
 "ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'SpecimenId (4927) not found.'}]}"}],
 "RequiredUpload": 1,
@@ -9651,7 +9651,7 @@ sub get_conversionrule_runmode {
 
 sub update_item_bulk_runmode {
 
-=pod update_item_bulk_gadmin_HELP_START
+=pod update_item_bulk_HELP_START
 {
 "OperationName": "Update item records in bulk",
 "Description": "Update more than one item record in bulk from a JSON blob data",

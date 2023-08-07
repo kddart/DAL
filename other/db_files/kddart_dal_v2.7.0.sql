@@ -101,7 +101,7 @@ ALTER TABLE `designtype` CONVERT TO CHARACTER SET utf8 COLLATE utf8_general_ci;
 -- table factor
 CREATE TABLE `factor` (
   `FactorId` INTEGER NOT NULL AUTO_INCREMENT COMMENT 'factor id',
-  `FactorName` VARCHAR(32) NOT NULL COMMENT 'column name',
+  `FactorName` VARCHAR(255) NOT NULL COMMENT 'column name',
   `FactorCaption` VARCHAR(64) NULL COMMENT 'caption (shorter version of name)',
   `FactorDescription` VARCHAR(255) NULL COMMENT 'what is stored in the column',
   `TableNameOfFactor` VARCHAR(32) NOT NULL COMMENT 'which main table this factor refers to',

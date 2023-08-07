@@ -1091,52 +1091,56 @@ sub get_case_parameter {
               if (defined $src_file_rec->{'NextLevelProccessTag'}) {
 
                 my $next_l_proc_tagname = $src_file_rec->{'NextLevelProccessTag'};
-                my $next_l_recs         = $src_file_rec->{$next_l_proc_tagname};
+                my @next_l_proc_tagname_aref = split(' ', $next_l_proc_tagname);
 
-                my $new_next_l_recs = [];
+                for my $tagname (@next_l_proc_tagname_aref) {
+                    
+                  my $next_l_recs = $src_file_rec->{$tagname};
 
-                for (my $j = 0; $j < scalar(@{$next_l_recs}); $j++) {
+                  my $new_next_l_recs = [];
 
-                  my $next_l_rec = $next_l_recs->[$j];
+                  for (my $j = 0; $j < scalar(@{$next_l_recs}); $j++) {
 
-                  if (defined $next_l_rec->{'SrcValue'}) {
+                    my $next_l_rec = $next_l_recs->[$j];
 
-                    my $next_l_src_val_file = $next_l_rec->{'SrcValue'};
-                    my $next_l_src_val_ref  = undef;
+                    if (defined $next_l_rec->{'SrcValue'}) {
 
-                    if (defined $STORAGE->{"${next_l_src_val_file}_${process_id}"}) {
+                      my $next_l_src_val_file = $next_l_rec->{'SrcValue'};
+                      my $next_l_src_val_ref  = undef;
 
-                      $next_l_src_val_ref = $STORAGE->{"${next_l_src_val_file}_${process_id}"};
+                      if (defined $STORAGE->{"${next_l_src_val_file}_${process_id}"}) {
+
+                        $next_l_src_val_ref = $STORAGE->{"${next_l_src_val_file}_${process_id}"};
+                      }
+                      else {
+
+                        die "No STORAGE for ${next_l_src_val_file}_${process_id}";
+                      }
+
+                      my $next_l_target_para_name = '';
+
+                      if (defined $next_l_rec->{'ParaName'}) {
+
+                        $next_l_target_para_name                = $next_l_rec->{'ParaName'};
+                        $next_l_rec->{$next_l_target_para_name} = $next_l_src_val_ref->{'ReturnId'}->[0]->{'Value'};
+                        delete($next_l_rec->{'ParaName'});
+                        delete($next_l_rec->{'SrcValue'});
+                      }
+                      else {
+
+                        $logger->debug("$case_file: undefined ParaName in $src_file");
+                        die "$case_file: undefined ParaName in $src_file";
+                      }
                     }
-                    else {
 
-                      die "No STORAGE for ${next_l_src_val_file}_${process_id}";
-                    }
-
-                    my $next_l_target_para_name = '';
-
-                    if (defined $next_l_rec->{'ParaName'}) {
-
-                      $next_l_target_para_name                = $next_l_rec->{'ParaName'};
-                      $next_l_rec->{$next_l_target_para_name} = $next_l_src_val_ref->{'ReturnId'}->[0]->{'Value'};
-                      delete($next_l_rec->{'ParaName'});
-                      delete($next_l_rec->{'SrcValue'});
-                    }
-                    else {
-
-                      $logger->debug("$case_file: undefined ParaName in $src_file");
-                      die "$case_file: undefined ParaName in $src_file";
-                    }
+                    push(@{$new_next_l_recs}, $next_l_rec);
                   }
 
-                  push(@{$new_next_l_recs}, $next_l_rec);
-                }
+                  delete($src_file_rec->{'NextLevelProccessTag'});
 
-                delete($src_file_rec->{'NextLevelProccessTag'});
-                $src_file_rec->{$next_l_proc_tagname} = $new_next_l_recs;
+                }
               }
             }
-
             $para_val = XMLout($src_file_ref, RootName => 'DATA');
             $logger->debug("Processed XML output: $para_val");
           }

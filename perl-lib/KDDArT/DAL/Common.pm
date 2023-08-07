@@ -58,7 +58,7 @@ our @EXPORT   = qw($DTD_PATH $RPOSTGRES_UP_FILE $GIS_BUFFER_DISTANCE
                    $GENOTYPE2SPECIMEN_CFG $MULTIMEDIA_STORAGE_PATH $EXTRACTDATAFILE_STORAGE_PATH $ERR_INFO_AREF
                    $CFG_FILE_PATH $DSN_KDB_READ $DSN_KDB_WRITE $DSN_MDB_READ
                    $DSN_MDB_WRITE $DSN_GIS_READ $DSN_GIS_WRITE $RMYSQL_UP_FILE
-                   $MONETDB_UP_FILE $GENOTYPE2SPECIMEN_CFG $GENOTYPEFACTORFILTERING_CFG $OAUTH2_SITE
+                   $MONETDB_UP_FILE $GENOTYPE2SPECIMEN_CFG $GENOTYPEFACTORFILTERING_CFG $TRIALUNITFACTORFILTERING_CFG $OAUTH2_SITE
                    $OAUTH2_AUTHORIZE_PATH $OAUTH2_CLIENT_ID $OAUTH2_CLIENT_SECRET
                    $OAUTH2_SCOPE $OAUTH2_ACCESS_TOKEN_URL $JSON_SCHEMA_PATH
                    $SOLR_URL $POINT2POLYGON_BUFFER4SITE $POINT2POLYGON_BUFFER4TRIAL
@@ -91,7 +91,8 @@ our @EXPORT   = qw($DTD_PATH $RPOSTGRES_UP_FILE $GIS_BUFFER_DISTANCE
                    filter_csv_aref parse_marker_sorting get_sorting_function check_static_field
                    get_next_value_for check_bool_href check_email_href check_value_href load_config read_cookies
                    record_existence_bulk get_solr_cores get_solr_fields get_solr_entities
-                   validate_trait_db_bulk get_filtering_parts minute_diff append_geography_loc recurse_read_v2
+                   validate_trait_db_bulk get_filtering_parts minute_diff append_geography_loc recurse_read_v2 update_factor_value validate_factor_value 
+                   validate_all_factor_input check_maxlen_aref
                  );
 
 our $COOKIE_DOMAIN            = {};
@@ -179,7 +180,7 @@ our $ACCEPT_HEADER_LOOKUP   = { 'application/json' => 'JSON',
 
 our $VALID_CTYPE            = {'xml' => 1, 'json' => 1, 'geojson' => 1};
 
-our $DAL_VERSION            = '2.7.3';
+our $DAL_VERSION            = '2.7.4';
 our $DAL_COPYRIGHT          = 'Copyright (c) 2023, Diversity Arrays Technology, All rights reserved.';
 our $DAL_ABOUT              = 'Data Access Layer';
 
@@ -190,6 +191,8 @@ our $GENO_SPEC_MANY2MANY    = 'M-TO-M';
 our $GENOTYPE2SPECIMEN_CFG  = "FROM CFG_FILE";
 
 our $GENOTYPEFACTORFILTERING_CFG = "FROM CFG_FILE";
+
+our $TRIALUNITFACTORFILTERING_CFG = "FROM CFG_FILE";
 
 our $UNIT_POSITION_SPLITTER = "FROM CFG_FILE";
 
@@ -327,7 +330,6 @@ sub connect_kdb_write {
     $dbh = DBI->connect($dsn, $mysql_uname, $mysql_pass);
   }
   else {
-
     $dbh = DBI->connect($dsn, $mysql_uname, $mysql_pass, { 'RaiseError' => 1, 'AutoCommit' => 0});
   }
 
@@ -350,8 +352,7 @@ sub connect_mdb_write {
   if (!$no_auto_commit) {
     $dbh = DBI->connect($dsn, $monetdb_uname, $monetdb_pass);
   }
-  else {
-    $dbh = DBI->connect($dsn, $monetdb_uname, $monetdb_pass, { 'RaiseError' => 1, 'AutoCommit' => 0});
+  else {    $dbh = DBI->connect($dsn, $monetdb_uname, $monetdb_pass, { 'RaiseError' => 1, 'AutoCommit' => 0});
   }
 
 
@@ -376,7 +377,6 @@ sub connect_gis_write {
     $dbh = DBI->connect($dsn, $pg_uname, $pg_pass);
   }
   else {
-
     $dbh = DBI->connect($dsn, $pg_uname, $pg_pass, { 'RaiseError' => 1, 'AutoCommit' => 0 });
   }
 
@@ -471,7 +471,6 @@ sub read_cell {
     $cell_value = '';
   }
   else {
-
     $cell_value = trim($cell_value);
   }
 
@@ -492,7 +491,6 @@ sub permission_phrase {
       $tablename = '"' . $_[3] . '".';
     }
     else {
-
       $tablename = $_[3] . '.';
     }
   }
@@ -511,7 +509,6 @@ sub permission_phrase {
       $a_grp_id = qq|${tablename}"AccessGroupId"|;
     }
     else {
-
       $o_grp_id = "${tablename}OwnGroupId";
       $a_grp_id = "${tablename}AccessGroupId";
     }
@@ -539,7 +536,6 @@ sub permission_phrase {
     }
   }
   else {
-
     if ($sql_type == 1) {#Postgres
 
       $sql_phrase .= "((( CAST( (${tablename}OwnGroupId = $o_grp_id) AS INTEGER) * $PERM_MASK ) & ${tablename}OwnGroupPerm) | ";
@@ -627,7 +623,6 @@ sub arrayref2csvfile {
       push(@unorder_field_list, [$field, $field_order_href->{$field}]);
     }
     else {
-
       push(@unorder_field_list, [$field, 999999]);
     }
   }
@@ -715,7 +710,6 @@ sub arrayref2xml {
       }
     }
     else {
-
       if (ref $row ne 'ARRAY') {
 
         $attributes{'FieldValue'} = $row;
@@ -781,13 +775,11 @@ sub make_xml_tag {
           push(@nested_field, $fieldname);
         }
         else {
-
           $attributes{$fieldname} = $row->{$fieldname};
         }
       }
     }
     else {
-
       if (ref $row ne 'ARRAY') {
 
         $attributes{'FieldValue'} = $row;
@@ -804,7 +796,6 @@ sub make_xml_tag {
       $writer->endTag($tag_name);
     }
     else {
-
       $writer->emptyTag($tag_name, %attributes);
     }
   }
@@ -820,7 +811,6 @@ sub reconstruct_server_url {
     $url .= "https://";
   }
   else {
-
     $url .= "http://";
   }
 
@@ -866,7 +856,6 @@ sub dispatch_table2xml {
         }
       }
       else {
-
         $op_list_xml_writer->emptyTag('Operation',
                                       'REST'       => $url_part,
             );
@@ -915,7 +904,6 @@ sub dispatch_table2arrayref {
         }
       }
       else {
-
         push(@{$opt_aref}, {'REST' => $url_part});
       }
     }
@@ -944,7 +932,6 @@ sub read_dispatch_table {
         $record = 0;
       }
       else {
-
         $output .= $line;
       }
     }
@@ -1019,7 +1006,6 @@ sub record_existence {
     $sql .= "WHERE LOWER($field_name)=? ";
   }
   else {
-
     # MySQL or MariaDB is case insensitive by default
     $sql .= "WHERE $field_name=? ";
   }
@@ -1078,7 +1064,6 @@ sub id_existence_bulk {
       $sql   .= qq|WHERE "$field_name" IN $id_value_txt|;
     }
     else {
-
       $sql = "SELECT DISTINCT $field_name ";
       $sql   .= "FROM $table_name ";
       $sql   .= "WHERE $field_name IN $id_value_txt";
@@ -1105,14 +1090,12 @@ sub id_existence_bulk {
         }
       }
       else {
-
         $err = 1;
         $msg = "SQL: $sql - " . $dbh->errstr();
         last;
       }
     }
     else {
-
       $err = 1;
       $msg = "SQL: $sql - " . $dbh->errstr();
       last;
@@ -1238,7 +1221,6 @@ sub read_cell_value {
     $sql .= "WHERE lower(CAST($id_field AS VARCHAR(255)))=? ";
   }
   else {
-
     $sql .= "WHERE LOWER($id_field)=? ";
   }
 
@@ -1256,7 +1238,6 @@ sub read_cell_value {
     $field_value = '';
   }
   else {
-
     $field_value = trim($field_value);
   }
 
@@ -1346,7 +1327,6 @@ sub generate_factor_sql {
       }
     }
     else {
-
       # When the field name is not a wild card column like specific individual field name.
       # If the specific field name does not start with Factor. If it does start with
       # Factor, then virtual colum field selection has been done as part of vcol_field_part.
@@ -1358,7 +1338,6 @@ sub generate_factor_sql {
           $select_field_part .= "$field,";
         }
         else {
-
           $select_field_part .= "${table_name}.$field,";
         }
       }
@@ -1375,18 +1354,15 @@ sub generate_factor_sql {
       $returned_sql = "SELECT ${select_field_part}, ${vcol_field_part} ";
     }
     else {
-
       $returned_sql = "SELECT ${select_field_part} ";
     }
   }
   else {
-
     if (length($vcol_field_part) > 0) {
 
       $returned_sql = "SELECT ${vcol_field_part} ";
     }
     else {
-
       $returned_sql = "SELECT * ";
     }
   }
@@ -1491,7 +1467,6 @@ sub generate_factor_sql_v2 {
       }
     }
     else {
-
       # When the field name is not a wild card column like specific individual field name.
       # If the specific field name does not start with Factor. If it does start with
       # Factor, then virtual colum field selection has been done as part of vcol_field_part.
@@ -1503,7 +1478,6 @@ sub generate_factor_sql_v2 {
           $select_field_part .= "$field,";
         }
         else {
-
           $select_field_part .= "${table_name}.$field,";
         }
       }
@@ -1518,7 +1492,6 @@ sub generate_factor_sql_v2 {
     $returned_sql = "SELECT ${select_field_part} ";
   }
   else {
-
     $returned_sql = "SELECT ${table_name}.* ";
   }
 
@@ -1532,7 +1505,6 @@ sub generate_factor_sql_v2 {
     $returned_sql .= " $other_join ";
   }
   else {
-
     $returned_sql .= " FROM $table_name $other_join ";
   }
 
@@ -1629,7 +1601,6 @@ sub generate_factor_sql_v3 {
       }
     }
     else {
-
       # When the field name is not a wild card column like specific individual field name.
       # If the specific field name does not start with Factor. If it does start with
       # Factor, then virtual colum field selection has been done as part of vcol_field_part.
@@ -1641,7 +1612,6 @@ sub generate_factor_sql_v3 {
           $select_field_part .= "$field,";
         }
         else {
-
           $select_field_part .= "${table_name}.$field,";
         }
       }
@@ -1651,8 +1621,6 @@ sub generate_factor_sql_v3 {
   chop($select_field_part);
 
   my $returned_sql = '';
-
-  my $main_table_sql = "";
   my $factor_table_sql = "";
 
   if (length($select_field_part) > 0) {
@@ -1663,42 +1631,34 @@ sub generate_factor_sql_v3 {
       $factor_table_sql = "SELECT ${id_fieldname}, $factor_table_fields_sql";
     }
     else {
-
       $returned_sql = "SELECT ${select_field_part} ";
     }
 
-    $main_table_sql = "SELECT DISTINCT $select_field_part";
   }
   else {
-
     if (length($vcol_field_part) > 0) {
 
       $returned_sql = "SELECT ${vcol_field_part} ";
       $factor_table_sql = "SELECT ${id_fieldname}, $factor_table_fields_sql";
     }
     else {
-
       $returned_sql = "SELECT * ";
     }
 
-    $main_table_sql = "SELECT *";
   }
 
-  $returned_sql   .= "FROM ($main_table_sql FROM ${table_name} WHEREREPLACE GROUP BY ${table_name}.${id_fieldname} $other_join ORDERINGSTRING LIMITSTRING) ";
-  $returned_sql   .= "AS ${table_name} ";
+  $returned_sql   .= "FROM ${table_name} ";
 
   if (length($vcol_field_part) > 0) {
-    $returned_sql .= "LEFT JOIN ($factor_table_sql FROM $factor_table GROUP BY $id_fieldname) AS $factor_table ";
-    $returned_sql   .= "ON ${table_name}.${id_fieldname} = ${factor_table}.${id_fieldname} ";
+    $returned_sql .= " LEFT JOIN ($factor_table_sql FROM $factor_table GROUP BY $id_fieldname) AS $factor_table ";
+    $returned_sql .= " ON ${table_name}.${id_fieldname} = ${factor_table}.${id_fieldname} ";
   }
 
-  #$returned_sql   .= $other_join;
-  #$returned_sql   .= " GROUP BY ${table_name}.${id_fieldname} ";
+  $returned_sql   .= $other_join;
+  $returned_sql   .= " WHEREREPLACE GROUP BY ${table_name}.${id_fieldname} FACTORHAVING ORDERINGSTRING LIMITSTRING ";
 
   return ($err, $trouble_vcol_str, $returned_sql, \@vcol_list);
 }
-
-
 
 # a function that focuses on generating the columns required that includes factors
 sub generate_factor_columns_sql {
@@ -1780,7 +1740,6 @@ sub generate_factor_columns_sql {
       }
     }
     else {
-
       # When the field name is not a wild card column like specific individual field name.
       # If the specific field name does not start with Factor. If it does start with
       # Factor, then virtual colum field selection has been done as part of vcol_field_part.
@@ -1792,7 +1751,6 @@ sub generate_factor_columns_sql {
           $select_field_part .= "$field,";
         }
         else {
-
           $select_field_part .= "${table_name}.$field,";
         }
       }
@@ -1809,18 +1767,15 @@ sub generate_factor_columns_sql {
       $returned_sql = "SELECT ${select_field_part}, ${vcol_field_part} ";
     }
     else {
-
       $returned_sql = "SELECT ${select_field_part} ";
     }
   }
   else {
-
     if (length($vcol_field_part) > 0) {
 
       $returned_sql = "SELECT ${vcol_field_part} ";
     }
     else {
-
       $returned_sql = "SELECT * ";
     }
   }
@@ -1945,7 +1900,6 @@ sub generate_mfactor_sql {
       }
     }
     else {
-
       # When the field name is not a wild card column like specific individual field name.
       # If the specific field name does not start with Factor. If it does start with
       # Factor, then virtual colum field selection has been done as part of vcol_field_part.
@@ -1959,18 +1913,15 @@ sub generate_mfactor_sql {
             push(@select_field_list, qq|$field|);
           }
           else {
-
             push(@select_field_list, qq|"$field"|);
           }
         }
         else {
-
           if ($field =~ /"/) {
 
             push(@select_field_list, qq|"${table_name}".$field|);
           }
           else {
-
             push(@select_field_list, qq|"${table_name}"."$field"|);
           }
         }
@@ -1995,7 +1946,6 @@ sub generate_mfactor_sql {
     $returned_sql = "SELECT ${select_field_part} ";
   }
   else {
-
     $returned_sql = "SELECT ${select_field_part} ";
   }
 
@@ -2119,7 +2069,6 @@ sub gen_mfactor_sql {
       }
     }
     else {
-
       # When the field name is not a wild card column like specific individual field name.
       # If the specific field name does not start with Factor. If it does start with
       # Factor, then virtual colum field selection has been done as part of vcol_field_part.
@@ -2130,7 +2079,6 @@ sub gen_mfactor_sql {
           $select_field_part .= "$field,";
         }
         else {
-
           $select_field_part .= "${tname}.$field,";
         }
       }
@@ -2148,18 +2096,15 @@ sub gen_mfactor_sql {
       $returned_sql = "SELECT ${select_field_part}, ${vcol_field_part} ";
     }
     else {
-
       $returned_sql = "SELECT ${select_field_part} ";
     }
   }
   else {
-
     if (length($vcol_field_part) > 0) {
 
       $returned_sql = "SELECT ${vcol_field_part} ";
     }
     else {
-
       $err = 1;
       $trouble_vcol_str = 'Neither static nor virtual column matched.';
     }
@@ -2202,7 +2147,7 @@ sub generate_vcol_helpers {
       if (exists $vcol_params->{$col}) {
         $vcol_param_data{$col} = $vcol_params->{$col};
       }
-      else {
+      else {        
         $vcol_param_data{$col} = '';
       }
     }
@@ -2299,7 +2244,6 @@ sub is_valid_wkt_href {
       $geo_type_aref = $_[2];
     }
     else {
-
       $geo_type_aref = [$_[2]];
     }
   }
@@ -2328,7 +2272,6 @@ sub is_valid_wkt_href {
       $local_err = 1;
     }
     else {
-
       my $wkt_status = '';
       $sth->bind_col(1, \$wkt_status);
       $sth->fetch();
@@ -2346,7 +2289,6 @@ sub is_valid_wkt_href {
       $err_detail->{$param_name} = "$param_name is not a GIS well known text.";
     }
     else {
-
       if (scalar(@{$geo_type_aref}) > 0) {
 
         my $geo_type_sql = qq|SELECT ST_GeometryType(ST_GeomFromText('$well_known_text'))|;
@@ -2431,6 +2373,7 @@ sub check_maxlen {
   return ($err, $msg);
 }
 
+#function to return max length as an object
 sub check_maxlen_href {
 
   my %args     = %{$_[0]};
@@ -2449,6 +2392,7 @@ sub check_maxlen_href {
 
   return ($err, $err_detail);
 }
+
 
 sub check_integer_value {
 
@@ -2539,7 +2483,6 @@ sub check_perm_value {
       $msg .= "[$param_name], ";
     }
     else {
-
       if ($args{$param_name} > 7 || $args{$param_name} < 0) {
 
         $err = 1;
@@ -2565,7 +2508,6 @@ sub check_perm_href {
       $err_detail->{$param_name} = "$param_name is an integer.";
     }
     else {
-
       if ($args{$param_name} > 7 || $args{$param_name} < 0) {
 
         $err = 1;
@@ -2705,7 +2647,6 @@ sub check_email_href {
       $err_detail->{$param_name} = "$param_name is not a valid email.";
     }
     else {
-
       if ( !$is_valid ) {
 
         $err = 1;
@@ -2829,7 +2770,6 @@ sub add_dtd {
       $dtd_added = 1;
     }
     else {
-
       print UPDATE_XML_FH $line;
     }
   }
@@ -2938,7 +2878,6 @@ sub check_permission {
     $sql   .= qq|WHERE ((($perm_str) & $perm) = $perm) AND "$id_field" IN ($id_list_str)|;
   }
   else {
-
     $sql   .= "SELECT $id_field ";
     $sql   .= "FROM $table ";
     $sql   .= "WHERE ((($perm_str) & $perm) = $perm) AND $id_field IN ($id_list_str)";
@@ -3012,13 +2951,11 @@ sub read_data {
       $data = $array_ref;
     }
     else {
-
       $err = 1;
       $msg = $dbh->errstr();
     }
   }
   else {
-
     $err = 1;
     $msg = $dbh->errstr();
   }
@@ -3147,13 +3084,11 @@ sub get_csvfile_num_of_col {
       next;
     }
     else {
-
       if (length($line) == 0) {
 
         next;
       }
       else {
-
         my $status = $csv_parser->parse($line);
         if ($status) {
 
@@ -3216,7 +3151,6 @@ sub csvfile2arrayref {
     $ret_data = \@data;
   }
   else {
-
     $err_msg = "Line $err_line: $err_msg";
   }
 
@@ -3270,7 +3204,6 @@ sub before_parse_checking {
     ${$num_of_col} = $cur_nb_col;
   }
   else {
-
     if (${$num_of_col} != $cur_nb_col) {
 
       my $prev_num_of_col = ${$num_of_col};
@@ -3374,7 +3307,6 @@ sub csvfh2aref {
       $num_of_col = scalar(@columns);
     }
     else {
-
       if ($num_of_col != scalar(@columns)) {
 
         my $prev_num_of_col = $num_of_col;
@@ -3533,7 +3465,6 @@ sub csvfh2aref_index_lnl {
       $num_of_col = scalar(@columns);
     }
     else {
-
       if ($num_of_col != scalar(@columns)) {
 
         my $prev_num_of_col = $num_of_col;
@@ -3620,7 +3551,6 @@ sub csvfh2aref_index_sline {
       $num_of_col = scalar(@columns);
     }
     else {
-
       if ($num_of_col != scalar(@columns)) {
 
         my $prev_num_of_col = $num_of_col;
@@ -3676,7 +3606,6 @@ sub check_col_definition {
       last;
     }
     else {
-
       if ( !($args{$param_name} =~ /^\d+$/) ) {
 
         $err = 1;
@@ -3684,7 +3613,6 @@ sub check_col_definition {
         last;
       }
       else {
-
         if ($args{$param_name} >= $num_of_col) {
 
           $err = 1;
@@ -3715,7 +3643,6 @@ sub check_col_def_href {
       $err_detail->{$param_name} = $msg;
     }
     else {
-
       if ( !($args{$param_name} =~ /^[-|+]?\d+$/) ) {
 
         $err = 1;
@@ -3723,7 +3650,6 @@ sub check_col_def_href {
         $err_detail->{$param_name} = $msg;
       }
       else {
-
         if ($args{$param_name} >= $num_of_col) {
 
           my $param_val = $args{$param_name};
@@ -3883,7 +3809,6 @@ sub get_paged_id {
       push(@{$id_aref}, $data[$i]->{$id_field_name});
     }
     else {
-
       last;
     }
   }
@@ -4006,7 +3931,6 @@ sub get_paged_filter {
     $limit_clause = "LIMIT ${nb_per_page} OFFSET ${limit_start}";
   }
   else {
-
     $err     = 1;
     $err_msg = 'Unknown DBI driver';
 
@@ -4099,7 +4023,6 @@ sub get_paged_filter_sql {
     $limit_clause = "LIMIT ${nb_per_page} OFFSET ${limit_start}";
   }
   else {
-
     $err     = 1;
     $err_msg = 'Unknown DBI driver';
 
@@ -4369,13 +4292,11 @@ sub validate_trait_db {
         $err_msg = 'Contain a comma - invalid boolean expression';
       }
       else {
-
         if ($trait_value =~ /^[-+]?\d+\.?\d*$/) {
 
           $validation_rule_body =~ s/x/ $trait_value /ig;
         }
         else {
-
           $validation_rule_body =~ s/x/ '$trait_value' /ig;
         }
 
@@ -4395,14 +4316,12 @@ sub validate_trait_db {
           $err_msg = "Invalid boolean trait value validation expression ($validation_rule_body).";
         }
         else {
-
           if ($test_condition == 0) {
 
             $err = 1;
             $err_msg = $validation_err_msg;
           }
           else {
-
             $err = 0;
             $err_msg = '';
           }
@@ -4417,7 +4336,6 @@ sub validate_trait_db {
         $err_msg = 'Invalid choice expression containing [].';
       }
       else {
-
         my @choice_list = split(/\|/, $validation_rule_body);
 
         $err     = 1;
@@ -4453,7 +4371,6 @@ sub validate_trait_db {
         $err_msg = 'Invalid range expression';
       }
       else {
-
         $err     = 1;
         $err_msg = $validation_err_msg;
 
@@ -4495,20 +4412,17 @@ sub validate_trait_db {
           }
         }
         else {
-
           $err = 1;
           $err_msg = "Trait value ($trait_value) not a valid number";
         }
       }
     }
     else {
-
       $err = 1;
       $err_msg = 'Unknown trait value validation rule.';
     }
   }
   else {
-
     $err = 1;
     $err_msg = 'Unknown validation rule.';
   }
@@ -4554,7 +4468,6 @@ sub is_correct_validation_rule {
         $msg     = 'Contain a comma - invalid boolean expression';
       }
       else {
-
         $validation_rule_body =~ s/x/ $dummy_trait_val /ig;
 
         for my $operator (keys(%{$operator_lookup})) {
@@ -4610,7 +4523,6 @@ sub is_correct_validation_rule {
         $msg     = 'Invalid range expression';
       }
       else {
-
         if ($validation_rule_body =~ /\.{3,}/) {
 
           $correct = 0;
@@ -4619,13 +4531,11 @@ sub is_correct_validation_rule {
       }
     }
     else {
-
       $correct = 0;
       $msg     = 'Unknown validation rule.';
     }
   }
   else {
-
     $correct = 0;
     $msg     = 'Invalid validation rule.';
   }
@@ -4684,7 +4594,6 @@ sub parse_selected_field {
       }
     }
     else {
-
       $err     = 1;
       $err_msg = "$field unknown.";
       last;
@@ -4696,7 +4605,6 @@ sub parse_selected_field {
     push(@{$final_field_list}, '*');
   }
   else {
-
     if (!$id_field_selected) {
 
       if (length($id_field_name) > 0) {
@@ -4822,14 +4730,12 @@ sub parse_marker_filtering {
         }
       }
       else {
-
         $err = 1;
         $err_msg = "Field value empty";
         last;
       }
     }
     else {
-
       $err     = 1;
       $err_msg = "( $expression ): invalid filtering expression.";
       last;
@@ -4868,7 +4774,6 @@ sub parse_sorting {
       $field_href->{$geo_field}     = 1;
     }
     else {
-
       $field_href->{$field} = 1;
     }
   }
@@ -4910,7 +4815,6 @@ sub parse_sorting {
         $new_exp = qq|${table_name}"$field_name" $sort_order|;
       }
       else {
-
         $new_exp = "${table_name}$field_name $sort_order";
       }
 
@@ -4922,7 +4826,6 @@ sub parse_sorting {
           push(@{$sort_list}, $new_exp);
         }
         else {
-
           $err     = 1;
           $err_msg = "Field ($field_name) unknown.";
         }
@@ -4951,7 +4854,6 @@ sub parse_sorting {
         $new_exp = qq|LENGTH(${table_name}"$field_name") $sort_order, ${table_name}"$field_name" $sort_order|;
       }
       else {
-
         $new_exp = "LENGTH(${table_name}$field_name) $sort_order, ${table_name}$field_name $sort_order";
       }
 
@@ -4963,14 +4865,12 @@ sub parse_sorting {
           push(@{$sort_list}, $new_exp);
         }
         else {
-
           $err     = 1;
           $err_msg = "Field ($field_name) unknown.";
         }
       }
     }
     else {
-
       $err     = 1;
       $err_msg = "Expression ($expression) invalid.";
     }
@@ -5022,7 +4922,6 @@ sub parse_marker_sorting {
           push(@{$sort_list}, {'FieldName' => $field_name, 'Order' => $sort_order});
         }
         else {
-
           $err     = 1;
           $err_msg = "Field ($field_name) unknown.";
 
@@ -5031,7 +4930,6 @@ sub parse_marker_sorting {
       }
     }
     else {
-
       $err     = 1;
       $err_msg = "Expression ($expression) invalid.";
 
@@ -5097,7 +4995,6 @@ sub get_sorting_function {
       $sort_func_txt = qq|\$a\-\>\[$col_num\] $sort_oper \$b\-\>\[$col_num\]|;
     }
     else {
-
       $sort_func_txt = qq|\$b\-\>\[$col_num\] $sort_oper \$a\-\>\[$col_num\]|;
     }
 
@@ -5155,7 +5052,6 @@ sub update_vcol_data {
           $factor_sth->finish();
         }
         else {
-
           $sql  = "INSERT INTO $factor_table_name SET ";
           $sql .= "$id_field_name =?, ";
           $sql .= "FactorId=?, ";
@@ -5174,7 +5070,6 @@ sub update_vcol_data {
         }
       }
       else {
-
         if ($count > 0) {
 
           $sql  = "DELETE FROM $factor_table_name ";
@@ -5344,7 +5239,6 @@ sub samplemeasure_row2col {
     $inst_num_aref = $instance_num_aref;
   }
   else {
-
     for (my $i = 0; $i <= $max_instance_num; $i++) {
 
       push(@{$inst_num_aref}, $i);
@@ -5371,7 +5265,6 @@ sub samplemeasure_row2col {
         $survey_field_name    = "Survey_${trait_name}";
       }
       else {
-
         $trait_val_field_name = "${trait_name}__$hum_inst_num";
         $date_field_name      = "Date_${trait_name}__$hum_inst_num";
         $survey_field_name    = "Survey_${trait_name}__$hum_inst_num";
@@ -5472,7 +5365,6 @@ sub rollback_cleanup_multi {
       $sql .= qq|WHERE "$id_field" IN ($id_val_csv)|;
     }
     else {
-
       $sql  = "DELETE FROM $table_name ";
       $sql .= "WHERE $id_field IN ($id_val_csv)";
     }
@@ -5523,7 +5415,6 @@ sub write_aref2csv {
       push(@unorder_field_list, [$field, $field_order_href->{$field}]);
     }
     else {
-
       push(@unorder_field_list, [$field, 999999]);
     }
   }
@@ -5578,7 +5469,6 @@ sub write_href2csv {
       push(@unorder_field_list, [$field, $field_order_href->{$field}]);
     }
     else {
-
       push(@unorder_field_list, [$field, 999999]);
     }
   }
@@ -5698,7 +5588,6 @@ sub get_static_field {
         $required_status = 0;
       }
       else {
-
         $required_status = 1;
       }
 
@@ -5725,7 +5614,6 @@ sub get_static_field {
     return ($err, $msg, $field_data, $pkey_data);
   }
   else {
-
     my $sql   = "SELECT * FROM $tname LIMIT 1";
 
     my $sth = $dbh->prepare($sql);
@@ -5762,7 +5650,6 @@ sub get_static_field {
       $comment_lookup_href = $dbh->selectall_hashref($comment_sql, 'column_name');
     }
     else {
-
       my $comment_sql = "SHOW FULL COLUMNS IN $tname";
 
       $comment_lookup_href = $dbh->selectall_hashref($comment_sql, 'Field');
@@ -5789,7 +5676,6 @@ sub get_static_field {
         $required_status = 0;
       }
       else {
-
         $required_status = 1;
       }
 
@@ -5828,7 +5714,6 @@ sub get_static_field {
         }
       }
       else {
-
         if (defined $comment_lookup_href->{$field_name}->{'Comment'}) {
 
           $static_field->{'Description'} = $comment_lookup_href->{$field_name}->{'Comment'};
@@ -6018,7 +5903,6 @@ sub filter_csv {
       }
     }
     else {
-
       $line = <$input_filehandle>;
     }
 
@@ -6093,7 +5977,6 @@ sub filter_csv_aref {
       }
     }
     else {
-
       if ($start_from_line != -1) {
 
         my ($get_line_err, $line_result) = get_file_line($input_filehandle, $index_filehandle, $start_from_line);
@@ -6107,7 +5990,6 @@ sub filter_csv_aref {
         $start_from_line = -1;
       }
       else {
-
         $line = <$input_filehandle>;
         $line_counter += 1;
       }
@@ -6192,7 +6074,6 @@ sub recurse_read {
         $global_frequency_id_href->{$id} = 1;
       }
       else {
-
         $global_frequency_id_href->{$id} += 1;
       }
     }
@@ -6218,7 +6099,6 @@ sub recurse_read {
       $global_frequency_id_href->{$id} = 1;
     }
     else {
-
       $global_frequency_id_href->{$id} += 1;
     }
   }
@@ -6310,7 +6190,6 @@ sub parse_filtering {
       $field_href->{$geo_field}     = 1;
     }
     else {
-
       $field_href->{$field} = 1;
     }
   }
@@ -6374,7 +6253,6 @@ sub parse_filtering {
             last;
           }
           else {
-
             if ($operator =~ /\-GEOEQ/i) {
 
               $operator = '=';
@@ -6386,7 +6264,6 @@ sub parse_filtering {
           $dbh_gis->disconnect();
         }
         else {
-
           $err     = 1;
           $err_msg = "Filtering field ($field_name): unknown geometry text.";
           last;
@@ -6456,7 +6333,6 @@ sub parse_filtering {
                 $sub_query_where  .= qq|WHERE "${field_name}" $operator $field_value)|;
               }
               else {
-
                 $sub_query_where   = "${main_tname}.${id_field_name} IN ";
                 $sub_query_where  .= "(SELECT DISTINCT $id_field_name FROM $table_name ";
                 $sub_query_where  .= "WHERE ${field_name} $operator $field_value)";
@@ -6465,17 +6341,14 @@ sub parse_filtering {
               push(@{$where_exp}, $sub_query_where);
             }
             else {
-
               if ($main_tname =~ /\"/) {
                 push(@{$where_exp}, qq|${main_tname}."${field_name}" $operator $field_value|);
               }
-              else {
-                push(@{$where_exp}, "${main_tname}.${field_name} $operator $field_value");
+              else {                push(@{$where_exp}, "${main_tname}.${field_name} $operator $field_value");
               }
             }
           }
           else {
-
             if ($sub_query) {
 
               my $sub_query_where = '';
@@ -6509,7 +6382,6 @@ sub parse_filtering {
                   $gbc_oper = '<';
                 }
                 else {
-
                   $gbc_oper = '>';
                 }
 
@@ -6523,7 +6395,6 @@ sub parse_filtering {
                   push(@{$where_exp}, $sub_query_where);
                 }
                 else {
-
                   $sub_query_where  = qq|${main_tname}.${field_name} IN |;
                   $sub_query_where .= qq|(SELECT ${field_name} |;
                   $sub_query_where .= qq|FROM $table_name GROUP BY ${field_name} |;
@@ -6533,7 +6404,6 @@ sub parse_filtering {
                 }
               }
               else {
-
                 if ($main_tname =~ /\"/) {
 
                   $sub_query_where  = "${main_tname}.${id_field_name} IN ";
@@ -6543,7 +6413,6 @@ sub parse_filtering {
                   push(@{$where_exp}, $sub_query_where);
                 }
                 else {
-
                   $sub_query_where  = "${main_tname}.${id_field_name} IN ";
                   $sub_query_where .= "(SELECT DISTINCT $id_field_name FROM $table_name ";
                   $sub_query_where .= "WHERE ${field_name} $operator ?#${field_value}#)";
@@ -6553,20 +6422,17 @@ sub parse_filtering {
               }
             }
             else {
-
               if ($main_tname =~ /\"/) {
 
                 push(@{$where_exp}, qq|${main_tname}."${field_name}" $operator ?#${field_value}#|);
               }
               else {
-
                 push(@{$where_exp}, "${main_tname}.${field_name} $operator ?#${field_value}#");
               }
             }
           }
         }
         else {
-
           $err     = 1;
           $err_msg = "Filtering field ($field_name) unknown.";
           last;
@@ -6574,7 +6440,6 @@ sub parse_filtering {
       }
     }
     else {
-
       $err     = 1;
       $err_msg = "( $expression ): invalid filtering expression.";
       last;
@@ -6641,7 +6506,6 @@ sub test_filtering_factor {
       }
     }
     else {
-
     }
   }
 
@@ -6740,7 +6604,6 @@ sub parse_filtering_v2 {
         $field_value = 1;
       }
       else {
-
         ($empty, $field_value) = split(/$field_name\s*$operator/, $expression);
       }
 
@@ -6784,7 +6647,6 @@ sub parse_filtering_v2 {
             push(@{$vcol_having_exp}, $new_exp);
           }
           else {
-
             $err     = 1;
             $err_msg = "Filtering field ($field_name) unknown.";
             last;
@@ -6804,7 +6666,6 @@ sub parse_filtering_v2 {
             push(@{$scol_where_exp}, "ISNULL(${main_tname}.${field_name}) $operator ?#${field_value}#");
           }
           else {
-
             $err     = 1;
             $err_msg = "Filtering field ($field_name) unknown.";
             last;
@@ -6814,7 +6675,6 @@ sub parse_filtering_v2 {
         }
       }
       else {
-
         my $new_exp = "$field_name $operator $field_value";
 
         if (!$seen_expression_lookup->{$new_exp}) {
@@ -6863,12 +6723,10 @@ sub parse_filtering_v2 {
                 push(@{$scol_where_exp}, $sub_query_where);
               }
               else {
-
                 push(@{$scol_where_exp}, "${main_tname}.${field_name} $operator $field_value");
               }
             }
             else {
-
               if ($sub_query) {
 
                 my $sub_query_where = '';
@@ -6892,7 +6750,6 @@ sub parse_filtering_v2 {
                   }
                 }
                 else {
-
                   $sub_query_where  = "${main_tname}.${id_field_name} IN ";
                   $sub_query_where .= "(SELECT DISTINCT $id_field_name FROM $table_name ";
                   $sub_query_where .= "WHERE ${field_name} $operator ?#${field_value}#)";
@@ -6901,13 +6758,11 @@ sub parse_filtering_v2 {
                 }
               }
               else {
-
                 push(@{$scol_where_exp}, "${main_tname}.${field_name} $operator ?#${field_value}#");
               }
             }
           }
           else {
-
             $err     = 1;
             $err_msg = "Filtering field ($field_name) unknown.";
             last;
@@ -6916,7 +6771,6 @@ sub parse_filtering_v2 {
       }
     }
     else {
-
       $err     = 1;
       $err_msg = "( $expression ): invalid filtering expression.";
       last;
@@ -6982,7 +6836,6 @@ sub get_file_block {
         last;
       }
       else {
-
         $content .= $line;
       }
     }
@@ -7185,7 +7038,6 @@ sub load_config {
                 }
               }
               else {
-
                 $${block_name}->{"$main::kddart_base_dir/$param_name"} = $param_val;
               }
             }
@@ -7201,19 +7053,16 @@ sub load_config {
                 }
               }
               else {
-
                 $${block_name} = $param_val;
               }
             }
             else {
-
               if (defined $logger) { $logger->debug("Variable data type: $variable_data_type for $block_name UNSUPPORTED"); }
               $msg = "Variable data type: $variable_data_type for $block_name UNSUPPORTED";
               $err = 1;
             }
           }
           else {
-
             if (defined $logger) { $logger->debug("$block_name is undefined."); }
             $msg = "$block_name is undefined.";
             $err = 1;
@@ -7222,14 +7071,12 @@ sub load_config {
       }
     }
     else {
-
       if (defined $logger) { $logger->debug("Config file $CFG_FILE_PATH : NOT READABLE"); }
       $msg = "Config file $CFG_FILE_PATH : NOT READABLE";
       $err = 1;
     }
   }
   else {
-
     if (defined $logger) { $logger->debug("Config file $CFG_FILE_PATH : NOT FOUND"); }
     $msg = "Config file $CFG_FILE_PATH : NOT FOUND";
     $err = 1;
@@ -7304,7 +7151,6 @@ sub record_existence_bulk {
       push(@{$unfound_aref}, $field_val);
     }
     else {
-
       push(@{$found_aref}, $field_val);
     }
   }
@@ -7489,7 +7335,6 @@ sub get_solr_entities {
                                                      'entity_name' => $entity_name};
         }
         else {
-
           my $err     = 1;
           my $err_msg = "Error: $query_sql - no entity_name field";
 
@@ -7612,13 +7457,11 @@ sub validate_trait_db_bulk {
             $err_val_idx   = $i;
           }
           else {
-
             if ($trait_value =~ /^[-+]?\d+\.?\d*$/) {
 
               $validation_rule_body =~ s/x/ $trait_value /ig;
             }
             else {
-
               $validation_rule_body =~ s/x/ '$trait_value' /ig;
             }
 
@@ -7640,7 +7483,6 @@ sub validate_trait_db_bulk {
               $err_val_idx   = $i;
             }
             else {
-
               if ($test_condition == 0) {
 
                 $err          = 1;
@@ -7649,7 +7491,6 @@ sub validate_trait_db_bulk {
                 $err_val_idx  = $i;
               }
               else {
-
                 $err          = 0;
                 $err_msg      = '';
                 $err_trait_id = -1;
@@ -7668,7 +7509,6 @@ sub validate_trait_db_bulk {
             $err_val_idx  = $i;
           }
           else {
-
             my @choice_list = split(/\|/, $validation_rule_body);
 
             $err          = 1;
@@ -7710,7 +7550,6 @@ sub validate_trait_db_bulk {
             $err_val_idx  = $i;
           }
           else {
-
             $err          = 1;
             $err_msg      = $validation_err_msg;
             $err_trait_id = $trait_id;
@@ -7762,7 +7601,6 @@ sub validate_trait_db_bulk {
               }
             }
             else {
-
               $err          = 1;
               $err_msg      = "Trait value ($trait_value) not a valid number";
               $err_trait_id = $trait_id;
@@ -7771,7 +7609,6 @@ sub validate_trait_db_bulk {
           }
         }
         else {
-
           $err          = 1;
           $err_msg      = 'Unknown trait value validation rule.';
           $err_trait_id = $trait_id;
@@ -7779,7 +7616,6 @@ sub validate_trait_db_bulk {
         }
       }
       else {
-
         $err          = 1;
         $err_msg      = "Unknown validation rule.";
         $err_trait_id = $trait_id;
@@ -8167,7 +8003,7 @@ sub recurse_read_v2 {
           push(@{$data}, $read_recurse_rec);
         }
       }
-      
+
     }
 
     push(@{$data}, $read_data_rec);
@@ -8175,6 +8011,359 @@ sub recurse_read_v2 {
   }
 
   return ($err, $msg, $data, $recursive_count);
+}
+
+#a wrapper to update factor values based on the input and whether there already exists the factor value
+sub update_factor_value {
+
+  my $dbh              = $_[0];
+  my $vcol_id          = $_[1];
+  my $factor_value     = $_[2];
+  my $factor_table     = $_[3];
+  my $object_id_field  = $_[4];
+  my $object_id        = $_[5];
+
+  my $sql  = "SELECT Count(*) ";
+  $sql .= "FROM $factor_table ";
+  $sql .= "WHERE $object_id_field=? AND FactorId=?";
+
+  my $err = 0;
+  my $msg = "";
+
+  my ($read_err, $count) = read_cell($dbh, $sql, [$object_id, $vcol_id]);
+
+  if (length($factor_value) > 0) {
+
+    my $validation_sql = "SELECT FactorId, FactorValidRule, FactorValidRuleErrMsg FROM factor WHERE FactorId=?";
+
+    my ($r_factor_err, $r_factor_msg, $validation_data) = read_data($dbh, $validation_sql, [$vcol_id]);
+
+    my $val_rule = "";
+    my $val_msg = "";
+    
+    foreach my $valid_rec (@{$validation_data}) {
+      $val_rule = $valid_rec->{'FactorValidRule'};
+      $val_msg  = $valid_rec->{'FactorValidRuleErrMsg'};
+    }
+
+    # Factor Validation to be supported in 2.7.5 to allow all objects to have validation
+    #if (length($val_rule) > 0) {
+    #   my ($factor_validation_err, $factor_validation_message) = validate_factor_value($val_rule, $val_msg,$factor_value,$vcol_id);
+
+    #   if ($factor_validation_err) {
+    #      return ($factor_validation_err, $factor_validation_message);
+    #   }
+
+    #}
+
+    if ($count > 0) {
+
+      $sql  = "UPDATE $factor_table SET ";
+      $sql .= "FactorValue=? ";
+      $sql .= "WHERE $object_id_field=? AND FactorId=?";
+
+      my $factor_sth = $dbh->prepare($sql);
+      $factor_sth->execute($factor_value, $object_id, $vcol_id);
+
+      if ($dbh->err()) {
+
+        $err = 1;
+        $msg  = "Unexpected error. ";
+
+      }
+
+      $factor_sth->finish();
+    }
+    else {
+      $sql  = "INSERT INTO $factor_table SET ";
+      $sql .= "$object_id_field=?, ";
+      $sql .= "FactorId=?, ";
+      $sql .= "FactorValue=?";
+
+      my $factor_sth = $dbh->prepare($sql);
+      $factor_sth->execute($object_id, $vcol_id, $factor_value);
+
+      if ($dbh->err()) {
+
+        $err = 1;
+        $msg  = "Unexpected error.";
+
+      }
+
+      $factor_sth->finish();
+    }
+  }
+  else {
+    if ($count > 0) {
+
+      $sql  = "DELETE FROM $factor_table ";
+      $sql .= "WHERE $object_id_field=? AND FactorId=?";
+
+      my $factor_sth = $dbh->prepare($sql);
+      $factor_sth->execute($object_id, $vcol_id);
+
+      if ($dbh->err()) {
+
+        $err = 1;
+        $msg = "Unexpected error.";
+
+
+      }
+      $factor_sth->finish();
+    }
+  }
+
+
+  return ($err, $msg);
+
+}
+
+sub validate_all_factor_input {
+  my $pre_validate_vcol = $_[0];
+  my $vcol_error_aref = [];
+  my $vcol_error = 0;
+
+  for my $vcol_param_name (keys(%{$pre_validate_vcol})) {
+
+    my $vcol_id = $pre_validate_vcol->{$vcol_param_name}->{'FactorId'};
+    my $vcol_value = $pre_validate_vcol->{$vcol_param_name}->{'Value'};
+    my $val_rule = $pre_validate_vcol->{$vcol_param_name}->{'Rule'};
+    my $val_msg = $pre_validate_vcol->{$vcol_param_name}->{'RuleErrorMsg'};
+    my $vcol_can_be_null = $pre_validate_vcol->{$vcol_param_name}->{'CanFactorHaveNull'};
+
+    if ($vcol_can_be_null == 1 && (! defined $vcol_value)) {
+      next;
+    }
+
+    if ($vcol_can_be_null == 1 && length($vcol_value) == 0) {
+      next;
+    }
+
+    my ($factor_validation_err, $factor_validation_message) = validate_factor_value($val_rule, $val_msg,$vcol_value,$vcol_id);
+
+    if ($factor_validation_err) {
+        push(@{$vcol_error_aref}, {$vcol_param_name => $factor_validation_message});
+        $vcol_error = 1;
+    }
+
+    
+  }
+
+  return ($vcol_error, $vcol_error_aref);
+}
+
+
+sub validate_factor_value {
+
+  my $factor_validation_rule = $_[0];
+  my $factor_validation_message = $_[1];
+  my $factor_value = $_[2];
+  my $err_factor_id = $_[3];
+
+  my $operator_lookup = { 'AND'     => '&&',
+                          'OR'      => '||',
+                          '[^<>!]=' => '==',
+  };
+
+  my $err          = 0;
+  my $err_msg      = "";
+
+  if (! defined $factor_validation_rule) {
+        $err          = 0;
+        $err_msg      = "";
+
+        return ($err, $err_msg);
+  }
+
+  if (length($factor_validation_rule) == 0) {
+        $err          = 0;
+        $err_msg      = "";
+
+        return ($err, $err_msg);
+  }
+
+  if ($factor_validation_rule =~ /(\w+)\((.*)\)/) {
+
+    my $factor_validation_rule_prefix = $1;
+    my $factor_validation_rule_body   = $2;
+
+    if (uc($factor_validation_rule_prefix) eq 'REGEX') {
+
+      if (!($factor_value =~ /$factor_validation_rule_body/)) {
+
+        $err          = 1;
+        $err_msg      = $factor_validation_message;
+
+
+      }
+    }
+    elsif (uc($factor_validation_rule_prefix) eq 'BOOLEX') {
+
+      if ($factor_validation_rule_body !~ /x/) {
+
+        $err           = 1;
+        $err_msg       = 'No variable x in boolean expression.';
+
+
+      }
+      elsif ( ($factor_validation_rule_body =~ /\&/) ||
+              ($factor_validation_rule_body =~ /\|/) ) {
+
+        $err           = 1;
+        $err_msg       = 'Contain forbidden characters';
+
+
+      }
+      elsif ( $factor_validation_rule_body =~ /\d+\.?\d*\s*,/) {
+
+        $err           = 1;
+        $err_msg       = 'Contain a comma - invalid boolean expression';
+
+
+      }
+      else {
+        if ($factor_value =~ /^[-+]?\d+\.?\d*$/) {
+
+          $factor_validation_rule_body =~ s/x/ $factor_value /ig;
+        }
+        else {
+          $factor_validation_rule_body =~ s/x/ '$factor_value' /ig;
+        }
+
+        for my $operator (keys(%{$operator_lookup})) {
+
+          my $perl_operator = $operator_lookup->{$operator};
+          $factor_validation_rule_body =~ s/$operator/$perl_operator/g;
+        }
+
+        my $test_condition;
+
+        eval(q{$test_condition = } . qq{($factor_validation_rule_body) ? 1 : 0;});
+
+        if($@) {
+
+          $err           = 1;
+          $err_msg       = "Invalid boolean Factor value validation expression ($factor_validation_rule_body).";
+        }
+        else {
+          if ($test_condition == 0) {
+
+            $err          = 1;
+            $err_msg      = $factor_validation_message;
+
+
+          }
+          else {
+            $err          = 0;
+            $err_msg      = '';
+          }
+        }
+      }
+    }
+    elsif (uc($factor_validation_rule_prefix) eq 'CHOICE') {
+
+      if ($factor_validation_rule_body =~ /^\[.*\]$/) {
+
+        $err          = 1;
+        $err_msg      = 'Invalid choice expression containing [].';
+
+
+      }
+      else {
+        my @choice_list = split(/\|/, $factor_validation_rule_body);
+
+        $err          = 1;
+        $err_msg      = $factor_validation_message;
+
+
+
+        foreach my $choice (@choice_list) {
+
+          if (lc("$choice") eq lc("$factor_value")) {
+
+            $err          = 0;
+            $err_msg      = '';
+            last;
+          }
+        }
+      }
+    }
+    elsif ( (uc($factor_validation_rule_prefix) eq 'DATE_RANGE') ) {
+
+      if ($factor_value !~ /^\d{4}\-\d{2}\-\d{2}( \d{2}\:\d{2}\:\d{2})?$/) {
+
+        $err     = 1;
+        $err_msg = 'Invalid date';
+      }
+    }
+    elsif ( (uc($factor_validation_rule_prefix) eq 'RANGE')   ||
+            (uc($factor_validation_rule_prefix) eq 'LERANGE') ||
+            (uc($factor_validation_rule_prefix) eq 'RERANGE') ||
+            (uc($factor_validation_rule_prefix) eq 'BERANGE') ) {
+
+      if ($factor_validation_rule_body !~ /^[-+]?\d+\.?\d*\s*\.\.\s*[-+]?\d+\.?\d*$/) {
+        $err          = 1;
+        $err_msg      = 'Invalid range expression';
+      }
+      else {
+        $err          = 1;
+        $err_msg      = $factor_validation_message;
+        
+        if ($factor_value =~ /^[-+]?\d+\.?\d*$/) {
+
+          my ($left_val, $right_val) = split(/\s*\.\.\s*/, $factor_validation_rule_body);
+
+          if (uc($factor_validation_rule_prefix) eq 'RANGE') {
+
+            if ($factor_value >= $left_val && $factor_value <= $right_val) {
+
+              $err          = 0;
+              $err_msg      = '';
+            }
+          }
+          elsif (uc($factor_validation_rule_prefix) eq 'LERANGE') {
+
+            if ($factor_value > $left_val && $factor_value <= $right_val) {
+
+              $err          = 0;
+              $err_msg      = '';
+            }
+          }
+          elsif (uc($factor_validation_rule_prefix) eq 'RERANGE') {
+
+            if ($factor_value >= $left_val && $factor_value < $right_val) {
+
+              $err          = 0;
+              $err_msg      = '';
+            }
+          }
+          elsif (uc($factor_validation_rule_prefix) eq 'BERANGE') {
+
+            if ($factor_value > $left_val && $factor_value < $right_val) {
+
+              $err          = 0;
+              $err_msg      = '';
+            }
+          }
+        }
+        else {          $err          = 1;
+          $err_msg      = "Factor value ($factor_value) not a valid number";
+        }
+      }
+    }
+    else {      $err          = 1;
+      $err_msg      = 'Unknown Factor value validation rule.';
+    }
+  }
+  else {
+    $err          = 1;
+    $err_msg      = "Unknown validation rule.";
+
+
+  }
+
+  return ($err, $err_msg);
+
 }
 
 1;
