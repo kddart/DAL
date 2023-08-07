@@ -6,11 +6,11 @@ Description: Bug Fixing Patch and Improvements
 
 + Update Trial Unit Bulk revamped to no longer remove trial units to be updated
 
-+ Permissions in Inventory Module overhauled. Admin access no longer required for storage, item parent, item and item group opreations
++ Permissions in Inventory Module overhauled. Admin access no longer required for storage, item parent, item and item group operations
 
 + Deleting trial units will now delete relevant trial unit location entries in the PostgreSQL database
 
-Databse Update
+Database Update
 
 + FactorName changed to VARCHAR(255) data type.
 
