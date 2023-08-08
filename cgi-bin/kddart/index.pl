@@ -1058,7 +1058,7 @@ CGI::Application::Dispatch->dispatch(
                                                              rm  => 'get_item' },
 
     'import/item/csv'                                   => { app => 'KDDArT::DAL::Inventory',
-                                                             rm  => 'import_item_csv_gadmin' },
+                                                             rm  => 'import_item_csv' },
 
     'list/item/:nperpage/page/:num'                     => { app => 'KDDArT::DAL::Inventory',
                                                              rm  => 'list_item_advanced' },
