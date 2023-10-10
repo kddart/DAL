@@ -296,6 +296,8 @@ sub add_genotype_runmode {
   my $query = $self->query();
 
   my $data_for_postrun_href = {};
+  my $genotype_err = 0;
+  my $genotype_err_aref = [];
 
   # Generic required static field checking
 
@@ -368,7 +370,7 @@ sub add_genotype_runmode {
     return $data_for_postrun_href;
   }
 
-  my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength ";
+  my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength, FactorValidRuleErrMsg, FactorValidRule  ";
   $sql   .= "FROM factor ";
   $sql   .= "WHERE TableNameOfFactor='genotypefactor'";
 
@@ -378,16 +380,27 @@ sub add_genotype_runmode {
   my $vcol_param_data = {};
   my $vcol_len_info   = {};
   my $vcol_param_data_maxlen = {};
+  my $pre_validate_vcol = {};
+
   for my $vcol_id (keys(%{$vcol_data})) {
 
     my $vcol_param_name = "VCol_${vcol_id}";
-    my $vcol_value      = $query->param($vcol_param_name);
+    my $vcol_value      = $query->param($vcol_param_name) ;
     if ($vcol_data->{$vcol_id}->{'CanFactorHaveNull'} != 1) {
 
       $vcol_param_data->{$vcol_param_name} = $vcol_value;
     }
+
     $vcol_len_info->{$vcol_param_name} = $vcol_data->{$vcol_id}->{'FactorValueMaxLength'};
     $vcol_param_data_maxlen->{$vcol_param_name} = $vcol_value;
+
+    $pre_validate_vcol->{$vcol_param_name} = {
+      'Rule' => $vcol_data->{$vcol_id}->{'FactorValidRule'},
+      'Value'=> $vcol_value,
+      'FactorId'=> $vcol_id,
+      'RuleErrorMsg'=> $vcol_data->{$vcol_id}->{'FactorValidRuleErrMsg'},
+      'CanFactorHaveNull' => $vcol_data->{$vcol_id}->{'CanFactorHaveNull'},
+    };
   }
 
   my ($vcol_missing_err, $vcol_missing_href) = check_missing_href( $vcol_param_data );
@@ -421,10 +434,9 @@ sub add_genotype_runmode {
     if (!$taxonomy_existence) {
 
       my $err_msg = "TaxonomyId ($taxonomy_id) does not exist.";
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'TaxonomyId' => $err_msg}]};
-
-      return $data_for_postrun_href;
+   
+      push(@{$genotype_err_aref}, {'TaxonomyId' => $err_msg});
+      $genotype_err = 1;
     }
   }
 
@@ -433,10 +445,9 @@ sub add_genotype_runmode {
   if (!$genus_existence) {
 
     my $err_msg = "Genus ($genus_id) does not exist.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'GenusId' => $err_msg}]};
 
-    return $data_for_postrun_href;
+    push(@{$genotype_err_aref}, {'GenusId' => $err_msg});
+    $genotype_err = 1;
   }
 
   my $geno_lookup_sql = 'SELECT GenotypeId FROM genotype WHERE GenotypeName=? AND GenusId=?';
@@ -446,10 +457,9 @@ sub add_genotype_runmode {
   if (length($lookup_geno_id) > 0) {
 
     my $err_msg = "GenotypeName ($genotype_name): already exists.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'GenotypeName' => $err_msg}]};
 
-    return $data_for_postrun_href;
+    push(@{$genotype_err_aref}, {'GenotypeName' => $err_msg});
+    $genotype_err = 1;
   }
 
   $geno_lookup_sql = 'SELECT GenotypeId FROM genotypealias WHERE GenotypeAliasName=? AND GenusId=?';
@@ -459,10 +469,10 @@ sub add_genotype_runmode {
   if (length($lookup_geno_id) > 0) {
 
     my $err_msg = "$genotype_name is already used as a Genotype Alias.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'GenotypeName' => $err_msg}]};
 
-    return $data_for_postrun_href;
+    push(@{$genotype_err_aref}, {'GenotypeName' => $err_msg});
+    $genotype_err = 1;
+    
   }
 
   my $access_grp_existence = record_existence($dbh_k_read, 'systemgroup', 'SystemGroupId', $access_group);
@@ -470,40 +480,51 @@ sub add_genotype_runmode {
   if (!$access_grp_existence) {
 
     my $err_msg = "AccessGroup ($access_group) does not exist.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'AccessGroupId' => $err_msg}]};
 
-    return $data_for_postrun_href;
+    push(@{$genotype_err_aref}, {'AccessGroupId' => $err_msg});
+    $genotype_err = 1;
   }
 
   if ( ($own_perm > 7 || $own_perm < 0) ) {
 
     my $err_msg = "OwnGroupPerm ($own_perm) is invalid.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'OwnGroupPerm' => $err_msg}]};
 
-    return $data_for_postrun_href;
+    push(@{$genotype_err_aref}, {'OwnGroupPerm' => $err_msg});
+    $genotype_err = 1;
   }
 
   if ( ($access_perm > 7 || $access_perm < 0) ) {
 
     my $err_msg = "AccessGroupPerm ($access_perm) is invalid.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'AccessGroupPerm' => $err_msg}]};
 
-    return $data_for_postrun_href;
+    push(@{$genotype_err_aref}, {'AccessGroupPerm' => $err_msg});
+    $genotype_err = 1;
   }
 
   if ( ($other_perm > 7 || $other_perm < 0) ) {
 
     my $err_msg = "OtherPerm ($other_perm) is invalid.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'OtherPerm' => $err_msg}]};
 
-    return $data_for_postrun_href;
+    push(@{$genotype_err_aref}, {'OtherPerm' => $err_msg});
+    $genotype_err = 1;
+  }
+
+  #prevalidate values to be finished in later version
+
+  my ($vcol_error, $vcol_error_aref) = validate_all_factor_input($pre_validate_vcol);
+
+  if ($vcol_error) {
+    push(@{$genotype_err_aref}, @{$vcol_error_aref});
+    $genotype_err = 1;
   }
 
   $dbh_k_read->disconnect();
+
+  if ($genotype_err != 0) {
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => $genotype_err_aref};
+    return $data_for_postrun_href;
+  }
 
   my $dbh_k_write = connect_kdb_write();
 
@@ -1206,6 +1227,9 @@ sub add_specimen_runmode {
   my $query = $self->query();
 
   my $data_for_postrun_href = {};
+  my $specimen_err = 0;
+  my $specimen_err_aref = [];
+
 
   my $runmode_start_time = [gettimeofday()];
 
@@ -1281,10 +1305,8 @@ sub add_specimen_runmode {
 
   if ($int_err) {
 
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$int_err_href]};
-
-    return $data_for_postrun_href;
+    push(@{$specimen_err_aref}, $int_err_href);
+    $specimen_err = 1;
   }
 
   my $dbh_write = connect_kdb_write();
@@ -1292,18 +1314,17 @@ sub add_specimen_runmode {
   if ( !record_existence($dbh_write, 'breedingmethod', 'BreedingMethodId', $breed_method_id) ) {
 
     my $err_msg = "BreedingMethodId ($breed_method_id) not found.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'BreedingMethodId' => $err_msg}]};
 
-    return $data_for_postrun_href;
+    push(@{$specimen_err_aref}, {'BreedingMethodId' => $err_msg});
+    $specimen_err = 1;
   }
 
   if (defined($source_crossing_id)) {
     if ( !record_existence($dbh_write, 'crossing', 'CrossingId', $source_crossing_id) ) {
       my $err_msg = "CrossingId ($source_crossing_id) not found.";
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'CrossingId' => $err_msg}]};
-      return $data_for_postrun_href;
+
+      push(@{$specimen_err_aref}, {'CrossingId' => $err_msg});
+      $specimen_err = 1;
     }
   }
 
@@ -1316,10 +1337,9 @@ sub add_specimen_runmode {
     if (record_existence($dbh_write, 'specimen', 'SpecimenBarcode', $specimen_barcode)) {
 
       my $err_msg = "SpecimenBarcode ($specimen_barcode): already exists.";
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'SpecimenBarcode' => $err_msg}]};
 
-      return $data_for_postrun_href;
+      push(@{$specimen_err_aref}, {'SpecimenBarcode' => $err_msg});
+      $specimen_err = 1;
     }
   }
 
@@ -1334,17 +1354,16 @@ sub add_specimen_runmode {
   if ($spec_name_exist) {
 
     my $err_msg = "SpecimenName ($specimen_name): already exists.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'SpecimenName' => $err_msg}]};
 
-    return $data_for_postrun_href;
+    push(@{$specimen_err_aref}, {'SpecimenName' => $err_msg});
+    $specimen_err = 1;
   }
 
   my $chk_name_elapsed = tv_interval($chk_name_start_time);
 
   $self->logger->debug("Checking name time: $chk_name_elapsed");
 
-  my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength ";
+  my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength, FactorValidRuleErrMsg, FactorValidRule  ";
   $sql   .= "FROM factor ";
   $sql   .= "WHERE TableNameOfFactor='specimenfactor'";
 
@@ -1354,16 +1373,27 @@ sub add_specimen_runmode {
   my $vcol_param_data = {};
   my $vcol_len_info   = {};
   my $vcol_param_data_maxlen = {};
+  my $pre_validate_vcol = {};
+
   for my $vcol_id (keys(%{$vcol_data})) {
 
     my $vcol_param_name = "VCol_${vcol_id}";
-    my $vcol_value      = $query->param($vcol_param_name);
+    my $vcol_value      = $query->param($vcol_param_name) ;
     if ($vcol_data->{$vcol_id}->{'CanFactorHaveNull'} != 1) {
 
       $vcol_param_data->{$vcol_param_name} = $vcol_value;
     }
+
     $vcol_len_info->{$vcol_param_name} = $vcol_data->{$vcol_id}->{'FactorValueMaxLength'};
     $vcol_param_data_maxlen->{$vcol_param_name} = $vcol_value;
+
+    $pre_validate_vcol->{$vcol_param_name} = {
+      'Rule' => $vcol_data->{$vcol_id}->{'FactorValidRule'},
+      'Value'=> $vcol_value,
+      'FactorId'=> $vcol_id,
+      'RuleErrorMsg'=> $vcol_data->{$vcol_id}->{'FactorValidRuleErrMsg'},
+      'CanFactorHaveNull' => $vcol_data->{$vcol_id}->{'CanFactorHaveNull'},
+    };
   }
 
   my ($vcol_missing_err, $vcol_missing_href) = check_missing_href( $vcol_param_data );
@@ -1608,6 +1638,25 @@ sub add_specimen_runmode {
 
     return $data_for_postrun_href;
   }
+
+  #prevalidate values to be finished in later version
+
+  my ($vcol_error, $vcol_error_aref) = validate_all_factor_input($pre_validate_vcol);
+
+  if ($vcol_error) {
+    push(@{$specimen_err_aref}, @{$vcol_error_aref});
+    $specimen_err = 1;
+  }
+
+  if ($specimen_err != 0) {
+
+    $dbh_write->disconnect();
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => $specimen_err_aref};
+    return $data_for_postrun_href;
+  }
+
 
   my $inh_own_grp_id     = $inh_data_aref->[0]->{'OwnGroupId'};
   my $inh_own_grp_perm   = $inh_data_aref->[0]->{'OwnGroupPerm'};
@@ -2644,6 +2693,9 @@ sub update_genotype_runmode {
   my $genotype_id = $self->param('id');
 
   my $data_for_postrun_href = {};
+  my $genotype_err = 0;
+  my $genotype_err_aref = [];
+
 
   # Generic required static field checking
 
@@ -2740,22 +2792,6 @@ sub update_genotype_runmode {
     $genotype_color = $query->param('GenotypeColor');
   }
 
-  if (length($query->param('TaxonomyId')) > 0) {
-
-    $taxonomy_id = $query->param('TaxonomyId');
-
-    my $taxonomy_existence = record_existence($dbh_k_read, 'taxonomy', 'TaxonomyId', $taxonomy_id);
-
-    if (!$taxonomy_existence) {
-
-      my $err_msg = "TaxonomyId ($taxonomy_id) does not exist.";
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'TaxonomyId' => $err_msg}]};
-
-      return $data_for_postrun_href;
-    }
-  }
-
 
   my $group_id = $self->authen->group_id();
   my $gadmin_status = $self->authen->gadmin_status();
@@ -2802,7 +2838,7 @@ sub update_genotype_runmode {
     return $data_for_postrun_href;
   }
 
-  $sql    = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength ";
+  my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength, FactorValidRuleErrMsg, FactorValidRule  ";
   $sql   .= "FROM factor ";
   $sql   .= "WHERE TableNameOfFactor='genotypefactor'";
 
@@ -2811,16 +2847,27 @@ sub update_genotype_runmode {
   my $vcol_param_data = {};
   my $vcol_len_info   = {};
   my $vcol_param_data_maxlen = {};
+  my $pre_validate_vcol = {};
+
   for my $vcol_id (keys(%{$vcol_data})) {
 
     my $vcol_param_name = "VCol_${vcol_id}";
-    my $vcol_value      = $query->param($vcol_param_name);
+    my $vcol_value      = $query->param($vcol_param_name) ;
     if ($vcol_data->{$vcol_id}->{'CanFactorHaveNull'} != 1) {
 
       $vcol_param_data->{$vcol_param_name} = $vcol_value;
     }
+
     $vcol_len_info->{$vcol_param_name} = $vcol_data->{$vcol_id}->{'FactorValueMaxLength'};
     $vcol_param_data_maxlen->{$vcol_param_name} = $vcol_value;
+
+    $pre_validate_vcol->{$vcol_param_name} = {
+      'Rule' => $vcol_data->{$vcol_id}->{'FactorValidRule'},
+      'Value'=> $vcol_value,
+      'FactorId'=> $vcol_id,
+      'RuleErrorMsg'=> $vcol_data->{$vcol_id}->{'FactorValidRuleErrMsg'},
+      'CanFactorHaveNull' => $vcol_data->{$vcol_id}->{'CanFactorHaveNull'},
+    };
   }
 
   my ($vcol_missing_err, $vcol_missing_href) = check_missing_href( $vcol_param_data );
@@ -2843,15 +2890,30 @@ sub update_genotype_runmode {
     return $data_for_postrun_href;
   }
 
+
+  if (length($query->param('TaxonomyId')) > 0) {
+
+    $taxonomy_id = $query->param('TaxonomyId');
+
+    my $taxonomy_existence = record_existence($dbh_k_read, 'taxonomy', 'TaxonomyId', $taxonomy_id);
+
+    if (!$taxonomy_existence) {
+
+      my $err_msg = "TaxonomyId ($taxonomy_id) does not exist.";
+
+      push(@{$genotype_err_aref}, {'TaxonomyId' => $err_msg});
+      $genotype_err = 1;
+    }
+  }
+
   my $genus_existence = record_existence($dbh_k_read, 'genus', 'GenusId', $genus_id);
 
   if (!$genus_existence) {
 
     my $err_msg = "Genus ($genus_id) does not exist.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'GenusId' => $err_msg}]};
 
-    return $data_for_postrun_href;
+    push(@{$genotype_err_aref}, {'GenusId' => $err_msg});
+    $genotype_err = 1;
   }
 
   my $geno_lookup_sql = 'SELECT GenotypeId FROM genotype WHERE GenotypeName=? AND GenusId=? AND GenotypeId<>?';
@@ -2861,11 +2923,10 @@ sub update_genotype_runmode {
 
   if (length($lookup_geno_id) > 0) {
 
-    my $err_msg = "$genotype_name already exists.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'GenotypeName' => $err_msg}]};
+    my $err_msg = "GenotypeName ($genotype_name): already exists.";
 
-    return $data_for_postrun_href;
+    push(@{$genotype_err_aref}, {'GenotypeName' => $err_msg});
+    $genotype_err = 1;
   }
 
   my $db_geno_name = read_cell_value($dbh_k_read, 'genotype', 'GenotypeName', 'GenotypeId', $genotype_id);
@@ -2884,12 +2945,28 @@ sub update_genotype_runmode {
   if (length($lookup_geno_id) > 0) {
 
     my $err_msg = "$genotype_name is already used as a Genotype Alias.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'GenotypeName' => $err_msg}] };
-    return $data_for_postrun_href;
+
+    push(@{$genotype_err_aref}, {'GenotypeName' => $err_msg});
+    $genotype_err = 1;
+    
   }
 
   $dbh_k_read->disconnect();
+
+  #prevalidate values to be finished in later version
+
+  my ($vcol_error, $vcol_error_aref) = validate_all_factor_input($pre_validate_vcol);
+
+  if ($vcol_error) {
+    push(@{$genotype_err_aref}, @{$vcol_error_aref});
+    $genotype_err = 1;
+  }
+
+  if ($genotype_err != 0) {
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => $genotype_err_aref};
+    return $data_for_postrun_href;
+  }
 
   my $dbh_k_write = connect_kdb_write();
 
@@ -2918,81 +2995,35 @@ sub update_genotype_runmode {
   }
   $sth->finish();
 
+  my $vcol_error = [];
+
   for my $vcol_id (keys(%{$vcol_data})) {
 
     if (defined $query->param('VCol_' . "$vcol_id")) {
 
       my $factor_value = $query->param('VCol_' . "$vcol_id");
 
-      $sql  = 'SELECT Count(*) ';
-      $sql .= 'FROM genotypefactor ';
-      $sql .= 'WHERE GenotypeId=? AND FactorId=?';
+      my ($vcol_err, $vcol_msg) = update_factor_value($dbh_k_write, $vcol_id, $factor_value, 'genotypefactor', 'GenotypeId', $genotype_id);
 
-      my ($read_err, $count) = read_cell($dbh_k_write, $sql, [$genotype_id, $vcol_id]);
+      if ($vcol_err) {
 
-      if (length($factor_value) > 0) {
+        $self->logger->debug("VCol_" . "$vcol_id => $vcol_msg" );
 
-        if ($count > 0) {
+        push(@{$genotype_err_aref}, {'VCol_' . "$vcol_id" => $vcol_msg});
 
-          $sql  = 'UPDATE genotypefactor SET ';
-          $sql .= 'FactorValue=? ';
-          $sql .= 'WHERE GenotypeId=? AND FactorId=?';
-          my $factor_sth = $dbh_k_write->prepare($sql);
-          $factor_sth->execute($factor_value, $genotype_id, $vcol_id);
-
-          if ($dbh_k_write->err()) {
-
-            $data_for_postrun_href->{'Error'} = 1;
-            $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-            return $data_for_postrun_href;
-          }
-          $factor_sth->finish();
-        }
-        else {
-
-          $sql  = 'INSERT INTO genotypefactor SET ';
-          $sql .= 'GenotypeId=?, ';
-          $sql .= 'FactorId=?, ';
-          $sql .= 'FactorValue=?';
-          my $factor_sth = $dbh_k_write->prepare($sql);
-          $factor_sth->execute($genotype_id, $vcol_id, $factor_value);
-
-          if ($dbh_k_write->err()) {
-
-            $data_for_postrun_href->{'Error'} = 1;
-            $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-            return $data_for_postrun_href;
-          }
-
-          $factor_sth->finish();
-        }
-      }
-      else {
-
-        if ($count > 0) {
-
-          $sql  = 'DELETE FROM genotypefactor ';
-          $sql .= 'WHERE GenotypeId=? AND FactorId=?';
-
-          my $factor_sth = $dbh_k_write->prepare($sql);
-          $factor_sth->execute($genotype_id, $vcol_id);
-
-          if ($dbh_k_write->err()) {
-
-            $data_for_postrun_href->{'Error'} = 1;
-            $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-            return $data_for_postrun_href;
-          }
-          $factor_sth->finish();
-        }
+        $genotype_err = 1;
       }
     }
   }
+  
 
   $dbh_k_write->disconnect();
+
+  if ($genotype_err != 0) {
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => $genotype_err_aref};
+    return $data_for_postrun_href;
+  }
 
   my $info_msg_aref = [{'Message' => "Genotype ($genotype_id) has been updated successfully."}];
 
@@ -3031,6 +3062,9 @@ sub update_specimen_runmode {
   my $specimen_id = $self->param('id');
 
   my $data_for_postrun_href = {};
+  my $specimen_err = 0;
+  my $specimen_err_aref = [];
+
 
   # Generic required static field checking
 
@@ -3208,10 +3242,9 @@ sub update_specimen_runmode {
   if ( !record_existence($dbh_k_read, 'breedingmethod', 'BreedingMethodId', $breed_method_id) ) {
 
     my $err_msg = "BreedingMethodId ($breed_method_id) not found.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'BreedingMethodId' => $err_msg}]};
 
-    return $data_for_postrun_href;
+    push(@{$specimen_err_aref}, {'BreedingMethodId' => $err_msg});
+    $specimen_err = 1;
   }
 
   if ( length($query->param('SpecimenBarcode')) > 0 ) {
@@ -3228,10 +3261,9 @@ sub update_specimen_runmode {
     if (length($spec_barcode_db) > 0) {
 
       my $err_msg = "SpecimenBarcode ($specimen_barcode): already exists.";
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'SpecimenBarcode' => $err_msg}]};
 
-      return $data_for_postrun_href;
+      push(@{$specimen_err_aref}, {'SpecimenBarcode' => $err_msg});
+      $specimen_err = 1;
     }
   }
   else {
@@ -3242,14 +3274,14 @@ sub update_specimen_runmode {
   if ( length($query->param('SourceCrossingId')) > 0 ) {
     if ( !record_existence($dbh_k_read, 'crossing', 'CrossingId', $source_crossing_id) ) {
       my $err_msg = "SourceCrossingId ($source_crossing_id) not found.";
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'SourceCrossingId' => $err_msg}]};
-      return $data_for_postrun_href;
+
+      push(@{$specimen_err_aref}, {'CrossingId' => $err_msg});
+      $specimen_err = 1;
     }
   }
 
 
-  my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength ";
+  my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength, FactorValidRuleErrMsg, FactorValidRule  ";
   $sql   .= "FROM factor ";
   $sql   .= "WHERE TableNameOfFactor='specimenfactor'";
 
@@ -3258,18 +3290,28 @@ sub update_specimen_runmode {
   my $vcol_param_data = {};
   my $vcol_len_info   = {};
   my $vcol_param_data_maxlen = {};
+  my $pre_validate_vcol = {};
+
   for my $vcol_id (keys(%{$vcol_data})) {
 
     my $vcol_param_name = "VCol_${vcol_id}";
-    my $vcol_value      = $query->param($vcol_param_name);
+    my $vcol_value      = $query->param($vcol_param_name) ;
     if ($vcol_data->{$vcol_id}->{'CanFactorHaveNull'} != 1) {
 
       $vcol_param_data->{$vcol_param_name} = $vcol_value;
     }
+
     $vcol_len_info->{$vcol_param_name} = $vcol_data->{$vcol_id}->{'FactorValueMaxLength'};
     $vcol_param_data_maxlen->{$vcol_param_name} = $vcol_value;
-  }
 
+    $pre_validate_vcol->{$vcol_param_name} = {
+      'Rule' => $vcol_data->{$vcol_id}->{'FactorValidRule'},
+      'Value'=> $vcol_value,
+      'FactorId'=> $vcol_id,
+      'RuleErrorMsg'=> $vcol_data->{$vcol_id}->{'FactorValidRuleErrMsg'},
+      'CanFactorHaveNull' => $vcol_data->{$vcol_id}->{'CanFactorHaveNull'},
+    };
+  }
   my ($vcol_missing_err, $vcol_missing_href) = check_missing_href( $vcol_param_data );
 
   if ($vcol_missing_err) {
@@ -3300,11 +3342,27 @@ sub update_specimen_runmode {
   if (length($spec_name_db) > 0) {
 
     my $err_msg = "SpecimenName ($specimen_name): already exists.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'SpecimenName' => $err_msg}]};
 
+    push(@{$specimen_err_aref}, {'SpecimenName' => $err_msg});
+    $specimen_err = 1;
+  }
+
+  my ($vcol_error, $vcol_error_aref) = validate_all_factor_input($pre_validate_vcol);
+
+  if ($vcol_error) {
+    push(@{$specimen_err_aref}, @{$vcol_error_aref});
+    $specimen_err = 1;
+  }
+
+  if ($specimen_err != 0) {
+
+    $dbh_k_read->disconnect();
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => $specimen_err_aref};
     return $data_for_postrun_href;
   }
+
 
   $dbh_k_read->disconnect();
 
@@ -3340,76 +3398,21 @@ sub update_specimen_runmode {
 
     if (defined $query->param('VCol_' . "$vcol_id")) {
 
-      my $vcol_value = $query->param('VCol_' . "$vcol_id");
+      my $factor_value = $query->param('VCol_' . "$vcol_id");
 
-      $sql  = 'SELECT Count(*) ';
-      $sql .= 'FROM specimenfactor ';
-      $sql .= 'WHERE SpecimenId=? AND FactorId=?';
+      my ($vcol_err, $vcol_msg) = update_factor_value($dbh_write, $vcol_id, $factor_value, 'specimenfactor', 'SpecimenId', $specimen_id);
 
-      my ($read_err, $count) = read_cell($dbh_write, $sql, [$specimen_id, $vcol_id]);
+      if ($vcol_err) {
 
-      if (length($vcol_value) > 0) {
+        $self->logger->debug("VCol_" . "$vcol_id => $vcol_msg" );
 
-        if ($count > 0) {
+        push(@{$specimen_err_aref}, {'VCol_' . "$vcol_id" => $vcol_msg});
 
-          $sql  = 'UPDATE specimenfactor SET ';
-          $sql .= 'FactorValue=? ';
-          $sql .= 'WHERE SpecimenId=? AND FactorId=?';
-
-          my $vcol_sth = $dbh_write->prepare($sql);
-          $vcol_sth->execute($vcol_value, $specimen_id, $vcol_id);
-
-          if ($dbh_write->err()) {
-
-            $data_for_postrun_href->{'Error'} = 1;
-            $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-            return $data_for_postrun_href;
-          }
-          $vcol_sth->finish();
-        }
-        else {
-
-          $sql  = 'INSERT INTO specimenfactor SET ';
-          $sql .= 'SpecimenId=?, ';
-          $sql .= 'FactorId=?, ';
-          $sql .= 'FactorValue=?';
-
-          my $vcol_sth = $dbh_write->prepare($sql);
-          $vcol_sth->execute($specimen_id, $vcol_id, $vcol_value);
-
-          if ($dbh_write->err()) {
-
-            $data_for_postrun_href->{'Error'} = 1;
-            $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-            return $data_for_postrun_href;
-          }
-          $vcol_sth->finish();
-        }
-      }
-      else {
-
-        if ($count > 0) {
-
-          $sql  = 'DELETE FROM specimenfactor ';
-          $sql .= 'WHERE SpecimenId=? AND FactorId=?';
-
-          my $factor_sth = $dbh_write->prepare($sql);
-          $factor_sth->execute($specimen_id, $vcol_id);
-
-          if ($dbh_write->err()) {
-
-            $data_for_postrun_href->{'Error'} = 1;
-            $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-            return $data_for_postrun_href;
-          }
-          $factor_sth->finish();
-        }
+        $specimen_err = 1;
       }
     }
   }
+  
 
   $dbh_write->disconnect();
 
@@ -3421,6 +3424,7 @@ sub update_specimen_runmode {
 
   return $data_for_postrun_href;
 }
+
 
 sub add_genotype_to_specimen_runmode {
 
@@ -3750,6 +3754,9 @@ sub add_genotype_alias_runmode {
   my $query   = $self->query();
 
   my $data_for_postrun_href = {};
+  my $genotype_alias_err = 0;
+  my $genotype_alias_err_aref = [];
+
 
   # Generic required static field checking
 
@@ -3769,6 +3776,59 @@ sub add_genotype_alias_runmode {
 
     return $for_postrun_href;
   }
+
+  my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength, FactorValidRuleErrMsg, FactorValidRule  ";
+  $sql   .= "FROM factor ";
+  $sql   .= "WHERE TableNameOfFactor='genotypealiasfactor'";
+
+  my $vcol_data = $dbh_read->selectall_hashref($sql, 'FactorId');
+
+  my $vcol_param_data = {};
+  my $vcol_len_info   = {};
+  my $vcol_param_data_maxlen = {};
+  my $pre_validate_vcol = {};
+
+  for my $vcol_id (keys(%{$vcol_data})) {
+
+    my $vcol_param_name = "VCol_${vcol_id}";
+    my $vcol_value      = $query->param($vcol_param_name) ;
+    if ($vcol_data->{$vcol_id}->{'CanFactorHaveNull'} != 1) {
+
+      $vcol_param_data->{$vcol_param_name} = $vcol_value;
+    }
+
+    $vcol_len_info->{$vcol_param_name} = $vcol_data->{$vcol_id}->{'FactorValueMaxLength'};
+    $vcol_param_data_maxlen->{$vcol_param_name} = $vcol_value;
+
+    $pre_validate_vcol->{$vcol_param_name} = {
+      'Rule' => $vcol_data->{$vcol_id}->{'FactorValidRule'},
+      'Value'=> $vcol_value,
+      'FactorId'=> $vcol_id,
+      'RuleErrorMsg'=> $vcol_data->{$vcol_id}->{'FactorValidRuleErrMsg'},
+      'CanFactorHaveNull' => $vcol_data->{$vcol_id}->{'CanFactorHaveNull'},
+    };
+  }
+
+  my ($vcol_missing_err, $vcol_missing_href) = check_missing_href( $vcol_param_data );
+
+  if ($vcol_missing_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$vcol_missing_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  my ($vcol_maxlen_err, $vcol_maxlen_href) = check_maxlen_href($vcol_param_data_maxlen, $vcol_len_info);
+
+  if ($vcol_maxlen_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$vcol_maxlen_href]};
+
+    return $data_for_postrun_href;
+  }
+
 
   $dbh_read->disconnect();
 
@@ -3841,10 +3901,8 @@ sub add_genotype_alias_runmode {
 
       my $err_msg = "GenotypeAliasType ($geno_alias_type): not found.";
 
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'GenotypeAliasType' => $err_msg}]};
-
-      return $data_for_postrun_href;
+      push(@{$genotype_alias_err_aref}, {'GenotypeAliasType' => $err_msg});
+      $genotype_alias_err = 1;
     }
   }
 
@@ -3854,10 +3912,8 @@ sub add_genotype_alias_runmode {
 
       my $err_msg = "GenotypeAliasStatus ($geno_alias_status): not found.";
 
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'GenotypeAliasStatus' => $err_msg}]};
-
-      return $data_for_postrun_href;
+      push(@{$genotype_alias_err_aref}, {'GenotypeAliasStatus' => $err_msg});
+      $genotype_alias_err = 1;
     }
   }
 
@@ -3869,10 +3925,8 @@ sub add_genotype_alias_runmode {
 
     my $err_msg = "GenotypeAliasName ($geno_alias_name): already exists.";
 
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'GenotypeAliasName' => $err_msg}]};
-
-    return $data_for_postrun_href;
+    push(@{$genotype_alias_err_aref}, {'GenotypeAliasName' => $err_msg});
+    $genotype_alias_err = 1;
   }
 
   $sql = 'SELECT GenotypeId FROM genotype WHERE GenotypeName=? AND GenusId=?';
@@ -3883,11 +3937,28 @@ sub add_genotype_alias_runmode {
 
     my $err_msg = "GenotypeAliasName ($geno_alias_name): already used as GenotypeName in genotype ($db_geno_id).";
 
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'GenotypeAliasName' => $err_msg}]};
+    push(@{$genotype_alias_err_aref}, {'GenotypeAliasName' => $err_msg});
+    $genotype_alias_err = 1;
+  }
 
+  #prevalidate values to be finished in later version
+
+  my ($vcol_error, $vcol_error_aref) = validate_all_factor_input($pre_validate_vcol);
+
+  if ($vcol_error) {
+    push(@{$genotype_alias_err_aref}, @{$vcol_error_aref});
+    $genotype_alias_err = 1;
+  }
+
+  if ($genotype_alias_err != 0) {
+
+    $dbh_write->disconnect();
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => $genotype_alias_err_aref};
     return $data_for_postrun_href;
   }
+
 
   $sql    = 'INSERT INTO genotypealias SET ';
   $sql   .= 'GenotypeAliasName=?, ';
@@ -3954,6 +4025,9 @@ sub update_genotype_alias_runmode {
   my $query         = $self->query();
 
   my $data_for_postrun_href = {};
+  my $genotype_alias_err = 0;
+  my $genotype_alias_err_aref = [];
+
 
   # Generic required static field checking
 
@@ -3972,6 +4046,58 @@ sub update_genotype_alias_runmode {
     $self->logger->debug($chk_sfield_msg);
 
     return $for_postrun_href;
+  }
+
+  my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength, FactorValidRuleErrMsg, FactorValidRule  ";
+  $sql   .= "FROM factor ";
+  $sql   .= "WHERE TableNameOfFactor='genotypealiasfactor'";
+
+  my $vcol_data = $dbh_read->selectall_hashref($sql, 'FactorId');
+
+  my $vcol_param_data = {};
+  my $vcol_len_info   = {};
+  my $vcol_param_data_maxlen = {};
+  my $pre_validate_vcol = {};
+
+  for my $vcol_id (keys(%{$vcol_data})) {
+
+    my $vcol_param_name = "VCol_${vcol_id}";
+    my $vcol_value      = $query->param($vcol_param_name) ;
+    if ($vcol_data->{$vcol_id}->{'CanFactorHaveNull'} != 1) {
+
+      $vcol_param_data->{$vcol_param_name} = $vcol_value;
+    }
+
+    $vcol_len_info->{$vcol_param_name} = $vcol_data->{$vcol_id}->{'FactorValueMaxLength'};
+    $vcol_param_data_maxlen->{$vcol_param_name} = $vcol_value;
+
+    $pre_validate_vcol->{$vcol_param_name} = {
+      'Rule' => $vcol_data->{$vcol_id}->{'FactorValidRule'},
+      'Value'=> $vcol_value,
+      'FactorId'=> $vcol_id,
+      'RuleErrorMsg'=> $vcol_data->{$vcol_id}->{'FactorValidRuleErrMsg'},
+      'CanFactorHaveNull' => $vcol_data->{$vcol_id}->{'CanFactorHaveNull'},
+    };
+  }
+
+  my ($vcol_missing_err, $vcol_missing_href) = check_missing_href( $vcol_param_data );
+
+  if ($vcol_missing_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$vcol_missing_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  my ($vcol_maxlen_err, $vcol_maxlen_href) = check_maxlen_href($vcol_param_data_maxlen, $vcol_len_info);
+
+  if ($vcol_maxlen_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$vcol_maxlen_href]};
+
+    return $data_for_postrun_href;
   }
 
   $dbh_read->disconnect();
@@ -4071,10 +4197,9 @@ sub update_genotype_alias_runmode {
   if (length($db_geno_alias_id) > 0) {
 
     my $err_msg = "GenotypeAliasName ($geno_alias_name) - GenusId ($genus_id): already used.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
-    return $data_for_postrun_href;
+    push(@{$genotype_alias_err_aref}, {'GenotypeAliasName' => $err_msg});
+    $genotype_alias_err = 1;
   }
 
   $sql  = 'SELECT GenotypeId FROM genotype ';
@@ -4086,10 +4211,9 @@ sub update_genotype_alias_runmode {
   if (length($db_geno_id) > 0) {
 
     my $err_msg = "GenotypeAliasName ($geno_alias_name): already used as GenotypeName in genotype ($db_geno_id).";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
-    return $data_for_postrun_href;
+    push(@{$genotype_alias_err_aref}, {'GenotypeAliasName' => $err_msg});
+    $genotype_alias_err = 1;
   }
 
   if (defined $query->param('GenotypeAliasType')) {
@@ -4110,10 +4234,8 @@ sub update_genotype_alias_runmode {
 
       my $err_msg = "GenotypeAliasType ($geno_alias_type): not found.";
 
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'GenotypeAliasType' => $err_msg}]};
-
-      return $data_for_postrun_href;
+      push(@{$genotype_alias_err_aref}, {'GenotypeAliasType' => $err_msg});
+      $genotype_alias_err = 1;
     }
   }
   else {
@@ -4139,10 +4261,8 @@ sub update_genotype_alias_runmode {
 
       my $err_msg = "GenotypeAliasStatus ($geno_alias_status): not found.";
 
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'GenotypeAliasStatus' => $err_msg}]};
-
-      return $data_for_postrun_href;
+      push(@{$genotype_alias_err_aref}, {'GenotypeAliasStatus' => $err_msg});
+      $genotype_alias_err = 1;
     }
   }
   else {
@@ -4167,6 +4287,24 @@ sub update_genotype_alias_runmode {
     $geno_alias_lang = undef;
   }
 
+  #prevalidate values to be finished in later version
+
+  my ($vcol_error, $vcol_error_aref) = validate_all_factor_input($pre_validate_vcol);
+
+  if ($vcol_error) {
+    push(@{$genotype_alias_err_aref}, @{$vcol_error_aref});
+    $genotype_alias_err = 1;
+  }
+
+  if ($genotype_alias_err != 0) {
+
+    $dbh_write->disconnect();
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => $genotype_alias_err_aref};
+    return $data_for_postrun_href;
+  }
+
   $sql    = 'UPDATE genotypealias SET ';
   $sql   .= 'GenotypeAliasName=?, ';
   $sql   .= 'GenotypeAliasType=?, ';
@@ -4188,7 +4326,37 @@ sub update_genotype_alias_runmode {
   }
   $sth->finish();
 
+  my $vcol_error = [];
+
+  for my $vcol_id (keys(%{$vcol_data})) {
+
+    if (defined $query->param('VCol_' . "$vcol_id")) {
+
+      my $factor_value = $query->param('VCol_' . "$vcol_id");
+
+      my ($vcol_err, $vcol_msg) = update_factor_value($dbh_write, $vcol_id, $factor_value, 'genotypealiasfactor', 'GenotypeAliasId', $geno_alias_id);
+
+      if ($vcol_err) {
+
+        $self->logger->debug("VCol_" . "$vcol_id => $vcol_msg" );
+
+        push(@{$genotype_alias_err_aref}, {'VCol_' . "$vcol_id" => $vcol_msg});
+
+        $genotype_alias_err = 1;
+      }
+    }
+  }
+
   $dbh_write->disconnect();
+
+  if ($genotype_alias_err != 0) {
+
+    $dbh_write->disconnect();
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => $genotype_alias_err_aref};
+    return $data_for_postrun_href;
+  }
 
   my $info_msg_aref = [{'Message' => "GenotypeAlias ($geno_alias_id) has been updated successfully."}];
 
@@ -7527,14 +7695,7 @@ sub list_genotype_advanced_runmode {
   $sql =~ s/ORDERINGSTRING/$final_sort_sql/;
 
   if ($pagination == 0) {
-    if (defined $self->param('nperpage')) {
-      $nb_per_page = $self->param('nperpage');
-
-      $sql =~ s/LIMITSTRING/LIMIT  $nb_per_page/;
-    }
-    else {
-      $sql =~ s/LIMITSTRING/LIMIT 50/;
-    }
+    $sql =~ s/LIMITSTRING//;
   }
   else {
     $sql =~ s/LIMITSTRING/$paged_limit_clause/;
@@ -8571,7 +8732,7 @@ sub import_genotype_csv_runmode {
   $matched_col->{$TaxonomyId_col}            = 'TaxonomyId';
 
 
-  my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength ";
+  my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength, FactorValidRuleErrMsg, FactorValidRule  ";
   $sql   .= "FROM factor ";
   $sql   .= "WHERE TableNameOfFactor='genotypefactor'";
 
@@ -8581,6 +8742,7 @@ sub import_genotype_csv_runmode {
   my $vcol_req_field         = [];
   my $vcol_len_info          = {};
   my $any_vcol_defined       = 0;
+  my $pre_validate_vcol = {};
 
   for my $vcol_id (keys(%{$vcol_data})) {
 
@@ -8599,6 +8761,13 @@ sub import_genotype_csv_runmode {
       push(@{$vcol_req_field}, $vcol_param_name);
     }
     $vcol_len_info->{$vcol_param_name} = $vcol_data->{$vcol_id}->{'FactorValueMaxLength'};
+
+    $pre_validate_vcol->{$vcol_param_name} = {
+      'Rule' => $vcol_data->{$vcol_id}->{'FactorValidRule'},
+      'FactorId'=> $vcol_id,
+      'RuleErrorMsg'=> $vcol_data->{$vcol_id}->{'FactorValidRuleErrMsg'},
+      'CanFactorHaveNull' => $vcol_data->{$vcol_id}->{'CanFactorHaveNull'}
+    };
   }
 
   $dbh_k_read->disconnect();
@@ -8857,6 +9026,87 @@ sub import_genotype_csv_runmode {
     return $self->_set_error($err_msg);
   }
 
+  #validate factors. seperate loop to make it easy to decouple if needed.
+
+  my $factor_row_count = 0;
+  my $factor_err = 0;
+  my $factor_err_aref = [];
+  my @factor_err_row_aref;
+
+  $i = 0;
+
+  while( $i < $num_of_rows ) {
+
+    my $j = $i;
+    $inner_loop_max_j = $j + $num_of_bulk_insert;
+    my $smallest_num = $num_of_rows > $inner_loop_max_j ? $inner_loop_max_j : $num_of_rows;
+
+    my $uniq_geno_name_where     = '';
+    my $uniq_taxonomy_id_href    = {};
+
+    #$self->logger->debug("Checking: $i, $smallest_num");
+
+    while( $j < $smallest_num ) {
+
+      my $data_row = $data_aref->[$j];
+
+      my $potential_error_per_row = {};
+
+      my $factor_row_error = 0;
+
+      for my $field (keys(%{$data_row})) {
+
+        $self->logger->debug("$field => " . $data_row->{$field});
+        $self->logger->debug("===");
+      }
+
+      for my $vcol_name (keys(%{$pre_validate_vcol})) {
+
+          my $vcol_value = $data_row->{$vcol_name};
+          my $vcol_id = $pre_validate_vcol->{$vcol_name}->{'FactorId'};
+          my $val_rule = $pre_validate_vcol->{$vcol_name}->{'Rule'};
+          my $val_msg = $pre_validate_vcol->{$vcol_name}->{'RuleErrorMsg'};
+          my $vcol_can_be_null = $pre_validate_vcol->{$vcol_name}->{'CanFactorHaveNull'};
+
+          $self->logger->debug("Checking $vcol_name with $vcol_value matches $val_rule");
+
+          if ($vcol_can_be_null == 1 && (! defined $vcol_value)) {
+            next;
+          }
+
+          if ($vcol_can_be_null == 1 && length($vcol_value) == 0) {
+            next;
+          }
+
+          my ($factor_validation_err, $factor_validation_message) = validate_factor_value($val_rule, $val_msg,$vcol_value,$vcol_id);
+
+          if ($factor_validation_err) {
+              $potential_error_per_row->{"Row_$factor_row_count-$vcol_name"} = $factor_validation_message;
+              $factor_row_error = 1;
+          }
+
+          if ($factor_row_error) {
+            push(@{$factor_err_aref},$potential_error_per_row);
+            push(@factor_err_row_aref,$factor_row_count);
+            $factor_err = 1;
+          }
+
+        
+      }
+      $j += 1;
+      $factor_row_count += 1;
+    }
+    
+
+    $i += $num_of_bulk_insert;
+  }
+
+  #there were errors in the factor validation
+  if ($factor_err) {
+    my $err_msg = 'Row (' . join(',', @factor_err_row_aref) . '): have invalid Factor Values';
+    return $self->_set_error($err_msg);
+  }
+
   my $group_id = $self->authen->group_id();
   my $default_owner_perm = 7;
   my $default_acc_perm   = 5;
@@ -8865,6 +9115,8 @@ sub import_genotype_csv_runmode {
   my $total_affected_records = 0;
   my $total_vcol_records     = 0;
   $i = 0;
+
+  
 
   $sql = 'SELECT GenotypeId FROM genotype ORDER BY GenotypeId DESC LIMIT 1';
   my $prior_last_geno_id = read_cell($dbh_write, $sql, []);
@@ -9616,7 +9868,7 @@ sub import_specimen_csv_runmode {
     $matched_col->{$InheritanceGenotype_col}   = 'InheritanceGenotype';
   }
 
-  my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength ";
+  my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength, FactorValidRuleErrMsg, FactorValidRule  ";
   $sql   .= "FROM factor ";
   $sql   .= "WHERE TableNameOfFactor='specimenfactor'";
 
@@ -10580,6 +10832,8 @@ sub add_breedingmethod_runmode {
   my $query = $self->query();
 
   my $data_for_postrun_href = {};
+  my $breeding_method_err = 0;
+  my $breeding_method_err_aref = [];
 
   # Generic required static field checking
 
@@ -10631,28 +10885,39 @@ sub add_breedingmethod_runmode {
     }
   }
 
-  my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength ";
+  my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength, FactorValidRuleErrMsg, FactorValidRule  ";
   $sql   .= "FROM factor ";
   $sql   .= "WHERE TableNameOfFactor='breedingmethodfactor'";
 
   my $dbh_k_read = connect_kdb_read();
   my $vcol_data = $dbh_k_read->selectall_hashref($sql, 'FactorId');
 
-  my $vcol_param_data        = {};
-  my $vcol_len_info          = {};
+  my $vcol_param_data = {};
+  my $vcol_len_info   = {};
   my $vcol_param_data_maxlen = {};
-  for my $vcol_id ( keys( %{$vcol_data} ) ) {
+  my $pre_validate_vcol = {};
+
+  for my $vcol_id (keys(%{$vcol_data})) {
 
     my $vcol_param_name = "VCol_${vcol_id}";
-    my $vcol_value      = $query->param($vcol_param_name);
-
-    if ( $vcol_data->{$vcol_id}->{'CanFactorHaveNull'} != 1 ) {
+    my $vcol_value      = $query->param($vcol_param_name) ;
+    if ($vcol_data->{$vcol_id}->{'CanFactorHaveNull'} != 1) {
 
       $vcol_param_data->{$vcol_param_name} = $vcol_value;
     }
-    $vcol_len_info->{$vcol_param_name}          = $vcol_data->{$vcol_id}->{'FactorValueMaxLength'};
+
+    $vcol_len_info->{$vcol_param_name} = $vcol_data->{$vcol_id}->{'FactorValueMaxLength'};
     $vcol_param_data_maxlen->{$vcol_param_name} = $vcol_value;
+
+    $pre_validate_vcol->{$vcol_param_name} = {
+      'Rule' => $vcol_data->{$vcol_id}->{'FactorValidRule'},
+      'Value'=> $vcol_value,
+      'FactorId'=> $vcol_id,
+      'RuleErrorMsg'=> $vcol_data->{$vcol_id}->{'FactorValidRuleErrMsg'},
+      'CanFactorHaveNull' => $vcol_data->{$vcol_id}->{'CanFactorHaveNull'},
+    };
   }
+
 
   # Validate virtual column for factor
   my ( $vcol_missing_err, $vcol_missing_href ) = check_missing_href($vcol_param_data);
@@ -10681,18 +10946,17 @@ sub add_breedingmethod_runmode {
 
     my $err_msg = "BreedingMethodType ($breedingmethod_type) does not exist.";
     $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'BreedingMethodTypeId' => $err_msg}]};
 
-    return $data_for_postrun_href;
+    push(@{$breeding_method_err_aref}, {'BreedingMethodTypeId' => $err_msg});
+    $breeding_method_err = 1;
   }
 
   if (record_existence($dbh_k_read, 'breedingmethod', 'BreedingMethodName', $breedingmethod_name)) {
 
     my $err_msg = "BreedingMethodName ($breedingmethod_name) already exists.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'BreedingMethodName' => $err_msg}]};
 
-    return $data_for_postrun_href;
+    push(@{$breeding_method_err_aref}, {'BreedingMethodName' => $err_msg});
+    $breeding_method_err = 1;
   }
 
   if (defined $breedingmethod_acronym) {
@@ -10700,11 +10964,28 @@ sub add_breedingmethod_runmode {
     if (record_existence($dbh_k_read, 'breedingmethod', 'BreedingMethodAcronym', $breedingmethod_acronym)) {
 
       my $err_msg = "BreedingMethodAcronym ($breedingmethod_acronym) already exists.";
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'BreedingMethodAcronym' => $err_msg}]};
 
-      return $data_for_postrun_href;
+      push(@{$breeding_method_err_aref}, {'BreedingMethodAcronym' => $err_msg});
+      $breeding_method_err = 1;
     }
+  }
+
+  #prevalidate values to be finished in later version
+
+  my ($vcol_error, $vcol_error_aref) = validate_all_factor_input($pre_validate_vcol);
+
+  if ($vcol_error) {
+    push(@{$breeding_method_err_aref}, @{$vcol_error_aref});
+    $breeding_method_err = 1;
+  }
+
+  if ($breeding_method_err != 0) {
+
+    $dbh_k_read->disconnect();
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => $breeding_method_err_aref};
+    return $data_for_postrun_href;
   }
 
   $dbh_k_read->disconnect();
@@ -10919,7 +11200,7 @@ sub list_breedingmethod_runmode {
   my $data_for_postrun_href = {};
 
   my $dbh = connect_kdb_read();
-  my $field_list = ['breedingmethod.*', 'generaltype.TypeName AS BreedingMethodTypeName'];
+  my $field_list = ['breedingmethod.*', 'VCol*','generaltype.TypeName AS BreedingMethodTypeName'];
 
   my $other_join = ' LEFT JOIN generaltype ON breedingmethod.BreedingMethodTypeId = generaltype.TypeId ';
 
@@ -10994,6 +11275,9 @@ sub update_breedingmethod_runmode {
   my $query             = $self->query();
 
   my $data_for_postrun_href = {};
+  my $breeding_method_err = 0;
+  my $breeding_method_err_aref = [];
+
 
   # Generic required static field checking
 
@@ -11105,7 +11389,7 @@ sub update_breedingmethod_runmode {
   }
 
 
-  my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength ";
+  my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength, FactorValidRuleErrMsg, FactorValidRule  ";
   $sql   .= "FROM factor ";
   $sql   .= "WHERE TableNameOfFactor='breedingmethodfactor'";
 
@@ -11114,16 +11398,27 @@ sub update_breedingmethod_runmode {
   my $vcol_param_data = {};
   my $vcol_len_info   = {};
   my $vcol_param_data_maxlen = {};
+  my $pre_validate_vcol = {};
+
   for my $vcol_id (keys(%{$vcol_data})) {
 
     my $vcol_param_name = "VCol_${vcol_id}";
-    my $vcol_value      = $query->param($vcol_param_name);
+    my $vcol_value      = $query->param($vcol_param_name) ;
     if ($vcol_data->{$vcol_id}->{'CanFactorHaveNull'} != 1) {
 
       $vcol_param_data->{$vcol_param_name} = $vcol_value;
     }
+
     $vcol_len_info->{$vcol_param_name} = $vcol_data->{$vcol_id}->{'FactorValueMaxLength'};
     $vcol_param_data_maxlen->{$vcol_param_name} = $vcol_value;
+
+    $pre_validate_vcol->{$vcol_param_name} = {
+      'Rule' => $vcol_data->{$vcol_id}->{'FactorValidRule'},
+      'Value'=> $vcol_value,
+      'FactorId'=> $vcol_id,
+      'RuleErrorMsg'=> $vcol_data->{$vcol_id}->{'FactorValidRuleErrMsg'},
+      'CanFactorHaveNull' => $vcol_data->{$vcol_id}->{'CanFactorHaveNull'},
+    };
   }
 
   my ($vcol_missing_err, $vcol_missing_msg) = check_missing_value( $vcol_param_data );
@@ -11154,9 +11449,9 @@ sub update_breedingmethod_runmode {
 
     my $err_msg = "BreedingMethodType ($breedingmethod_type) does not exist.";
     $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'BreedingMethodTypeId' => $err_msg}]};
 
-    return $data_for_postrun_href;
+    push(@{$breeding_method_err_aref}, {'BreedingMethodTypeId' => $err_msg});
+    $breeding_method_err = 1;
   }
 
   my $chk_bmeth_name_sql = 'SELECT BreedingMethodId FROM breedingmethod WHERE BreedingMethodName=? AND BreedingMethodId <> ?';
@@ -11173,11 +11468,10 @@ sub update_breedingmethod_runmode {
 
   if (length($db_bmeth_id) > 0) {
 
-    my $err_msg = "BreedingMethodName ($breedingmethod_name): already exists.";
-    $data_for_postrun_href->{'Error'}       = 1;
-    $data_for_postrun_href->{'Data'}        = {'Error' => [{'BreedingMethodName' => $err_msg}]};
+    my $err_msg = "BreedingMethodName ($breedingmethod_name) already exists.";
 
-    return $data_for_postrun_href;
+    push(@{$breeding_method_err_aref}, {'BreedingMethodName' => $err_msg});
+    $breeding_method_err = 1;
   }
 
   my $chk_bmeth_acro_sql = 'SELECT BreedingMethodId FROM breedingmethod WHERE BreedingMethodAcronym=? AND BreedingMethodId <> ?';
@@ -11194,10 +11488,27 @@ sub update_breedingmethod_runmode {
 
   if (length($db_bmeth_id) > 0) {
 
-    my $err_msg = "BreedingMethodAcronym ($breedingmethod_acronym): already exists.";
-    $data_for_postrun_href->{'Error'}       = 1;
-    $data_for_postrun_href->{'Data'}        = {'Error' => [{'BreedingMethodAcronym' => $err_msg}]};
+      my $err_msg = "BreedingMethodAcronym ($breedingmethod_acronym) already exists.";
 
+      push(@{$breeding_method_err_aref}, {'BreedingMethodAcronym' => $err_msg});
+      $breeding_method_err = 1;
+  }
+
+  #prevalidate values to be finished in later version
+
+  my ($vcol_error, $vcol_error_aref) = validate_all_factor_input($pre_validate_vcol);
+
+  if ($vcol_error) {
+    push(@{$breeding_method_err_aref}, @{$vcol_error_aref});
+    $breeding_method_err = 1;
+  }
+
+  if ($breeding_method_err != 0) {
+
+    $dbh_k_read->disconnect();
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => $breeding_method_err_aref};
     return $data_for_postrun_href;
   }
 
@@ -11227,85 +11538,36 @@ sub update_breedingmethod_runmode {
   }
   $sth->finish();
 
+  my $vcol_error = [];
+
   for my $vcol_id (keys(%{$vcol_data})) {
 
     if (defined $query->param('VCol_' . "$vcol_id")) {
 
       my $factor_value = $query->param('VCol_' . "$vcol_id");
 
-      $sql  = 'SELECT Count(*) ';
-      $sql .= 'FROM breedingmethodfactor ';
-      $sql .= 'WHERE BreedingMethodId=? AND FactorId=?';
+      my ($vcol_err, $vcol_msg) = update_factor_value($dbh_k_write, $vcol_id, $factor_value, 'breedingmethodfactor', 'BreedingMethodId', $breedingmethod_id);
 
-      my ($read_err, $count) = read_cell($dbh_k_write, $sql, [$breedingmethod_id, $vcol_id]);
+      if ($vcol_err) {
 
-      if (length($factor_value) > 0) {
+        $self->logger->debug("VCol_" . "$vcol_id => $vcol_msg" );
 
-        if ($count > 0) {
+        push(@{$breeding_method_err_aref}, {'VCol_' . "$vcol_id" => $vcol_msg});
 
-          $sql  = 'UPDATE breedingmethodfactor SET ';
-          $sql .= 'FactorValue=? ';
-          $sql .= 'WHERE BreedingMethodId=? AND FactorId=?';
-          my $factor_sth = $dbh_k_write->prepare($sql);
-          $factor_sth->execute($factor_value, $breedingmethod_id, $vcol_id);
-
-          if ($dbh_k_write->err()) {
-
-            $self->logger->debug($dbh_k_write->errstr());
-            $data_for_postrun_href->{'Error'} = 1;
-            $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-            return $data_for_postrun_href;
-          }
-
-          $factor_sth->finish();
-        }
-        else {
-
-          $sql  = 'INSERT INTO breedingmethodfactor SET ';
-          $sql .= 'BreedingMethodId=?, ';
-          $sql .= 'FactorId=?, ';
-          $sql .= 'FactorValue=?';
-          my $factor_sth = $dbh_k_write->prepare($sql);
-          $factor_sth->execute($breedingmethod_id, $vcol_id, $factor_value);
-
-          if ($dbh_k_write->err()) {
-
-            $self->logger->debug($dbh_k_write->errstr());
-            $data_for_postrun_href->{'Error'} = 1;
-            $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-            return $data_for_postrun_href;
-          }
-
-          $factor_sth->finish();
-        }
-      }
-      else {
-
-        if ($count > 0) {
-
-          $sql  = 'DELETE FROM breedingmethodfactor ';
-          $sql .= 'WHERE BreedingMethodId=? AND FactorId=?';
-
-          my $factor_sth = $dbh_k_write->prepare($sql);
-          $factor_sth->execute($breedingmethod_id, $vcol_id);
-
-          if ($dbh_k_write->err()) {
-
-            $self->logger->debug($dbh_k_write->errstr());
-            $data_for_postrun_href->{'Error'} = 1;
-            $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-            return $data_for_postrun_href;
-          }
-          $factor_sth->finish();
-        }
+        $breeding_method_err = 1;
       }
     }
   }
-
   $dbh_k_write->disconnect();
+
+  if ($breeding_method_err != 0) {
+
+    $dbh_k_read->disconnect();
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => $breeding_method_err_aref};
+    return $data_for_postrun_href;
+  }
 
   my $info_msg_aref = [{'Message' => "BreedingMethod ($breedingmethod_id) has been updated successfully."}];
 
@@ -11356,8 +11618,8 @@ sub get_breedingmethod_runmode {
     return $data_for_postrun_href;
   }
 
-  my $field_list = ['breedingmethod.*', 'generaltype.TypeName AS BreedingMethodTypeName'];
-
+   my $field_list = ['breedingmethod.*', 'VCol*','generaltype.TypeName AS BreedingMethodTypeName'];
+   
   my $other_join = ' LEFT JOIN generaltype ON breedingmethod.BreedingMethodTypeId = generaltype.TypeId ';
 
   my ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_sql($dbh, $field_list, 'breedingmethod',

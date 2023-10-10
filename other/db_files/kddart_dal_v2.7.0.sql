@@ -340,7 +340,7 @@ ALTER TABLE `systemgroup` CONVERT TO CHARACTER SET utf8 COLLATE utf8_general_ci;
 CREATE TABLE `systemuser` (
   `UserId` INTEGER NOT NULL AUTO_INCREMENT COMMENT 'user id',
   `UserName` VARCHAR(32) NOT NULL COMMENT 'user name',
-  `UserPassword` VARCHAR(128) NOT NULL COMMENT 'user password',
+  `UserPassword` VARCHAR(128) NOT NULL COMMENT 'hashed user password',
   `PasswordSalt` VARCHAR(64) NOT NULL COMMENT 'password salt (used to hash/encrypt password?)',
   `ContactId` INTEGER NOT NULL COMMENT 'contact id',
   `LastLoginDateTime` DATETIME NULL COMMENT 'date and time of last logon',
@@ -2277,10 +2277,6 @@ ALTER TABLE `trialunittreatment` ADD FOREIGN KEY (`TreatmentId`)
   REFERENCES `treatment` (`TreatmentId`) 
   ON DELETE NO ACTION ON UPDATE NO ACTION;
 
-ALTER TABLE `crossingmeasurement` ADD FOREIGN KEY (`CMGroupId`)
-  REFERENCES `cmgroup` (`CMGroupId`) 
-  ON DELETE NO ACTION ON UPDATE NO ACTION;
-
 ALTER TABLE `cmgroup` ADD FOREIGN KEY (`TrialId`)
   REFERENCES `trial` (`TrialId`) 
   ON DELETE NO ACTION ON UPDATE NO ACTION;
@@ -2343,10 +2339,6 @@ ALTER TABLE `itemmeasurement` ADD FOREIGN KEY (`OperatorId`)
 
 ALTER TABLE `itemmeasurement` ADD FOREIGN KEY (`SampleTypeId`)
   REFERENCES `generaltype` (`TypeId`) 
-  ON DELETE NO ACTION ON UPDATE NO ACTION;
-
-ALTER TABLE `itemmeasurement` ADD FOREIGN KEY (`IMGroupId`)
-  REFERENCES `imgroup` (`IMGroupId`) 
   ON DELETE NO ACTION ON UPDATE NO ACTION;
 
 ALTER TABLE `trialunittreatment` ADD FOREIGN KEY (`TrialUnitId`)

@@ -1,3 +1,21 @@
+Version 2.7.5
+Date: 10/10/2023
+Description: Bug Fixing Patch and Improvements
+
++ Item Measurements and Item Measurement Group related endpoints added
+
++ Crossing Measurement and Crossing Measurement Group related endpoints added
+
++ Virtual Column validation added for all Core module objects that support virtual columns. They are: organisation, contact, site, trial, genotype, specimen, item, trial event, trial group, survey, device register, trial unit, general type, genotype alias, project and breeding method.
+   
+Database Update
+
++ Drop any constraints in itemmeasurement and crossingmeasurement.
+
+Instance Testing 
+
++ A number of new whitebox tests have been added. This takes the number of tests that can be run at the start of deployment to 482. VCol related tests will be 47.
+
 Version 2.7.4
 Date: 07/08/2023
 Description: Bug Fixing Patch and Improvements

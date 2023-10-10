@@ -15,6 +15,8 @@ package KDDArT::DAL::Trial;
 use strict;
 use warnings;
 
+use Digest::MD5 qw(md5 md5_hex md5_base64);
+
 BEGIN {
   use File::Spec;
 
@@ -226,7 +228,7 @@ sub setup {
     'add_trialunit_treatment'                => 'add_trialunit_treatment_runmode',
     'get_trialunit_treatment'                => 'get_trialunit_treatment_runmode',
     'remove_trialunit_treatment'             => 'remove_trialunit_treatment_runmode',
-    'update_trialunit_treatment'             => 'update_trialunit_treatment_runmode',
+    'update_trialunit_treatment'             => 'update_trialunit_treatment_runmode'
     );
 
   my $logger = get_logger();
@@ -338,10 +340,7 @@ sub add_site_runmode {
 
       if ($is_wkt_err) {
 
-        #$data_for_postrun_href->{'Error'} = 1;
-        #$data_for_postrun_href->{'Data'}  = {'Error' => [$wkt_err_href]};
-
-        push(@{$site_err_aref}, $wkt_err_href);
+          push(@{$site_err_aref}, $wkt_err_href);
         $site_err = 1;
       }
     }
@@ -356,10 +355,6 @@ sub add_site_runmode {
     my ($sdate_err, $sdate_href) = check_dt_href( {'SiteStartDate' => $site_sdate} );
 
     if ($sdate_err) {
-
-      #$data_for_postrun_href->{'Error'} = 1;
-      #$data_for_postrun_href->{'Data'}  = {'Error' => [$sdate_href]};
-
       push(@{$site_err_aref}, $sdate_href);
       $site_err = 1;
     }
@@ -372,9 +367,6 @@ sub add_site_runmode {
     my ($edate_err, $edate_href) = check_dt_href( {'SiteEndDate' => $site_edate} );
 
     if ($edate_err) {
-
-      #$data_for_postrun_href->{'Error'} = 1;
-      #$data_for_postrun_href->{'Data'}  = {'Error' => [$edate_href]};
 
       push(@{$site_err_aref}, $edate_href);
       $site_err = 1;
@@ -410,6 +402,7 @@ sub add_site_runmode {
       'Value'=> $vcol_value,
       'FactorId'=> $vcol_id,
       'RuleErrorMsg'=> $vcol_data->{$vcol_id}->{'FactorValidRuleErrMsg'},
+      'CanFactorHaveNull' => $vcol_data->{$vcol_id}->{'CanFactorHaveNull'}
     };
   }
   
@@ -438,8 +431,6 @@ sub add_site_runmode {
   if (!$sitetype_existence) {
 
     my $err_msg = "SiteType ($sitetype_id) does not exist.";
-    #$data_for_postrun_href->{'Error'} = 1;
-    #$data_for_postrun_href->{'Data'}  = {'Error' => [{'SiteTypeId' => $err_msg}]};
 
     push(@{$site_err_aref}, {'SiteTypeId' => $err_msg});
     $site_err = 1;
@@ -450,8 +441,6 @@ sub add_site_runmode {
   if (!$cur_manager_existence) {
 
     my $err_msg = "CurrentManager ($cur_manager_id) does not exist.";
-    #$data_for_postrun_href->{'Error'} = 1;
-    #$data_for_postrun_href->{'Data'}  = {'Error' => [{'CurrentSiteManagerId' => $err_msg}]};
 
     push(@{$site_err_aref}, {'SiteTypeId' => $err_msg});
     $site_err = 1;
@@ -461,12 +450,12 @@ sub add_site_runmode {
 
   #prevalidate values to be finished in later version
 
-  #my ($vcol_error, $vcol_error_aref) = validate_all_factor_input($pre_validate_vcol);
+  my ($vcol_error, $vcol_error_aref) = validate_all_factor_input($pre_validate_vcol);
 
-  #if ($vcol_error) {
-  #  push(@{$site_err_aref}, @{$vcol_error_aref});
-  #  $site_err = 1;
-  #}
+  if ($vcol_error) {
+     push(@{$site_err_aref}, @{$vcol_error_aref});
+     $site_err = 1;
+  }
 
   if ($site_err != 0) {
     $data_for_postrun_href->{'Error'} = 1;
@@ -794,10 +783,6 @@ sub add_trial_runmode {
       if ($filtertrialname eq $trial_name) {
 
           my $err_msg = "Duplicate ($trial_name) cannot be used.";
-          #$data_for_postrun_href->{'Error'} = 1;
-          #$data_for_postrun_href->{'Data'}  = {'Error' => [{'TrialName' => $err_msg}]};
-
-          #return $data_for_postrun_href;
 
           push(@{$trial_err_aref}, {'TrialName' => $err_msg});
           $trial_err = 1;
@@ -864,9 +849,6 @@ sub add_trial_runmode {
 
     if ($is_wkt_err) {
 
-      #$data_for_postrun_href->{'Error'} = 1;
-      #$data_for_postrun_href->{'Data'}  = {'Error' => [$wkt_err_href]};
-
       push(@{$trial_err_aref}, $wkt_err_href);
       $trial_err = 1;
     }
@@ -876,10 +858,6 @@ sub add_trial_runmode {
 
   if ($date_err) {
 
-    #$data_for_postrun_href->{'Error'} = 1;
-    #$data_for_postrun_href->{'Data'}  = {'Error' => [$date_href]};
-
-    #return $data_for_postrun_href;
     push(@{$trial_err_aref}, $date_href);
     $trial_err = 1;
   }
@@ -889,9 +867,6 @@ sub add_trial_runmode {
     ($date_err, $date_href) = check_dt_href( { 'TrialEndDate'   => $trial_edate } );
 
     if ($date_err) {
-
-      #$data_for_postrun_href->{'Error'} = 1;
-      #$data_for_postrun_href->{'Data'}  = {'Error' => [$date_href]};
 
       push(@{$trial_err_aref}, $date_href);
       $trial_err = 1;
@@ -931,6 +906,7 @@ sub add_trial_runmode {
       'Value'=> $vcol_value,
       'FactorId'=> $vcol_id,
       'RuleErrorMsg'=> $vcol_data->{$vcol_id}->{'FactorValidRuleErrMsg'},
+      'CanFactorHaveNull' => $vcol_data->{$vcol_id}->{'CanFactorHaveNull'}
     };
   }
 
@@ -961,10 +937,7 @@ sub add_trial_runmode {
     if (!$project_existence) {
 
       my $err_msg = "Project ($project_id) does not exist.";
-      #$data_for_postrun_href->{'Error'} = 1;
-      #$data_for_postrun_href->{'Data'}  = {'Error' => [{'ProjectId' => $err_msg}]};
 
-      #return $data_for_postrun_href;
       push(@{$trial_err_aref}, {'ProjectId' => $err_msg});
       $trial_err = 1;
     }
@@ -975,10 +948,7 @@ sub add_trial_runmode {
     if (!record_existence($dbh_k_read, 'workflow', 'WorkflowId', $workflow_id)) {
 
       my $err_msg = "CurrentWorkflowId ($workflow_id) does not exist.";
-      #$data_for_postrun_href->{'Error'} = 1;
-      #$data_for_postrun_href->{'Data'}  = {'Error' => [{'CurrentWorkflowId' => $err_msg}]};
 
-      #return $data_for_postrun_href;
       push(@{$trial_err_aref}, {'CurrentWorkflowId' => $err_msg});
       $trial_err = 1;
     }
@@ -989,10 +959,7 @@ sub add_trial_runmode {
   if (!$site_existence) {
 
     my $err_msg = "Site ($site_id) does not exist.";
-    #$data_for_postrun_href->{'Error'} = 1;
-    #$data_for_postrun_href->{'Data'}  = {'Error' => [{'SiteId' => $err_msg}]};
 
-    #return $data_for_postrun_href;
     push(@{$trial_err_aref}, {'SiteId' => $err_msg});
     $trial_err = 1;
   }
@@ -1002,10 +969,7 @@ sub add_trial_runmode {
   if (!$trialtype_existence) {
 
     my $err_msg = "TrialType ($trial_type_id) does not exist.";
-    #$data_for_postrun_href->{'Error'} = 1;
-    #$data_for_postrun_href->{'Data'}  = {'Error' => [{'TrialTypeId' => $err_msg}]};
 
-    #return $data_for_postrun_href;
     push(@{$trial_err_aref}, {'TrialTypeId' => $err_msg});
     $trial_err = 1;
   }
@@ -1013,10 +977,7 @@ sub add_trial_runmode {
   if (!type_existence($dbh_k_read, 'season', $season_id)) {
 
     my $err_msg = "Season ($season_id) does not exist.";
-    #$data_for_postrun_href->{'Error'} = 1;
-    #$data_for_postrun_href->{'Data'}  = {'Error' => [{'SeasonId' => $err_msg}]};
 
-    #return $data_for_postrun_href;
     push(@{$trial_err_aref}, {'SeasonId' => $err_msg});
     $trial_err = 1;
   }
@@ -1031,10 +992,7 @@ sub add_trial_runmode {
   if (!$design_type_existence) {
 
     my $err_msg = "DesignType ($design_type_id) does not exist.";
-    #$data_for_postrun_href->{'Error'} = 1;
-    #$data_for_postrun_href->{'Data'}  = {'Error' => [{'DesignTypeId' => $err_msg}]};
 
-    #return $data_for_postrun_href;
     push(@{$trial_err_aref}, {'DesignTypeId' => $err_msg});
     $trial_err = 1;
   }
@@ -1044,10 +1002,7 @@ sub add_trial_runmode {
   if (!$trial_manager_existence) {
 
     my $err_msg = "TrialManager ($trial_manager_id) does not exist.";
-    #$data_for_postrun_href->{'Error'} = 1;
-    #$data_for_postrun_href->{'Data'}  = {'Error' => [{'TrialManagerId' => $err_msg}]};
 
-    #return $data_for_postrun_href;
     push(@{$trial_err_aref}, {'TrialManagerId' => $err_msg});
     $trial_err = 1;
   }
@@ -1057,10 +1012,7 @@ sub add_trial_runmode {
   if (!$access_grp_existence) {
 
     my $err_msg = "AccessGroup ($access_group) does not exist.";
-    #$data_for_postrun_href->{'Error'} = 1;
-    #$data_for_postrun_href->{'Data'}  = {'Error' => [{'AccessGroupId' => $err_msg}]};
 
-    #return $data_for_postrun_href;
     push(@{$trial_err_aref}, {'AccessGroupId' => $err_msg});
     $trial_err = 1;
   }
@@ -1068,10 +1020,7 @@ sub add_trial_runmode {
   if ( ($own_perm > 7 || $own_perm < 0) ) {
 
     my $err_msg = "OwnGroupPerm ($own_perm) is invalid.";
-    #$data_for_postrun_href->{'Error'} = 1;
-    #$data_for_postrun_href->{'Data'}  = {'Error' => [{'OwnGroupPerm' => $err_msg}]};
 
-    #return $data_for_postrun_href;
     push(@{$trial_err_aref}, {'OwnGroupPerm' => $err_msg});
     $trial_err = 1;
   }
@@ -1079,10 +1028,7 @@ sub add_trial_runmode {
   if ( ($access_perm > 7 || $access_perm < 0) ) {
 
     my $err_msg = "AccesGroupPerm ($access_perm) is invalid.";
-    #$data_for_postrun_href->{'Error'} = 1;
-    #$data_for_postrun_href->{'Data'}  = {'Error' => [{'AccessGroupPerm' => $err_msg}]};
 
-    #return $data_for_postrun_href;
     push(@{$trial_err_aref}, {'AccessGroupPerm' => $err_msg});
     $trial_err = 1;
   }
@@ -1090,24 +1036,19 @@ sub add_trial_runmode {
   if ( ($other_perm > 7 || $other_perm < 0) ) {
 
     my $err_msg = "OtherPerm ($other_perm) is invalid.";
-    #$data_for_postrun_href->{'Error'} = 1;
-    #$data_for_postrun_href->{'Data'}  = {'Error' => [{'OtherPerm' => $err_msg}]};
-
-    #return $data_for_postrun_href;
+    
     push(@{$trial_err_aref}, {'OtherPerm' => $err_msg});
     $trial_err = 1;
   }
 
   $dbh_k_read->disconnect();
 
-  #prevalidate values to be finished in later version
+  my ($vcol_error, $vcol_error_aref) = validate_all_factor_input($pre_validate_vcol);
 
-  #my ($vcol_error, $vcol_error_aref) = validate_all_factor_input($pre_validate_vcol);
-
-  #if ($vcol_error) {
-  #  push(@{$trial_err_aref}, @{$vcol_error_aref});
-  #  $trial_err = 1;
-  #}
+  if ($vcol_error) {
+    push(@{$trial_err_aref}, @{$vcol_error_aref});
+    $trial_err = 1;
+  }
 
   if ($trial_err != 0) {
     $data_for_postrun_href->{'Error'} = 1;
@@ -1306,6 +1247,8 @@ sub add_trial_unit_runmode {
   }
 
   my $data_for_postrun_href = {};
+  my $trial_unit_err_aref = [];
+  my $trial_unit_err = 0;
 
   # Generic required static field checking
 
@@ -1367,28 +1310,36 @@ sub add_trial_unit_runmode {
     $barcode = $query->param('TrialUnitBarcode');
   }
 
-  my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength ";
+  my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength, FactorValidRuleErrMsg, FactorValidRule  ";
   $sql   .= "FROM factor ";
   $sql   .= "WHERE TableNameOfFactor='trialunitfactor'";
 
   my $dbh_k_read = connect_kdb_read();
   my $vcol_data = $dbh_k_read->selectall_hashref($sql, 'FactorId');
-
-  my $vcol_param_data = {};
-  my $vcol_len_info   = {};
+  my $vcol_param_data        = {};
+  my $vcol_len_info          = {};
   my $vcol_param_data_maxlen = {};
+  my $pre_validate_vcol = {};
 
   for my $vcol_id (keys(%{$vcol_data})) {
 
     my $vcol_param_name = "VCol_${vcol_id}";
-    my $vcol_value      = $query->param($vcol_param_name);
-
+    my $vcol_value      = $query->param($vcol_param_name) ;
     if ($vcol_data->{$vcol_id}->{'CanFactorHaveNull'} != 1) {
 
       $vcol_param_data->{$vcol_param_name} = $vcol_value;
     }
+
     $vcol_len_info->{$vcol_param_name} = $vcol_data->{$vcol_id}->{'FactorValueMaxLength'};
     $vcol_param_data_maxlen->{$vcol_param_name} = $vcol_value;
+
+    $pre_validate_vcol->{$vcol_param_name} = {
+      'Rule' => $vcol_data->{$vcol_id}->{'FactorValidRule'},
+      'Value'=> $vcol_value,
+      'FactorId'=> $vcol_id,
+      'RuleErrorMsg'=> $vcol_data->{$vcol_id}->{'FactorValidRuleErrMsg'},
+      'CanFactorHaveNull' => $vcol_data->{$vcol_id}->{'CanFactorHaveNull'}
+    };
   }
 
   my ($vcol_missing_err, $vcol_missing_href) = check_missing_href( $vcol_param_data );
@@ -1450,22 +1401,21 @@ sub add_trial_unit_runmode {
 
   my $dbh_k_write = connect_kdb_write();
 
-  # my $treatment_id        = 0;
+  my $treatment_id        = 0;
 
-  # if (length($query->param('TreatmentId')) > 0) {
+  if (length($query->param('TreatmentId')) > 0) {
 
-  #   $treatment_id = $query->param('TreatmentId');
-  #   my $treatment_existence = record_existence($dbh_k_write, 'treatment', 'TreatmentId', $treatment_id);
+    $treatment_id = $query->param('TreatmentId');
+    my $treatment_existence = record_existence($dbh_k_write, 'treatment', 'TreatmentId', $treatment_id);
 
-  #   if (!$treatment_existence) {
+    if (!$treatment_existence) {
 
-  #     my $err_msg = "Treatment ($treatment_id) does not exist.";
-  #     $data_for_postrun_href->{'Error'} = 1;
-  #     $data_for_postrun_href->{'Data'}  = {'Error' => [{'TreatmentId' => $err_msg}]};
+      my $err_msg = "Treatment ($treatment_id) does not exist.";
 
-  #     return $data_for_postrun_href;
-  #   }
-  # }
+      push(@{$trial_unit_err_aref}, {'TreatmentId' => $err_msg});
+      $trial_unit_err = 1;
+    }
+   }
 
   my $trial_existence = record_existence($dbh_k_write, 'trial', 'TrialId', $trial_id);
 
@@ -1483,10 +1433,9 @@ sub add_trial_unit_runmode {
     if (record_existence($dbh_k_write, 'trialunit', 'TrialUnitBarcode', $barcode)) {
 
       my $err_msg = "TrialUnitBarcode ($barcode): already exists.";
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'TrialUnitBarcode' => $err_msg}]};
 
-      return $data_for_postrun_href;
+      push(@{$trial_unit_err_aref}, {'TrialUnitBarcode' => $err_msg});
+      $trial_unit_err = 1;
     }
   }
 
@@ -1495,10 +1444,9 @@ sub add_trial_unit_runmode {
     if (!record_existence($dbh_k_write, 'trialunit', 'TrialUnitId', $src_trial_unit_id)) {
 
       my $err_msg = "SourceTrialUnitId ($src_trial_unit_id) not found.";
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'SourceTrialUnitId' => $err_msg}]};
 
-      return $data_for_postrun_href;
+      push(@{$trial_unit_err_aref}, {'SourceTrialUnitId' => $err_msg});
+      $trial_unit_err = 1;
     }
   }
 
@@ -1548,10 +1496,9 @@ sub add_trial_unit_runmode {
         if (length($query->param("TrialUnit" . $dim)) == 0) {
 
           my $err_msg = "TrialUnit${dim} is missing while ${dim} dimension is defined.";
-          $data_for_postrun_href->{'Error'} = 1;
-          $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
-          return $data_for_postrun_href;
+          push(@{$trial_unit_err_aref}, {"TrialUnit${dim}" => $err_msg});
+          $trial_unit_err = 1;
         }
         else {
 
@@ -1560,14 +1507,16 @@ sub add_trial_unit_runmode {
           push(@coord_val_list, $dim_val);
           push(@coord_dim_list, $dim);
           push(@sql_coord_dim_list, "TrialUnit${dim}=?");
+
+          $self->logger->debug("Read cell: $dim -> $dim_val ");
         }
       }
     }
 
-    if (scalar(@coord_val_list) > 0) {
+    if (scalar(@coord_val_list) > 0 && $trial_unit_err == 0) {
 
       $sql = 'SELECT TrialUnitId FROM trialunit WHERE TrialId=? AND ' . join(' AND ', @sql_coord_dim_list);
-
+      $self->logger->debug("Read cell: $sql ");
       my ($r_tu_id_err, $db_trialunit_id) = read_cell($dbh_k_write, $sql, [$trial_id, @coord_val_list]);
 
       if ($r_tu_id_err) {
@@ -1583,10 +1532,14 @@ sub add_trial_unit_runmode {
 
         my $err_msg = "Dimension (" . join(',', @coord_dim_list) . ") value (" . join(',', @coord_val_list) . '): ';
         $err_msg   .= 'already used.';
-        $data_for_postrun_href->{'Error'} = 1;
-        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
-        return $data_for_postrun_href;
+        foreach my $dim_name (@coord_dim_list) {
+          #push(@{$trial_unit_err_aref}, {"TrialUnit${dim_name}" => $err_msg});
+        }
+        
+        push(@{$trial_unit_err_aref}, {"Message" => $err_msg});
+
+        $trial_unit_err = 1;
       }
     }
   }
@@ -1595,88 +1548,98 @@ sub add_trial_unit_runmode {
   my @dimension_sql_list;
   my @user_dimension_list;
 
-  for my $dimension_rec (@{$dimension_aref}) {
+  if ($trial_unit_err == 0) {
+    for my $dimension_rec (@{$dimension_aref}) {
 
-    my $dimension = $dimension_rec->{'Dimension'};
+      my $dimension = $dimension_rec->{'Dimension'};
 
-    if (defined $query->param("TrialUnit${dimension}")) {
+      if (defined $query->param("TrialUnit${dimension}")) {
 
-      if (length($query->param("TrialUnit${dimension}")) > 0) {
+        if (length($query->param("TrialUnit${dimension}")) > 0) {
 
-        $dimension_provided = 1;
+          $dimension_provided = 1;
 
-        my $dimension_val = $query->param("TrialUnit${dimension}");
+          my $dimension_val = $query->param("TrialUnit${dimension}");
 
-        if ($dimension ne 'Position') {
+          if ($dimension ne 'Position') {
 
-          if ( $dimension_val !~ /^\d+$/ ) {
+            if ( $dimension_val !~ /^\d+$/ ) {
 
-            my $err_msg = "TrialUnit${dimension} ($dimension_val): not a positive integer.";
-            $data_for_postrun_href->{'Error'} = 1;
-            $data_for_postrun_href->{'Data'}  = {'Error' => [{"TrialUnit${dimension}" => $err_msg}]};
+              my $err_msg = "TrialUnit${dimension} ($dimension_val): not a positive integer.";
 
-            return $data_for_postrun_href;
+              push(@{$trial_unit_err_aref}, {"TrialUnit${dimension}"=> $err_msg});
+              $trial_unit_err = 1;
+            }
+          }
+
+          push(@dimension_val_list, $dimension_val);
+          push(@dimension_sql_list, "TrialUnit${dimension}=?");
+          push(@user_dimension_list, $dimension);
+
+          $self->logger->debug("Read cell: $dimension -> $dimension_val ");
+        }
+      }
+
+      if (lc($dimension) eq lc('EntryId')) {
+
+        my $entry_id_val = $query->param('TrialUnitEntryId');
+
+        if (length($entry_id_val) > 0) {
+
+          if ($force == 0) {
+
+            my $entry_id_sql = 'SELECT TrialUnitId FROM trialunit WHERE TrialId=? AND TrialUnitEntryId=?';
+            
+            $self->logger->debug("Read cell: $entry_id_sql ");
+            my ($r_tu_id_err, $db_trialunit_id) = read_cell($dbh_k_write, $entry_id_sql, [$trial_id, $entry_id_val]);
+
+            if ($r_tu_id_err) {
+
+              my $err_msg = "Unexpected Error.";
+              $data_for_postrun_href->{'Error'} = 1;
+              $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+              return $data_for_postrun_href;
+            }
+
+            if (length($db_trialunit_id) > 0) {
+
+              my $err_msg = "TrialUnitEntryId ($entry_id_val) is already used.";
+
+              push(@{$trial_unit_err_aref}, {'TrialUnitEntryId' => $err_msg});
+              $trial_unit_err = 1;
+            }
           }
         }
+        else {
 
-        push(@dimension_val_list, $dimension_val);
-        push(@dimension_sql_list, "TrialUnit${dimension}=?");
-        push(@user_dimension_list, $dimension);
+          my $err_msg = "TrialUnitEntryId is missing while EntryId is defined.";
+
+          push(@{$trial_unit_err_aref}, {"TrialUnitEntryId" => $err_msg});
+          $trial_unit_err = 1;
+        }
       }
     }
 
-    if (lc($dimension) eq lc('EntryId')) {
+    if ($dimension_provided == 0) {
 
-      my $entry_id_val = $query->param('TrialUnitEntryId');
+      my $err_msg = "No dimension value provided.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
-      if (length($entry_id_val) > 0) {
-
-        if ($force == 0) {
-
-          my $entry_id_sql = 'SELECT TrialUnitId FROM trialunit WHERE TrialId=? AND TrialUnitEntryId=?';
-
-          my ($r_tu_id_err, $db_trialunit_id) = read_cell($dbh_k_write, $entry_id_sql, [$trial_id, $entry_id_val]);
-
-          if ($r_tu_id_err) {
-
-            my $err_msg = "Unexpected Error.";
-            $data_for_postrun_href->{'Error'} = 1;
-            $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-            return $data_for_postrun_href;
-          }
-
-          if (length($db_trialunit_id) > 0) {
-
-            my $err_msg = "TrialUnitEntryId ($entry_id_val) is already used.";
-            $data_for_postrun_href->{'Error'} = 1;
-            $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-            return $data_for_postrun_href;
-          }
-        }
-      }
-      else {
-
-        my $err_msg = "TrialUnitEntryId is missing while EntryId is defined.";
-        $data_for_postrun_href->{'Error'} = 1;
-        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-        return $data_for_postrun_href;
-      }
+      return $data_for_postrun_href;
     }
   }
-
-  if ($dimension_provided == 0) {
-
-    my $err_msg = "No dimension value provided.";
+  else {
     $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
+    $data_for_postrun_href->{'Data'}  = {'Error' => $trial_unit_err_aref};
     return $data_for_postrun_href;
   }
+  
 
   $sql = 'SELECT TrialUnitId FROM trialunit WHERE TrialId=? AND ' . join(' AND ', @dimension_sql_list);
+  $self->logger->debug("Read cell: $sql $trial_unit_err");
+
 
   my ($r_tu_id_err, $db_trialunit_id) = read_cell($dbh_k_write, $sql, [$trial_id, @dimension_val_list]);
 
@@ -1693,10 +1656,12 @@ sub add_trial_unit_runmode {
 
     my $err_msg = "Dimension (" . join(',', @user_dimension_list) . ") value (" . join(',', @dimension_val_list) . '): ';
     $err_msg   .= 'already used.';
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
-    return $data_for_postrun_href;
+    foreach my $dim_name (@user_dimension_list) {
+      push(@{$trial_unit_err_aref}, {"TrialUnit${dim_name}" => $err_msg});
+    }
+    
+    $trial_unit_err = 1;
   }
 
   my $trialunit_info_xml  = read_file($trialunit_info_xml_file);
@@ -1706,6 +1671,9 @@ sub add_trial_unit_runmode {
 
   my @geno_id_list;
   $sql = '';
+
+  my $specimen_count = 0;
+
   for my $trialunitspecimen (@{$trialunit_info_aref}) {
 
     my $specimen_id = $trialunitspecimen->{'SpecimenId'};
@@ -1723,10 +1691,9 @@ sub add_trial_unit_runmode {
     if (defined $uniq_spec_href->{"${specimen_id}_${spec_num}"}) {
 
       my $err_msg   = "Specimen ($specimen_id, $spec_num): duplicate.";
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-      return $data_for_postrun_href;
+      
+      push(@{$trial_unit_err_aref}, {"TrialUnitSpecimen${specimen_count}Specimen" => $err_msg});
+      $trial_unit_err = 1;
     }
     else {
 
@@ -1743,10 +1710,10 @@ sub add_trial_unit_runmode {
     if (scalar(@geno_id) == 0) {
 
       my $err_msg = "SpecimenId ($specimen_id) does not exist.";
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
-      return $data_for_postrun_href;
+      push(@{$trial_unit_err_aref}, {"TrialUnitSpecimen${specimen_count}Specimen" => $err_msg});
+      $trial_unit_err = 1;
+
     }
 
     my $item_id = undef;
@@ -1763,10 +1730,9 @@ sub add_trial_unit_runmode {
       if (!$item_existence) {
 
         my $err_msg = "ItemId ($item_id) does not exist.";
-        $data_for_postrun_href->{'Error'} = 1;
-        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
-        return $data_for_postrun_href;
+        push(@{$trial_unit_err_aref}, {"TrialUnitSpecimen${specimen_count}ItemId" => $err_msg});
+        $trial_unit_err = 1;
       }
     }
 
@@ -1777,10 +1743,9 @@ sub add_trial_unit_runmode {
     if (length($plant_date) > 0 && (!($plant_date =~ /\d{4}\-\d{2}\-\d{2}/))) {
 
       my $err_msg = "PlantDate ($plant_date) is not an acceptable date: yyyy-mm-dd";
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
-      return $data_for_postrun_href;
+      push(@{$trial_unit_err_aref}, {"TrialUnitSpecimen${specimen_count}PlantDate" => $err_msg});
+      $trial_unit_err = 1;
     }
 
     my $harvest_date = $trialunitspecimen->{'HarvestDate'};
@@ -1788,10 +1753,9 @@ sub add_trial_unit_runmode {
     if (length($harvest_date) > 0 && (!($harvest_date =~ /\d{4}\-\d{2}\-\d{2}/))) {
 
       my $err_msg = "HarvestDate ($harvest_date) is not an acceptable date: yyyy-mm-dd";
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
-      return $data_for_postrun_href;
+      push(@{$trial_unit_err_aref}, {"TrialUnitSpecimen${specimen_count}HarvestDate" => $err_msg});
+      $trial_unit_err = 1;
     }
 
     my $has_died = $trialunitspecimen->{'HasDied'};
@@ -1799,11 +1763,12 @@ sub add_trial_unit_runmode {
     if (length($has_died) > 0 && (!($has_died =~ /^[0|1]$/))) {
 
       my $err_msg = "HasDied ($has_died) can be either 1 or 0 only.";
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
-      return $data_for_postrun_href;
+      push(@{$trial_unit_err_aref}, {"TrialUnitSpecimen${specimen_count}HasDied" => $err_msg});
+      $trial_unit_err = 1;
     }
+
+    $specimen_count++;
   }
 
   my ($is_trial_ok, $trouble_trial_id_aref) = check_permission($dbh_k_write, 'trial', 'TrialId',
@@ -1835,6 +1800,44 @@ sub add_trial_unit_runmode {
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $perm_err_msg}]};
 
+    return $data_for_postrun_href;
+  }
+  
+  # Validate virtual column for factor
+  my ( $vcol_missing_err, $vcol_missing_msg ) = check_missing_value($vcol_param_data);
+
+  if ($vcol_missing_err) {
+
+    $vcol_missing_msg = $vcol_missing_msg . ' missing';
+    
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $vcol_missing_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my ( $vcol_maxlen_err, $vcol_maxlen_msg ) = check_maxlen( $vcol_param_data_maxlen, $vcol_len_info );
+
+  if ($vcol_maxlen_err) {
+
+    $vcol_maxlen_msg = $vcol_maxlen_msg . ' longer than maximum length.';
+    
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $vcol_maxlen_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my ($vcol_error, $vcol_error_aref) = validate_all_factor_input($pre_validate_vcol);
+
+  if ($vcol_error) {
+    push(@{$trial_unit_err_aref}, @{$vcol_error_aref});
+    $trial_unit_err = 1;
+  }
+
+   if ($trial_unit_err != 0) {
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => $trial_unit_err_aref};
     return $data_for_postrun_href;
   }
 
@@ -1983,6 +1986,24 @@ sub add_trial_unit_runmode {
     }
   }
 
+  #add trial treatment
+  if (length($query->param('TreatmentId')) > 0) {
+    $sql = "INSERT INTO trialunittreatment (TreatmentId, TrialUnitId) ";
+    $sql .= "VALUES (?, ?)";
+    my $sth = $dbh_k_write->prepare($sql);
+    $sth->execute($treatment_id, $trial_unit_id);
+
+    if ($dbh_k_write->err()) {
+
+      $self->logger->debug("SQL Error:" . $dbh_k_write->errstr());
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => "Unexpected error. $trial_unit_id $treatment_id"}]};
+
+      return $data_for_postrun_href;
+    }
+    $sth->finish();
+  }
+
   $dbh_k_write->disconnect();
 
   my $info_msg_aref  = [{'Message' => "TrialUnit ($trial_unit_id) has been added successfully."}];
@@ -1996,6 +2017,7 @@ sub add_trial_unit_runmode {
 
   return $data_for_postrun_href;
 }
+
 
 
 sub add_trial_unit_bulk_runmode {
@@ -2027,6 +2049,11 @@ sub add_trial_unit_bulk_runmode {
   my $query = $self->query();
 
   my $data_for_postrun_href = {};
+
+  my $per_trialunit_error = {};
+
+  my $trial_unit_err_aref = [];
+  my $trial_unit_err = 0;
 
   my $trial_id = $self->param('id');
 
@@ -2075,8 +2102,6 @@ sub add_trial_unit_bulk_runmode {
     return $data_for_postrun_href;
   }
 
-  # Issue9468
-  # my $dbh_k_write   = connect_kdb_write();
   my $dbh_k_write   = connect_kdb_write(1);
   my $dbh_gis_write = connect_gis_write();
 
@@ -2164,6 +2189,8 @@ sub add_trial_unit_bulk_runmode {
 
     my $uniq_entry_id_href = {};
     my $uniq_coord_href    = {};
+
+    my $trialunit_count = 0;
 
     for my $trialunit (@{$trialunit_info_aref}) {
 
@@ -2509,6 +2536,14 @@ sub add_trial_unit_bulk_runmode {
         $trialunit->{'trialunitspecimen'} = $tu_spec_aref;
       }
 
+      if (ref($trialunit->{'trialunitfactor'}) eq 'HASH') {
+        my $tu_factor_href = $trialunit->{'trialunitfactor'};
+        my $tu_factor_aref = [];
+        push(@{$tu_factor_aref}, $tu_factor_href);
+        $trialunit->{'trialunitfactor'} = $tu_factor_aref;
+
+      }
+
       my $trialunit_location = '';
 
       if (length($trialunit->{'trialunitlocation'}) > 0) {
@@ -2656,59 +2691,97 @@ sub add_trial_unit_bulk_runmode {
       }
     }
 
-    my $trialunit_factor_lookup = {};
-    for my $trialunit_rec (@{$trialunit_info_aref}) {
-      my $factor_id    = $trialunit_rec->{'trialunitfactor'}->{'FactorId'};
-      my $factor_value = $trialunit_rec->{'trialunitfactor'}->{'FactorValue'};
-
-      $trialunit_factor_lookup->{$factor_id} = $factor_value;
-    }
-
     my $dbh_k_read = connect_kdb_read();
 
-    $sql  = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength ";
-    $sql .= "FROM factor ";
-    $sql .= "WHERE TableNameOfFactor='trialunitfactor'";
+    $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength, FactorValidRuleErrMsg, FactorValidRule  ";
+    $sql   .= "FROM factor ";
+    $sql   .= "WHERE TableNameOfFactor='trialunitfactor'";
 
     my $vcol_data = $dbh_k_read->selectall_hashref($sql, 'FactorId');
 
     my $vcol_param_data = {};
     my $vcol_len_info   = {};
     my $vcol_param_data_maxlen = {};
+    my $pre_validate_vcol = {};
 
     for my $vcol_id (keys(%{$vcol_data})) {
 
       my $vcol_param_name = "VCol_${vcol_id}";
-      my $vcol_value      = $trialunit_factor_lookup->{$vcol_id} ;
 
-      if ($vcol_data->{$vcol_id}->{'CanFactorHaveNull'} != 1) {
-
-        $vcol_param_data->{$vcol_param_name} = $vcol_value;
-      }
       $vcol_len_info->{$vcol_param_name} = $vcol_data->{$vcol_id}->{'FactorValueMaxLength'};
-      $vcol_param_data_maxlen->{$vcol_param_name} = $vcol_value;
+
+      $pre_validate_vcol->{$vcol_param_name} = {
+        'Rule' => $vcol_data->{$vcol_id}->{'FactorValidRule'},
+        'FactorId'=> $vcol_id,
+        'RuleErrorMsg'=> $vcol_data->{$vcol_id}->{'FactorValidRuleErrMsg'},
+        'CanFactorHaveNull' => $vcol_data->{$vcol_id}->{'CanFactorHaveNull'}
+      };
+    }
+    #based on the vcol object above, we apply the values based on the input and try to validate and return an error per row.
+    #this should be improved so that all trial unit errors are returned at once.
+
+     for my $trialunit (@{$trialunit_info_aref}) {
+
+      my $factor_aref = $trialunit->{'trialunitfactor'};
+     
+      my $vcol_error_aref = [];
+    
+      for my $factor_href (@{$factor_aref}) {
+
+        my $vcol_id = $factor_href->{'FactorId'};
+        my $vcol_value = $factor_href->{'FactorValue'};
+
+        my $vcol_param_name = "VCol_${vcol_id}";
+
+        $self->logger->debug("$vcol_param_name => $vcol_value");
+
+        $vcol_len_info->{$vcol_param_name} = $vcol_data->{$vcol_id}->{'FactorValueMaxLength'};
+        $vcol_param_data_maxlen->{$vcol_param_name} = $vcol_value;
+
+        if ($vcol_data->{$vcol_id}->{'CanFactorHaveNull'} != 1) {
+          $vcol_param_data->{$vcol_param_name} = $vcol_value;
+        }
+
+        $pre_validate_vcol->{$vcol_param_name}->{'Value'} = $vcol_value;
+      }
+
+      my ($vcol_missing_err, $vcol_missing_href) = check_missing_href( $vcol_param_data );
+
+      if ($vcol_missing_err) {
+
+        push(@{$trial_unit_err_aref},$vcol_missing_href);
+        $trial_unit_err = 1;
+      }
+
+      my ($vcol_maxlen_err, $vcol_maxlen_href) = check_maxlen_href($vcol_param_data_maxlen, $vcol_len_info);
+
+      if ($vcol_maxlen_err) {
+
+        push(@{$trial_unit_err_aref},$vcol_maxlen_href);
+        $trial_unit_err = 1;
+      }
+
+      my ($vcol_error, $vcol_error_aref) = validate_all_factor_input($pre_validate_vcol);
+
+      if ($vcol_error) {
+
+        push(@{$trial_unit_err_aref}, @{$vcol_error_aref});
+        $trial_unit_err = 1;
+      }
+
+      if ($trial_unit_err) {
+
+        push(@{$trial_unit_err_aref}, {'Message' => "VCol Errors in bulk add."});
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => $trial_unit_err_aref};
+
+        return 1;
+      }
+
     }
 
-    my ($vcol_missing_err, $vcol_missing_href) = check_missing_href( $vcol_param_data );
 
-    if ($vcol_missing_err) {
-
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [$vcol_missing_href]};
-
-      return $data_for_postrun_href;
-    }
-
-    my ($vcol_maxlen_err, $vcol_maxlen_href) = check_maxlen_href($vcol_param_data_maxlen, $vcol_len_info);
-
-    if ($vcol_maxlen_err) {
-
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [$vcol_maxlen_href]};
-
-      return $data_for_postrun_href;
-    }
-
+  
     $dbh_k_read->disconnect();
 
     # optimisation starts from here. the optimisation will use TrialUnitBarcode as the key for mapping
@@ -2737,8 +2810,6 @@ sub add_trial_unit_bulk_runmode {
     }
 
     my $bulk_sql = 'INSERT INTO trialunit ';
-    # Issue9468
-    # $bulk_sql   .= '(TrialId,TreatmentId,SourceTrialUnitId,ReplicateNumber,TrialUnitBarcode,TrialUnitNote,SampleSupplierID,';
     $bulk_sql   .= '(TrialId,SourceTrialUnitId,ReplicateNumber,TrialUnitBarcode,TrialUnitNote,SampleSupplierID,';
     $bulk_sql   .= join(',', @dimension_field_list) . ') VALUES ';
 
@@ -3133,15 +3204,23 @@ sub add_trial_unit_bulk_runmode {
     my @tu_factor_sql_list;
 
     for my $trialunit (@{$trialunit_info_aref}) {
+
       my $trialunit_id = $trialunit->{'TrialUnitId'};
 
-      my $factor_id = $trialunit->{'trialunitfactor'}->{'FactorId'};
-      my $factor_value = $trialunit->{'trialunitfactor'}->{'FactorValue'};
+      my $factor_aref = $trialunit->{'trialunitfactor'};
 
-      if (length($factor_value) > 0) {
-        my $tut_sql_str = qq|(${trialunit_id}, ${factor_id}, '${factor_value}')|;
-        push(@tu_factor_sql_list, $tut_sql_str);
+      for my $factor_href (@{$factor_aref}) {
+        my $factor_id = $factor_href->{'FactorId'};
+        my $factor_value = $factor_href->{'FactorValue'};
+
+        if (length($factor_value) > 0) {
+          my $tut_sql_str = qq|(${trialunit_id}, ${factor_id}, '${factor_value}')|;
+          push(@tu_factor_sql_list, $tut_sql_str);
+        }
       }
+     
+
+     
     }
 
     if (scalar(@tu_factor_sql_list) > 0) {
@@ -3548,8 +3627,6 @@ sub update_site_runmode {
       if ($sdate_err) {
 
         my $err_msg = "$sdate_msg not date/time.";
-        #$data_for_postrun_href->{'Error'} = 1;
-        #$data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
         push(@{$site_err_aref}, {'Message' => $err_msg});
         $site_err = 1;
@@ -3580,8 +3657,6 @@ sub update_site_runmode {
       if ($edate_err) {
 
         my $err_msg = "$edate_msg not date/time.";
-        #$data_for_postrun_href->{'Error'} = 1;
-        #$data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
         push(@{$site_err_aref}, {'Message' => $err_msg});
         $site_err = 1;
@@ -3633,6 +3708,7 @@ my $vcol_data = $dbh_k_read->selectall_hashref($sql, 'FactorId');
       'Value'=> $vcol_value,
       'FactorId'=> $vcol_id,
       'RuleErrorMsg'=> $vcol_data->{$vcol_id}->{'FactorValidRuleErrMsg'},
+      'CanFactorHaveNull' => $vcol_data->{$vcol_id}->{'CanFactorHaveNull'}
     };
   }
 
@@ -3663,9 +3739,7 @@ my $vcol_data = $dbh_k_read->selectall_hashref($sql, 'FactorId');
   if (!$sitetype_existence) {
 
     my $err_msg = "SiteType ($sitetype_id) does not exist.";
-    #$data_for_postrun_href->{'Error'} = 1;
-    #$data_for_postrun_href->{'Data'}  = {'Error' => [{'SiteTypeId' => $err_msg}]};
-
+ 
     push(@{$site_err_aref}, {'SiteTypeId' => $err_msg});
     $site_err = 1;
   }
@@ -3675,8 +3749,6 @@ my $vcol_data = $dbh_k_read->selectall_hashref($sql, 'FactorId');
   if (!$cur_manager_existence) {
 
     my $err_msg = "CurrentManager ($cur_manager_id) does not exist.";
-    #$data_for_postrun_href->{'Error'} = 1;
-    #$data_for_postrun_href->{'Data'}  = {'Error' => [{'CurrentSiteManagerId' => $err_msg}]};
 
     push(@{$site_err_aref}, {'SiteTypeId' => $err_msg});
     $site_err = 1;
@@ -3684,12 +3756,12 @@ my $vcol_data = $dbh_k_read->selectall_hashref($sql, 'FactorId');
 
   #prevalidate values to be finished in later version
 
-  #my ($vcol_error, $vcol_error_aref) = validate_all_factor_input($pre_validate_vcol);
+  my ($vcol_error, $vcol_error_aref) = validate_all_factor_input($pre_validate_vcol);
 
-  #if ($vcol_error) {
-  #  push(@{$site_err_aref}, @{$vcol_error_aref});
-  #  $site_err = 1;
-  #}
+  if ($vcol_error) {
+    push(@{$site_err_aref}, @{$vcol_error_aref});
+    $site_err = 1;
+  }
 
   if ($site_err != 0) {
     $data_for_postrun_href->{'Error'} = 1;
@@ -5510,11 +5582,7 @@ sub update_trial_runmode {
       if ($filter_trialname eq $trial_name && $trial_id == $filter_trialid) {
 
           my $err_msg = "Duplicate ($trial_name) cannot be used.";
-          #$data_for_postrun_href->{'Error'} = 1;
-          #$data_for_postrun_href->{'Data'}  = {'Error' => [{'TrialName' => $err_msg}]};
-
-          #return $data_for_postrun_href;
-
+          
           push(@{$trial_err_aref}, {'TrialName' => $err_msg});
           $trial_err = 1;
       }
@@ -5541,10 +5609,7 @@ sub update_trial_runmode {
       if (!$project_existence) {
 
         my $err_msg = "Project ($project_id) does not exist.";
-        #$data_for_postrun_href->{'Error'} = 1;
-        #$data_for_postrun_href->{'Data'}  = {'Error' => [{'ProjectId' => $err_msg}]};
 
-        #return $data_for_postrun_href;
         push(@{$trial_err_aref}, {'ProjectId' => $err_msg});
         $trial_err = 1;
       }
@@ -5614,10 +5679,7 @@ sub update_trial_runmode {
   if (!type_existence($dbh_k_read, 'season', $season_id)) {
 
     my $err_msg = "Season ($season_id) does not exist.";
-    #$data_for_postrun_href->{'Error'} = 1;
-    #$data_for_postrun_href->{'Data'}  = {'Error' => [{'SeasonId' => $err_msg}]};
 
-    #return $data_for_postrun_href;
     push(@{$trial_err_aref}, {'SeasonId' => $err_msg});
     $trial_err = 1;
   }
@@ -5676,6 +5738,7 @@ sub update_trial_runmode {
       'Value'=> $vcol_value,
       'FactorId'=> $vcol_id,
       'RuleErrorMsg'=> $vcol_data->{$vcol_id}->{'FactorValidRuleErrMsg'},
+      'CanFactorHaveNull' => $vcol_data->{$vcol_id}->{'CanFactorHaveNull'}
     };
   }
 
@@ -5704,10 +5767,7 @@ sub update_trial_runmode {
     if (!record_existence($dbh_k_read, 'workflow', 'WorkflowId', $workflow_id)) {
 
       my $err_msg = "CurrentWorkflowId ($workflow_id) does not exist.";
-      #$data_for_postrun_href->{'Error'} = 1;
-      #$data_for_postrun_href->{'Data'}  = {'Error' => [{'CurrentWorkflowId' => $err_msg}]};
 
-      #return $data_for_postrun_href;
       push(@{$trial_err_aref}, {'CurrentWorkflowId' => $err_msg});
       $trial_err = 1;
     }
@@ -5717,10 +5777,6 @@ sub update_trial_runmode {
 
   if ($date_err) {
 
-    #$data_for_postrun_href->{'Error'} = 1;
-    #$data_for_postrun_href->{'Data'}  = {'Error' => [$date_href]};
-
-    #return $data_for_postrun_href;
     push(@{$trial_err_aref}, $date_href);
     $trial_err = 1;
   }
@@ -5731,10 +5787,6 @@ sub update_trial_runmode {
 
     if ($date_err) {
 
-      #$data_for_postrun_href->{'Error'} = 1;
-      #$data_for_postrun_href->{'Data'}  = {'Error' => [$date_href]};
-
-      #return $data_for_postrun_href;
       push(@{$trial_err_aref}, $date_href);
       $trial_err = 1;
     }
@@ -5749,10 +5801,7 @@ sub update_trial_runmode {
   if (!$site_existence) {
 
     my $err_msg = "Site ($site_id) does not exist.";
-    #$data_for_postrun_href->{'Error'} = 1;
-    #$data_for_postrun_href->{'Data'}  = {'Error' => [{'SiteId' => $err_msg}]};
 
-    #return $data_for_postrun_href;
     push(@{$trial_err_aref}, {'SiteId' => $err_msg});
     $trial_err = 1;
   }
@@ -5762,10 +5811,7 @@ sub update_trial_runmode {
   if (!$trialtype_existence) {
 
     my $err_msg = "TrialType ($trial_type_id) does not exist.";
-    #$data_for_postrun_href->{'Error'} = 1;
-    #$data_for_postrun_href->{'Data'}  = {'Error' => [{'TrialTypeId' => $err_msg}]};
 
-    #return $data_for_postrun_href;
     push(@{$trial_err_aref}, {'TrialTypeId' => $err_msg});
     $trial_err = 1;
   }
@@ -5775,10 +5821,7 @@ sub update_trial_runmode {
   if (!$design_type_existence) {
 
     my $err_msg = "DesignType ($design_type_id) does not exist.";
-    #$data_for_postrun_href->{'Error'} = 1;
-    #$data_for_postrun_href->{'Data'}  = {'Error' => [{'DesignTypeId' => $err_msg}]};
-
-    #return $data_for_postrun_href;
+    
     push(@{$trial_err_aref}, {'DesignTypeId' => $err_msg});
     $trial_err = 1;
   }
@@ -5788,10 +5831,7 @@ sub update_trial_runmode {
   if (!$trial_manager_existence) {
 
     my $err_msg = "TrialManager ($trial_manager_id) does not exist.";
-    #$data_for_postrun_href->{'Error'} = 1;
-    #$data_for_postrun_href->{'Data'}  = {'Error' => [{'TrialManagerId' => $err_msg}]};
 
-    #return $data_for_postrun_href;
     push(@{$trial_err_aref}, {'TrialManagerId' => $err_msg});
     $trial_err = 1;
   }
@@ -5800,12 +5840,12 @@ sub update_trial_runmode {
 
   #prevalidate values to be finished in later version
 
-  #my ($vcol_error, $vcol_error_aref) = validate_all_factor_input($pre_validate_vcol);
+  my ($vcol_error, $vcol_error_aref) = validate_all_factor_input($pre_validate_vcol);
 
-  #if ($vcol_error) {
-  #  push(@{$trial_err_aref}, @{$vcol_error_aref});
-  #  $trial_err = 1;
-  #}
+  if ($vcol_error) {
+    push(@{$trial_err_aref}, @{$vcol_error_aref});
+    $trial_err = 1;
+  }
 
   if ($trial_err != 0) {
     $data_for_postrun_href->{'Error'} = 1;
@@ -6426,6 +6466,8 @@ sub update_trial_unit_runmode {
   my $query         = $self->query();
 
   my $data_for_postrun_href = {};
+  my $trial_unit_err_aref = [];
+  my $trial_unit_err = 0;
 
   # Generic required static field checking
 
@@ -6449,8 +6491,6 @@ sub update_trial_unit_runmode {
 
   my $dbh_k_write = connect_kdb_write();
 
-  # Issue9468
-  # my $read_tr_u_sql    =   'SELECT TrialId, SourceTrialUnitId, SampleSupplierId, TrialUnitNote, TrialUnitBarcode, TreatmentId ';
   my $read_tr_u_sql    =   'SELECT TrialId, SourceTrialUnitId, SampleSupplierId, TrialUnitNote, TrialUnitBarcode ';
      $read_tr_u_sql   .=   'FROM trialunit WHERE TrialUnitId=? ';
 
@@ -6491,7 +6531,6 @@ sub update_trial_unit_runmode {
   $sample_supplier_id  =  $trial_u_df_val_data->[0]->{'SampleSupplierId'};
   $trial_unit_comment  =  $trial_u_df_val_data->[0]->{'TrialUnitNote'};
   $barcode             =  $trial_u_df_val_data->[0]->{'TrialUnitBarcode'};
-  # $treatment_id        =  $trial_u_df_val_data->[0]->{'TreatmentId'};
 
 
   if (length($trial_id) == 0) {
@@ -6582,11 +6621,10 @@ sub update_trial_unit_runmode {
 
     if (length($db_trial_unit_id) > 0) {
 
-      my $err_msg = "TrialUnitBarcode ($barcode) already exists.";
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'TrialUnitBarcode' => $err_msg}]};
-
-      return $data_for_postrun_href;
+      my $err_msg = "TrialUnitBarcode ($barcode): already exists.";
+      
+      push(@{$trial_unit_err_aref}, {'TrialUnitBarcode' => $err_msg});
+      $trial_unit_err = 1;
     }
   }
 
@@ -6594,11 +6632,10 @@ sub update_trial_unit_runmode {
 
     if (!record_existence($dbh_k_write, 'trialunit', 'TrialUnitId', $src_trial_unit_id)) {
 
-      my $err_msg = "SourceTrialUnitId ($src_trial_unit_id): not found.";
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+      my $err_msg = "SourceTrialUnitId ($src_trial_unit_id) not found.";
 
-      return $data_for_postrun_href;
+      push(@{$trial_unit_err_aref}, {'SourceTrialUnitId' => $err_msg});
+      $trial_unit_err = 1;
     }
   }
 
@@ -6648,10 +6685,9 @@ sub update_trial_unit_runmode {
           if ( $dimension_val !~ /^\d+$/ ) {
 
             my $err_msg = "TrialUnit${dimension} ($dimension_val): not a positive integer.";
-            $data_for_postrun_href->{'Error'} = 1;
-            $data_for_postrun_href->{'Data'}  = {'Error' => [{"TrialUnit${dimension}" => $err_msg}]};
 
-            return $data_for_postrun_href;
+              push(@{$trial_unit_err_aref}, {"TrialUnit${dimension}"=> $err_msg});
+              $trial_unit_err = 1;
           }
         }
 
@@ -6673,7 +6709,7 @@ sub update_trial_unit_runmode {
 
   my $dbh_k_read = connect_kdb_read();
 
-  $sql    = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength ";
+  my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength, FactorValidRuleErrMsg, FactorValidRule  ";
   $sql   .= "FROM factor ";
   $sql   .= "WHERE TableNameOfFactor='trialunitfactor'";
 
@@ -6682,16 +6718,27 @@ sub update_trial_unit_runmode {
   my $vcol_param_data = {};
   my $vcol_len_info   = {};
   my $vcol_param_data_maxlen = {};
+  my $pre_validate_vcol = {};
+
   for my $vcol_id (keys(%{$vcol_data})) {
 
     my $vcol_param_name = "VCol_${vcol_id}";
-    my $vcol_value      = $query->param($vcol_param_name);
+    my $vcol_value      = $query->param($vcol_param_name) ;
     if ($vcol_data->{$vcol_id}->{'CanFactorHaveNull'} != 1) {
 
       $vcol_param_data->{$vcol_param_name} = $vcol_value;
     }
+
     $vcol_len_info->{$vcol_param_name} = $vcol_data->{$vcol_id}->{'FactorValueMaxLength'};
     $vcol_param_data_maxlen->{$vcol_param_name} = $vcol_value;
+
+    $pre_validate_vcol->{$vcol_param_name} = {
+      'Rule' => $vcol_data->{$vcol_id}->{'FactorValidRule'},
+      'Value'=> $vcol_value,
+      'FactorId'=> $vcol_id,
+      'RuleErrorMsg'=> $vcol_data->{$vcol_id}->{'FactorValidRuleErrMsg'},
+      'CanFactorHaveNull' => $vcol_data->{$vcol_id}->{'CanFactorHaveNull'}
+    };
   }
 
   my ($vcol_missing_err, $vcol_missing_href) = check_missing_href( $vcol_param_data );
@@ -6731,11 +6778,27 @@ sub update_trial_unit_runmode {
 
     my $err_msg = "Dimension (" . join(',', @user_dimension_list) . ") value (" . join(',', @dimension_val_list) . '): ';
     $err_msg   .= 'already used.';
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
+    foreach my $dim_name (@user_dimension_list) {
+      push(@{$trial_unit_err_aref}, {"TrialUnit${dim_name}" => $err_msg});
+    }
+    
+    $trial_unit_err = 1;
+  }
+
+  my ($vcol_error, $vcol_error_aref) = validate_all_factor_input($pre_validate_vcol);
+
+  if ($vcol_error) {
+    push(@{$trial_unit_err_aref}, @{$vcol_error_aref});
+    $trial_unit_err = 1;
+  }
+
+   if ($trial_unit_err != 0) {
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => $trial_unit_err_aref};
     return $data_for_postrun_href;
   }
+
 
   $self->logger->debug("Parameter list: " . join(',', ($sample_supplier_id,
                                                       $replicate_number, $barcode, $trial_unit_comment,
@@ -7010,6 +7073,10 @@ sub update_trial_unit_bulk_runmode {
   }
 
   my $data_for_postrun_href = {};
+  my $per_trialunit_error = {};
+  my $trial_unit_err_aref = [];
+  my $trial_unit_err = 0;
+
 
   # Validate XML file
   my $trialunit_info_xml_file = $self->authen->get_upload_file();
@@ -7294,6 +7361,15 @@ sub update_trial_unit_bulk_runmode {
         $trialunit->{trialunitspecimen} = $tu_specimen_aref;
       }
 
+      my $tu_factor_aref = $trialunit->{trialunitfactor};
+      if (!defined($tu_factor_aref)) { 
+        next; # TODO: can we allow this ?
+      } elsif (ref $tu_factor_aref ne "ARRAY") {
+        $tu_factor_aref = [$tu_factor_aref];
+        $trialunit->{trialunitfactor} = $tu_factor_aref;
+      }
+ 
+
       my @geno_id_list;
       my $uniq_spec_href = {};
       for my $trialunitspecimen (@$tu_specimen_aref) {
@@ -7375,58 +7451,104 @@ sub update_trial_unit_bulk_runmode {
       }
     }
 
-    my $trialunit_factor_lookup = {};
-    for my $trialunit_rec (@{$trialunit_info_aref}) {
-      my $factor_id    = $trialunit_rec->{'trialunitfactor'}->{'FactorId'};
-      my $factor_value = $trialunit_rec->{'trialunitfactor'}->{'FactorValue'};
-
-      $trialunit_factor_lookup->{$factor_id} = $factor_value;
-    }
-
     my $dbh_k_read = connect_kdb_read();
 
-    $sql  = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength ";
-    $sql .= "FROM factor ";
-    $sql .= "WHERE TableNameOfFactor='trialunitfactor'";
+    $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength, FactorValidRuleErrMsg, FactorValidRule  ";
+    $sql   .= "FROM factor ";
+    $sql   .= "WHERE TableNameOfFactor='trialunitfactor'";
 
     my $vcol_data = $dbh_k_read->selectall_hashref($sql, 'FactorId');
 
     my $vcol_param_data = {};
     my $vcol_len_info   = {};
     my $vcol_param_data_maxlen = {};
+    my $pre_validate_vcol = {};
 
     for my $vcol_id (keys(%{$vcol_data})) {
 
       my $vcol_param_name = "VCol_${vcol_id}";
-      my $vcol_value      = $trialunit_factor_lookup->{$vcol_id} ;
-
-      if ($vcol_data->{$vcol_id}->{'CanFactorHaveNull'} != 1) {
-
-        $vcol_param_data->{$vcol_param_name} = $vcol_value;
-      }
+      
       $vcol_len_info->{$vcol_param_name} = $vcol_data->{$vcol_id}->{'FactorValueMaxLength'};
-      $vcol_param_data_maxlen->{$vcol_param_name} = $vcol_value;
+
+      $pre_validate_vcol->{$vcol_param_name} = {
+        'Rule' => $vcol_data->{$vcol_id}->{'FactorValidRule'},
+        'FactorId'=> $vcol_id,
+        'RuleErrorMsg'=> $vcol_data->{$vcol_id}->{'FactorValidRuleErrMsg'},
+        'CanFactorHaveNull' => $vcol_data->{$vcol_id}->{'CanFactorHaveNull'}
+      };
     }
 
-    my ($vcol_missing_err, $vcol_missing_href) = check_missing_href( $vcol_param_data );
+     #based on the vcol object above, we apply the values based on the input and try to validate and return an error per row.
+    #this should be improved so that all trial unit errors are returned at once.
 
-    if ($vcol_missing_err) {
+     for my $trialunit (@{$trialunit_info_aref}) {
 
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [$vcol_missing_href]};
+      my $factor_aref = $trialunit->{'trialunitfactor'};
+     
+      my $vcol_error_aref = [];
+    
+      for my $factor_href (@{$factor_aref}) {
 
-      return $data_for_postrun_href;
+        my $vcol_id = $factor_href->{'FactorId'};
+        my $vcol_value = $factor_href->{'FactorValue'};
+
+        my $vcol_param_name = "VCol_${vcol_id}";
+
+        $self->logger->debug("$vcol_param_name -> $vcol_value");
+
+        $vcol_len_info->{$vcol_param_name} = $vcol_data->{$vcol_id}->{'FactorValueMaxLength'};
+        $vcol_param_data_maxlen->{$vcol_param_name} = $vcol_value;
+
+        if ($vcol_data->{$vcol_id}->{'CanFactorHaveNull'} != 1) {
+          $vcol_param_data->{$vcol_param_name} = $vcol_value;
+        }
+
+        $pre_validate_vcol->{$vcol_param_name}->{'Value'} = $vcol_value;
+      }
+
+      my ($vcol_missing_err, $vcol_missing_href) = check_missing_href( $vcol_param_data );
+
+      if ($vcol_missing_err) {
+
+        push(@{$trial_unit_err_aref},$vcol_missing_href);
+        $trial_unit_err = 1;
+      }
+
+      my ($vcol_maxlen_err, $vcol_maxlen_href) = check_maxlen_href($vcol_param_data_maxlen, $vcol_len_info);
+
+      if ($vcol_maxlen_err) {
+
+        push(@{$trial_unit_err_aref},$vcol_maxlen_href);
+        $trial_unit_err = 1;
+      }
+
+      my ($vcol_error, $vcol_error_aref) = validate_all_factor_input($pre_validate_vcol);
+
+      if ($vcol_error) {
+        foreach my $vcol_err_href (@{$vcol_error_aref}) {
+            for my $error_key (keys(%{$vcol_err_href})) {
+
+              $self->logger->debug("$error_key => ". $vcol_err_href->{$error_key});
+
+            }
+
+        }
+
+        push(@{$trial_unit_err_aref}, @{$vcol_error_aref});
+        $trial_unit_err = 1;
+      }
+
+      if ($trial_unit_err) {
+
+        push(@{$trial_unit_err_aref}, {'Message' => "VCol Errors in bulk update."});
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => $trial_unit_err_aref};
+
+        return 1;
+      }
+
     }
 
-    my ($vcol_maxlen_err, $vcol_maxlen_href) = check_maxlen_href($vcol_param_data_maxlen, $vcol_len_info);
-
-    if ($vcol_maxlen_err) {
-
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [$vcol_maxlen_href]};
-
-      return $data_for_postrun_href;
-    }
 
     $dbh_k_read->disconnect();
 
@@ -7745,14 +7867,19 @@ sub update_trial_unit_bulk_runmode {
     for my $trialunit (@{$trialunit_info_aref}) {
       my $trialunit_id = $trialunit->{'TrialUnitId'};
 
-      my $factor_id = $trialunit->{'trialunitfactor'}->{'FactorId'};
-      my $factor_value = $trialunit->{'trialunitfactor'}->{'FactorValue'};
+      my $factor_aref = $trialunit->{'trialunitfactor'};
 
-      if (length($factor_value) > 0) {
-        push(@tu_factor_delete_list, $trialunit_id);
-        my $tut_sql_str = qq|(${trialunit_id}, ${factor_id}, '${factor_value}')|;
-        push(@tu_factor_sql_list, $tut_sql_str);
-      }
+      for my $factor_href (@{$factor_aref}) {
+
+        my $factor_id = $factor_href->{'FactorId'};
+        my $factor_value = $factor_href->{'FactorValue'};
+
+         if (length($factor_value) > 0) {
+            push(@tu_factor_delete_list, $trialunit_id);
+            my $tut_sql_str = qq|(${trialunit_id}, ${factor_id}, '${factor_value}')|;
+            push(@tu_factor_sql_list, $tut_sql_str);
+        }
+      }    
     }
 
     if (scalar(@tu_factor_delete_list) > 0) {
@@ -9427,14 +9554,7 @@ sub list_trial_unit_advanced_runmode {
   $sql =~ s/ORDERINGSTRING/$final_sort_sql/;
 
   if ($pagination == 0) {
-    if (defined $self->param('nperpage')) {
-      $nb_per_page = $self->param('nperpage');
-
-      $sql =~ s/LIMITSTRING/LIMIT  $nb_per_page/;
-    }
-    else {
-      $sql =~ s/LIMITSTRING/LIMIT 50/;
-    }
+    $sql =~ s/LIMITSTRING//;
   }
   else {
     $sql =~ s/LIMITSTRING/$paged_limit_clause/;
@@ -11287,6 +11407,18 @@ sub del_trial_crossing_runmode {
     return $data_for_postrun_href;
   }
 
+  my $crossing_has_measurements = record_existence( $dbh_k_read, 'crossingmeasurement', 'CrossingId', $crossing_id );
+
+  if ($crossing_has_measurements) {
+
+    my $err_msg = "Crossing ($crossing_id): has crossing measurements attached. ";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+
   my $dbh_write = connect_kdb_write();
 
   $self->logger->debug($crossing_id);
@@ -11383,12 +11515,6 @@ sub add_project_runmode {
       my ($sdate_err, $sdate_href) = check_dt_href( {'ProjectStartDate' => $project_sdate} );
 
       if ($sdate_err) {
-
-        #$data_for_postrun_href->{'Error'} = 1;
-        #$data_for_postrun_href->{'Data'}  = {'Error' => [$sdate_href]};
-
-        #return $data_for_postrun_href;
-
         push(@{$project_err_aref}, $sdate_href);
         $project_err = 1;
       }
@@ -11406,12 +11532,6 @@ sub add_project_runmode {
       my ($edate_err, $edate_href) = check_dt_href( {'ProjectEndDate' => $project_edate} );
 
       if ($edate_err) {
-
-        #$data_for_postrun_href->{'Error'} = 1;
-        #$data_for_postrun_href->{'Data'}  = {'Error' => [$edate_href]};
-
-        #return $data_for_postrun_href;
-
         push(@{$project_err_aref}, $edate_href);
         $project_err = 1;
       }
@@ -11467,6 +11587,7 @@ sub add_project_runmode {
       'Value'=> $vcol_value,
       'FactorId'=> $vcol_id,
       'RuleErrorMsg'=> $vcol_data->{$vcol_id}->{'FactorValidRuleErrMsg'},
+      'CanFactorHaveNull' => $vcol_data->{$vcol_id}->{'CanFactorHaveNull'}
     };
   }
 
@@ -11493,10 +11614,6 @@ sub add_project_runmode {
   if (record_existence($dbh_k_read, 'project', 'ProjectName', $project_name)) {
 
     my $err_msg = "ProjectName ($project_name) already exists.";
-    #$data_for_postrun_href->{'Error'} = 1;
-    #$data_for_postrun_href->{'Data'}  = {'Error' => [{'ProjectName' => $err_msg}]};
-
-    #return $data_for_postrun_href;
 
     push(@{$project_err_aref}, {'ProjectName' => $err_msg});
     $project_err = 1;
@@ -11507,11 +11624,7 @@ sub add_project_runmode {
   if (!$projecttype_existence) {
 
     my $err_msg = "TypeId ($projecttype_id) does not exist.";
-    #$data_for_postrun_href->{'Error'} = 1;
-    #$data_for_postrun_href->{'Data'}  = {'Error' => [{'TypeId' => $err_msg}]};
-
-    #return $data_for_postrun_href;
-
+    
     push(@{$project_err_aref}, {'TypeId' => $err_msg});
     $project_err = 1;
   }
@@ -11521,11 +11634,7 @@ sub add_project_runmode {
   if (!$cur_manager_existence) {
 
     my $err_msg = "ProjectManagerId ($cur_manager_id) does not exist.";
-    #$data_for_postrun_href->{'Error'} = 1;
-    #$data_for_postrun_href->{'Data'}  = {'Error' => [{'ProjectManagerId' => $err_msg}]};
-
-    #return $data_for_postrun_href;
-
+    
     push(@{$project_err_aref}, {'ProjectManagerId' => $err_msg});
     $project_err = 1;
   }
@@ -11534,12 +11643,12 @@ sub add_project_runmode {
 
   #check vcol validation
 
-  #my ($vcol_error, $vcol_error_aref) = validate_all_factor_input($pre_validate_vcol);
+  my ($vcol_error, $vcol_error_aref) = validate_all_factor_input($pre_validate_vcol);
 
-  #if ($vcol_error) {
-  #  push(@{$project_err_aref}, @{$vcol_error_aref});
-  #  $project_err = 1;
-  #}
+  if ($vcol_error) {
+    push(@{$project_err_aref}, @{$vcol_error_aref});
+    $project_err = 1;
+  }
 
   if ($project_err != 0) {
     $data_for_postrun_href->{'Error'} = 1;
@@ -11691,8 +11800,6 @@ sub update_project_runmode {
   if (length($db_proj_id) > 0) {
 
     my $err_msg = "ProjectName ($project_name) already exists.";
-    #$data_for_postrun_href->{'Error'} = 1;
-    #$data_for_postrun_href->{'Data'}  = {'Error' => [{'ProjectName' => $err_msg}]};
 
     push(@{$project_err_aref}, {'ProjectName' => $err_msg});
     $project_err = 1;
@@ -11743,11 +11850,6 @@ sub update_project_runmode {
 
       if ($sdate_err) {
 
-        #$data_for_postrun_href->{'Error'} = 1;
-        #$data_for_postrun_href->{'Data'}  = {'Error' => [$sdate_href]};
-
-        #return $data_for_postrun_href;
-
         push(@{$project_err_aref}, $sdate_href);
         $project_err = 1;
       }
@@ -11776,11 +11878,6 @@ sub update_project_runmode {
       my ($edate_err, $edate_href) = check_dt_href( {'ProjectEndDate' => $project_edate} );
 
       if ($edate_err) {
-
-        #$data_for_postrun_href->{'Error'} = 1;
-        #$data_for_postrun_href->{'Data'}  = {'Error' => [$edate_href]};
-
-        #return $data_for_postrun_href;
 
         push(@{$project_err_aref}, $edate_href);
         $project_err = 1;
@@ -11845,6 +11942,7 @@ sub update_project_runmode {
       'Value'=> $vcol_value,
       'FactorId'=> $vcol_id,
       'RuleErrorMsg'=> $vcol_data->{$vcol_id}->{'FactorValidRuleErrMsg'},
+      'CanFactorHaveNull' => $vcol_data->{$vcol_id}->{'CanFactorHaveNull'}
     };
   }
 
@@ -11874,11 +11972,6 @@ sub update_project_runmode {
 
     my $err_msg = "ProjectTypeId ($projecttype_id) does not exist.";
 
-    #$data_for_postrun_href->{'Error'} = 1;
-    #$data_for_postrun_href->{'Data'}  = {'Error' => [{'TypeId' => $err_msg}]};
-
-    #return $data_for_postrun_href;
-
     push(@{$project_err_aref}, {'TypeId' => $err_msg});
     $project_err = 1;
   }
@@ -11888,10 +11981,6 @@ sub update_project_runmode {
   if (!$cur_manager_existence) {
 
     my $err_msg = "ProjectManagerId ($cur_manager_id) does not exist.";
-    #$data_for_postrun_href->{'Error'} = 1;
-    #$data_for_postrun_href->{'Data'}  = {'Error' => [{'ProjectManagerId' => $err_msg}]};
-
-    #return $data_for_postrun_href;
 
     push(@{$project_err_aref}, {'ProjectManagerId' => $err_msg});
     $project_err = 1;
@@ -11899,12 +11988,12 @@ sub update_project_runmode {
 
   #check vcol validation
 
-  #my ($vcol_error, $vcol_error_aref) = validate_all_factor_input($pre_validate_vcol);
+  my ($vcol_error, $vcol_error_aref) = validate_all_factor_input($pre_validate_vcol);
 
-  #if ($vcol_error) {
-  #  push(@{$project_err_aref}, @{$vcol_error_aref});
-  #  $project_err = 1;
-  #}
+  if ($vcol_error) {
+    push(@{$project_err_aref}, @{$vcol_error_aref});
+    $project_err = 1;
+  }
 
   if ($project_err != 0) {
     $data_for_postrun_href->{'Error'} = 1;
@@ -14284,6 +14373,8 @@ sub add_trialgroup_runmode {
   my $query = $self->query();
 
   my $data_for_postrun_href = {};
+  my $trial_group_err_aref = [];
+  my $trial_group_err = 0;
 
   # Generic required static field checking
 
@@ -14359,7 +14450,7 @@ sub add_trialgroup_runmode {
     return $data_for_postrun_href;
   }
 
-  my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength ";
+  my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength, FactorValidRuleErrMsg, FactorValidRule  ";
   $sql   .= "FROM factor ";
   $sql   .= "WHERE TableNameOfFactor='trialgroupfactor'";
 
@@ -14369,16 +14460,27 @@ sub add_trialgroup_runmode {
   my $vcol_param_data = {};
   my $vcol_len_info   = {};
   my $vcol_param_data_maxlen = {};
+  my $pre_validate_vcol = {};
+
   for my $vcol_id (keys(%{$vcol_data})) {
 
     my $vcol_param_name = "VCol_${vcol_id}";
-    my $vcol_value      = $query->param($vcol_param_name);
+    my $vcol_value      = $query->param($vcol_param_name) ;
     if ($vcol_data->{$vcol_id}->{'CanFactorHaveNull'} != 1) {
 
       $vcol_param_data->{$vcol_param_name} = $vcol_value;
     }
+
     $vcol_len_info->{$vcol_param_name} = $vcol_data->{$vcol_id}->{'FactorValueMaxLength'};
     $vcol_param_data_maxlen->{$vcol_param_name} = $vcol_value;
+
+    $pre_validate_vcol->{$vcol_param_name} = {
+      'Rule' => $vcol_data->{$vcol_id}->{'FactorValidRule'},
+      'Value'=> $vcol_value,
+      'FactorId'=> $vcol_id,
+      'RuleErrorMsg'=> $vcol_data->{$vcol_id}->{'FactorValidRuleErrMsg'},
+      'CanFactorHaveNull' => $vcol_data->{$vcol_id}->{'CanFactorHaveNull'},
+    };
   }
 
   my ($vcol_missing_err, $vcol_missing_href) = check_missing_href( $vcol_param_data );
@@ -14404,19 +14506,18 @@ sub add_trialgroup_runmode {
   if (record_existence($dbh_k_read, 'trialgroup', 'TrialGroupName', $t_grp_name)) {
 
     my $err_msg = "TrialGroupName ($t_grp_name): already exists.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'TrialGroupName' => $err_msg}]};
 
-    return $data_for_postrun_href;
+    push(@{$trial_group_err_aref}, {'TrialGroupName' => $err_msg});
+    $trial_group_err = 1;
   }
+
 
   if (!type_existence($dbh_k_read, 'trialgroup', $t_grp_type)) {
 
     my $err_msg = "TrialGroupType ($t_grp_type): not found or inactive.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'TrialGroupType' => $err_msg}]};
-
-    return $data_for_postrun_href;
+    
+    push(@{$trial_group_err_aref}, {'TrialGroupType' => $err_msg});
+    $trial_group_err = 1;
   }
 
   my $entry_xml_file           = $self->authen->get_upload_file();
@@ -14462,17 +14563,20 @@ sub add_trialgroup_runmode {
   my $trial_id_aref      = [];
   my $uniq_trial_id_href = {};
 
+  my $trial_id_duplicate_string = "";
+  my $trial_id_notfound_string = "";
+  my $trial_id_permission_string = "";
+
+  my $trialgroup_error_msg = "";
+
   for my $trial_entry_info (@{$trial_entry_aref}) {
 
     my $trial_id = $trial_entry_info->{'TrialId'};
 
     if (defined $uniq_trial_id_href->{$trial_id}) {
 
-      my $err_msg = "Trial ($trial_id): duplicate.";
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-      return $data_for_postrun_href;
+      $trial_id_duplicate_string .= "$trial_id, ";
+      $trial_group_err = 1;
     }
     else {
 
@@ -14499,11 +14603,8 @@ sub add_trialgroup_runmode {
 
     my $unfound_trial_csv = join(',', @{$unfound_trial_aref});
 
-    my $err_msg = "Trial ($unfound_trial_csv): not found.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-    return $data_for_postrun_href;
+    $trial_id_notfound_string .= "$unfound_trial_csv";
+    $trial_group_err = 1;
   }
 
   my $group_id      = $self->authen->group_id();
@@ -14515,16 +14616,40 @@ sub add_trialgroup_runmode {
 
   if (!$is_trial_ok) {
 
-    my $trouble_trial_id = $trouble_trial_id_aref->[0];
+    my $trouble_trial_id = join(',', @{$trouble_trial_id_aref});
 
-    my $err_msg = "Permission denied: Group ($group_id) and Trial ($trouble_trial_id).";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-    return $data_for_postrun_href;
+    $trial_id_permission_string .= "$trouble_trial_id";
+    $trial_group_err = 1;
   }
 
   $dbh_k_read->disconnect();
+
+  my ($vcol_error, $vcol_error_aref) = validate_all_factor_input($pre_validate_vcol);
+
+  if ($vcol_error) {
+    push(@{$trial_group_err_aref}, @{$vcol_error_aref});
+    $trial_group_err = 1;
+  }
+
+  if ($trial_group_err) {
+    if (length($trial_id_permission_string) > 0) {
+      $trialgroup_error_msg .= "Permission denied: $group_id and trials $trial_id_permission_string. ";
+    }
+    if (length($unfound_trial_aref) > 0) {
+      $trialgroup_error_msg .= "Trials $unfound_trial_aref not found. ";
+    }
+    if (length($unfound_trial_aref) > 0) {
+      $trialgroup_error_msg .= "Trials $unfound_trial_aref duplicate in trialgroup entry file. ";
+    }
+
+    push(@{$trial_group_err_aref}, {'Message' => $trialgroup_error_msg});
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => $trial_group_err_aref};
+    return $data_for_postrun_href;
+
+  }
+
 
   my $user_id = $self->authen->user_id();
 
@@ -14648,6 +14773,8 @@ sub update_trialgroup_runmode {
   my $query = $self->query();
 
   my $data_for_postrun_href = {};
+  my $trial_group_err_aref = [];
+  my $trial_group_err = 0;
 
   # Generic required static field checking
 
@@ -14844,25 +14971,37 @@ sub update_trialgroup_runmode {
     return $data_for_postrun_href;
   }
 
-  my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength ";
+  my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength, FactorValidRuleErrMsg, FactorValidRule  ";
   $sql   .= "FROM factor ";
   $sql   .= "WHERE TableNameOfFactor='trialgroupfactor'";
 
+  my $dbh_k_read = connect_kdb_read();
   my $vcol_data = $dbh_k_read->selectall_hashref($sql, 'FactorId');
 
   my $vcol_param_data = {};
   my $vcol_len_info   = {};
   my $vcol_param_data_maxlen = {};
+  my $pre_validate_vcol = {};
+
   for my $vcol_id (keys(%{$vcol_data})) {
 
     my $vcol_param_name = "VCol_${vcol_id}";
-    my $vcol_value      = $query->param($vcol_param_name);
+    my $vcol_value      = $query->param($vcol_param_name) ;
     if ($vcol_data->{$vcol_id}->{'CanFactorHaveNull'} != 1) {
 
       $vcol_param_data->{$vcol_param_name} = $vcol_value;
     }
+
     $vcol_len_info->{$vcol_param_name} = $vcol_data->{$vcol_id}->{'FactorValueMaxLength'};
     $vcol_param_data_maxlen->{$vcol_param_name} = $vcol_value;
+
+    $pre_validate_vcol->{$vcol_param_name} = {
+      'Rule' => $vcol_data->{$vcol_id}->{'FactorValidRule'},
+      'Value'=> $vcol_value,
+      'FactorId'=> $vcol_id,
+      'RuleErrorMsg'=> $vcol_data->{$vcol_id}->{'FactorValidRuleErrMsg'},
+      'CanFactorHaveNull' => $vcol_data->{$vcol_id}->{'CanFactorHaveNull'},
+    };
   }
 
   my ($vcol_missing_err, $vcol_missing_href) = check_missing_href( $vcol_param_data );
@@ -14901,19 +15040,17 @@ sub update_trialgroup_runmode {
   if (length($db_t_grp_id) > 0) {
 
     my $err_msg = "TrialGroupName ($t_grp_name): already exists.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'TrialGroupName' => $err_msg}]};
 
-    return $data_for_postrun_href;
+    push(@{$trial_group_err_aref}, {'TrialGroupName' => $err_msg});
+    $trial_group_err = 1;
   }
 
   if (!type_existence($dbh_k_read, 'trialgroup', $t_grp_type)) {
 
     my $err_msg = "TrialGroupType ($t_grp_type): not found or inactive.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'TrialGroupType' => $err_msg}]};
 
-    return $data_for_postrun_href;
+    push(@{$trial_group_err_aref}, {'TrialGroupType' => $err_msg});
+    $trial_group_err = 1;
   }
 
   my $user_id = $self->authen->user_id();
@@ -14926,6 +15063,20 @@ sub update_trialgroup_runmode {
 
     return $data_for_postrun_href;
   }
+
+  my ($vcol_error, $vcol_error_aref) = validate_all_factor_input($pre_validate_vcol);
+
+  if ($vcol_error) {
+    push(@{$trial_group_err_aref}, @{$vcol_error_aref});
+    $trial_group_err = 1;
+  }
+
+  if ($trial_group_err) {
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => $trial_group_err_aref};
+    return $data_for_postrun_href;
+  }
+
 
   $sql  = 'UPDATE trialgroup SET ';
   $sql .= 'TrialGroupName=?, ';
@@ -14956,75 +15107,27 @@ sub update_trialgroup_runmode {
 
       my $factor_value = $query->param('VCol_' . "$vcol_id");
 
-      $sql  = 'SELECT Count(*) ';
-      $sql .= 'FROM trialgroupfactor ';
-      $sql .= 'WHERE TrialGroupId=? AND FactorId=?';
+      my ($vcol_err, $vcol_msg) = update_factor_value($dbh_k_write, $vcol_id, $factor_value, 'trialgroupfactor', 'TrialGroupId', $t_grp_id);
 
-      my ($read_err, $count) = read_cell($dbh_k_write, $sql, [$t_grp_id, $vcol_id]);
+      if ($vcol_err) {
 
-      if (length($factor_value) > 0) {
+        $self->logger->debug("VCol_" . "$vcol_id => $vcol_msg" );
 
-        if ($count > 0) {
+        push(@{$trial_group_err_aref}, {'VCol_' . "$vcol_id" => $vcol_msg});
 
-          $sql  = 'UPDATE trialgroupfactor SET ';
-          $sql .= 'FactorValue=? ';
-          $sql .= 'WHERE TrialGroupId=? AND FactorId=?';
-          my $factor_sth = $dbh_k_write->prepare($sql);
-          $factor_sth->execute($factor_value, $t_grp_id, $vcol_id);
-
-          if ($dbh_k_write->err()) {
-
-            $data_for_postrun_href->{'Error'} = 1;
-            $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-            return $data_for_postrun_href;
-          }
-          $factor_sth->finish();
-        }
-        else {
-
-          $sql  = 'INSERT INTO trialgroupfactor SET ';
-          $sql .= 'TrialGroupId=?, ';
-          $sql .= 'FactorId=?, ';
-          $sql .= 'FactorValue=?';
-          my $factor_sth = $dbh_k_write->prepare($sql);
-          $factor_sth->execute($t_grp_id, $vcol_id, $factor_value);
-
-          if ($dbh_k_write->err()) {
-
-            $data_for_postrun_href->{'Error'} = 1;
-            $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-            return $data_for_postrun_href;
-          }
-
-          $factor_sth->finish();
-        }
-      }
-      else {
-
-        if ($count > 0) {
-
-          $sql  = 'DELETE FROM trialgroupfactor ';
-          $sql .= 'WHERE TrialGroupId=? AND FactorId=?';
-
-          my $factor_sth = $dbh_k_write->prepare($sql);
-          $factor_sth->execute($t_grp_id, $vcol_id);
-
-          if ($dbh_k_write->err()) {
-
-            $data_for_postrun_href->{'Error'} = 1;
-            $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-            return $data_for_postrun_href;
-          }
-          $factor_sth->finish();
-        }
+        $trial_group_err = 1;
       }
     }
   }
 
   $dbh_k_write->disconnect();
+
+  if ($trial_group_err != 0) {
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => $trial_group_err_aref};
+    return $data_for_postrun_href;
+  }
+
 
   my $info_msg_aref = [{'Message' => "TrialGroup ($t_grp_id) has been updated successfully."}];
 

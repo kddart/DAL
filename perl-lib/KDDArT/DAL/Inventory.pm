@@ -2766,6 +2766,13 @@ sub del_item_runmode {
     return $self->_set_error("Item ($item_id): has a group.");
   }
 
+    my $is_item_has_itemmeasurement = record_existence( $dbh_k_read, 'itemmeasurement', 'ItemId', $item_id );
+
+  if ($is_item_has_trialunitspecimen) {
+
+    return $self->_set_error("Item ($item_id): has item measurements.");
+  }
+
   my $dbh_k_write = connect_kdb_write();
 
   my $statement = "DELETE FROM itemlog WHERE ItemId=?";
@@ -2834,6 +2841,8 @@ sub add_item_runmode {
   my $query    = $self->query();
 
   my $data_for_postrun_href = {};
+  my $item_err_aref = [];
+  my $item_err = 0;
 
   # Generic required static field checking
 
@@ -2997,10 +3006,8 @@ sub add_item_runmode {
 
       if ($mdt_err) {
 
-        $data_for_postrun_href->{'Error'} = 1;
-        $data_for_postrun_href->{'Data'}  = {'Error' => [$mdt_href]};
-
-        return $data_for_postrun_href;
+        push(@{$item_err_aref}, $mdt_href);
+        $item_err = 1;
       }
     }
   }
@@ -3017,20 +3024,16 @@ sub add_item_runmode {
 
       my $err_msg = "TrialUnitSpecimen ($trial_unit_spec_id): not found.";
 
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'TrialUnitSpecimenId' => $err_msg}]};
-
-      return $data_for_postrun_href;
+      push(@{$item_err_aref}, {'TrialUnitSpecimenId' => $err_msg});
+      $item_err = 1;
     }
 
     if ("$item_specimen" ne "$tuspec_specimen_id") {
 
       my $err_msg = "TrialUnitSpecimen ($trial_unit_spec_id) and SpecimenId ($item_specimen): ambiguous.";
 
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'TrialUnitSpecimenId' => $err_msg}]};
-
-      return $data_for_postrun_href;
+      push(@{$item_err_aref}, {'TrialUnitSpecimenId' => $err_msg});
+      $item_err = 1;
     }
   }
 
@@ -3040,10 +3043,8 @@ sub add_item_runmode {
 
       my $err_msg = "ItemSource ($item_source): not found.";
 
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'ItemSourceId' => $err_msg}]};
-
-      return $data_for_postrun_href;
+      push(@{$item_err_aref}, {'ItemSourceId' => $err_msg});
+      $item_err = 1;
     }
   }
 
@@ -3053,20 +3054,17 @@ sub add_item_runmode {
 
       my $err_msg = "ContainerTypeId ($item_container_type): not found or inactive.";
 
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'ContainerTypeId' => $err_msg}]};
-
-      return $data_for_postrun_href;
+      push(@{$item_err_aref}, {'ContainerTypeId' => $err_msg});
+      $item_err = 1;
     }
   }
 
   if (!record_existence($dbh_k_write, 'specimen', 'SpecimenId', $item_specimen)) {
 
     my $err_msg = "Specimen ($item_specimen): not found.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'SpecimenId' => $err_msg}]};
 
-    return $data_for_postrun_href;
+    push(@{$item_err_aref}, {'SpecimenId' => $err_msg});
+    $item_err = 1;
   }
 
   if (defined $item_scale) {
@@ -3074,10 +3072,9 @@ sub add_item_runmode {
     if (!record_existence($dbh_k_write, 'deviceregister', 'DeviceRegisterId', $item_scale)) {
 
       my $err_msg = "Scale ($item_scale): not found.";
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'ScaleId' => $err_msg}]};
 
-      return $data_for_postrun_href;
+      push(@{$item_err_aref}, {'ScaleId' => $err_msg});
+      $item_err = 1;
     }
   }
 
@@ -3086,10 +3083,9 @@ sub add_item_runmode {
     if (!record_existence($dbh_k_write, 'storage', 'StorageId', $item_storage)) {
 
       my $err_msg = "Storage ($item_storage): not found.";
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'StorageId' => $err_msg}]};
-
-      return $data_for_postrun_href;
+      
+      push(@{$item_err_aref}, {'StorageId' => $err_msg});
+      $item_err = 1;
     }
   }
 
@@ -3098,20 +3094,18 @@ sub add_item_runmode {
     if (!record_existence($dbh_k_write, 'generalunit', 'UnitId', $item_unit)) {
 
       my $err_msg = "UnitId ($item_unit): not found.";
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'UnitId' => $err_msg}]};
 
-      return $data_for_postrun_href;
+      push(@{$item_err_aref}, {'UnitId' => $err_msg});
+      $item_err = 1;
     }
   }
 
   if (!type_existence($dbh_k_write, 'item', $item_type)) {
 
     my $err_msg = "ItemTypeId ($item_type): not found or inactive.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'ItemTypeId' => $err_msg}]};
 
-    return $data_for_postrun_href;
+    push(@{$item_err_aref}, {'ItemTypeId' => $err_msg});
+    $item_err = 1;
   }
 
   if (defined $item_state) {
@@ -3119,10 +3113,9 @@ sub add_item_runmode {
     if (!type_existence($dbh_k_write, 'state', $item_state)) {
 
       my $err_msg = "ItemStateId ($item_state): not found or inactive.";
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'ItemStateId' => $err_msg}]};
 
-      return $data_for_postrun_href;
+      push(@{$item_err_aref}, {'ItemStateId' => $err_msg});
+      $item_err = 1;
     }
   }
 
@@ -3131,10 +3124,9 @@ sub add_item_runmode {
     if (record_existence($dbh_k_write, 'item', 'ItemBarcode', $item_barcode)) {
 
       my $err_msg = "ItemBarcode ($item_barcode): already exits.";
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'ItemBarcode' => $err_msg}]};
-
-      return $data_for_postrun_href;
+      
+      push(@{$item_err_aref}, {'ItemBarcode' => $err_msg});
+      $item_err = 1;
     }
   }
 
@@ -3144,10 +3136,8 @@ sub add_item_runmode {
 
     if ($afloat_err) {
 
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [$afloat_href]};
-
-      return $data_for_postrun_href;
+      push(@{$item_err_aref}, $afloat_href);
+      $item_err = 1;
     }
   }
 
@@ -3157,10 +3147,8 @@ sub add_item_runmode {
 
     if ($mdt_err) {
 
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [$mdt_href]};
-
-      return $data_for_postrun_href;
+      push(@{$item_err_aref}, $mdt_href);
+      $item_err = 1;
     }
   }
 
@@ -3169,10 +3157,9 @@ sub add_item_runmode {
     if (!record_existence($dbh_k_write, 'systemuser', 'UserId', $item_measure_by_user)) {
 
       my $err_msg = "LastMeasuredUser ($item_measure_by_user): not found.";
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'LastMeasuredUserId' => $err_msg}]};
 
-      return $data_for_postrun_href;
+      push(@{$item_err_aref}, {'LastMeasuredUserId' => $err_msg});
+      $item_err = 1;
     }
   }
 
@@ -3182,10 +3169,8 @@ sub add_item_runmode {
 
       my $err_msg = ' can only be subsample or group.';;
 
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'ItemOperation' => $err_msg}]};
-
-      return $data_for_postrun_href;
+      push(@{$item_err_aref}, {'ItemOperation' => $err_msg});
+      $item_err = 1;
     }
   }
 
@@ -3194,6 +3179,7 @@ sub add_item_runmode {
   my $vcol_param_data        = {};
   my $vcol_len_info          = {};
   my $vcol_param_data_maxlen = {};
+  my $pre_validate_vcol = {};
 
   for my $vcol_id ( keys( %{$vcol_data} ) ) {
 
@@ -3205,6 +3191,14 @@ sub add_item_runmode {
     }
     $vcol_len_info->{$vcol_param_name}          = $vcol_data->{$vcol_id}->{'FactorValueMaxLength'};
     $vcol_param_data_maxlen->{$vcol_param_name} = $vcol_value;
+
+    $pre_validate_vcol->{$vcol_param_name} = {
+      'Rule' => $vcol_data->{$vcol_id}->{'FactorValidRule'},
+      'Value'=> $vcol_value,
+      'FactorId'=> $vcol_id,
+      'RuleErrorMsg'=> $vcol_data->{$vcol_id}->{'FactorValidRuleErrMsg'},
+      'CanFactorHaveNull' => $vcol_data->{$vcol_id}->{'CanFactorHaveNull'},
+    };
   }
 
   # Validate virtual column for factor
@@ -3239,7 +3233,7 @@ sub add_item_runmode {
 
   if ($r_spec_perm_err) {
 
-    $self->logger->debug("Read specimen permission faile");
+    $self->logger->debug("Read specimen permission failed");
     my $err_msg = "Unexpected Error.";
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
@@ -3251,17 +3245,30 @@ sub add_item_runmode {
 
     my $err_msg = "SpecimenId ($item_specimen): not found.";
     $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
-    return $data_for_postrun_href;
+    push(@{$item_err_aref}, {'SpecimenId' => $err_msg});
+    $item_err = 1;
+
   }
 
   if ( ($spec_perm & $READ_PERM) != $READ_PERM ) {
 
     my $err_msg = "SpecimenId ($item_specimen): permission denied.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
+    push(@{$item_err_aref}, {'SpecimenId' => $err_msg});
+    $item_err = 1;
+  }
+
+  my ($vcol_error, $vcol_error_aref) = validate_all_factor_input($pre_validate_vcol);
+
+  if ($vcol_error) {
+    push(@{$item_err_aref}, @{$vcol_error_aref});
+    $item_err = 1;
+  }
+
+  if ($item_err != 0) {
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => $item_err_aref};
     return $data_for_postrun_href;
   }
 
@@ -3373,6 +3380,8 @@ sub update_item_runmode {
   }
 
   my $data_for_postrun_href = {};
+  my $item_err_aref = [];
+  my $item_err = 0;
 
   # Generic required static field checking
 
@@ -3652,10 +3661,8 @@ sub update_item_runmode {
 
       if ($mdt_err) {
 
-        $data_for_postrun_href->{'Error'} = 1;
-        $data_for_postrun_href->{'Data'}  = {'Error' => [$mdt_href]};
-
-        return $data_for_postrun_href;
+        push(@{$item_err_aref}, $mdt_href);
+        $item_err = 1;
       }
     }
   }
@@ -3670,20 +3677,16 @@ sub update_item_runmode {
 
       my $err_msg = "TrialUnitSpecimen ($trial_unit_spec_id): not found.";
 
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'TrialUnitSpecimenId' => $err_msg}]};
-
-      return $data_for_postrun_href;
+      push(@{$item_err_aref}, {'TrialUnitSpecimenId' => $err_msg});
+      $item_err = 1;
     }
 
     if ("$item_specimen" ne "$tuspec_specimen_id") {
 
       my $err_msg = "TrialUnitSpecimen ($trial_unit_spec_id) and SpecimenId ($item_specimen): ambiguous.";
 
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'TrialUnitSpecimenId' => $err_msg}]};
-
-      return $data_for_postrun_href;
+      push(@{$item_err_aref}, {'TrialUnitSpecimenId' => $err_msg});
+      $item_err = 1;
     }
   }
 
@@ -3693,10 +3696,8 @@ sub update_item_runmode {
 
       my $err_msg = "ItemSource ($item_source): not found.";
 
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'ItemSourceId' => $err_msg}]};
-
-      return $data_for_postrun_href;
+      push(@{$item_err_aref}, {'ItemSourceId' => $err_msg});
+      $item_err = 1;
     }
   }
 
@@ -3706,20 +3707,17 @@ sub update_item_runmode {
 
       my $err_msg = "ContainerTypeId ($item_container_type): not found or inactive.";
 
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'ContainerTypeId' => $err_msg}]};
-
-      return $data_for_postrun_href;
+      push(@{$item_err_aref}, {'ContainerTypeId' => $err_msg});
+      $item_err = 1;
     }
   }
 
   if (!record_existence($dbh_k_write, 'specimen', 'SpecimenId', $item_specimen)) {
 
     my $err_msg = "Specimen ($item_specimen): not found.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'SpecimenId' => $err_msg}]};
 
-    return $data_for_postrun_href;
+    push(@{$item_err_aref}, {'SpecimenId' => $err_msg});
+    $item_err = 1;
   }
 
   if (defined $item_scale) {
@@ -3727,10 +3725,9 @@ sub update_item_runmode {
     if (!record_existence($dbh_k_write, 'deviceregister', 'DeviceRegisterId', $item_scale)) {
 
       my $err_msg = "Scale ($item_scale): not found.";
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'ScaleId' => $err_msg}]};
-
-      return $data_for_postrun_href;
+      
+      push(@{$item_err_aref}, {'ScaleId' => $err_msg});
+      $item_err = 1;
     }
   }
 
@@ -3739,10 +3736,9 @@ sub update_item_runmode {
     if (!record_existence($dbh_k_write, 'storage', 'StorageId', $item_storage)) {
 
       my $err_msg = "Storage ($item_storage): not found.";
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'StorageId' => $err_msg}]};
 
-      return $data_for_postrun_href;
+      push(@{$item_err_aref}, {'StorageId' => $err_msg});
+      $item_err = 1;
     }
   }
 
@@ -3751,20 +3747,18 @@ sub update_item_runmode {
     if (!record_existence($dbh_k_write, 'generalunit', 'UnitId', $item_unit)) {
 
       my $err_msg = "UnitId ($item_unit): not found.";
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'UnitId' => $err_msg}]};
 
-      return $data_for_postrun_href;
+      push(@{$item_err_aref}, {'UnitId' => $err_msg});
+      $item_err = 1;
     }
   }
 
   if (!type_existence($dbh_k_write, 'item', $item_type)) {
 
     my $err_msg = "ItemTypeId ($item_type): not found or inactive.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'ItemTypeId' => $err_msg}]};
 
-    return $data_for_postrun_href;
+    push(@{$item_err_aref}, {'ItemTypeId' => $err_msg});
+    $item_err = 1;
   }
 
   if (defined $item_state) {
@@ -3772,10 +3766,9 @@ sub update_item_runmode {
     if (!type_existence($dbh_k_write, 'state', $item_state)) {
 
       my $err_msg = "ItemStateId ($item_state): not found or inactive.";
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'ItemStateId' => $err_msg}]};
 
-      return $data_for_postrun_href;
+      push(@{$item_err_aref}, {'ItemStateId' => $err_msg});
+      $item_err = 1;
     }
   }
 
@@ -3788,19 +3781,17 @@ sub update_item_runmode {
 
       $self->logger->debug("Lookup existing barcode failed");
       my $err_msg = "Unexpected Error.";
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'ItemStateId' => $err_msg}]};
-
-      return $data_for_postrun_href;
+      
+      push(@{$item_err_aref}, {'ItemBarcode' => $err_msg});
+      $item_err = 1;
     }
 
     if (length($found_item_id) > 0) {
 
       my $err_msg = "ItemBarcode ($item_barcode): already exits.";
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'ItemBarcode' => $err_msg}]};
 
-      return $data_for_postrun_href;
+      push(@{$item_err_aref}, {'ItemBarcode' => $err_msg});
+      $item_err = 1;
     }
   }
   else {
@@ -3814,10 +3805,8 @@ sub update_item_runmode {
 
     if ($afloat_err) {
 
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [$afloat_href]};
-
-      return $data_for_postrun_href;
+      push(@{$item_err_aref}, $afloat_href);
+      $item_err = 1;
     }
   }
 
@@ -3832,10 +3821,8 @@ sub update_item_runmode {
 
   if ($mdt_err) {
 
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$mdt_href]};
-
-    return $data_for_postrun_href;
+    push(@{$item_err_aref}, $mdt_href);
+    $item_err = 1;
   }
 
   if ($item_measure_by_user ne '-1') {
@@ -3843,10 +3830,9 @@ sub update_item_runmode {
     if (!record_existence($dbh_k_write, 'systemuser', 'UserId', $item_measure_by_user)) {
 
       my $err_msg = "LastMeasuredUser ($item_measure_by_user): not found.";
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'LastMeasuredUserId' => $err_msg}]};
-
-      return $data_for_postrun_href;
+      
+      push(@{$item_err_aref}, {'LastMeasuredUserId' => $err_msg});
+      $item_err = 1;
     }
   }
 
@@ -3856,19 +3842,17 @@ sub update_item_runmode {
 
       my $err_msg = ' can only be subsample or group.';;
 
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'ItemOperation' => $err_msg}]};
-
-      return $data_for_postrun_href;
+      push(@{$item_err_aref}, {'ItemOperation' => $err_msg});
+      $item_err = 1;
     }
   }
 
   # Get the virtual col from the factor table
   my $vcol_data              = $self->_get_item_factor();
-  my $vcol_param_data_compul = {};
   my $vcol_param_data        = {};
   my $vcol_len_info          = {};
   my $vcol_param_data_maxlen = {};
+  my $pre_validate_vcol = {};
 
   for my $vcol_id ( keys( %{$vcol_data} ) ) {
 
@@ -3876,20 +3860,30 @@ sub update_item_runmode {
     my $vcol_value      = $query->param($vcol_param_name);
     if ( $vcol_data->{$vcol_id}->{'CanFactorHaveNull'} != 1 ) {
 
-      $vcol_param_data_compul->{$vcol_param_name} = $vcol_value;
+      $vcol_param_data->{$vcol_param_name} = $vcol_value;
     }
-    $vcol_param_data->{$vcol_param_name} = $vcol_value;
     $vcol_len_info->{$vcol_param_name}          = $vcol_data->{$vcol_id}->{'FactorValueMaxLength'};
     $vcol_param_data_maxlen->{$vcol_param_name} = $vcol_value;
+
+    $pre_validate_vcol->{$vcol_param_name} = {
+      'Rule' => $vcol_data->{$vcol_id}->{'FactorValidRule'},
+      'Value'=> $vcol_value,
+      'FactorId'=> $vcol_id,
+      'RuleErrorMsg'=> $vcol_data->{$vcol_id}->{'FactorValidRuleErrMsg'},
+      'CanFactorHaveNull' => $vcol_data->{$vcol_id}->{'CanFactorHaveNull'},
+    };
   }
 
   # Validate virtual column for factor
-  my ( $vcol_missing_err, $vcol_missing_msg ) = check_missing_value($vcol_param_data_compul);
+  my ($vcol_missing_err, $vcol_missing_msg) = check_missing_value( $vcol_param_data );
 
   if ($vcol_missing_err) {
 
     $vcol_missing_msg = $vcol_missing_msg . ' missing';
-    return $self->_set_error($vcol_missing_msg);
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $vcol_missing_msg}]};
+
+    return $data_for_postrun_href;
   }
 
   my ( $vcol_maxlen_err, $vcol_maxlen_msg ) = check_maxlen( $vcol_param_data_maxlen, $vcol_len_info );
@@ -3931,8 +3925,11 @@ sub update_item_runmode {
 
   if (scalar(@{$geno_data}) != scalar(@{$geno_p_data_perm})) {
 
-    my $err_msg = "SpecimenId ($item_specimen): permission denied.";
-    return $self->_set_error($err_msg);
+    my $err_msg = "SpecimenId ($item_specimen): not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+
+    push(@{$item_err_aref}, {'SpecimenId' => $err_msg});
+    $item_err = 1;
   }
 
   my ($get_scol_err, $get_scol_msg, $scol_data, $pkey_data) = get_static_field($dbh_k_write, 'item');
@@ -3947,6 +3944,20 @@ sub update_item_runmode {
 
     return $data_for_postrun_href;
   }
+
+  my ($vcol_error, $vcol_error_aref) = validate_all_factor_input($pre_validate_vcol);
+
+  if ($vcol_error) {
+    push(@{$item_err_aref}, @{$vcol_error_aref});
+    $item_err = 1;
+  }
+
+  if ($item_err != 0) {
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => $item_err_aref};
+    return $data_for_postrun_href;
+  }  
+
 
   my @field_list;
 
@@ -4023,17 +4034,36 @@ sub update_item_runmode {
     return $data_for_postrun_href;
   }
 
-  my ($up_vcol_err, $up_vcol_err_msg) = update_vcol_data($dbh_k_write, $vcol_data, $vcol_param_data,
-                                                         'itemfactor', 'ItemId', $item_id);
-
-  if ($up_vcol_err) {
-
-    $self->logger->debug($up_vcol_err_msg);
-    return $self->_set_error('Unexpected error.');
-  }
-
   $sth->finish();
+
+  my $vcol_error = [];
+
+  for my $vcol_id (keys(%{$vcol_data})) {
+
+    if (defined $query->param('VCol_' . "$vcol_id")) {
+
+      my $factor_value = $query->param('VCol_' . "$vcol_id");
+
+      my ($vcol_err, $vcol_msg) = update_factor_value($dbh_k_write, $vcol_id, $factor_value, 'itemfactor', 'ItemId', $item_id);
+
+      if ($vcol_err) {
+
+        $self->logger->debug("VCol_" . "$vcol_id => $vcol_msg" );
+
+        push(@{$item_err_aref}, {'VCol_' . "$vcol_id" => $vcol_msg});
+
+        $item_err = 1;
+      }
+    }
+  }
+  
   $dbh_k_write->disconnect();
+
+  if ($item_err != 0) {
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => $item_err_aref};
+    return $data_for_postrun_href;
+  }
 
   my $info_msg_aref = [ { 'Message' => "Item ($item_id) has been updated successfully." } ];
 
@@ -11095,7 +11125,7 @@ sub _get_item_factor {
   my ($self) = @_;
   my $query  = $self->query();
   my $sql    = "
-        SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength
+        SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength, FactorValidRuleErrMsg, FactorValidRule
         FROM factor
         WHERE TableNameOfFactor='itemfactor'
     ";

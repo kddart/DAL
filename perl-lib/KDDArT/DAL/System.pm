@@ -1300,7 +1300,7 @@ sub change_user_password_runmode {
 "SuccessMessageJSON": "{'Info' : [{'Message' : 'Your password has been changed successfully.'}]}",
 "ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Incorrect username or password.' /></DATA>"}],
 "ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Incorrect username or password.'}]}"}],
-"HTTPParameter": [{"Name": "CurrentUserPassword", "DataType": "varchar", "Required": "1", "ColSize": "128"}, {"Name": "NewUserPassword", "DataType": "varchar", "Required": "1", "ColSize": "128"}],
+"HTTPParameter": [{"Name": "CurrentUserPassword", "Description": "Hashed (with HMAC SHA1) current password", "DataType": "varchar", "Required": "1", "ColSize": "128"}, {"Name": "NewUserPassword", "DataType": "varchar", "Description": "Hashed (with HMAC SHA1) new password", "Required": "1", "ColSize": "128"}],
 "URLParameter": [{"ParameterName": "username", "Description": "Existing username"}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
@@ -7842,8 +7842,9 @@ sub request_reset_password_runmode {
 "SuccessMessageJSON": "{'ReturnId' : [{'Value' : 'dc9544d610dbb69bb7abc06b9aaed514abfa6789', 'ParaName': 'ResetToken'}], 'StatInfo' : [{'ServerElapsedTime' : '0.007','Unit' : 'second'}],'Info' : [{'Message' : 'Password Reset Token Succesfully Generated.'}], 'RecordMeta' : [{'TagName' : 'ResetToken'}]}",
 "ErrorMessageXML": [{"SystemUserName": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unable to validate User' /></DATA>"}],
 "URLParameter": [{"ParameterName": "username", "Description": "Username requiring a password reset"}],
+"HTTPParameter": [{"Required": 1, "Name": "UserId", "Description": "User Id of user required a password request token for confirmation."}],
 "ErrorMessageJSON": [{"SystemUserName": "{'Error' : [{'Message' : 'Unable to validate User'}]}"}],
-"HTTPReturnedErrorCode": [{"HTTPCode": 401}]
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
   my $self  = shift;

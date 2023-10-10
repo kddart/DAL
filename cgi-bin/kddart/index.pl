@@ -790,6 +790,54 @@ CGI::Application::Dispatch->dispatch(
     'list/samplemeasurement/:nperpage/page/:num'        => { app => 'KDDArT::DAL::Trait',
                                                              rm  => 'list_samplemeasurement_advanced' },
 
+    'import/itemmeasurement/csv'                        => { app => 'KDDArT::DAL::Trait',
+                                                             rm  => 'import_itemmeasurement_csv' },                                                             
+
+    'import/imgroupdata/csv'                            => { app => 'KDDArT::DAL::Trait',
+                                                             rm  => 'import_imgroup_data_csv' },
+
+    'export/itemmeasurement/csv'                        => { app => 'KDDArT::DAL::Trait',
+                                                             rm  => 'export_itemmeasurement_csv' },
+
+    'list/itemmeasurement/:nperpage/page/:num'          => { app => 'KDDArT::DAL::Trait',
+                                                             rm  => 'list_itemmeasurement_advanced' },
+
+    'list/imgroup'                                      => { app => 'KDDArT::DAL::Trait',
+                                                             rm  => 'list_imgroup' },
+
+    'get/imgroup/:id'                                   => { app => 'KDDArT::DAL::Trait',
+                                                             rm  => 'get_imgroup' },
+
+    'update/imgroup/:id'                                => { app => 'KDDArT::DAL::Trait',
+                                                             rm  => 'update_imgroup' },
+
+    'delete/imgroup/:id'                                => { app => 'KDDArT::DAL::Trait',
+                                                             rm  => 'delete_imgroup' },
+
+    'list/crossingmeasurement/:nperpage/page/:num'      => { app => 'KDDArT::DAL::Trait',
+                                                             rm  => 'list_crossingmeasurement_advanced' },
+
+    'import/crossingmeasurement/csv'                    => { app => 'KDDArT::DAL::Trait',
+                                                             rm  => 'import_crossingmeasurement_csv' },                                                             
+
+    'export/crossingmeasurement/csv'                    => { app => 'KDDArT::DAL::Trait',
+                                                             rm  => 'export_crossingmeasurement_csv' },
+
+    'trial/:id/import/cmgroupdata/csv'                  => { app => 'KDDArT::DAL::Trait',
+                                                             rm  => 'import_cmgroup_data_csv' },
+
+    'trial/:id/list/cmgroup'                            => { app => 'KDDArT::DAL::Trait',
+                                                             rm  => 'list_cmgroup' },
+
+    'get/cmgroup/:id'                                   => { app => 'KDDArT::DAL::Trait',
+                                                             rm  => 'get_cmgroup' },
+
+    'update/cmgroup/:id'                                => { app => 'KDDArT::DAL::Trait',
+                                                             rm  => 'update_cmgroup' },
+
+    'delete/cmgroup/:id'                                => { app => 'KDDArT::DAL::Trait',
+                                                             rm  => 'delete_cmgroup' },
+
     'add/plate'                                         => { app => 'KDDArT::DAL::Extract',
                                                              rm  => 'add_plate_gadmin' },
 

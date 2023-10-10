@@ -1019,7 +1019,7 @@ sub execute_reset_password_runmode {
 "ErrorMessageXML": [{"SystemUserName": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Passwords do not match.' /></DATA>"}],
 "ErrorMessageJSON": [{"SystemUserName": "{'Error' : [{'Message' : 'Passwords do not match.'}]}"}],
 "URLParameter": [{"ParameterName": "username", "Description": "Username of user having password reset"}],
-"HTTPParameter": [{"Required": 1, "Name": "NewUserPassword", "Description": "New Password"}, {"Required": 1, "Name": "NewUserPasswordConfirmed", "Description": "New Password Confirmed"}, {"Required": 1, "Name": "PasswordToken", "Description": "Token for validation"} ],
+"HTTPParameter": [{"Required": 1, "Name": "NewUserPassword", "Description": "Hashed (with HMAC SHA1) new password"}, {"Required": 1, "Name": "NewUserPasswordConfirmed", "Description": "Hashed (with HMAC SHA1) new password confirmed"}, {"Required": 1, "Name": "PasswordToken", "Description": "Token for validation"} ],
 "HTTPReturnedErrorCode": [{"HTTPCode": 401}]
 }
 =cut

@@ -62,6 +62,8 @@ ansible-playbook kddart_dal_v2_7_0_server_deployment_leap.yml --extra-vars="loca
 
 Note: ip_network in the ansible script should include the subnet mask (e.g. 192.18.18.18/23)
 
+Note: do not use and the equals sign for dbpass
+
 9. Login as root to the target machine and execute /root/KDDArT-DAL-v2.7.0/other/run_create_empty_dbs.sh
 
 10. Restart target machine. It must be done before proceeding to the next instruction.

@@ -39,7 +39,6 @@ CREATE TABLE crossingmeasurement (
   INDEX xcm_CMGroupId (CMGroupId),
   INDEX (CrossingId),
   PRIMARY KEY (CrossingId, TraitId, OperatorId, InstanceNumber, SampleTypeId, CMGroupId),
-  CONSTRAINT crossingmeasurement_fk FOREIGN KEY (CMGroupId) REFERENCES cmgroup (CMGroupId) ON DELETE NO ACTION ON UPDATE NO ACTION,
   CONSTRAINT crossingmeasurement_fk_1 FOREIGN KEY (TraitId) REFERENCES trait (TraitId) ON DELETE NO ACTION ON UPDATE NO ACTION,
   CONSTRAINT crossingmeasurement_fk_2 FOREIGN KEY (OperatorId) REFERENCES systemuser (UserId) ON DELETE NO ACTION ON UPDATE NO ACTION,
   CONSTRAINT crossingmeasurement_fk_3 FOREIGN KEY (SampleTypeId) REFERENCES generaltype (TypeId) ON DELETE NO ACTION ON UPDATE NO ACTION,
@@ -78,11 +77,10 @@ CREATE TABLE itemmeasurement (
   INDEX xim_MeasureDateTime (MeasureDateTime),
   INDEX (ItemId),
   PRIMARY KEY (ItemId, TraitId, OperatorId, InstanceNumber, SampleTypeId, IMGroupId),
-  CONSTRAINT itemmeasurement_fk FOREIGN KEY (ItemId) REFERENCES item (ItemId) ON DELETE NO ACTION ON UPDATE NO ACTION,
-  CONSTRAINT itemmeasurement_fk_1 FOREIGN KEY (TraitId) REFERENCES trait (TraitId) ON DELETE NO ACTION ON UPDATE NO ACTION,
-  CONSTRAINT itemmeasurement_fk_2 FOREIGN KEY (OperatorId) REFERENCES systemuser (UserId) ON DELETE NO ACTION ON UPDATE NO ACTION,
-  CONSTRAINT itemmeasurement_fk_3 FOREIGN KEY (SampleTypeId) REFERENCES generaltype (TypeId) ON DELETE NO ACTION ON UPDATE NO ACTION,
-  CONSTRAINT itemmeasurement_fk_4 FOREIGN KEY (IMGroupId) REFERENCES imgroup (IMGroupId) ON DELETE NO ACTION ON UPDATE NO ACTION
+  CONSTRAINT itemmeasurement_fk_1 FOREIGN KEY (ItemId) REFERENCES item (ItemId) ON DELETE NO ACTION ON UPDATE NO ACTION,
+  CONSTRAINT itemmeasurement_fk_2 FOREIGN KEY (TraitId) REFERENCES trait (TraitId) ON DELETE NO ACTION ON UPDATE NO ACTION,
+  CONSTRAINT itemmeasurement_fk_3 FOREIGN KEY (OperatorId) REFERENCES systemuser (UserId) ON DELETE NO ACTION ON UPDATE NO ACTION,
+  CONSTRAINT itemmeasurement_fk_4 FOREIGN KEY (SampleTypeId) REFERENCES generaltype (TypeId) ON DELETE NO ACTION ON UPDATE NO ACTION,
 ) ENGINE=InnoDB comment='Measurement of the sample from item inventory for a particular trait/variate, by the operator on certain date/time. Measurement can be done for sample type if it does not refer to the entire inventory item.';
 
 CREATE TABLE survey (
@@ -226,6 +224,8 @@ ALTER TABLE trialunitspecimen ADD COLUMN TUSBarcode VARCHAR(254) NULL comment 'b
                               ADD UNIQUE INDEX xtus_TUSBarcode (TUSBarcode);
 
 ALTER TABLE workflowdef ADD UNIQUE INDEX wfd_workfloworder (WorkflowId, StepOrder);
+
+ALTER TABLE factor MODIFY FactorName varchar(255);
 
 
 COMMIT;

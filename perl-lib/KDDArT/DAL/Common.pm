@@ -92,7 +92,7 @@ our @EXPORT   = qw($DTD_PATH $RPOSTGRES_UP_FILE $GIS_BUFFER_DISTANCE
                    get_next_value_for check_bool_href check_email_href check_value_href load_config read_cookies
                    record_existence_bulk get_solr_cores get_solr_fields get_solr_entities
                    validate_trait_db_bulk get_filtering_parts minute_diff append_geography_loc recurse_read_v2 update_factor_value validate_factor_value 
-                   validate_all_factor_input check_maxlen_aref
+                   validate_all_factor_input check_maxlen_aref update_mfactor_value
                  );
 
 our $COOKIE_DOMAIN            = {};
@@ -180,7 +180,7 @@ our $ACCEPT_HEADER_LOOKUP   = { 'application/json' => 'JSON',
 
 our $VALID_CTYPE            = {'xml' => 1, 'json' => 1, 'geojson' => 1};
 
-our $DAL_VERSION            = '2.7.4';
+our $DAL_VERSION            = '2.7.5';
 our $DAL_COPYRIGHT          = 'Copyright (c) 2023, Diversity Arrays Technology, All rights reserved.';
 our $DAL_ABOUT              = 'Data Access Layer';
 
@@ -3912,7 +3912,14 @@ sub get_paged_filter {
 
     $err     = 2;
     $err_msg = 'Page unavailable.';
-    return ($err, $err_msg, $nb_records, $nb_pages, 'LIMIT 0');
+    if ($driver_name eq 'monetdb') {
+      my $limit_start  = ($page-1)*$nb_per_page;
+      return ($err, $err_msg, $nb_records, $nb_pages, "LIMIT ${nb_per_page} OFFSET ${limit_start}");
+    }
+    else {
+      return ($err, $err_msg, $nb_records, $nb_pages, 'LIMIT 0');
+    }
+    
   }
 
   my $limit_start  = ($page-1)*$nb_per_page;
@@ -8046,16 +8053,14 @@ sub update_factor_value {
       $val_msg  = $valid_rec->{'FactorValidRuleErrMsg'};
     }
 
-    # Factor Validation to be supported in 2.7.5 to allow all objects to have validation
-    #if (length($val_rule) > 0) {
-    #   my ($factor_validation_err, $factor_validation_message) = validate_factor_value($val_rule, $val_msg,$factor_value,$vcol_id);
+    if (length($val_rule) > 0) {
+       my ($factor_validation_err, $factor_validation_message) = validate_factor_value($val_rule, $val_msg,$factor_value,$vcol_id);
 
-    #   if ($factor_validation_err) {
-    #      return ($factor_validation_err, $factor_validation_message);
-    #   }
-
-    #}
-
+       if ($factor_validation_err) {
+          return ($factor_validation_err, $factor_validation_message);
+       }
+    }
+    
     if ($count > 0) {
 
       $sql  = "UPDATE $factor_table SET ";
@@ -8103,6 +8108,113 @@ sub update_factor_value {
       $factor_sth->execute($object_id, $vcol_id);
 
       if ($dbh->err()) {
+
+        $err = 1;
+        $msg = "Unexpected error.";
+
+
+      }
+      $factor_sth->finish();
+    }
+  }
+
+
+  return ($err, $msg);
+
+}
+
+#a wrapper that will call the factor table in mysql and then update the value in monetdb. Slight differences in monetdb syntax means need another function
+sub update_mfactor_value {
+
+  my $dbh              = $_[0];
+  my $dbh_m            = $_[1];
+  my $vcol_id          = $_[2];
+  my $factor_value     = $_[3];
+  my $factor_table     = $_[4];
+  my $object_id_field  = $_[5];
+  my $object_id        = $_[6];
+
+  my $sql  = "SELECT Count(*) ";
+  $sql .= "FROM $factor_table ";
+  $sql .= "WHERE $object_id_field=? AND FactorId=?";
+
+  my $err = 0;
+  my $msg = "";
+
+  my ($read_err, $count) = read_cell($dbh, $sql, [$object_id, $vcol_id]);
+
+  if (length($factor_value) > 0) {
+
+    my $validation_sql = "SELECT FactorId, FactorValidRule, FactorValidRuleErrMsg FROM factor WHERE FactorId=?";
+
+    my ($r_factor_err, $r_factor_msg, $validation_data) = read_data($dbh, $validation_sql, [$vcol_id]);
+
+    my $val_rule = "";
+    my $val_msg = "";
+    
+    foreach my $valid_rec (@{$validation_data}) {
+      $val_rule = $valid_rec->{'FactorValidRule'};
+      $val_msg  = $valid_rec->{'FactorValidRuleErrMsg'};
+    }
+
+    # Factor Validation to be supported in 2.7.5 to allow all objects to have validation
+    if (length($val_rule) > 0) {
+       my ($factor_validation_err, $factor_validation_message) = validate_factor_value($val_rule, $val_msg,$factor_value,$vcol_id);
+
+       if ($factor_validation_err) {
+          return ($factor_validation_err, $factor_validation_message);
+       }
+
+    }
+
+    if ($count > 0) {
+
+      $sql  = 'UPDATE "'.$factor_table.'" SET ';
+      $sql .= '"FactorValue"=? ';
+      $sql .= 'WHERE "'.$object_id_field.'"=? AND "FactorId"=?';
+
+      my $factor_sth = $dbh_m->prepare($sql);
+      $factor_sth->execute($factor_value, $object_id, $vcol_id);
+
+      if ($dbh_m->err()) {
+
+        $err = 1;
+        $msg  = "Unexpected error. ";
+
+      }
+
+      $factor_sth->finish();
+    }
+    else {
+      $sql  = 'INSERT INTO "'.$factor_table.'"(';
+      $sql .= '"'.$object_id_field.'", ';
+      $sql .= '"FactorId", ';
+      $sql .= '"FactorValue")';
+      $sql .= 'VALUES (?,?,?)';
+
+      my $factor_sth = $dbh_m->prepare($sql);
+      $factor_sth->execute($object_id, $vcol_id, $factor_value);
+
+      if ($dbh_m->err()) {
+
+        $err = 1;
+        $msg  = "Unexpected error.";
+
+      }
+
+      $factor_sth->finish();
+    }
+  }
+  else {
+    if ($count > 0) {
+
+      $sql  = 'DELETE FROM "'.$factor_table.'" ';
+      $sql .= 'WHERE "'.$object_id_field.'"=? AND "FactorId"=?';
+
+      my $factor_sth = $dbh_m->prepare($sql);
+      $factor_sth->execute($object_id, $vcol_id);
+
+      if ($dbh_m->err()) {
 
         $err = 1;
         $msg = "Unexpected error.";

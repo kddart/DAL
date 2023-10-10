@@ -86,7 +86,7 @@
     - name: Add zypper repo from Geo
       shell: >
         if [ ! `zypper lr | grep 'Geo'` ]; then
-        zypper ar --no-gpgcheck http://download.opensuse.org/repositories/Application:/Geo/{{ os_version.stdout }} Geo;
+        zypper ar --no-gpgcheck https://mirrorcache-au.opensuse.org/repositories/Application:/Geo/{{ os_version.stdout }} Geo;
         fi;
 
     - name: Add zypper repo for Perl-dev

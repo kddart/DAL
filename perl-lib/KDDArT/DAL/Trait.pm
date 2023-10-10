@@ -67,6 +67,15 @@ sub setup {
                                            'add_trait2traitgroup',
                                            'remove_trait_from_traitgroup',
                                            'del_traitgroup',
+                                           'import_itemmeasurement_csv',
+                                           'import_imgroup_data_csv',
+                                           'update_imgroup',
+                                           'delete_imgroup',
+                                           'import_crossingmeasurement_csv',
+                                           'import_cmgroup_data_csv',
+                                           'update_cmgroup',
+                                           'delete_cmgroup',
+
       );
   __PACKAGE__->authen->count_session_request_runmodes(':all');
   __PACKAGE__->authen->check_signature_runmodes('add_treatment_gadmin',
@@ -83,17 +92,26 @@ sub setup {
                                                 'update_traitgroup',
                                                 'remove_trait_from_traitgroup',
                                                 'del_traitgroup',
+                                                'update_imgroup',
+                                                'delete_imgroup',
+                                                'update_cmgroup',
+                                                'delete_cmgroup',
+
       );
   __PACKAGE__->authen->check_gadmin_runmodes('add_treatment_gadmin',
                                              'update_treatment_gadmin',
                                              'del_trait_gadmin',
-                                             'del_treatment_gadmin',
+                                             'del_treatment_gadmin'
       );
   __PACKAGE__->authen->check_sign_upload_runmodes('import_samplemeasurement_csv',
                                                   'import_datakapture_data_csv',
                                                   'import_smgroup_data_csv',
                                                   'add_traitgroup',
                                                   'add_trait2traitgroup',
+                                                  'import_itemmeasurement_csv',
+                                                  'import_imgroup_data_csv',
+                                                  'import_crossingmeasurement_csv',
+                                                  'import_cmgroup_data_csv',
       );
 
   $self->run_modes(
@@ -130,7 +148,23 @@ sub setup {
     'add_trait2traitgroup'             => 'add_trait2traitgroup_runmode',
     'remove_trait_from_traitgroup'     => 'remove_trait_from_traitgroup_runmode',
     'del_traitgroup'                   => 'del_traitgroup_runmode',
-      );
+    'import_itemmeasurement_csv'       => 'import_itemmeasurement_csv_runmode',
+    'export_itemmeasurement_csv'       => 'export_itemmeasurement_csv_runmode',
+    'import_imgroup_data_csv'          => 'import_imgroup_data_csv_runmode',
+    'list_itemmeasurement_advanced'    => 'list_itemmeasurement_advanced_runmode',
+    'list_imgroup'                     => 'list_imgroup_runmode',
+    'get_imgroup'                      => 'get_imgroup_runmode',
+    'update_imgroup'                   => 'update_imgroup_runmode',
+    'delete_imgroup'                   => 'delete_imgroup_runmode',
+    'import_crossingmeasurement_csv'         => 'import_crossingmeasurement_csv_runmode',
+    'export_crossingmeasurement_csv'         => 'export_crossingmeasurement_csv_runmode',
+    'import_cmgroup_data_csv'                => 'import_cmgroup_data_csv_runmode',
+    'list_crossingmeasurement_advanced'      => 'list_crossingmeasurement_advanced_runmode',
+    'list_cmgroup'                           => 'list_cmgroup_runmode',
+    'get_cmgroup'                            => 'get_cmgroup_runmode',
+    'update_cmgroup'                         => 'update_cmgroup_runmode',
+    'delete_cmgroup'                         => 'delete_cmgroup_runmode'
+    );
 
   my $logger = get_logger();
   Log::Log4perl::MDC->put('client_ip', $ENV{'REMOTE_ADDR'});
@@ -187,6 +221,8 @@ sub add_treatment_runmode {
   my $query = $self->query();
 
   my $data_for_postrun_href = {};
+  my $treatment_err = 0;
+  my $treatment_err_aref = [];
 
   # Generic required static field checking
 
@@ -210,7 +246,7 @@ sub add_treatment_runmode {
 
   my $treatment_text        = $query->param('TreatmentText');
 
-  my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength ";
+  my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength, FactorValidRuleErrMsg, FactorValidRule  ";
   $sql   .= "FROM factor ";
   $sql   .= "WHERE TableNameOfFactor='treatmentfactor'";
 
@@ -220,29 +256,29 @@ sub add_treatment_runmode {
   my $vcol_param_data = {};
   my $vcol_len_info   = {};
   my $vcol_param_data_maxlen = {};
+  my $pre_validate_vcol = {};
+
   for my $vcol_id (keys(%{$vcol_data})) {
 
     my $vcol_param_name = "VCol_${vcol_id}";
-    my $vcol_value      = $query->param($vcol_param_name);
+    my $vcol_value      = $query->param($vcol_param_name) ;
     if ($vcol_data->{$vcol_id}->{'CanFactorHaveNull'} != 1) {
 
       $vcol_param_data->{$vcol_param_name} = $vcol_value;
     }
+
     $vcol_len_info->{$vcol_param_name} = $vcol_data->{$vcol_id}->{'FactorValueMaxLength'};
     $vcol_param_data_maxlen->{$vcol_param_name} = $vcol_value;
+
+    $pre_validate_vcol->{$vcol_param_name} = {
+      'Rule' => $vcol_data->{$vcol_id}->{'FactorValidRule'},
+      'Value'=> $vcol_value,
+      'FactorId'=> $vcol_id,
+      'RuleErrorMsg'=> $vcol_data->{$vcol_id}->{'FactorValidRuleErrMsg'},
+      'CanFactorHaveNull' => $vcol_data->{$vcol_id}->{'CanFactorHaveNull'},
+    };
   }
-
-  my ($vcol_missing_err, $vcol_missing_msg) = check_missing_value( $vcol_param_data );
-
-  if ($vcol_missing_err) {
-
-    $vcol_missing_msg = $vcol_missing_msg . ' missing';
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $vcol_missing_msg}]};
-
-    return $data_for_postrun_href;
-  }
-
+  
   my ($vcol_maxlen_err, $vcol_maxlen_msg) = check_maxlen($vcol_param_data_maxlen, $vcol_len_info);
 
   if ($vcol_maxlen_err) {
@@ -257,13 +293,25 @@ sub add_treatment_runmode {
   if (record_existence($dbh_k_read, 'treatment', 'TreatmentText', $treatment_text)) {
 
     my $err_msg = "TreatmentText ($treatment_text): already exists.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'TreatmentText' => $err_msg}]};
 
-    return $data_for_postrun_href;
+    push(@{$treatment_err_aref}, {'TreatmentText' => $err_msg});
+    $treatment_err = 1;
   }
 
   $dbh_k_read->disconnect();
+
+  my ($vcol_error, $vcol_error_aref) = validate_all_factor_input($pre_validate_vcol);
+
+  if ($vcol_error) {
+    push(@{$treatment_err_aref}, @{$vcol_error_aref});
+    $treatment_err = 1;
+  }
+
+  if ($treatment_err != 0) {
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => $treatment_err_aref};
+    return $data_for_postrun_href;
+  }
 
   my $dbh_k_write = connect_kdb_write();
 
@@ -355,6 +403,8 @@ sub update_treatment_runmode {
   my $query        = $self->query();
 
   my $data_for_postrun_href = {};
+  my $treatment_err = 0;
+  my $treatment_err_aref = [];
 
   # Generic required static field checking
 
@@ -388,25 +438,37 @@ sub update_treatment_runmode {
 
   my $treatment_text        = $query->param('TreatmentText');
 
-  my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength ";
+ my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength, FactorValidRuleErrMsg, FactorValidRule  ";
   $sql   .= "FROM factor ";
   $sql   .= "WHERE TableNameOfFactor='treatmentfactor'";
 
+  my $dbh_k_read = connect_kdb_read();
   my $vcol_data = $dbh_k_read->selectall_hashref($sql, 'FactorId');
 
   my $vcol_param_data = {};
   my $vcol_len_info   = {};
   my $vcol_param_data_maxlen = {};
+  my $pre_validate_vcol = {};
+
   for my $vcol_id (keys(%{$vcol_data})) {
 
     my $vcol_param_name = "VCol_${vcol_id}";
-    my $vcol_value      = $query->param($vcol_param_name);
+    my $vcol_value      = $query->param($vcol_param_name) ;
     if ($vcol_data->{$vcol_id}->{'CanFactorHaveNull'} != 1) {
 
       $vcol_param_data->{$vcol_param_name} = $vcol_value;
     }
+
     $vcol_len_info->{$vcol_param_name} = $vcol_data->{$vcol_id}->{'FactorValueMaxLength'};
     $vcol_param_data_maxlen->{$vcol_param_name} = $vcol_value;
+
+    $pre_validate_vcol->{$vcol_param_name} = {
+      'Rule' => $vcol_data->{$vcol_id}->{'FactorValidRule'},
+      'Value'=> $vcol_value,
+      'FactorId'=> $vcol_id,
+      'RuleErrorMsg'=> $vcol_data->{$vcol_id}->{'FactorValidRuleErrMsg'},
+      'CanFactorHaveNull' => $vcol_data->{$vcol_id}->{'CanFactorHaveNull'},
+    };
   }
 
   my ($vcol_missing_err, $vcol_missing_msg) = check_missing_value( $vcol_param_data );
@@ -447,13 +509,25 @@ sub update_treatment_runmode {
   if (length($db_treatment_id) > 0) {
 
     my $err_msg = "TreatmentText ($treatment_text): already exists.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'TreatmentText' => $err_msg}]};
 
-    return $data_for_postrun_href;
+    push(@{$treatment_err_aref}, {'TreatmentText' => $err_msg});
+    $treatment_err = 1;
   }
 
   $dbh_k_read->disconnect();
+
+  my ($vcol_error, $vcol_error_aref) = validate_all_factor_input($pre_validate_vcol);
+
+  if ($vcol_error) {
+    push(@{$treatment_err_aref}, @{$vcol_error_aref});
+    $treatment_err = 1;
+  }
+
+  if ($treatment_err != 0) {
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => $treatment_err_aref};
+    return $data_for_postrun_href;
+  }
 
   my $dbh_k_write = connect_kdb_write();
 
@@ -473,82 +547,33 @@ sub update_treatment_runmode {
   }
   $sth->finish();
 
+  my $vcol_error = [];
+
   for my $vcol_id (keys(%{$vcol_data})) {
 
     if (defined $query->param('VCol_' . "$vcol_id")) {
 
       my $factor_value = $query->param('VCol_' . "$vcol_id");
 
-      $sql  = 'SELECT Count(*) ';
-      $sql .= 'FROM treatmentfactor ';
-      $sql .= 'WHERE TreatmentId=? AND FactorId=?';
+      my ($vcol_err, $vcol_msg) = update_factor_value($dbh_k_write, $vcol_id, $factor_value, 'treatmentfactor', 'TreatmentId', $treatment_id);
 
-      my ($read_err, $count) = read_cell($dbh_k_write, $sql, [$treatment_id, $vcol_id]);
+      if ($vcol_err) {
 
-      if (length($factor_value) > 0) {
+        $self->logger->debug("VCol_" . "$vcol_id => $vcol_msg" );
 
-        if ($count > 0) {
+        push(@{$treatment_err_aref}, {'VCol_' . "$vcol_id" => $vcol_msg});
 
-          $sql  = 'UPDATE treatmentfactor SET ';
-          $sql .= 'FactorValue=? ';
-          $sql .= 'WHERE TreatmentId=? AND FactorId=?';
-          my $factor_sth = $dbh_k_write->prepare($sql);
-          $factor_sth->execute($factor_value, $treatment_id, $vcol_id);
-
-          if ($dbh_k_write->err()) {
-
-            $data_for_postrun_href->{'Error'} = 1;
-            $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-            return $data_for_postrun_href;
-          }
-
-          $factor_sth->finish();
-        }
-        else {
-
-          $sql  = 'INSERT INTO treatmentfactor SET ';
-          $sql .= 'TreatmentId=?, ';
-          $sql .= 'FactorId=?, ';
-          $sql .= 'FactorValue=?';
-          my $factor_sth = $dbh_k_write->prepare($sql);
-          $factor_sth->execute($treatment_id, $vcol_id, $factor_value);
-
-          if ($dbh_k_write->err()) {
-
-            $data_for_postrun_href->{'Error'} = 1;
-            $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-            return $data_for_postrun_href;
-          }
-
-          $factor_sth->finish();
-        }
-      }
-      else {
-
-        if ($count > 0) {
-
-          $sql  = 'DELETE FROM treatmentfactor ';
-          $sql .= 'WHERE TreatmentId=? AND FactorId=?';
-
-          my $factor_sth = $dbh_k_write->prepare($sql);
-          $factor_sth->execute($treatment_id, $vcol_id);
-
-          if ($dbh_k_write->err()) {
-
-            $data_for_postrun_href->{'Error'} = 1;
-            $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-            return $data_for_postrun_href;
-          }
-          $factor_sth->finish();
-        }
+        $treatment_err = 1;
       }
     }
   }
-
   $dbh_k_write->disconnect();
+
+  if ($treatment_err != 0) {
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => $treatment_err_aref};
+    return $data_for_postrun_href;
+  }
 
   my $info_msg_aref = [{'Message' => "Treatment ($treatment_id) has been updated successfully."}];
 
@@ -1321,7 +1346,7 @@ sub list_samplemeasurement_advanced_runmode {
     $other_join .=  ' LEFT JOIN generatype ON samplemeasurement.SampleTypeId = generaltype.TypeId ';
   }
 
-  $sql    =  "SELECT samplemeasurement.* FROM samplemeasurement ";
+  $sql    =  "SELECT samplemeasurement.*, trait.TraitName  FROM samplemeasurement ";
   $sql   .=  "LEFT JOIN trait ON trait.TraitId = samplemeasurement.TraitId ";
   $sql   .=  "$other_join ";
   $sql   .=  "$filtering_exp ";
@@ -1565,6 +1590,7 @@ sub get_treatment_runmode {
   $data_for_postrun_href->{'Error'}     = 0;
   $data_for_postrun_href->{'Data'}      = {'Treatment'  => $treatment_data,
                                            'VCol'       => $vcol_list,
+                                           'SQL'        => $sql,
                                            'RecordMeta' => [{'TagName' => 'Treatment'}],
   };
 
@@ -9030,10 +9056,6 @@ sub insert_samplemeasurement_data_v2 {
       if ($int_id_err) {
 
         $int_id_msg = "Row ($row_counter): " . $int_id_msg . ' not integer.';
-        #$data_for_postrun_href->{'Error'} = 1;
-        #$data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $int_id_msg}]};
-
-        #return $data_for_postrun_href;
 
         my $error_obj = {};
 
@@ -9054,10 +9076,6 @@ sub insert_samplemeasurement_data_v2 {
         if ($int_err) {
 
           $int_msg = "Row ($row_counter): " . $int_msg . ' not an integer.';
-          #$data_for_postrun_href->{'Error'} = 1;
-          #$data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $int_msg}]};
-
-          #return $data_for_postrun_href;
 
           my $error_obj = {};
 
@@ -9114,10 +9132,7 @@ sub insert_samplemeasurement_data_v2 {
         if ($int_err) {
 
           $int_msg = "Row ($row_counter): " . $int_msg . ' not an integer.';
-          #$data_for_postrun_href->{'Error'} = 1;
-          #$data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $int_msg}]};
-
-          #return $data_for_postrun_href;
+  
 
           my $error_obj = {};
 
@@ -9342,10 +9357,6 @@ sub insert_samplemeasurement_data_v2 {
     if (! defined $trialunit_info_href->{$tu_id}) {
 
       my $err_msg = "Row ($row_num): TrialUnit ($tu_id) does not exist.";
-      #$data_for_postrun_href->{'Error'} = 1;
-      #$data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-      #return $data_for_postrun_href;
 
       my $error_obj = {};
 
@@ -9364,10 +9375,6 @@ sub insert_samplemeasurement_data_v2 {
       if ( ($trial_permission & $READ_WRITE_PERM) != $READ_WRITE_PERM ) {
 
         my $perm_err_msg = "Row ($row_num): Permission denied, Group ($group_id) and Trial ($trial_id).";
-        #$data_for_postrun_href->{'Error'} = 1;
-        #$data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $perm_err_msg}]};
-
-        #return $data_for_postrun_href;
 
         my $error_obj = {};
 
@@ -9395,10 +9402,6 @@ sub insert_samplemeasurement_data_v2 {
       if ( ! defined $trait_lookup->{$trait_id} ) {
 
         my $err_msg = "Row ($row_num): Trait ($trait_id) not found.";
-        #$data_for_postrun_href->{'Error'} = 1;
-        #$data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-        #return $data_for_postrun_href;
 
         my $error_obj = {};
 
@@ -9416,11 +9419,6 @@ sub insert_samplemeasurement_data_v2 {
         if ( ($trait_perm & $LINK_PERM) != $LINK_PERM ) {
 
           my $perm_err_msg = "Row ($row_num): Permission denied, Group ($group_id) and Trait ($trait_id).";
-          #$data_for_postrun_href->{'Error'} = 1;
-          #$data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $perm_err_msg}]};
-
-          #return $data_for_postrun_href;
-
           my $error_obj = {};
 
           $error_obj->{'Message'} = $perm_err_msg;
@@ -9437,11 +9435,6 @@ sub insert_samplemeasurement_data_v2 {
           my $trial_id = $trialunit_info_href->{$tu_id}->{'TrialId'};
 
           my $err_msg = "Row ($row_num): Trait ($trait_id) is not attached to Trial ($trial_id).";
-          #$data_for_postrun_href->{'Error'} = 1;
-          #$data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-          #return $data_for_postrun_href;
-
           my $error_obj = {};
 
           $error_obj->{'Message'} = $err_msg;
@@ -9481,10 +9474,6 @@ sub insert_samplemeasurement_data_v2 {
       if (! defined $operator_lookup->{$oper_id}) {
 
         my $err_msg = "Row ($row_num): Operator ($oper_id) does not exist.";
-        #$data_for_postrun_href->{'Error'} = 1;
-        #$data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-        #return $data_for_postrun_href;
 
         my $error_obj = {};
 
@@ -9569,10 +9558,6 @@ sub insert_samplemeasurement_data_v2 {
       if (! defined $survey_lookup->{$survey_id_row}) {
 
         my $err_msg = "Row ($row_num): Survey ($survey_id_row) does not exist.";
-        #$data_for_postrun_href->{'Error'} = 1;
-        #$data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-        #return $data_for_postrun_href;
 
         my $error_obj = {};
 
@@ -9620,10 +9605,6 @@ sub insert_samplemeasurement_data_v2 {
     if (! defined $sample_type_lookup->{$sam_type_id}) {
 
       my $err_msg = "Row ($row_num): SampleType ($sam_type_id) does not exist.";
-      #$data_for_postrun_href->{'Error'} = 1;
-      #$data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-      #return $data_for_postrun_href;
 
       my $error_obj = {};
 
@@ -9737,10 +9718,6 @@ sub insert_samplemeasurement_data_v2 {
       push(@{$full_error_aref}, $error_obj);
     }
 
-    #$data_for_postrun_href->{'Error'} = 1;
-    #$data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-    #return $data_for_postrun_href;
   }
 
   foreach my $error_obj (@{$full_error_aref}) {
@@ -10114,5 +10091,4192 @@ sub validate_trait_db_bulk_v2 {
   return ($final_err, $err_msg, $full_err_trait_href, $full_list_invalid);
 }
 
+sub import_itemmeasurement_csv_runmode {
+
+=pod import_itemmeasurement_csv_HELP_START
+{
+"OperationName": "Import item measurements",
+"Description": "Import item measurements from a csv file formatted as a sparse matrix of phenotypic data.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='2 records of itemmeasurement have been inserted successfully.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : '2 records of itemmeasurement have been inserted successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Row (1): Item (1) does not exist.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Row (1): Item (1) does not exist.'}]}"}],
+"RequiredUpload": 1,
+"UploadFileFormat": "CSV",
+"UploadFileParameterName": "uploadfile",
+"HTTPParameter": [{"Required": 1, "Name": "ItemId", "Description": "Column number counting from zero for ItemId column in the upload CSV file"}, {"Required": 1, "Name": "SampleTypeId", "Description": "Column number counting from zero for SampleTypeId column in the upload CSV file"}, {"Required": 1, "Name": "TraitId", "Description": "Column number counting from zero for TraitId column in the upload CSV file"}, {"Required": 1, "Name": "OperatorId", "Description": "Column number counting from zero for OperatorId column for the upload CSV file"}, {"Required": 1, "Name": "MeasureDateTime", "Description": "Column number counting from zero for MeasureDateTime column in the upload CSV file"}, {"Required": 1, "Name": "InstanceNumber", "Description": "Column number counting from zero for InstanceNumber column in the upload CSV file"}, {"Required": 1, "Name": "TraitValue", "Description": "Column number counting from zero for TraitValue column in the upload CSV file"},  {"Required": 0, "Name": "StateReason", "Description": "Column number counting from zero for StateReason column in the upload CSV file for sub-plot scoring"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self  = shift;
+  my $query = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  my $data_csv_file = $self->authen->get_upload_file();
+
+  my $num_of_col = get_csvfile_num_of_col($data_csv_file);
+
+  $self->logger->debug("Number of columns: $num_of_col");
+
+  my $ItemId_col          = $query->param('ItemId');
+  my $TraitId_col         = $query->param('TraitId');
+  my $OperatorId_col      = $query->param('OperatorId');
+  my $InstanceNumber_col  = $query->param('InstanceNumber');
+  my $SampleTypeId_col    = $query->param('SampleTypeId');
+  my $MeasureDateTime_col = $query->param('MeasureDateTime');
+  my $TraitValue_col      = $query->param('TraitValue');
+
+  my $chk_col_href = { 'ItemId'          => $ItemId_col,
+                       'SampleTypeId'    => $SampleTypeId_col,
+                       'TraitId'         => $TraitId_col,
+                       'MeasureDateTime' => $MeasureDateTime_col,
+                       'InstanceNumber'  => $InstanceNumber_col,
+                       'TraitValue'      => $TraitValue_col,
+                     };
+
+  my $matched_col = {};
+
+  $matched_col->{$ItemId_col}          = 'ItemId';
+  $matched_col->{$SampleTypeId_col}    = 'SampleTypeId';
+  $matched_col->{$TraitId_col}         = 'TraitId';
+  $matched_col->{$MeasureDateTime_col} = 'MeasureDateTime';
+  $matched_col->{$InstanceNumber_col}  = 'InstanceNumber';
+  $matched_col->{$TraitValue_col}      = 'TraitValue';
+
+  my $StateReason_col = undef;
+
+  if (defined $query->param('StateReason')) {
+
+    if (length($query->param('StateReason')) > 0) {
+
+      $StateReason_col = $query->param('StateReason');
+      $chk_col_href->{'StateReason'} = $StateReason_col;
+
+      $matched_col->{$StateReason_col} = 'StateReason';
+    }
+  }
+
+  my ($col_def_err, $col_def_err_href) = check_col_def_href( $chk_col_href, $num_of_col);
+
+  if ($col_def_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$col_def_err_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (length($OperatorId_col) > 0) {
+
+    my ($col_def_err, $col_def_err_href) = check_col_def_href( { 'OperatorId' => $OperatorId_col },
+                                                               $num_of_col
+        );
+
+    if ($col_def_err) {
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [$col_def_err_href]};
+
+      return $data_for_postrun_href;
+    }
+
+    $matched_col->{$OperatorId_col} = 'OperatorId';
+  }
+
+  my @fieldname_list;
+
+  for (my $i = 0; $i < $num_of_col; $i++) {
+
+    if ($matched_col->{$i}) {
+
+      push(@fieldname_list, $matched_col->{$i});
+    }
+    else {
+
+      push(@fieldname_list, 'null');
+    }
+  }
+
+  my ($data_aref, $csv_err, $err_msg) = csvfile2arrayref($data_csv_file, \@fieldname_list, 0);
+
+  if ($csv_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $dbh_write = connect_kdb_write();
+
+  my $check_non_trait_field = 1;
+  my $validate_trait_value  = 1;
+  $data_for_postrun_href = $self->insert_itemmeasurement_data_v2($dbh_write,
+                                                                $data_aref,
+                                                                $check_non_trait_field,
+                                                                $validate_trait_value
+      );
+
+  $dbh_write->disconnect();
+
+  return $data_for_postrun_href;
+}
+
+sub export_itemmeasurement_csv_runmode {
+
+=pod export_itemmeasurement_csv_HELP_START
+{
+"OperationName": "Export item measurements",
+"Description": "Export item measurements (if exists) into a csv file formatted as a sparse matrix of phenotypic data",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><OutputFile csv='http://kddart-d.diversityarrays.com/data/admin/export_itemmeasurement_fc77a5593427a35b804a07150dccb942.csv' /></DATA>",
+"SuccessMessageJSON": "{'OutputFile' : [{'csv' : 'http://kddart-d.diversityarrays.com/data/admin/export_itemmeasurement_fc77a5593427a35b804a07150dccb942.csv'}]}",
+"ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
+"ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
+"HTTPParameter": [{"Required": 0, "Name": "ItemIdCSV", "Description": "Filtering parameter for ItemId. The value is comma separated value of ItemId."}, {"Required": 0, "Name": "SampleTypeIdCSV", "Description": "Filtering parameter for SampleTypeId. The value is comma separated value of SampleTypeId."}, {"Required": 0, "Name": "TraitIdCSV", "Description": "Filtering parameter for TraitId. The value is comma separated value of TraitId."}, {"Required": 0, "Name": "OperatorIdCSV", "Description": "Filtering parameter for OperatorId. The value is comma separated value of OperatorId."}, {"Required": 0, "Name": "MeasureDateTimeFrom", "Description": "Filtering parameter for MeasureDateTime. The value is correctly formatted date/time from which the item measurement was recorded."}, {"Required": 0, "Name": "MeasureDateTimeTo", "Description": "Filtering parameter for MeasureDateTime. The value is correctly formatted date/time to which the item measurement was recorded."}, {"Required": 0, "Name": "IMGroupIdCSV", "Description": "Filtering parameter for IMGroupId. The value is comma separated value of IMGroupId."}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self  = shift;
+  my $query = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  my $item_id_csv = '';
+
+  if (defined $query->param('ItemIdCSV')) {
+
+    $item_id_csv = $query->param('ItemIdCSV');
+  }
+
+  my $stype_id_csv = '';
+
+  if (defined $query->param('SampleTypeIdCSV')) {
+
+    $stype_id_csv = $query->param('SampleTypeIdCSV');
+  }
+
+  my $trait_id_csv = '';
+
+  if (defined $query->param('TraitIdCSV')) {
+
+    $trait_id_csv = $query->param('TraitIdCSV');
+  }
+
+  my $operator_id_csv = '';
+
+  if (defined $query->param('OperatorIdCSV')) {
+
+    $operator_id_csv = $query->param('OperatorIdCSV');
+  }
+
+  my $measure_dt_from = '';
+
+  if (defined $query->param('MeasureDateTimeFrom')) {
+
+    $measure_dt_from = $query->param('MeasureDateTimeFrom');
+  }
+
+  my $measure_dt_to = '';
+
+  if (defined $query->param('MeasureDateTimeTo')) {
+
+    $measure_dt_to = $query->param('MeasureDateTimeTo');
+  }
+
+  my $imgroup_id_csv = '';
+
+  if (defined $query->param('IMGroupIdCSV')) {
+
+    $imgroup_id_csv = $query->param('IMGroupIdCSV');
+  }
+
+  my $dbh = connect_kdb_read();
+
+  $self->logger->debug("ItemIdCSV: $item_id_csv");
+
+  my @where_phrases;
+
+  if (length($imgroup_id_csv) > 0) {
+
+    my ($smgrp_exist_err, $smgrp_rec_str) = record_exist_csv($dbh, 'imgroup', 'IMGroupId', $imgroup_id_csv);
+
+    if ($smgrp_exist_err) {
+
+      my $err_msg = "IMGroup ($smgrp_rec_str): not found.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my $where_smgrp = " IMGroupId IN ($smgrp_rec_str) ";
+    push(@where_phrases, $where_smgrp);
+  }
+
+  if (length($item_id_csv) > 0) {
+
+    my ($item_exist_err, $item_rec_str) = record_exist_csv($dbh, 'item', 'ItemId', $item_id_csv);
+
+    if ($item_exist_err) {
+
+      my $err_msg = "Item ($item_rec_str) not found.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my $where_item = " itemmeasurement.ItemId IN ($item_rec_str) ";
+    push(@where_phrases, $where_item);
+  }
+
+  if (length($stype_id_csv) > 0) {
+
+    my ($stype_exist_err, $stype_rec_str) = type_existence_csv($dbh, 'item', $stype_id_csv);
+
+    if ($stype_exist_err) {
+
+      my $err_msg = "SampleType ($stype_rec_str) not found.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my $where_stype = " SampleTypeId IN ($stype_rec_str) ";
+    push(@where_phrases, $where_stype);
+  }
+
+  if (length($trait_id_csv) > 0) {
+
+    my ($trait_exist_err, $trait_rec_str) = record_exist_csv($dbh, 'trait', 'TraitId', $trait_id_csv);
+
+    if ($trait_exist_err) {
+
+      my $err_msg = "Trait ($trait_rec_str) not found.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my $where_trait = " TraitId IN ($trait_rec_str) ";
+    push(@where_phrases, $where_trait);
+  }
+
+  if (length($operator_id_csv) > 0) {
+
+    my ($oper_exist_err, $oper_rec_str) = record_exist_csv($dbh, 'systemuser', 'UserId', $operator_id_csv);
+
+    if ($oper_exist_err) {
+
+      my $err_msg = "Operator ($oper_rec_str) not found.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my $where_operator = " OperatorId IN ($oper_rec_str) ";
+    push(@where_phrases, $where_operator);
+  }
+
+  my $where_measure_time = '';
+
+  if (length($measure_dt_from) > 0) {
+
+    my ($mdt_from_err, $mdt_from_msg) = check_dt_value( { 'MeasureDateTimeFrom' => $measure_dt_from } );
+
+    if ($mdt_from_err) {
+
+      my $err_msg = "$mdt_from_msg not date/time.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+    $where_measure_time = " MeasureDateTime >= '$measure_dt_from' ";
+  }
+
+  if (length($measure_dt_to) > 0) {
+
+
+    my ($mdt_to_err, $mdt_to_msg) = check_dt_value( { 'MeasureDateTimeTo' => $measure_dt_to } );
+
+    if ($mdt_to_err) {
+
+      my $err_msg = "$mdt_to_msg not date/time.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    if (length($where_measure_time) > 0) {
+
+      $where_measure_time .= " AND MeasureDateTime <= '$measure_dt_to' ";
+    }
+    else {
+
+      $where_measure_time = " MeasureDateTime <= '$measure_dt_to' ";
+    }
+  }
+
+  push(@where_phrases, $where_measure_time);
+
+  my @field_headers = ('ItemId', 'TraitId', 'OperatorId', 'MeasureDateTime',
+                       'InstanceNumber', 'SampleTypeId', 'TraitValue',
+                       'IMGroupId', 'StateReason');
+
+  my @sql_field_list;
+
+  foreach my $field_name (@field_headers) {
+
+    push(@sql_field_list, "itemmeasurement.${field_name}");
+  }
+
+  my $sql = 'SELECT ' . join(',', @sql_field_list) . ' ';
+  $sql   .= 'FROM itemmeasurement LEFT JOIN item ';
+  $sql   .= 'ON itemmeasurement.ItemId = item.ItemId ';
+
+  my $where_clause = '';
+  for my $phrase (@where_phrases) {
+
+    if (length($phrase) > 0) {
+
+      if (length($where_clause) > 0) {
+
+        $where_clause .= "AND $phrase";
+      }
+      else {
+
+        $where_clause .= "$phrase";
+      }
+    }
+  }
+
+  if (length($where_clause) > 0) {
+
+    $sql .= " WHERE $where_clause ";
+  }
+
+  my $export_data_sql_md5 = md5_hex($sql);
+
+  $self->logger->debug("SQL: $sql");
+
+  my $username          = $self->authen->username();
+  my $doc_root          = $ENV{'DOCUMENT_ROOT'};
+  my $export_data_path  = "${doc_root}/data/$username";
+  my $current_runmode   = $self->get_current_runmode();
+  my $lock_filename     = "${current_runmode}.lock";
+  my $filename          = "export_itemmeasurement_$export_data_sql_md5";
+  my $csv_file          = "${export_data_path}/${filename}.csv";
+
+  if ( !(-e $export_data_path) ) {
+
+    mkdir($export_data_path);
+  }
+
+  my $lockfile = File::Lockfile->new($lock_filename, $export_data_path);
+
+  my $pid = $lockfile->check();
+
+  if ($pid) {
+
+    $self->logger->debug("$lock_filename exists in $export_data_path");
+    my $msg = 'Lockfile exists: either another process of this export is running or ';
+    $msg   .= 'there was an unexpected error regarding clearing this lockfile.';
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $lockfile->write();
+
+  my $sth = $dbh->prepare($sql);
+  $sth->execute();
+
+  if ($dbh->err()) {
+
+    $lockfile->remove();
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $self->logger->debug("csv: $csv_file");
+
+  open(my $smeasure_csv_fh, ">$csv_file") or die "Can't open $csv_file for writing: $!";
+
+  print $smeasure_csv_fh '#' . join(',', @field_headers) . "\n";
+
+  while ( my $row_aref = $sth->fetchrow_arrayref() ) {
+
+    foreach my $col_entry (@{$row_aref}) {
+        if (length($col_entry)) {
+          $col_entry = qq|"$col_entry"|;
+        }
+        else {
+          $col_entry = "";
+        }
+    }
+
+    my $csv_line = join(',', @{$row_aref});
+
+    print $smeasure_csv_fh "$csv_line\n";
+  }
+
+  close($smeasure_csv_fh);
+
+  $lockfile->remove();
+
+  $sth->finish();
+
+  $self->logger->debug("Document root: $doc_root");
+
+  $dbh->disconnect();
+
+  my $url = reconstruct_server_url();
+
+  my $info_aref = [{ 'csv' => "$url/data/$username/${filename}.csv" }];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'OutputFile' => $info_aref };
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub import_imgroup_data_csv_runmode {
+
+=pod import_imgroup_data_csv_HELP_START
+{
+"OperationName": "Import item measurements in a group",
+"Description": "Import item measurements from a csv file formatted as a sparse matrix of phenotypic data in a group. It returns Item Measurement Group (IMGroupId) when the operation is successful.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"KDDArTModule": "main",
+"KDDArTTable": "imgroup",
+"SkippedField": ["OperatorId","IMGroupDateTime"],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='3 records of itemmeasurement have been inserted successfully.' /><StatInfo Unit='second' ServerElapsedTime='0.092' /><ReturnId Value='5' ParaName='IMGroupId' /></DATA>",
+"SuccessMessageJSON": "{'StatInfo' : [{'ServerElapsedTime' : '0.109','Unit' : 'second'}],'ReturnId' : [{'ParaName' : 'IMGroupId','Value' : '6'}],'Info' : [{'Message' : '3 records of itemmeasurement have been inserted successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Operator (16): not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Operator (16): not found.'}]}"}],
+"RequiredUpload": 1,
+"UploadFileFormat": "CSV",
+"UploadFileParameterName": "uploadfile",
+"HTTPParameter": [{"Required": 1, "Name": "ItemIdCol", "Description": "Column number counting from zero for ItemId column in the upload CSV file"}, {"Required": 1, "Name": "SampleTypeIdCol", "Description": "Column number counting from zero for SampleTypeId column in the upload CSV file"}, {"Required": 1, "Name": "TraitIdCol", "Description": "Column number counting from zero for TraitId column in the upload CSV file"}, {"Required": 1, "Name": "OperatorIdCol", "Description": "Column number counting from zero for OperatorId column for the upload CSV file"}, {"Required": 1, "Name": "MeasureDateTimeCol", "Description": "Column number counting from zero for MeasureDateTime column in the upload CSV file"}, {"Required": 1, "Name": "InstanceNumberCol", "Description": "Column number counting from zero for InstanceNumber column in the upload CSV file"}, {"Required": 1, "Name": "TraitValueCol", "Description": "Column number counting from zero for TraitValue column in the upload CSV file"}, {"Required": 0, "Name": "StateReasonCol", "Description": "Column number counting from zero for StateReason column in the upload CSV file for sub-plot scoring"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self     = shift;
+  my $query    = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  # Generic required static field checking
+
+  my $dbh_read = connect_kdb_read();
+
+  my $skip_field = {'OperatorId'      => 1,
+                    'IMGroupDateTime' => 1,
+                   };
+
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'imgroup', $skip_field);
+
+  if ($chk_sfield_err) {
+
+    $self->logger->debug($chk_sfield_msg);
+
+    return $for_postrun_href;
+  }
+
+  # Finish generic required static field checking
+
+  my $imgroup_name = $query->param('IMGroupName');
+
+  my $operator_id = $self->authen->user_id();
+
+  my $dbh_write = connect_kdb_write();
+
+  if (record_existence($dbh_write, 'imgroup', 'IMGroupName', $imgroup_name)) {
+
+    my $err_msg = "IMGroupName ($imgroup_name): already exists.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'IMGroupName' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $imgroup_status = undef;
+
+  if (defined $query->param('IMGroupStatus')) {
+
+    if (length($query->param('IMGroupStatus')) > 0) {
+
+      $imgroup_status = $query->param('IMGroupStatus');
+    }
+  }
+
+  my $imgroup_note = undef;
+
+  if (defined $query->param('IMGroupNote')) {
+
+    if (length($query->param('IMGroupNote')) > 0) {
+
+      $imgroup_note = $query->param('IMGroupNote');
+    }
+  }
+
+  my $cur_dt = DateTime->now( time_zone => $TIMEZONE );
+  $cur_dt = DateTime::Format::MySQL->format_datetime($cur_dt);
+
+  my $group_id = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  my $data_csv_file = $self->authen->get_upload_file();
+
+  my $num_of_col = get_csvfile_num_of_col($data_csv_file);
+
+  $self->logger->debug("Number of columns: $num_of_col");
+
+  my $ItemId_col          = $query->param('ItemIdCol');
+  my $SampleTypeId_col    = $query->param('SampleTypeIdCol');
+  my $TraitId_col         = $query->param('TraitIdCol');
+  my $MeasureDateTime_col = $query->param('MeasureDateTimeCol');
+  my $InstanceNumber_col  = $query->param('InstanceNumberCol');
+  my $TraitValue_col      = $query->param('TraitValueCol');
+
+  my $chk_col_href = { 'ItemIdCol'          => $ItemId_col,
+                       'SampleTypeIdCol'    => $SampleTypeId_col,
+                       'TraitIdCol'         => $TraitId_col,
+                       'MeasureDateTimeCol' => $MeasureDateTime_col,
+                       'InstanceNumberCol'  => $InstanceNumber_col,
+                       'TraitValueCol'      => $TraitValue_col,
+                     };
+
+  my $matched_col = {};
+
+  $matched_col->{$ItemId_col}          = 'ItemId';
+  $matched_col->{$SampleTypeId_col}    = 'SampleTypeId';
+  $matched_col->{$TraitId_col}         = 'TraitId';
+  $matched_col->{$MeasureDateTime_col} = 'MeasureDateTime';
+  $matched_col->{$InstanceNumber_col}  = 'InstanceNumber';
+  $matched_col->{$TraitValue_col}      = 'TraitValue';
+
+
+  my $StateReason_col = undef;
+
+  if (defined $query->param('StateReasonCol')) {
+
+    if (length($query->param('StateReasonCol')) > 0) {
+
+      $StateReason_col = $query->param('StateReasonCol');
+      $chk_col_href->{'StateReasonCol'} = $StateReason_col;
+
+      $matched_col->{$StateReason_col} = 'StateReason';
+    }
+  }
+
+  my $OperatorId_col      = undef;
+
+  if (defined $query->param('OperatorIdCol')) {
+
+    if (length($query->param('OperatorIdCol')) > 0) {
+
+      $OperatorId_col = $query->param('OperatorIdCol');
+      $chk_col_href->{'OperatorIdCol'} = $OperatorId_col;
+
+      $matched_col->{$OperatorId_col} = 'OperatorId';
+    }
+  }
+
+  my ($col_def_err, $col_def_err_href) = check_col_def_href( $chk_col_href, $num_of_col);
+
+  if ($col_def_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$col_def_err_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  my @fieldname_list;
+
+  for (my $i = 0; $i < $num_of_col; $i++) {
+    if ($matched_col->{$i}) {
+
+      push(@fieldname_list, $matched_col->{$i});
+    }
+    else {
+
+      push(@fieldname_list, 'null');
+    }
+  }
+
+  my ($data_aref, $csv_err, $err_msg) = csvfile2arrayref($data_csv_file, \@fieldname_list, 0);
+
+  if ($csv_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $sql = 'INSERT INTO imgroup SET ';
+  $sql   .= 'IMGroupName=?, ';
+  $sql   .= 'OperatorId=?, ';
+  $sql   .= 'IMGroupStatus=?, ';
+  $sql   .= 'IMGroupDateTime=?, ';
+  $sql   .= 'IMGroupNote=?';
+
+  my $sth = $dbh_write->prepare($sql);
+  $sth->execute($imgroup_name, $operator_id, $imgroup_status, $cur_dt, $imgroup_note);
+
+  my $imgroup_id = -1;
+
+  if ($dbh_write->err()) {
+
+    $self->logger->debug("Add imgroup record failed");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $imgroup_id = $dbh_write->last_insert_id(undef, undef, 'imgroup', 'IMGroupId');
+  $self->logger->debug("IMGroupID: $imgroup_id");
+
+  $sth->finish();
+
+  my $check_non_trait_field      = 1;
+  my $validate_trait_value       = 1;
+
+  $data_for_postrun_href = $self->insert_itemmeasurement_data_v2($dbh_write,
+                                                                $data_aref,
+                                                                $check_non_trait_field,
+                                                                $validate_trait_value,
+                                                                $imgroup_id,
+                                                               );
+
+  if ($data_for_postrun_href->{'Error'} == 1) {
+
+    # Delete IMGroup record and return $data_for_postrun_href
+    $sql = 'DELETE FROM imgroup WHERE IMGroupId=?';
+
+    $sth = $dbh_write->prepare($sql);
+    $sth->execute($imgroup_id);
+
+    if ($dbh_write->err()) {
+
+      $self->logger->debug("Delete imgroup record failed");
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  $dbh_write->disconnect();
+
+  my $return_id_aref = [{'Value'   => "$imgroup_id", 'ParaName' => 'IMGroupId'}];
+
+  $data_for_postrun_href->{'Data'}->{'ReturnId'} = $return_id_aref;
+
+  return $data_for_postrun_href;
+}
+
+#version 2 of import item measurement functions that return all errors in the CSV
+#version 2 of import item measurement functions that return all errors in the CSV
+sub insert_itemmeasurement_data_v2 {
+
+  my $self                = $_[0];
+  my $dbh_write           = $_[1];
+  my $data_aref           = $_[2];
+  my $chk_non_trait_field = $_[3];
+  my $validate_trait      = $_[4];
+
+  my $imgroup_id = 0;
+
+  if (defined $_[5]) {
+
+    $imgroup_id = $_[5];
+  }
+
+  my $data_for_postrun_href = {};
+
+  my $user_id       = $self->authen->user_id();
+  my $group_id      = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+  my $perm_str      = permission_phrase($group_id, 0, $gadmin_status);
+
+  #full error array with the following format for individual errors
+  # {'Row' => row of error, 'Type' => type of error, 'Message' => 'message', 'ErrorInput' => what input caused error}
+  my $full_error_aref = [];
+
+  if (scalar(@{$data_aref}) == 0) {
+
+    $self->logger->debug("No data provided");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'No data provided.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $bulk_sql = 'INSERT INTO itemmeasurement ';
+  $bulk_sql   .= '(ItemId,SampleTypeId,IMGroupId,TraitId,OperatorId,MeasureDateTime,InstanceNumber,TraitValue,StateReason) ';
+  $bulk_sql   .= 'VALUES ';
+
+  my $sql;
+  my $sth;
+
+  my $uniq_sam_type_href      = {};
+  my $sam_type_val_aref       = [];
+  my $sam_type_idx_aref       = [];
+
+  my $uniq_trait_id_href      = {};
+  my $trait_id_val_aref       = [];
+  my $trait_id_idx_aref       = [];
+
+  my $item_trait_id_val_aref    = [];
+  my $item_trait_id_idx_aref    = [];
+
+  my $uniq_operator_href      = {};
+  my $operator_val_aref       = [];
+  my $operator_idx_aref       = [];
+
+  my $trait_id2val_href       = {};
+  my $trait_id2idx_href       = {};
+
+  my $date_error_flag = 0;
+  my $date_error_aref = [];
+
+  my $row_counter = 1;
+  for my $data_row (@{$data_aref}) {
+    $self->logger->debug("$row_counter:");
+    for my $data_key (keys(%{$data_row})) {
+      $self->logger->debug("$data_key -> " .$data_row->{$data_key});
+    }  
+
+    $self->logger->debug("----");
+
+    my $effective_user_id = $user_id;
+    my $item_id           = $data_row->{'ItemId'};
+    my $samp_type_id      = $data_row->{'SampleTypeId'};
+    my $trait_id          = $data_row->{'TraitId'};
+    
+    $uniq_trait_id_href->{$trait_id}     = 1;
+    $uniq_sam_type_href->{$samp_type_id} = 1;
+
+    #$self->logger->debug("Checking non trait data: $chk_non_trait_field");
+
+    if ($chk_non_trait_field) {
+
+      my ($int_id_err, $int_id_msg) = check_integer_value( { 'ItemId'         => $data_row->{'ItemId'},
+                                                             'SampleTypeId'   => $data_row->{'SampleTypeId'},
+                                                             'TraitId'        => $data_row->{'TraitId'},
+                                                             'InstanceNumber' => $data_row->{'InstanceNumber'},
+                                                           });
+
+      if ($int_id_err) {
+
+        $int_id_msg = "Row ($row_counter): " . $int_id_msg . ' not integer.';
+
+        my $error_obj = {};
+
+        $error_obj->{'Message'} = $int_id_msg;
+        $error_obj->{'Row'} = $row_counter;
+        $error_obj->{'Type'} = 'ItemInteger';
+        $error_obj->{'ErrorInput'} = $int_id_msg;
+
+        push(@{$full_error_aref}, $error_obj);
+      }
+
+      if (length($data_row->{'OperatorId'}) > 0) {
+
+        my $operator_id = $data_row->{'OperatorId'};
+
+        my ($int_err, $int_msg) = check_integer_value( { 'OperatorId' => $operator_id } );
+
+        if ($int_err) {
+
+          $int_msg = "Row ($row_counter): " . $int_msg . ' not an integer.';
+
+          my $error_obj = {};
+
+          $error_obj->{'Message'} = $int_msg;
+          $error_obj->{'Row'} = $row_counter;
+          $error_obj->{'Type'} = 'OperatorInteger';
+          $error_obj->{'ErrorInput'} = $int_id_msg;
+
+          push(@{$full_error_aref}, $error_obj);
+        }
+
+        $uniq_operator_href->{$operator_id} = 1;
+        push(@{$operator_val_aref}, $operator_id);
+        push(@{$operator_idx_aref}, $row_counter);
+
+        $effective_user_id = $operator_id;
+      }
+    }
+
+
+    push(@{$sam_type_val_aref},$samp_type_id);
+    push(@{$sam_type_idx_aref},$row_counter);
+
+    if (length($data_row->{'OperatorId'}) > 0) {
+
+      $effective_user_id = $data_row->{'OperatorId'};
+    }
+    my $trait_val = $data_row->{'TraitValue'};
+    my $db_trait_val = $dbh_write->quote($trait_val);
+
+    if ($validate_trait) {
+
+      if (defined $trait_id2val_href->{$trait_id}) {
+
+        my $val_aref = $trait_id2val_href->{$trait_id};
+        push(@{$val_aref}, $trait_val);
+        $trait_id2val_href->{$trait_id} = $val_aref;
+      }
+      else {
+
+        $trait_id2val_href->{$trait_id} = [$trait_val];
+      }
+
+      if (defined $trait_id2idx_href->{$trait_id}) {
+
+        my $idx_aref = $trait_id2idx_href->{$trait_id};
+        push(@{$idx_aref}, $row_counter);
+        $trait_id2idx_href->{$trait_id} = $idx_aref;
+      }
+      else {
+
+        $trait_id2idx_href->{$trait_id} = [$row_counter];
+      }
+    }
+
+    my $measure_dt   = $data_row->{'MeasureDateTime'};
+
+    # Check measure date/time
+
+    my ($measure_dt_err, $measure_dt_msg) = check_dt_value( {'MeasureDateTime' => $measure_dt} );
+
+    if ($measure_dt_err) {
+
+      my $error_obj = {};
+
+      $error_obj->{'Message'} = $measure_dt_msg;
+      $error_obj->{'Row'} = $row_counter;
+      $error_obj->{'Type'} = 'Date';
+      $error_obj->{'ErrorInput'} = $measure_dt;
+
+      push(@{$full_error_aref}, $error_obj);
+    }
+
+    # End check measure date/time
+
+    my $instance_num = $data_row->{'InstanceNumber'};
+
+    my $state_reason      = 'NULL';
+
+    if (defined $data_row->{'StateReason'}) {
+
+      if (length($data_row->{'StateReason'}) > 0) {
+
+        $state_reason = $dbh_write->quote($data_row->{'StateReason'});
+      }
+    }
+
+    $bulk_sql .= "($item_id,$samp_type_id,$imgroup_id,$trait_id,$effective_user_id,";
+    $bulk_sql .= "'$measure_dt',$instance_num,$db_trait_val,$state_reason),";
+
+    $row_counter += 1;
+  }
+
+  chop($bulk_sql);      # remove excessive comma
+  #
+
+  my @trait_id_list = keys(%{$uniq_trait_id_href});
+
+  if (scalar(@trait_id_list) == 0) {
+
+    $self->logger->debug("List of trait id is empty");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  # Release the memorny
+  $uniq_trait_id_href = {};
+
+  $sql  = "SELECT TraitId, $perm_str AS UltimatePerm ";
+  $sql .= "FROM trait ";
+  $sql .= "WHERE TraitId IN (" . join(',', @trait_id_list) . ')';
+
+  my $trait_lookup = $dbh_write->selectall_hashref($sql, 'TraitId');
+
+  if ($dbh_write->err()) {
+
+    $self->logger->debug("Get trait info failed");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my @operator_list = keys(%{$uniq_operator_href});
+
+  if (scalar(@operator_list) > 0) {
+
+    $sql = "SELECT UserId FROM systemuser WHERE UserId IN (" . join(',', @operator_list) . ")";
+
+    my $operator_lookup = $dbh_write->selectall_hashref($sql, 'UserId');
+
+    if ($dbh_write->err()) {
+
+      $self->logger->debug("Get operator info failed");
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    for (my $i = 0; $i < scalar(@{$operator_val_aref}); $i++) {
+
+      my $oper_id  = $operator_val_aref->[$i];
+      my $row_num  = $operator_idx_aref->[$i];
+
+      if (! defined $operator_lookup->{$oper_id}) {
+
+        my $err_msg = "Row ($row_num): Operator ($oper_id) does not exist.";
+
+        my $error_obj = {};
+
+        $error_obj->{'Message'} = $err_msg;
+        $error_obj->{'Row'} = $row_num;
+        $error_obj->{'Type'} = "Operator";
+        #$error_obj->{'Date'} = $measure_dt;
+        $error_obj->{'ErrorInput'} = "Operator ($oper_id)";
+
+        push(@{$full_error_aref}, $error_obj);
+      }
+    }
+  }
+
+  my @sample_type_list = keys(%{$uniq_sam_type_href});
+
+  if (scalar(@sample_type_list) == 0) {
+
+    $self->logger->debug("List of sample type id is empty");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sql  = "SELECT TypeId FROM generaltype WHERE Class='sample' AND ";
+  $sql .= "TypeId IN (" . join(',', @sample_type_list) . ")";
+
+  my $sample_type_lookup = $dbh_write->selectall_hashref($sql, 'TypeId');
+
+  if ($dbh_write->err()) {
+
+    $self->logger->debug("Get sample type info failed");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  for (my $i = 0; $i < scalar(@{$sam_type_val_aref}); $i++) {
+
+    my $sam_type_id = $sam_type_val_aref->[$i];
+    my $row_num     = $sam_type_idx_aref->[$i];
+
+    if (! defined $sample_type_lookup->{$sam_type_id}) {
+
+      my $err_msg = "Row ($row_num): SampleType ($sam_type_id) does not exist.";
+
+      my $error_obj = {};
+
+      $error_obj->{'Message'} = $err_msg;
+      $error_obj->{'Row'} = $row_num;
+      $error_obj->{'Type'} = "SampleType";
+      #$error_obj->{'Date'} = $measure_dt;
+      $error_obj->{'ErrorInput'} = "SampleType ($sam_type_id)";
+
+      push(@{$full_error_aref}, $error_obj);
+    }
+  }
+
+  my $trait_validation_error_aref = [];
+
+  $self->logger->debug("Now trying to validate trait values");
+
+  for my $trait_id2val (keys(%{$trait_id2val_href})) {
+    $self->logger->debug("Trait: $trait_id2val");
+  }
+
+  my ($v_trait_val_err, $invalid_error_message,
+      $v_trait_id_href, $trait_validation_error_aref) = validate_trait_db_bulk_v2($dbh_write, $trait_id2val_href,$self);
+
+  $self->logger->debug("Validation Error: $v_trait_val_err");
+  $self->logger->debug("Validation Error: $invalid_error_message");
+  $self->logger->debug("Number of Validation Error: " . scalar(@{$trait_validation_error_aref}));
+
+  if ($v_trait_val_err) {
+
+    foreach my $invalid_obj (@{$trait_validation_error_aref}) {
+
+      my $v_trait_id = $invalid_obj->{'Trait'};
+      my $v_trait_idx = $invalid_obj->{'Index'};
+      my $v_trait_val_msg = $invalid_obj->{'Message'};
+      my $v_trait_val = $invalid_obj->{'Value'};
+
+      $self->logger->debug("Validation error on TraitId: $v_trait_id - index: $v_trait_idx");
+      my $row_num = $trait_id2idx_href->{$v_trait_id}->[$v_trait_idx];
+      my $err_msg = "Row ($row_num): $v_trait_val_msg";
+
+      my $error_obj = {};
+
+      $error_obj->{'Message'} = $err_msg;
+      $error_obj->{'Row'} = $row_num;
+      $error_obj->{'Type'} = "Validation";
+      #$error_obj->{'Date'} = $measure_dt;
+      $error_obj->{'ErrorInput'} = "$v_trait_val (Trait $v_trait_id)";
+
+      push(@{$full_error_aref}, $error_obj);
+    }
+
+  }
+
+  foreach my $error_obj (@{$full_error_aref}) {
+      $self->logger->debug($error_obj->{'Row'}. ": " . $error_obj->{'Message'});
+  }
+
+  if (scalar(@{$full_error_aref}) > 0) {
+    my $err_msg = 'Issues with CSV identified.';
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg,'ErrorList' => $full_error_aref}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $self->logger->debug("Bulk SQL: $bulk_sql");
+
+  my $nrows_inserted = $dbh_write->do($bulk_sql);
+
+  if ($dbh_write->err()) {
+
+    $self->logger->debug("Db err code: " . $dbh_write->err());
+
+    if ($dbh_write->err() == 1062) {
+
+      my $err_str = $dbh_write->errstr();
+
+      $err_str =~ /Duplicate entry '(.+)'/;
+      my $err_msg = "Duplicate Entry: $1";
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+    else {
+
+      $self->logger->debug('Error code: ' . $dbh_write->err());
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  my $info_msg = "$nrows_inserted records of itemmeasurement have been inserted successfully.";
+  my $info_msg_aref = [{'Message' => $info_msg}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'      => $info_msg_aref};
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub list_itemmeasurement_advanced_runmode {
+
+=pod list_itemmeasurement_advanced_HELP_START
+{
+"OperationName": "List item measurements",
+"Description": "List item measurements. This listing requires pagination definition.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "FILTERING"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Pagination Page='1' NumOfRecords='27823' NumOfPages='557' NumPerPage='50' /><StatInfo ServerElapsedTime='0.444' Unit='second' /><RecordMeta TagName='itemmeasurement' /><itemmeasurement OperatorId='0' TraitValue='40' InstanceNumber='6' ItemId='17572' MeasureDateTime='2011-01-15 14:28:37' SampleTypeId='328' TraitId='70' /></DATA>",
+"SuccessMessageJSON": "{'Pagination' : [{'NumOfPages' : 16,'Page' : '1','NumPerPage' : '3','NumOfRecords' : '47'}],'StatInfo' : [{'Unit' : 'second','ServerElapsedTime' : '0.006'}],'RecordMeta' : [{'TagName' : 'itemmeasurement'}],'itemmeasurement' : [{'SampleTypeId' : '161','InstanceNumber' : '5','TraitValue' : '11','ItemId' : '23','IMGroupId' : '15','StateReason' : 'TEST','TraitId' : '23','OperatorId' : '0','MeasureDateTime' : '2011-01-15 14:28:37'},{'ItemId' : '23','TraitValue' : '40','InstanceNumber' : '6','SampleTypeId' : '161','OperatorId' : '0','MeasureDateTime' : '2011-01-15 14:28:37','StateReason' : 'TEST','TraitId' : '23','IMGroupId' : '15'},{'StateReason' : 'TEST','TraitId' : '23','MeasureDateTime' : '2011-01-15 14:28:37','OperatorId' : '0','IMGroupId' : '15','TraitValue' : '16','InstanceNumber' : '6','ItemId' : '23','SampleTypeId' : '161'}]}",
+"ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
+"ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
+"URLParameter": [{"ParameterName": "nperpage", "Description": "Number of records in a page for pagination"}, {"ParameterName": "num", "Description": "The page number of the pagination"}],
+"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database field name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "FieldList", "Description": "Comma separated value of wanted fields."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases."}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self  = shift;
+
+  my $query = $self->query();
+
+  my $data_for_postrun_href   = {};
+
+  my $pagination  = 0;
+  my $nb_per_page = -1;
+  my $page        = -1;
+
+  if ( (defined $self->param('nperpage')) && (defined $self->param('num'))) {
+
+    $pagination  = 1;
+    $nb_per_page = $self->param('nperpage');
+    $page        = $self->param('num');
+  }
+
+  my $group_id = $self->authen->group_id();
+
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  my $perm_str = permission_phrase($group_id, 0, $gadmin_status, 'trait');
+
+  my $field_list_csv = '';
+
+  if (defined $query->param('FieldList')) {
+
+    $field_list_csv = $query->param('FieldList');
+  }
+
+  my $filtering_csv = '';
+
+  if (defined $query->param('Filtering')) {
+
+    $filtering_csv = $query->param('Filtering');
+  }
+
+  my $sorting = '';
+  if (defined $query->param('Sorting')) {
+
+    $sorting  = $query->param('Sorting');
+  }
+
+  if (defined $self->param('sampletypeid')) {
+
+    my $sampletype_id  = $self->param('sampletype_id');
+
+    if ($filtering_csv = ~ /SampleTypeId=(.*),?/) {
+
+      if ("$sampletype_id" ne "$1" ) {
+
+        my $err_msg  = 'Duplicate filtering condition for SampleTypeId. ';
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+        return $data_for_postrun_href;
+      }
+    }
+    else {
+
+      if (length($filtering_csv) > 0) {
+
+        if ($filtering_csv =~ /&$/) {
+
+          $filtering_csv   .=  "SampleTypeId=$sampletype_id";
+        }
+        else {
+
+          $filtering_csv    .=  "&SampleTypeId=$sampletype_id";
+        }
+      }
+      else {
+
+        $filtering_csv       .=  "SampleTypeId=$sampletype_id";
+      }
+    }
+  }
+
+  my $field_list = $field_list_csv;
+
+  my $sql = 'SELECT itemmeasurement.* FROM itemmeasurement ';
+  $sql   .= 'ORDER BY itemmeasurement.ItemId DESC ';
+  $sql   .= 'LIMIT 1 ';
+
+  my ($read_im_err, $read_im_msg, $im_data) = $self->list_itemmeasurement($sql, 0, $field_list);
+
+  if ($read_im_err) {
+
+    $self->logger->debug($read_im_msg);
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $dbh =  connect_kdb_read();
+
+  my $item_data_aref = $im_data;
+
+  my @field_list_all;
+
+  if (scalar(@{$item_data_aref}) == 1) {
+
+    @field_list_all = keys(%{$item_data_aref->[0]});
+  }
+  else {
+
+    my ($sfield_err, $sfield_msg, $sfield_data, $pkey_data) = get_static_field($dbh, 'itemmeasurement');
+
+    if ($sfield_err) {
+
+      $self->logger->debug("Get static field failed: $sfield_msg");
+      return $self->_set_error();
+    }
+
+    for my $sfield_rec (@{$sfield_data}) {
+
+      push(@field_list_all, $sfield_rec->{'Name'});
+    }
+
+    for my $pkey_field (@{$pkey_data}) {
+
+      push(@field_list_all, $pkey_field);
+    }
+  }
+
+  $self->logger->debug("Field list all: " . join(',', @field_list_all));
+
+  my $final_field_list = \@field_list_all;
+
+  if (length($field_list_csv) > 0) {
+
+    my ($sel_field_err, $sel_field_msg, $sel_field_list) = parse_selected_field($field_list_csv,
+                                                                                \@field_list_all,
+                                                                                'SampleTypeId');
+
+    if ($sel_field_err) {
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $sel_field_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    $final_field_list = $sel_field_list;
+
+    if ($filtering_csv =~ /SampleTypeId/) {
+
+      push(@{$final_field_list}, 'SampleTypeId');
+    }
+  }
+
+  my ($filter_err, $filter_msg, $filter_phrase, $where_arg) = parse_filtering_v2('SampleTypeId',
+                                                                                 'itemmeasurement',
+                                                                                 $filtering_csv,
+                                                                                 $final_field_list);
+
+
+  $self->logger->debug("Filter phrase: $filter_phrase");
+
+  if ($filter_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $filter_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $filter_where_phrase = '';
+  if (length($filter_phrase) > 0) {
+
+    $filter_where_phrase = " AND $filter_phrase ";
+  }
+
+  my $filtering_exp  = " WHERE (($perm_str) & $READ_PERM) = $READ_PERM $filter_where_phrase ";
+
+  my $pagination_aref = [];
+  my $paged_limit_clause = '';
+
+  if ($pagination) {
+
+    my ($int_err, $int_err_msg)  = check_integer_value ({'nperpage' => $nb_per_page,
+                                                         'num'      => $page
+                                                        });
+
+    if ($int_err) {
+
+      $int_err_msg .= ' not integer';
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error'  =>  [{'Message' => $int_err_msg}]};
+      return $data_for_postrun_href;
+    }
+
+    my $count_sql =  "SELECT COUNT(*) ";
+    $count_sql   .=  "FROM itemmeasurement ";
+    $count_sql   .=  "LEFT JOIN trait ON itemmeasurement.TraitId = trait.TraitId ";
+    $count_sql   .=  "$filtering_exp";
+
+    $self->logger->debug("COUNT SQL: $count_sql");
+
+    my ($paged_id_err, $paged_id_msg, $nb_records,
+        $nb_pages, $limit_clause, $sql_count_time) = get_paged_filter_sql($dbh,
+                                                                          $nb_per_page,
+                                                                          $page,
+                                                                          $count_sql,
+                                                                          $where_arg);
+
+
+    $self->logger->debug("SQL Count time: $sql_count_time");
+
+    if ($paged_id_err == 1) {
+
+      $self->logger->debug($paged_id_msg);
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    if ($paged_id_err == 2) {
+
+      $page = 0;
+    }
+
+    $pagination_aref = [{'NumOfRecords' => $nb_records,
+                         'NumOfPages'   => $nb_pages,
+                         'Page'         => $page,
+                         'NumPerPage'   => $nb_per_page,
+                        }];
+
+    $paged_limit_clause = $limit_clause;
+  }
+
+  $dbh->disconnect();
+
+  my $sql_field_lookup = {};
+
+  my $other_join = '';
+
+  if ($sql_field_lookup->{'SampleTypeId'}) {
+
+    $other_join .=  ' LEFT JOIN generaltype ON itemmeasurement.SampleTypeId = generaltype.TypeId ';
+  }
+
+  $sql    =  "SELECT itemmeasurement.*, trait.TraitName  FROM itemmeasurement ";
+  $sql   .=  "LEFT JOIN trait ON trait.TraitId = itemmeasurement.TraitId ";
+  $sql   .=  "$other_join ";
+  $sql   .=  "$filtering_exp ";
+
+  my ($sort_err, $sort_msg, $sort_sql) = parse_sorting($sorting, $final_field_list);
+
+  if ($sort_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $sort_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (length($sort_sql) > 0) {
+
+    $sql    .= " ORDER BY $sort_sql";
+  }
+  else {
+
+    $sql    .= 'ORDER BY itemmeasurement.ItemId DESC';
+  }
+
+  $sql   .=  " $paged_limit_clause ";
+
+  my ($read_item_err, $read_item_msg, $item_data)   =  $self->list_itemmeasurement($sql, $where_arg, $field_list);
+
+  if ($read_item_err) {
+
+    $self->logger->debug($read_item_msg);
+    $data_for_postrun_href->{'Error'}  =  1;
+    $data_for_postrun_href->{'Data'}   =  {'Error' =>  [{'Message' => 'Unexpected error. '}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $data_for_postrun_href->{'Error'}   = 0;
+  $data_for_postrun_href->{'Data'}    = {'itemmeasurement'         =>   $item_data,
+                                         'Pagination'              =>   $pagination_aref,
+                                         'RecordMeta'              =>   [{'TagName' => 'itemmeasurement'}],
+                                        };
+
+  return $data_for_postrun_href;
+}
+
+sub list_itemmeasurement {
+
+  my $self            = $_[0];
+  my $sql             = $_[1];
+  my $where_para_aref = $_[2];
+  my $field_list      = $_[3];
+
+  my $err = 0;
+  my $msg = '';
+
+  my $data_aref = [];
+
+  my $sql_update       = $sql;
+
+  my $sql_select_field = ['itemmeasurement.ItemId',
+                          'itemmeasurement.TraitId',
+                          'itemmeasurement.OperatorId',
+                          'itemmeasurement.MeasureDateTime',
+                          'itemmeasurement.InstanceNumber',
+                          'itemmeasurement.SampleTypeId',
+                          'itemmeasurement.TraitValue' ];
+
+  $sql_select_field       =  join(',', @{$sql_select_field});
+  $self->logger->debug("SQL 1: $sql");
+
+  $sql_update  =~ s/SELECT itemmeasurement.\*/ $sql_select_field /;
+  
+  $sql = 'SELECT' . $sql_update;
+  $self->logger->debug("SQL 2: $sql");
+
+  my $dbh = connect_kdb_read();
+
+  ($err, $msg, $data_aref) = read_data($dbh, $sql, $where_para_aref);
+
+  if ($err) {
+
+    return ($err, $msg, []);
+  }
+
+  $dbh->disconnect();
+
+  return ($err, $msg, $data_aref);
+}
+
+sub list_imgroup_runmode {
+
+=pod list_imgroup_HELP_START
+{
+"OperationName": "List itemmeasurement groups",
+"Description": "List available itemmeasurement group.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><RecordMeta TagName='IMGroup' /><IMGroup  OperatorId='0' NumOfMeasurement='3' IMGroupDateTime='2017-04-19 15:22:10' IMGroupId='6' OperatorUserName='admin' IMGroupName='IMGroup_Test_31217813748' IMGroupStatus='TEST' IMGroupNote='Testing' update='update/imgroup/6' delete='delete/imgroup/6' /><StatInfo ServerElapsedTime='0.006' Unit='second' /></DATA>",
+"SuccessMessageJSON": "{'RecordMeta' : [{'TagName' : 'IMGroup'}],'StatInfo' : [{'ServerElapsedTime' : '0.007','Unit' : 'second'}],'IMGroup' : [{'IMGroupId' : '6','IMGroupDateTime' : '2017-04-19 15:22:10','OperatorId' : '0','NumOfMeasurement' : '3',delete' : 'delete/imgroup/6','IMGroupName' : 'IMGroup_Test_31217813748','update' : 'update/imgroup/6','IMGroupNote' : 'Testing','IMGroupStatus' : 'TEST','OperatorUserName' : 'admin'}]}",
+"ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
+"ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self     = shift;
+  my $query    = $self->query();
+
+  my $filtering_csv = '';
+
+  if (defined $query->param('Filtering')) {
+
+    $filtering_csv = $query->param('Filtering');
+  }
+
+  my $data_for_postrun_href = {};
+
+  my $dbh = connect_kdb_read();
+
+  my $group_id = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  $dbh->disconnect();
+
+  my $sql = 'SELECT imgroup.*, systemuser.UserName AS OperatorUserName ';
+  $sql   .= 'FROM imgroup LEFT JOIN systemuser ON imgroup.OperatorId = systemuser.UserId ';
+
+  my $filter_field_list = ['IMGroupName', 'OperatorId', 'IMGroupStatus', 'IMGroupDateTime', 'IMGroupNote'];
+
+  my ($filter_err, $filter_msg, $filter_phrase, $where_arg) = parse_filtering('IMGroupId',
+                                                                              'imgroup',
+                                                                              $filtering_csv,
+                                                                              $filter_field_list);
+
+  if ($filter_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $filter_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (length($filter_phrase) > 0) {
+
+    $sql .= " AND $filter_phrase";
+  }
+
+
+  my ($read_imgrp_err, $read_imgrp_msg, $imgrp_data) = $self->list_imgroup(1, 0, $sql, $where_arg);
+
+  if ($read_imgrp_err) {
+
+    $self->logger->debug($read_imgrp_msg);
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'IMGroup'    => $imgrp_data,
+                                           'RecordMeta' => [{'TagName' => 'IMGroup'}],
+  };
+
+  return $data_for_postrun_href;
+}
+
+sub list_imgroup {
+
+  my $self            = $_[0];
+  my $extra_attr_yes  = $_[1];
+  my $detail_attr_yes = $_[2];
+  my $sql             = $_[3];
+  my $where_para_aref = $_[4];
+
+  my $err       = 0;
+  my $msg       = '';
+  my $data_aref = [];
+
+  my $dbh = connect_kdb_read();
+
+  ($err, $msg, $data_aref) = read_data($dbh, $sql, $where_para_aref);
+
+  if ($err) {
+
+    return ($err, $msg, []);
+  }
+
+  my $imgroup_id_aref    = [];
+
+  my $imcount_lookup     = {};
+  my $trait_lookup       = {};
+  my $item_lookup  = {};
+
+  my $uniq_imgrp_trait_href   = {};
+  my $uniq_imgrp_item_href      = {};
+
+  if ($extra_attr_yes || $detail_attr_yes) {
+
+    for my $imgroup_rec (@{$data_aref}) {
+
+      push(@{$imgroup_id_aref}, $imgroup_rec->{'IMGroupId'});
+    }
+
+    if (scalar(@{$imgroup_id_aref}) > 0) {
+
+      my $count_sql = 'SELECT IMGroupId, COUNT(ItemId) AS NumOfMeasurement ';
+      $count_sql   .= 'FROM itemmeasurement ';
+      $count_sql   .= 'WHERE IMGroupId IN (' . join(',', @{$imgroup_id_aref}) . ') ';
+      $count_sql   .= 'GROUP BY IMGroupId;';
+
+      $self->logger->debug("COUNT MEASUREMENT SQL: $count_sql");
+
+      $imcount_lookup = $dbh->selectall_hashref($count_sql, 'IMGroupId');
+
+      if ($dbh->err()) {
+
+        $self->logger->debug("Count number of itemmeasurement failed");
+        $err = 1;
+        $msg = 'Unexpected Error';
+
+        return ($err, $msg, []);
+      }
+
+    }
+  }
+
+  my $extra_attr_imgroup_data = [];
+
+  my $user_id = $self->authen->user_id();
+
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  if ($extra_attr_yes) {
+
+    for my $imgroup_rec (@{$data_aref}) {
+
+      my $imgrp_id     = $imgroup_rec->{'IMGroupId'};
+      my $operator_id  = $imgroup_rec->{'OperatorId'};
+
+      if ("$operator_id" eq "$user_id") {
+
+        $imgroup_rec->{'update'} = "update/imgroup/${imgrp_id}";
+        $imgroup_rec->{'delete'} = "delete/imgroup/${imgrp_id}";
+      }
+
+      if (defined $imcount_lookup->{$imgrp_id}) {
+
+        $imgroup_rec->{'NumOfMeasurement'} = $imcount_lookup->{$imgrp_id}->{'NumOfMeasurement'};
+      }
+
+      if ($detail_attr_yes) {
+
+        if (defined $trait_lookup->{$imgrp_id}) {
+
+          $imgroup_rec->{'Trait'} = $trait_lookup->{$imgrp_id};
+        }
+
+        if (defined $item_lookup->{$imgrp_id}) {
+
+          $imgroup_rec->{'Item'} = $item_lookup->{$imgrp_id};
+        }
+
+      }
+
+      push(@{$extra_attr_imgroup_data}, $imgroup_rec);
+    }
+  }
+  else {
+
+    $extra_attr_imgroup_data = $data_aref;
+  }
+
+  $dbh->disconnect();
+
+  return ($err, $msg, $extra_attr_imgroup_data);
+}
+
+sub update_imgroup_runmode {
+
+=pod update_imgroup_HELP_START
+{
+"OperationName": "Update itemmeasurement group",
+"Description": "Update detail information about a itemmeasurement group.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"KDDArTModule": "main",
+"KDDArTTable": "imgroup",
+"SkippedField": ["OperatorId","IMGroupDateTime"],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><StatInfo Unit='second' ServerElapsedTime='0.047' /><Info Message='IMGroup (9) has been updated successfully.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'IMGroup (10) has been updated successfully.'}],'StatInfo' : [{'Unit' : 'second','ServerElapsedTime' : '0.075'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='IMGroup (7): not found.' /><StatInfo ServerElapsedTime='0.013' Unit='second' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'IMGroup (7): not found.'}],'StatInfo' : [{'Unit' : 'second','ServerElapsedTime' : '0.013'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing IMGroupId"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self       = shift;
+  my $imgroup_id = $self->param('id');
+  my $query      = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  # Generic required static field checking
+
+  my $dbh_read = connect_kdb_read();
+
+  my $skip_field = {'OperatorId'      => 1,
+                    'IMGroupDateTime' => 1,
+                   };
+
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'imgroup', $skip_field);
+
+  if ($chk_sfield_err) {
+
+    $self->logger->debug($chk_sfield_msg);
+
+    return $for_postrun_href;
+  }
+
+  # Finish generic required static field checking
+
+  my $dbh = connect_kdb_read();
+
+  my $chk_sql = 'SELECT OperatorId, IMGroupName, IMGroupStatus, IMGroupNote ';
+  $chk_sql   .= 'FROM imgroup WHERE IMGroupId=?';
+
+  my ($r_imgrp_err, $r_imgrp_msg, $imgrp_data) = read_data($dbh, $chk_sql, [$imgroup_id]);
+
+  if ($r_imgrp_err) {
+
+    $self->logger->debug("Get info about existing imgroup failed: $r_imgrp_msg");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (scalar(@{$imgrp_data}) == 0) {
+
+    my $err_msg = "IMGroup ($imgroup_id): not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $operator_id    = $imgrp_data->[0]->{'OperatorId'};
+  my $db_imgrp_name  = $imgrp_data->[0]->{'IMGroupName'};
+
+  my $imgroup_status = undef;
+
+  if (defined $imgrp_data->[0]->{'IMGroupStatus'}) {
+
+    if (length($imgrp_data->[0]->{'IMGroupStatus'}) > 0) {
+
+      $imgroup_status = $imgrp_data->[0]->{'IMGroupStatus'};
+    }
+  }
+
+  $imgroup_status = $query->param('IMGroupStatus');
+
+  if (length($imgroup_status) == 0) {
+
+    $imgroup_status = undef;
+  }
+
+  my $imgroup_note = undef;
+
+  if (defined $imgrp_data->[0]->{'IMGroupNote'}) {
+
+    if (length($imgrp_data->[0]->{'IMGroupNote'}) > 0) {
+
+      $imgroup_note = $imgrp_data->[0]->{'IMGroupNote'};
+    }
+  }
+
+  $imgroup_note = $query->param('IMGroupNote');
+
+  if (length($imgroup_note) == 0) {
+
+    $imgroup_note = undef;
+  }
+
+  my $group_id = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  $dbh->disconnect();
+
+  my $user_id = $self->authen->user_id();
+
+  if ("$user_id" ne "0") {
+
+    if ("$user_id" ne "$operator_id") {
+
+      my $err_msg = "Permission denied: User ($user_id).";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  my $dbh_write = connect_kdb_write();
+
+  my $cur_dt = DateTime->now( time_zone => $TIMEZONE );
+  $cur_dt = DateTime::Format::MySQL->format_datetime($cur_dt);
+
+  my $imgroup_name = $query->param('IMGroupName');
+
+  if ($imgroup_name ne $db_imgrp_name) {
+
+    if (record_existence($dbh_write, 'imgroup', 'IMGroupName', $imgroup_name)) {
+
+      my $err_msg = "IMGroup ($imgroup_name): already exists.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'IMGroupName' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  my $sql = 'UPDATE imgroup SET ';
+  $sql   .= 'IMGroupName=?, ';
+  $sql   .= 'IMGroupStatus=?, ';
+  $sql   .= 'IMGroupDateTime=?, ';
+  $sql   .= 'IMGroupNote=? ';
+  $sql   .= 'WHERE IMGroupId=?';
+
+  my $sth = $dbh_write->prepare($sql);
+  $sth->execute($imgroup_name, $imgroup_status, $cur_dt, $imgroup_note, $imgroup_id);
+
+  if ($dbh_write->err()) {
+
+    $self->logger->debug("Update IMGroup failed");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+  $sth->finish();
+
+  $dbh_write->disconnect();
+
+  my $info_msg_aref = [{'Message' => "IMGroup ($imgroup_id) has been updated successfully."}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'      => $info_msg_aref};
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub get_imgroup_runmode {
+
+=pod get_imgroup_HELP_START
+{
+"OperationName": "Get itemmeasurement group",
+"Description": "Get detail information about a itemmeasurement group.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><IMGroup update='update/imgroup/6' NumOfMeasurement='3' IMGroupDateTime='2017-04-19 15:22:10' OperatorUserName='admin' IMGroupStatus='TEST' IMGroupNote='Testing' IMGroupId='6' delete='delete/imgroup/6' IMGroupName='IMGroup_Test_31217813748' OperatorId='0'><Trait TraitId='14' TraitName='Trait_75223850117' /><Item ItemId='14' /></IMGroup><StatInfo Unit='second' ServerElapsedTime='0.015' /><RecordMeta TagName='IMGroup' /></DATA>",
+"SuccessMessageJSON": "{'RecordMeta' : [{'TagName' : 'IMGroup'}],'IMGroup' : [{'NumOfMeasurement' : '3','update' : 'update/imgroup/6','Trait' : [{'TraitName' : 'Trait_75223850117','TraitId' : '14'}],'Item' : [{'ItemId' : '14'}],'IMGroupDateTime' : '2017-04-19 15:22:10','OperatorUserName' : 'admin','IMGroupStatus' : 'TEST','IMGroupNote' : 'Testing','IMGroupId' : '6','IMGroupName' : 'IMGroup_Test_31217813748','delete' : 'delete/imgroup/6','OperatorId' : '0'}],'StatInfo' : [{'ServerElapsedTime' : '0.018','Unit' : 'second'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='IMGroup (7): not found.' /><StatInfo ServerElapsedTime='0.013' Unit='second' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'IMGroup (7): not found.'}],'StatInfo' : [{'Unit' : 'second','ServerElapsedTime' : '0.013'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing IMGroupId"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self       = shift;
+  my $imgroup_id = $self->param('id');
+  my $query      = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  my $dbh = connect_kdb_read();
+
+  my $group_id = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  $dbh->disconnect();
+
+  my $sql = 'SELECT imgroup.*, systemuser.UserName AS OperatorUserName ';
+  $sql   .= 'FROM imgroup LEFT JOIN systemuser ON imgroup.OperatorId = systemuser.UserId ';
+  $sql   .= 'WHERE IMGroupId = ?';
+
+  my ($read_imgrp_err, $read_imgrp_msg, $imgrp_data) = $self->list_imgroup(1, 1, $sql, [$imgroup_id]);
+
+  if ($read_imgrp_err) {
+
+    $self->logger->debug($read_imgrp_msg);
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'IMGroup'    => $imgrp_data,
+                                           'RecordMeta' => [{'TagName' => 'IMGroup'}],
+  };
+
+  return $data_for_postrun_href;
+}
+
+sub delete_imgroup_runmode {
+
+=pod delete_imgroup_HELP_START
+{
+"OperationName": "Delete itemmeasurement group",
+"Description": "Delete a itemmeasurement group and its associated itemmeasurement records.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><StatInfo ServerElapsedTime='0.075' Unit='second' /><Info Message='IMGroup (12) and its itemmeasurement records have been deleted successfully.' /></DATA>",
+"SuccessMessageJSON": "{'StatInfo' : [{'ServerElapsedTime' : '0.074','Unit' : 'second'}],'Info' : [{'Message' : 'IMGroup (11) and its itemmeasurement records have been deleted successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='IMGroup (7): not found.' /><StatInfo ServerElapsedTime='0.013' Unit='second' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'IMGroup (7): not found.'}],'StatInfo' : [{'Unit' : 'second','ServerElapsedTime' : '0.013'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing IMGroupId"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self       = shift;
+  my $imgroup_id = $self->param('id');
+  my $query      = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  my $dbh_write = connect_kdb_write();
+
+  my $chk_sql = 'SELECT OperatorId, IMGroupName, IMGroupStatus, IMGroupNote ';
+  $chk_sql   .= 'FROM imgroup WHERE IMGroupId=?';
+
+  my ($r_imgrp_err, $r_imgrp_msg, $imgrp_data) = read_data($dbh_write, $chk_sql, [$imgroup_id]);
+
+  if ($r_imgrp_err) {
+
+    $self->logger->debug("Get info about existing imgroup failed: $r_imgrp_msg");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (scalar(@{$imgrp_data}) == 0) {
+
+    my $err_msg = "IMGroup ($imgroup_id): not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $operator_id    = $imgrp_data->[0]->{'OperatorId'};
+
+  my $group_id = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  my $user_id = $self->authen->user_id();
+
+  if ("$user_id" ne "0") {
+
+    if ("$user_id" ne "$operator_id") {
+
+      my $err_msg = "Permission denied: User ($user_id).";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  my $sql = 'DELETE FROM itemmeasurement WHERE IMGroupId=?';
+
+  my $sth = $dbh_write->prepare($sql);
+
+  $sth->execute($imgroup_id);
+
+  if ($dbh_write->err()) {
+
+    $self->logger->debug("Delete itemmeasurement failed");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+  $sth->finish();
+
+  $sql = 'DELETE FROM imgroup where IMGroupId=?';
+
+  $sth = $dbh_write->prepare($sql);
+
+  $sth->execute($imgroup_id);
+
+  if ($dbh_write->err()) {
+
+    $self->logger->debug("Delete itemroup failed");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+  $sth->finish();
+
+  $dbh_write->disconnect();
+
+  my $info_msg_aref = [{'Message' => "IMGroup ($imgroup_id) and its itemmeasurement records have been deleted successfully."}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'      => $info_msg_aref};
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub list_crossingmeasurement_advanced_runmode {
+
+=pod list_crossingmeasurement_advanced_HELP_START
+{
+"OperationName": "List crossing measurements",
+"Description": "List crossing measurements. This listing requires pagination definition.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "FILTERING"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Pagination Page='1' NumOfRecords='27823' NumOfPages='557' NumPerPage='50' /><StatInfo ServerElapsedTime='0.444' Unit='second' /><RecordMeta TagName='crossingmeasurement' /><crossingmeasurement OperatorId='0' TraitValue='40' InstanceNumber='6' CrossingId='17572' MeasureDateTime='2011-01-15 14:28:37' SampleTypeId='328' TraitId='70' /></DATA>",
+"SuccessMessageJSON": "{'Pagination' : [{'NumOfPages' : 16,'Page' : '1','NumPerPage' : '3','NumOfRecords' : '47'}],'StatInfo' : [{'Unit' : 'second','ServerElapsedTime' : '0.006'}],'RecordMeta' : [{'TagName' : 'crossingmeasurement'}],'crossingmeasurement' : [{'SampleTypeId' : '161','InstanceNumber' : '5','TraitValue' : '11','CrossingId' : '23','CMGroupId' : '15','StateReason' : 'TEST','TraitId' : '23','OperatorId' : '0','MeasureDateTime' : '2011-01-15 14:28:37'},{'CrossingId' : '23','TraitValue' : '40','InstanceNumber' : '6','SampleTypeId' : '161','OperatorId' : '0','MeasureDateTime' : '2011-01-15 14:28:37','StateReason' : 'TEST','TraitId' : '23','CMGroupId' : '15'},{'StateReason' : 'TEST','TraitId' : '23','MeasureDateTime' : '2011-01-15 14:28:37','OperatorId' : '0','CMGroupId' : '15','TraitValue' : '16','InstanceNumber' : '6','CrossingId' : '23','SampleTypeId' : '161'}]}",
+"ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
+"ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
+"URLParameter": [{"ParameterName": "nperpage", "Description": "Number of records in a page for pagination"}, {"ParameterName": "num", "Description": "The page number of the pagination"}],
+"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database field name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "FieldList", "Description": "Comma separated value of wanted fields."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases."}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self  = shift;
+
+  my $query = $self->query();
+
+  my $data_for_postrun_href   = {};
+
+  my $pagination  = 0;
+  my $nb_per_page = -1;
+  my $page        = -1;
+
+  if ( (defined $self->param('nperpage')) && (defined $self->param('num'))) {
+
+    $pagination  = 1;
+    $nb_per_page = $self->param('nperpage');
+    $page        = $self->param('num');
+  }
+
+  my $group_id = $self->authen->group_id();
+
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  my $perm_str = permission_phrase($group_id, 0, $gadmin_status, 'trait');
+
+  my $field_list_csv = '';
+
+  if (defined $query->param('FieldList')) {
+
+    $field_list_csv = $query->param('FieldList');
+  }
+
+  my $filtering_csv = '';
+
+  if (defined $query->param('Filtering')) {
+
+    $filtering_csv = $query->param('Filtering');
+  }
+
+  my $sorting = '';
+  if (defined $query->param('Sorting')) {
+
+    $sorting  = $query->param('Sorting');
+  }
+
+  if (defined $self->param('sampletypeid')) {
+
+    my $sampletype_id  = $self->param('sampletype_id');
+
+    if ($filtering_csv = ~ /SampleTypeId=(.*),?/) {
+
+      if ("$sampletype_id" ne "$1" ) {
+
+        my $err_msg  = 'Duplicate filtering condition for SampleTypeId. ';
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+        return $data_for_postrun_href;
+      }
+    }
+    else {
+
+      if (length($filtering_csv) > 0) {
+
+        if ($filtering_csv =~ /&$/) {
+
+          $filtering_csv   .=  "SampleTypeId=$sampletype_id";
+        }
+        else {
+
+          $filtering_csv    .=  "&SampleTypeId=$sampletype_id";
+        }
+      }
+      else {
+
+        $filtering_csv       .=  "SampleTypeId=$sampletype_id";
+      }
+    }
+  }
+
+  my $field_list = $field_list_csv;
+
+  my $sql = 'SELECT crossingmeasurement.* FROM crossingmeasurement ';
+  $sql   .= 'ORDER BY crossingmeasurement.CrossingId DESC ';
+  $sql   .= 'LIMIT 1 ';
+
+  my ($read_im_err, $read_im_msg, $im_data) = $self->list_crossingmeasurement($sql, 0, $field_list);
+
+  if ($read_im_err) {
+
+    $self->logger->debug($read_im_msg);
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $dbh =  connect_kdb_read();
+
+  my $crossing_data_aref = $im_data;
+
+  my @field_list_all;
+
+  if (scalar(@{$crossing_data_aref}) == 1) {
+
+    @field_list_all = keys(%{$crossing_data_aref->[0]});
+  }
+  else {
+
+    my ($sfield_err, $sfield_msg, $sfield_data, $pkey_data) = get_static_field($dbh, 'crossingmeasurement');
+
+    if ($sfield_err) {
+
+      $self->logger->debug("Get static field failed: $sfield_msg");
+      return $self->_set_error();
+    }
+
+    for my $sfield_rec (@{$sfield_data}) {
+
+      push(@field_list_all, $sfield_rec->{'Name'});
+    }
+
+    for my $pkey_field (@{$pkey_data}) {
+
+      push(@field_list_all, $pkey_field);
+    }
+  }
+
+  $self->logger->debug("Field list all: " . join(',', @field_list_all));
+
+  my $final_field_list = \@field_list_all;
+
+  if (length($field_list_csv) > 0) {
+
+    my ($sel_field_err, $sel_field_msg, $sel_field_list) = parse_selected_field($field_list_csv,
+                                                                                \@field_list_all,
+                                                                                'SampleTypeId');
+
+    if ($sel_field_err) {
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $sel_field_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    $final_field_list = $sel_field_list;
+
+    if ($filtering_csv =~ /SampleTypeId/) {
+
+      push(@{$final_field_list}, 'SampleTypeId');
+    }
+  }
+
+  my ($filter_err, $filter_msg, $filter_phrase, $where_arg) = parse_filtering_v2('SampleTypeId',
+                                                                                 'crossingmeasurement',
+                                                                                 $filtering_csv,
+                                                                                 $final_field_list);
+
+
+  $self->logger->debug("Filter phrase: $filter_phrase");
+
+  if ($filter_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $filter_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $filter_where_phrase = '';
+  if (length($filter_phrase) > 0) {
+
+    $filter_where_phrase = " AND $filter_phrase ";
+  }
+
+  my $filtering_exp  = " WHERE (($perm_str) & $READ_PERM) = $READ_PERM $filter_where_phrase ";
+
+  my $pagination_aref = [];
+  my $paged_limit_clause = '';
+
+  if ($pagination) {
+
+    my ($int_err, $int_err_msg)  = check_integer_value ({'nperpage' => $nb_per_page,
+                                                         'num'      => $page
+                                                        });
+
+    if ($int_err) {
+
+      $int_err_msg .= ' not integer';
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error'  =>  [{'Message' => $int_err_msg}]};
+      return $data_for_postrun_href;
+    }
+
+    my $count_sql =  "SELECT COUNT(*) ";
+    $count_sql   .=  "FROM crossingmeasurement ";
+    $count_sql   .=  "LEFT JOIN trait ON crossingmeasurement.TraitId = trait.TraitId ";
+    $count_sql   .=  "$filtering_exp";
+
+    $self->logger->debug("COUNT SQL: $count_sql");
+
+    my ($paged_id_err, $paged_id_msg, $nb_records,
+        $nb_pages, $limit_clause, $sql_count_time) = get_paged_filter_sql($dbh,
+                                                                          $nb_per_page,
+                                                                          $page,
+                                                                          $count_sql,
+                                                                          $where_arg);
+
+
+    $self->logger->debug("SQL Count time: $sql_count_time");
+
+    if ($paged_id_err == 1) {
+
+      $self->logger->debug($paged_id_msg);
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    if ($paged_id_err == 2) {
+
+      $page = 0;
+    }
+
+    $pagination_aref = [{'NumOfRecords' => $nb_records,
+                         'NumOfPages'   => $nb_pages,
+                         'Page'         => $page,
+                         'NumPerPage'   => $nb_per_page,
+                        }];
+
+    $paged_limit_clause = $limit_clause;
+  }
+
+  $dbh->disconnect();
+
+  my $sql_field_lookup = {};
+
+  my $other_join = '';
+
+  if ($sql_field_lookup->{'SampleTypeId'}) {
+
+    $other_join .=  ' LEFT JOIN generaltype ON crossingmeasurement.SampleTypeId = generaltype.TypeId ';
+  }
+
+  $sql    =  "SELECT crossingmeasurement.*, trait.TraitName FROM crossingmeasurement ";
+  $sql   .=  "LEFT JOIN trait ON trait.TraitId = crossingmeasurement.TraitId ";
+  $sql   .=  "$other_join ";
+  $sql   .=  "$filtering_exp ";
+
+  my ($sort_err, $sort_msg, $sort_sql) = parse_sorting($sorting, $final_field_list);
+
+  if ($sort_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $sort_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (length($sort_sql) > 0) {
+
+    $sql    .= " ORDER BY $sort_sql";
+  }
+  else {
+
+    $sql    .= 'ORDER BY crossingmeasurement.CrossingId DESC';
+  }
+
+  $sql   .=  " $paged_limit_clause ";
+
+  my ($read_crossing_err, $read_crossing_msg, $crossing_data)   =  $self->list_crossingmeasurement($sql, $where_arg, $field_list);
+
+  if ($read_crossing_err) {
+
+    $self->logger->debug($read_crossing_msg);
+    $data_for_postrun_href->{'Error'}  =  1;
+    $data_for_postrun_href->{'Data'}   =  {'Error' =>  [{'Message' => 'Unexpected error. '}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $data_for_postrun_href->{'Error'}   = 0;
+  $data_for_postrun_href->{'Data'}    = {'crossingmeasurement'         =>   $crossing_data,
+                                         'Pagination'              =>   $pagination_aref,
+                                         'RecordMeta'              =>   [{'TagName' => 'crossingmeasurement'}],
+                                        };
+
+  return $data_for_postrun_href;
+}
+
+sub list_crossingmeasurement {
+
+  my $self            = $_[0];
+  my $sql             = $_[1];
+  my $where_para_aref = $_[2];
+  my $field_list      = $_[3];
+
+  my $err = 0;
+  my $msg = '';
+
+  my $data_aref = [];
+
+  my $sql_update       = $sql;
+
+  my $sql_select_field = ['crossingmeasurement.CrossingId',
+                          'crossingmeasurement.TraitId',
+                          'crossingmeasurement.OperatorId',
+                          'crossingmeasurement.MeasureDateTime',
+                          'crossingmeasurement.InstanceNumber',
+                          'crossingmeasurement.SampleTypeId',
+                          'crossingmeasurement.TraitValue' ];
+
+  $sql_select_field       =  join(',', @{$sql_select_field});
+  $self->logger->debug("SQL 1: $sql");
+
+  $sql_update  =~ s/SELECT crossingmeasurement.\*/ $sql_select_field /;
+  
+  $sql = 'SELECT' . $sql_update;
+  $self->logger->debug("SQL 2: $sql");
+
+  my $dbh = connect_kdb_read();
+
+  ($err, $msg, $data_aref) = read_data($dbh, $sql, $where_para_aref);
+
+  if ($err) {
+
+    return ($err, $msg, []);
+  }
+
+  $dbh->disconnect();
+
+  return ($err, $msg, $data_aref);
+}
+
+sub import_crossingmeasurement_csv_runmode {
+
+=pod import_crossingmeasurement_csv_HELP_START
+{
+"OperationName": "Import crossing measurements",
+"Description": "Import crossing measurements from a csv file formatted as a sparse matrix of phenotypic data.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='2 records of crossingmeasurement have been inserted successfully.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : '2 records of crossingmeasurement have been inserted successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Row (1): Crossing (1) does not exist.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Row (1): Crossing (1) does not exist.'}]}"}],
+"RequiredUpload": 1,
+"UploadFileFormat": "CSV",
+"UploadFileParameterName": "uploadfile",
+"HTTPParameter": [{"Required": 1, "Name": "CrossingId", "Description": "Column number counting from zero for CrossingId column in the upload CSV file"}, {"Required": 1, "Name": "SampleTypeId", "Description": "Column number counting from zero for SampleTypeId column in the upload CSV file"}, {"Required": 1, "Name": "TraitId", "Description": "Column number counting from zero for TraitId column in the upload CSV file"}, {"Required": 1, "Name": "OperatorId", "Description": "Column number counting from zero for OperatorId column for the upload CSV file"}, {"Required": 1, "Name": "MeasureDateTime", "Description": "Column number counting from zero for MeasureDateTime column in the upload CSV file"}, {"Required": 1, "Name": "InstanceNumber", "Description": "Column number counting from zero for InstanceNumber column in the upload CSV file"}, {"Required": 1, "Name": "TraitValue", "Description": "Column number counting from zero for TraitValue column in the upload CSV file"},  {"Required": 0, "Name": "StateReason", "Description": "Column number counting from zero for StateReason column in the upload CSV file for sub-plot scoring"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self  = shift;
+  my $query = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  my $data_csv_file = $self->authen->get_upload_file();
+
+  my $num_of_col = get_csvfile_num_of_col($data_csv_file);
+
+  $self->logger->debug("Number of columns: $num_of_col");
+
+  my $CrossingId_col      = $query->param('CrossingId');
+  my $TraitId_col         = $query->param('TraitId');
+  my $OperatorId_col      = $query->param('OperatorId');
+  my $InstanceNumber_col  = $query->param('InstanceNumber');
+  my $SampleTypeId_col    = $query->param('SampleTypeId');
+  my $MeasureDateTime_col = $query->param('MeasureDateTime');
+  my $TraitValue_col      = $query->param('TraitValue');
+
+  my $chk_col_href = { 'CrossingId'      => $CrossingId_col,
+                       'SampleTypeId'    => $SampleTypeId_col,
+                       'TraitId'         => $TraitId_col,
+                       'MeasureDateTime' => $MeasureDateTime_col,
+                       'InstanceNumber'  => $InstanceNumber_col,
+                       'TraitValue'      => $TraitValue_col,
+                     };
+
+  my $matched_col = {};
+
+  $matched_col->{$CrossingId_col}      = 'CrossingId';
+  $matched_col->{$SampleTypeId_col}    = 'SampleTypeId';
+  $matched_col->{$TraitId_col}         = 'TraitId';
+  $matched_col->{$MeasureDateTime_col} = 'MeasureDateTime';
+  $matched_col->{$InstanceNumber_col}  = 'InstanceNumber';
+  $matched_col->{$TraitValue_col}      = 'TraitValue';
+
+  my $StateReason_col = undef;
+
+  if (defined $query->param('StateReason')) {
+
+    if (length($query->param('StateReason')) > 0) {
+
+      $StateReason_col = $query->param('StateReason');
+      $chk_col_href->{'StateReason'} = $StateReason_col;
+
+      $matched_col->{$StateReason_col} = 'StateReason';
+    }
+  }
+
+  my ($col_def_err, $col_def_err_href) = check_col_def_href( $chk_col_href, $num_of_col);
+
+  if ($col_def_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$col_def_err_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (length($OperatorId_col) > 0) {
+
+    my ($col_def_err, $col_def_err_href) = check_col_def_href( { 'OperatorId' => $OperatorId_col },
+                                                               $num_of_col
+        );
+
+    if ($col_def_err) {
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [$col_def_err_href]};
+
+      return $data_for_postrun_href;
+    }
+
+    $matched_col->{$OperatorId_col} = 'OperatorId';
+  }
+
+  my @fieldname_list;
+
+  for (my $i = 0; $i < $num_of_col; $i++) {
+
+    if ($matched_col->{$i}) {
+
+      push(@fieldname_list, $matched_col->{$i});
+    }
+    else {
+
+      push(@fieldname_list, 'null');
+    }
+  }
+
+  my ($data_aref, $csv_err, $err_msg) = csvfile2arrayref($data_csv_file, \@fieldname_list, 0);
+
+  if ($csv_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $dbh_write = connect_kdb_write();
+
+  my $check_non_trait_field = 1;
+  my $validate_trait_value  = 1;
+  my $enforce_single_trial_data  = 1;
+
+  $data_for_postrun_href = $self->insert_crossingmeasurement_data_v2($dbh_write,
+                                                                $data_aref,
+                                                                $check_non_trait_field,
+                                                                $validate_trait_value,
+                                                                $enforce_single_trial_data
+      );
+
+  $dbh_write->disconnect();
+
+  return $data_for_postrun_href;
+}
+
+
+sub export_crossingmeasurement_csv_runmode {
+
+=pod export_crossingmeasurement_csv_HELP_START
+{
+"OperationName": "Export crossing measurements",
+"Description": "Export crossing measurements (if exists) into a csv file formatted as a sparse matrix of phenotypic data",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><OutputFile csv='http://kddart-d.diversityarrays.com/data/admin/export_crossingmeasurement_fc77a5593427a35b804a07150dccb942.csv' /></DATA>",
+"SuccessMessageJSON": "{'OutputFile' : [{'csv' : 'http://kddart-d.diversityarrays.com/data/admin/export_crossingmeasurement_fc77a5593427a35b804a07150dccb942.csv'}]}",
+"ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
+"ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
+"HTTPParameter": [{"Required": 0, "Name": "CrossingIdCSV", "Description": "Filtering parameter for CrossingId. The value is comma separated value of CrossingId."}, {"Required": 0, "Name": "SampleTypeIdCSV", "Description": "Filtering parameter for SampleTypeId. The value is comma separated value of SampleTypeId."}, {"Required": 0, "Name": "TraitIdCSV", "Description": "Filtering parameter for TraitId. The value is comma separated value of TraitId."}, {"Required": 0, "Name": "OperatorIdCSV", "Description": "Filtering parameter for OperatorId. The value is comma separated value of OperatorId."}, {"Required": 0, "Name": "MeasureDateTimeFrom", "Description": "Filtering parameter for MeasureDateTime. The value is correctly formatted date/time from which the crossing measurement was recorded."}, {"Required": 0, "Name": "MeasureDateTimeTo", "Description": "Filtering parameter for MeasureDateTime. The value is correctly formatted date/time to which the crossing measurement was recorded."}, {"Required": 0, "Name": "CMGroupIdCSV", "Description": "Filtering parameter for CMGroupId. The value is comma separated value of CMGroupId."}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self  = shift;
+  my $query = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  my $crossing_id_csv = '';
+
+  if (defined $query->param('CrossingIdCSV')) {
+
+    $crossing_id_csv = $query->param('CrossingIdCSV');
+  }
+
+  my $stype_id_csv = '';
+
+  if (defined $query->param('SampleTypeIdCSV')) {
+
+    $stype_id_csv = $query->param('SampleTypeIdCSV');
+  }
+
+  my $trait_id_csv = '';
+
+  if (defined $query->param('TraitIdCSV')) {
+
+    $trait_id_csv = $query->param('TraitIdCSV');
+  }
+
+  my $operator_id_csv = '';
+
+  if (defined $query->param('OperatorIdCSV')) {
+
+    $operator_id_csv = $query->param('OperatorIdCSV');
+  }
+
+  my $measure_dt_from = '';
+
+  if (defined $query->param('MeasureDateTimeFrom')) {
+
+    $measure_dt_from = $query->param('MeasureDateTimeFrom');
+  }
+
+  my $measure_dt_to = '';
+
+  if (defined $query->param('MeasureDateTimeTo')) {
+
+    $measure_dt_to = $query->param('MeasureDateTimeTo');
+  }
+
+  my $cmgroup_id_csv = '';
+
+  if (defined $query->param('CMGroupIdCSV')) {
+
+    $cmgroup_id_csv = $query->param('CMGroupIdCSV');
+  }
+
+  my $dbh = connect_kdb_read();
+
+  $self->logger->debug("CrossingIdCSV: $crossing_id_csv");
+
+  my @where_phrases;
+
+  if (length($cmgroup_id_csv) > 0) {
+
+    my ($smgrp_exist_err, $smgrp_rec_str) = record_exist_csv($dbh, 'cmgroup', 'CMGroupId', $cmgroup_id_csv);
+
+    if ($smgrp_exist_err) {
+
+      my $err_msg = "CMGroup ($smgrp_rec_str): not found.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my $where_smgrp = " CMGroupId IN ($smgrp_rec_str) ";
+    push(@where_phrases, $where_smgrp);
+  }
+
+  if (length($crossing_id_csv) > 0) {
+
+    my ($crossing_exist_err, $crossing_rec_str) = record_exist_csv($dbh, 'crossing', 'CrossingId', $crossing_id_csv);
+
+    if ($crossing_exist_err) {
+
+      my $err_msg = "Crossing ($crossing_rec_str) not found.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my $where_crossing = " crossingmeasurement.CrossingId IN ($crossing_rec_str) ";
+    push(@where_phrases, $where_crossing);
+  }
+
+  if (length($stype_id_csv) > 0) {
+
+    my ($stype_exist_err, $stype_rec_str) = type_existence_csv($dbh, 'crossing', $stype_id_csv);
+
+    if ($stype_exist_err) {
+
+      my $err_msg = "SampleType ($stype_rec_str) not found.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my $where_stype = " SampleTypeId IN ($stype_rec_str) ";
+    push(@where_phrases, $where_stype);
+  }
+
+  if (length($trait_id_csv) > 0) {
+
+    my ($trait_exist_err, $trait_rec_str) = record_exist_csv($dbh, 'trait', 'TraitId', $trait_id_csv);
+
+    if ($trait_exist_err) {
+
+      my $err_msg = "Trait ($trait_rec_str) not found.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my $where_trait = " TraitId IN ($trait_rec_str) ";
+    push(@where_phrases, $where_trait);
+  }
+
+  if (length($operator_id_csv) > 0) {
+
+    my ($oper_exist_err, $oper_rec_str) = record_exist_csv($dbh, 'systemuser', 'UserId', $operator_id_csv);
+
+    if ($oper_exist_err) {
+
+      my $err_msg = "Operator ($oper_rec_str) not found.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my $where_operator = " OperatorId IN ($oper_rec_str) ";
+    push(@where_phrases, $where_operator);
+  }
+
+  my $where_measure_time = '';
+
+  if (length($measure_dt_from) > 0) {
+
+    my ($mdt_from_err, $mdt_from_msg) = check_dt_value( { 'MeasureDateTimeFrom' => $measure_dt_from } );
+
+    if ($mdt_from_err) {
+
+      my $err_msg = "$mdt_from_msg not date/time.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+    $where_measure_time = " MeasureDateTime >= '$measure_dt_from' ";
+  }
+
+  if (length($measure_dt_to) > 0) {
+
+
+    my ($mdt_to_err, $mdt_to_msg) = check_dt_value( { 'MeasureDateTimeTo' => $measure_dt_to } );
+
+    if ($mdt_to_err) {
+
+      my $err_msg = "$mdt_to_msg not date/time.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+
+    if (length($where_measure_time) > 0) {
+
+      $where_measure_time .= " AND MeasureDateTime <= '$measure_dt_to' ";
+    }
+    else {
+
+      $where_measure_time = " MeasureDateTime <= '$measure_dt_to' ";
+    }
+  }
+
+  push(@where_phrases, $where_measure_time);
+
+  my @field_headers = ('CrossingId', 'TraitId', 'OperatorId', 'MeasureDateTime',
+                       'InstanceNumber', 'SampleTypeId', 'TraitValue',
+                       'CMGroupId', 'StateReason');
+
+  my @sql_field_list;
+
+  foreach my $field_name (@field_headers) {
+
+    push(@sql_field_list, "crossingmeasurement.${field_name}");
+  }
+
+  my $sql = 'SELECT ' . join(',', @sql_field_list) . ' ';
+  $sql   .= 'FROM crossingmeasurement LEFT JOIN crossing ';
+  $sql   .= 'ON crossingmeasurement.CrossingId = crossing.CrossingId ';
+
+  my $where_clause = '';
+  for my $phrase (@where_phrases) {
+
+    if (length($phrase) > 0) {
+
+      if (length($where_clause) > 0) {
+
+        $where_clause .= "AND $phrase";
+      }
+      else {
+
+        $where_clause .= "$phrase";
+      }
+    }
+  }
+
+  if (length($where_clause) > 0) {
+
+    $sql .= " WHERE $where_clause ";
+  }
+
+  my $export_data_sql_md5 = md5_hex($sql);
+
+  $self->logger->debug("SQL: $sql");
+
+  my $username          = $self->authen->username();
+  my $doc_root          = $ENV{'DOCUMENT_ROOT'};
+  my $export_data_path  = "${doc_root}/data/$username";
+  my $current_runmode   = $self->get_current_runmode();
+  my $lock_filename     = "${current_runmode}.lock";
+  my $filename          = "export_crossingmeasurement_$export_data_sql_md5";
+  my $csv_file          = "${export_data_path}/${filename}.csv";
+
+  if ( !(-e $export_data_path) ) {
+
+    mkdir($export_data_path);
+  }
+
+  my $lockfile = File::Lockfile->new($lock_filename, $export_data_path);
+
+  my $pid = $lockfile->check();
+
+  if ($pid) {
+
+    $self->logger->debug("$lock_filename exists in $export_data_path");
+    my $msg = 'Lockfile exists: either another process of this export is running or ';
+    $msg   .= 'there was an unexpected error regarding clearing this lockfile.';
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $lockfile->write();
+
+  my $sth = $dbh->prepare($sql);
+  $sth->execute();
+
+  if ($dbh->err()) {
+
+    $lockfile->remove();
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $self->logger->debug("csv: $csv_file");
+
+  open(my $smeasure_csv_fh, ">$csv_file") or die "Can't open $csv_file for writing: $!";
+
+  print $smeasure_csv_fh '#' . join(',', @field_headers) . "\n";
+
+  while ( my $row_aref = $sth->fetchrow_arrayref() ) {
+
+    foreach my $col_entry (@{$row_aref}) {
+        if (length($col_entry)) {
+          $col_entry = qq|"$col_entry"|;
+        }
+        else {
+          $col_entry = "";
+        }
+    }
+
+    my $csv_line = join(',', @{$row_aref});
+
+    print $smeasure_csv_fh "$csv_line\n";
+  }
+
+  close($smeasure_csv_fh);
+
+  $lockfile->remove();
+
+  $sth->finish();
+
+  $self->logger->debug("Document root: $doc_root");
+
+  $dbh->disconnect();
+
+  my $url = reconstruct_server_url();
+
+  my $info_aref = [{ 'csv' => "$url/data/$username/${filename}.csv" }];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'OutputFile' => $info_aref };
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub import_cmgroup_data_csv_runmode {
+
+=pod import_cmgroup_data_csv_HELP_START
+{
+"OperationName": "Import crossing measurements in a group",
+"Description": "Import crossing measurements from a csv file formatted as a sparse matrix of phenotypic data in a group. It returns Crossing Measurement Group (CMGroupId) when the operation is successful.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"KDDArTModule": "main",
+"KDDArTTable": "cmgroup",
+"SkippedField": ["TrialId","OperatorId","CMGroupDateTime"],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='3 records of crossingmeasurement have been inserted successfully.' /><StatInfo Unit='second' ServerElapsedTime='0.092' /><ReturnId Value='5' ParaName='CMGroupId' /></DATA>",
+"SuccessMessageJSON": "{'StatInfo' : [{'ServerElapsedTime' : '0.109','Unit' : 'second'}],'ReturnId' : [{'ParaName' : 'CMGroupId','Value' : '6'}],'Info' : [{'Message' : '3 records of crossingmeasurement have been inserted successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Trial (16): not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Trial (16): not found.'}]}"}],
+"RequiredUpload": 1,
+"UploadFileFormat": "CSV",
+"UploadFileParameterName": "uploadfile",
+"HTTPParameter": [{"Required": 1, "Name": "CrossingIdCol", "Description": "Column number counting from zero for CrossingId column in the upload CSV file"}, {"Required": 1, "Name": "CrossingTypeIdCol", "Description": "Column number counting from zero for SampleTypeId column in the upload CSV file"}, {"Required": 1, "Name": "TraitIdCol", "Description": "Column number counting from zero for TraitId column in the upload CSV file"}, {"Required": 1, "Name": "OperatorIdCol", "Description": "Column number counting from zero for OperatorId column for the upload CSV file"}, {"Required": 1, "Name": "MeasureDateTimeCol", "Description": "Column number counting from zero for MeasureDateTime column in the upload CSV file"}, {"Required": 1, "Name": "InstanceNumberCol", "Description": "Column number counting from zero for InstanceNumber column in the upload CSV file"}, {"Required": 1, "Name": "TraitValueCol", "Description": "Column number counting from zero for TraitValue column in the upload CSV file"}, {"Required": 0, "Name": "TrialUnitSpecimenIdCol", "Description": "Column number counting from zero for TrialUnitSpecimenId column in the upload CSV file for sub-plot scoring"}, {"Required": 0, "Name": "StateReasonCol", "Description": "Column number counting from zero for StateReason column in the upload CSV file for sub-plot scoring"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self     = shift;
+  my $trial_id = $self->param('id');
+  my $query    = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  # Generic required static field checking
+
+  my $dbh_read = connect_kdb_read();
+
+  my $skip_field = {'TrialId'         => 1,
+                    'OperatorId'      => 1,
+                    'CMGroupDateTime' => 1,
+                   };
+
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'cmgroup', $skip_field);
+
+  if ($chk_sfield_err) {
+
+    $self->logger->debug($chk_sfield_msg);
+
+    return $for_postrun_href;
+  }
+
+  # Finish generic required static field checking
+
+  my $cmgroup_name = $query->param('CMGroupName');
+
+  my $operator_id = $self->authen->user_id();
+
+  my $dbh_write = connect_kdb_write();
+
+  if (record_existence($dbh_write, 'cmgroup', 'CMGroupName', $cmgroup_name)) {
+
+    my $err_msg = "CMGroupName ($cmgroup_name): already exists.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'CMGroupName' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $cmgroup_status = undef;
+
+  if (defined $query->param('CMGroupStatus')) {
+
+    if (length($query->param('CMGroupStatus')) > 0) {
+
+      $cmgroup_status = $query->param('CMGroupStatus');
+    }
+  }
+
+  my $cmgroup_note = undef;
+
+  if (defined $query->param('CMGroupNote')) {
+
+    if (length($query->param('CMGroupNote')) > 0) {
+
+      $cmgroup_note = $query->param('CMGroupNote');
+    }
+  }
+
+  my $cur_dt = DateTime->now( time_zone => $TIMEZONE );
+  $cur_dt = DateTime::Format::MySQL->format_datetime($cur_dt);
+
+  if (!record_existence($dbh_write, 'trial', 'TrialId', $trial_id)) {
+
+    my $err_msg = "Trial ($trial_id): not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $group_id = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  my ($is_trial_ok, $trouble_trial_id_aref) = check_permission($dbh_write, 'trial', 'TrialId',
+                                                               [$trial_id], $group_id, $gadmin_status,
+                                                               $READ_WRITE_PERM);
+
+  if (!$is_trial_ok) {
+
+    my $trouble_trial_id = $trouble_trial_id_aref->[0];
+    my $err_msg = "Permission denied: Group ($group_id) and trial ($trial_id).";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $data_csv_file = $self->authen->get_upload_file();
+
+  my $num_of_col = get_csvfile_num_of_col($data_csv_file);
+
+  $self->logger->debug("Number of columns: $num_of_col");
+
+  my $CrossingId_col      = $query->param('CrossingIdCol');
+  my $SampleTypeId_col    = $query->param('SampleTypeIdCol');
+  my $TraitId_col         = $query->param('TraitIdCol');
+  my $MeasureDateTime_col = $query->param('MeasureDateTimeCol');
+  my $InstanceNumber_col  = $query->param('InstanceNumberCol');
+  my $TraitValue_col      = $query->param('TraitValueCol');
+
+  my $chk_col_href = { 'CrossingIdCol'      => $CrossingId_col,
+                       'SampleTypeIdCol'    => $SampleTypeId_col,
+                       'TraitIdCol'         => $TraitId_col,
+                       'MeasureDateTimeCol' => $MeasureDateTime_col,
+                       'InstanceNumberCol'  => $InstanceNumber_col,
+                       'TraitValueCol'      => $TraitValue_col,
+                     };
+
+  my $matched_col = {};
+
+  $matched_col->{$CrossingId_col}      = 'CrossingId';
+  $matched_col->{$SampleTypeId_col}    = 'SampleTypeId';
+  $matched_col->{$TraitId_col}         = 'TraitId';
+  $matched_col->{$MeasureDateTime_col} = 'MeasureDateTime';
+  $matched_col->{$InstanceNumber_col}  = 'InstanceNumber';
+  $matched_col->{$TraitValue_col}      = 'TraitValue';
+
+  my $StateReason_col = undef;
+
+  if (defined $query->param('StateReasonCol')) {
+
+    if (length($query->param('StateReasonCol')) > 0) {
+
+      $StateReason_col = $query->param('StateReasonCol');
+      $chk_col_href->{'StateReasonCol'} = $StateReason_col;
+
+      $matched_col->{$StateReason_col} = 'StateReason';
+    }
+  }
+
+  my $OperatorId_col      = undef;
+
+  if (defined $query->param('OperatorIdCol')) {
+
+    if (length($query->param('OperatorIdCol')) > 0) {
+
+      $OperatorId_col = $query->param('OperatorIdCol');
+      $chk_col_href->{'OperatorIdCol'} = $OperatorId_col;
+
+      $matched_col->{$OperatorId_col} = 'OperatorId';
+    }
+  }
+
+  my ($col_def_err, $col_def_err_href) = check_col_def_href( $chk_col_href, $num_of_col);
+
+  if ($col_def_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$col_def_err_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  my @fieldname_list;
+
+  for (my $i = 0; $i < $num_of_col; $i++) {
+    if ($matched_col->{$i}) {
+
+      push(@fieldname_list, $matched_col->{$i});
+    }
+    else {
+
+      push(@fieldname_list, 'null');
+    }
+  }
+
+  my ($data_aref, $csv_err, $err_msg) = csvfile2arrayref($data_csv_file, \@fieldname_list, 0);
+
+  if ($csv_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $sql = 'INSERT INTO cmgroup SET ';
+  $sql   .= 'CMGroupName=?, ';
+  $sql   .= 'TrialId=?, ';
+  $sql   .= 'OperatorId=?, ';
+  $sql   .= 'CMGroupStatus=?, ';
+  $sql   .= 'CMGroupDateTime=?, ';
+  $sql   .= 'CMGroupNote=?';
+
+  my $sth = $dbh_write->prepare($sql);
+  $sth->execute($cmgroup_name, $trial_id, $operator_id, $cmgroup_status, $cur_dt, $cmgroup_note);
+
+  my $cmgroup_id = -1;
+
+  if ($dbh_write->err()) {
+
+    $self->logger->debug("Add cmgroup record failed");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $cmgroup_id = $dbh_write->last_insert_id(undef, undef, 'cmgroup', 'CMGroupId');
+  $self->logger->debug("CMGroupID: $cmgroup_id");
+
+  $sth->finish();
+
+  my $check_non_trait_field      = 1;
+  my $validate_trait_value       = 1;
+  my $enforce_single_trial_data  = 1;
+
+  $data_for_postrun_href = $self->insert_crossingmeasurement_data_v2($dbh_write,
+                                                                $data_aref,
+                                                                $check_non_trait_field,
+                                                                $validate_trait_value,
+                                                                $enforce_single_trial_data,
+                                                                $cmgroup_id
+                                                               );
+
+  if ($data_for_postrun_href->{'Error'} == 1) {
+
+    # Delete CMGroup record and return $data_for_postrun_href
+    $sql = 'DELETE FROM cmgroup WHERE CMGroupId=?';
+
+    $sth = $dbh_write->prepare($sql);
+    $sth->execute($cmgroup_id);
+
+    if ($dbh_write->err()) {
+
+      $self->logger->debug("Delete cmgroup record failed");
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  $dbh_write->disconnect();
+
+  my $return_id_aref = [{'Value'   => "$cmgroup_id", 'ParaName' => 'CMGroupId'}];
+
+  $data_for_postrun_href->{'Data'}->{'ReturnId'} = $return_id_aref;
+
+  return $data_for_postrun_href;
+}
+
+sub insert_crossingmeasurement_data_v2 {
+
+  my $self                = $_[0];
+  my $dbh_write           = $_[1];
+  my $data_aref           = $_[2];
+  my $chk_non_trait_field = $_[3];
+  my $validate_trait      = $_[4];
+  my $enforce_single_trial_data      = $_[5];
+
+  my $cmgroup_id = 0;
+
+  if (defined $_[6]) {
+
+    $cmgroup_id = $_[6];
+  }
+
+  my $data_for_postrun_href = {};
+
+  my $user_id       = $self->authen->user_id();
+  my $group_id      = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+  my $perm_str      = permission_phrase($group_id, 0, $gadmin_status);
+
+  #full error array with the following format for individual errors
+  # {'Row' => row of error, 'Type' => type of error, 'Message' => 'message', 'ErrorInput' => what input caused error}
+  my $full_error_aref = [];
+
+  if (scalar(@{$data_aref}) == 0) {
+
+    $self->logger->debug("No data provided");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'No data provided.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $bulk_sql = 'INSERT INTO crossingmeasurement ';
+  $bulk_sql   .= '(CrossingId,SampleTypeId,CMGroupId,TraitId,OperatorId,MeasureDateTime,InstanceNumber,TraitValue,StateReason) ';
+  $bulk_sql   .= 'VALUES ';
+
+  my $sql;
+  my $sth;
+
+  my $uniq_sam_type_href      = {};
+  my $sam_type_val_aref       = [];
+  my $sam_type_idx_aref       = [];
+
+  my $uniq_trait_id_href      = {};
+  my $trait_id_val_aref       = [];
+  my $trait_id_idx_aref       = [];
+
+  my $crossing_trait_id_val_aref    = [];
+  my $crossing_trait_id_idx_aref    = [];
+
+  my $uniq_operator_href      = {};
+  my $operator_val_aref       = [];
+  my $operator_idx_aref       = [];
+
+  my $trait_id2val_href       = {};
+  my $trait_id2idx_href       = {};
+
+  my $date_error_flag = 0;
+  my $date_error_aref = [];
+
+  my $row_counter = 1;
+  for my $data_row (@{$data_aref}) {
+    $self->logger->debug("$row_counter:");
+    for my $data_key (keys(%{$data_row})) {
+      $self->logger->debug("$data_key -> " .$data_row->{$data_key});
+    }  
+
+    $self->logger->debug("----");
+
+    my $effective_user_id = $user_id;
+    my $crossing_id           = $data_row->{'CrossingId'};
+    my $samp_type_id      = $data_row->{'SampleTypeId'};
+    my $trait_id          = $data_row->{'TraitId'};
+    
+    $uniq_trait_id_href->{$trait_id}     = 1;
+    $uniq_sam_type_href->{$samp_type_id} = 1;
+
+    #$self->logger->debug("Checking non trait data: $chk_non_trait_field");
+
+    if ($chk_non_trait_field) {
+
+      my ($int_id_err, $int_id_msg) = check_integer_value( { 'CrossingId'         => $data_row->{'CrossingId'},
+                                                             'SampleTypeId'   => $data_row->{'SampleTypeId'},
+                                                             'TraitId'        => $data_row->{'TraitId'},
+                                                             'InstanceNumber' => $data_row->{'InstanceNumber'},
+                                                           });
+
+      if ($int_id_err) {
+
+        $int_id_msg = "Row ($row_counter): " . $int_id_msg . ' not integer.';
+
+        my $error_obj = {};
+
+        $error_obj->{'Message'} = $int_id_msg;
+        $error_obj->{'Row'} = $row_counter;
+        $error_obj->{'Type'} = 'CrossingInteger';
+        $error_obj->{'ErrorInput'} = $int_id_msg;
+
+        push(@{$full_error_aref}, $error_obj);
+      }
+
+      if (length($data_row->{'OperatorId'}) > 0) {
+
+        my $operator_id = $data_row->{'OperatorId'};
+
+        my ($int_err, $int_msg) = check_integer_value( { 'OperatorId' => $operator_id } );
+
+        if ($int_err) {
+
+          $int_msg = "Row ($row_counter): " . $int_msg . ' not an integer.';
+
+          my $error_obj = {};
+
+          $error_obj->{'Message'} = $int_msg;
+          $error_obj->{'Row'} = $row_counter;
+          $error_obj->{'Type'} = 'OperatorInteger';
+          $error_obj->{'ErrorInput'} = $int_id_msg;
+
+          push(@{$full_error_aref}, $error_obj);
+        }
+
+        $uniq_operator_href->{$operator_id} = 1;
+        push(@{$operator_val_aref}, $operator_id);
+        push(@{$operator_idx_aref}, $row_counter);
+
+        $effective_user_id = $operator_id;
+      }
+    }
+
+
+    push(@{$sam_type_val_aref},$samp_type_id);
+    push(@{$sam_type_idx_aref},$row_counter);
+
+    if (length($data_row->{'OperatorId'}) > 0) {
+
+      $effective_user_id = $data_row->{'OperatorId'};
+    }
+    my $trait_val = $data_row->{'TraitValue'};
+    my $db_trait_val = $dbh_write->quote($trait_val);
+
+    if ($validate_trait) {
+
+      if (defined $trait_id2val_href->{$trait_id}) {
+
+        my $val_aref = $trait_id2val_href->{$trait_id};
+        push(@{$val_aref}, $trait_val);
+        $trait_id2val_href->{$trait_id} = $val_aref;
+      }
+      else {
+
+        $trait_id2val_href->{$trait_id} = [$trait_val];
+      }
+
+      if (defined $trait_id2idx_href->{$trait_id}) {
+
+        my $idx_aref = $trait_id2idx_href->{$trait_id};
+        push(@{$idx_aref}, $row_counter);
+        $trait_id2idx_href->{$trait_id} = $idx_aref;
+      }
+      else {
+
+        $trait_id2idx_href->{$trait_id} = [$row_counter];
+      }
+    }
+
+    my $measure_dt   = $data_row->{'MeasureDateTime'};
+
+    # Check measure date/time
+
+    my ($measure_dt_err, $measure_dt_msg) = check_dt_value( {'MeasureDateTime' => $measure_dt} );
+
+    if ($measure_dt_err) {
+
+      my $error_obj = {};
+
+      $error_obj->{'Message'} = $measure_dt_msg;
+      $error_obj->{'Row'} = $row_counter;
+      $error_obj->{'Type'} = 'Date';
+      $error_obj->{'ErrorInput'} = $measure_dt;
+
+      push(@{$full_error_aref}, $error_obj);
+    }
+
+    # End check measure date/time
+
+    my $instance_num = $data_row->{'InstanceNumber'};
+
+    my $state_reason      = 'NULL';
+
+    if (defined $data_row->{'StateReason'}) {
+
+      if (length($data_row->{'StateReason'}) > 0) {
+
+        $state_reason = $dbh_write->quote($data_row->{'StateReason'});
+      }
+    }
+
+    $bulk_sql .= "($crossing_id,$samp_type_id,$cmgroup_id,$trait_id,$effective_user_id,";
+    $bulk_sql .= "'$measure_dt',$instance_num,$db_trait_val,$state_reason),";
+
+    $row_counter += 1;
+  }
+
+  chop($bulk_sql);      # remove excessive comma
+  #
+
+  my @trait_id_list = keys(%{$uniq_trait_id_href});
+
+  if (scalar(@trait_id_list) == 0) {
+
+    $self->logger->debug("List of trait id is empty");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  # Release the memorny
+  $uniq_trait_id_href = {};
+
+  $sql  = "SELECT TraitId, $perm_str AS UltimatePerm ";
+  $sql .= "FROM trait ";
+  $sql .= "WHERE TraitId IN (" . join(',', @trait_id_list) . ')';
+
+  my $trait_lookup = $dbh_write->selectall_hashref($sql, 'TraitId');
+
+  if ($dbh_write->err()) {
+
+    $self->logger->debug("Get trait info failed");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my @operator_list = keys(%{$uniq_operator_href});
+
+  if (scalar(@operator_list) > 0) {
+
+    $sql = "SELECT UserId FROM systemuser WHERE UserId IN (" . join(',', @operator_list) . ")";
+
+    my $operator_lookup = $dbh_write->selectall_hashref($sql, 'UserId');
+
+    if ($dbh_write->err()) {
+
+      $self->logger->debug("Get operator info failed");
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    for (my $i = 0; $i < scalar(@{$operator_val_aref}); $i++) {
+
+      my $oper_id  = $operator_val_aref->[$i];
+      my $row_num  = $operator_idx_aref->[$i];
+
+      if (! defined $operator_lookup->{$oper_id}) {
+
+        my $err_msg = "Row ($row_num): Operator ($oper_id) does not exist.";
+
+        my $error_obj = {};
+
+        $error_obj->{'Message'} = $err_msg;
+        $error_obj->{'Row'} = $row_num;
+        $error_obj->{'Type'} = "Operator";
+        #$error_obj->{'Date'} = $measure_dt;
+        $error_obj->{'ErrorInput'} = "Operator ($oper_id)";
+
+        push(@{$full_error_aref}, $error_obj);
+      }
+    }
+  }
+
+  my @sample_type_list = keys(%{$uniq_sam_type_href});
+
+  if (scalar(@sample_type_list) == 0) {
+
+    $self->logger->debug("List of sample type id is empty");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $sql  = "SELECT TypeId FROM generaltype WHERE Class='sample' AND ";
+  $sql .= "TypeId IN (" . join(',', @sample_type_list) . ")";
+
+  my $sample_type_lookup = $dbh_write->selectall_hashref($sql, 'TypeId');
+
+  if ($dbh_write->err()) {
+
+    $self->logger->debug("Get sample type info failed");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  for (my $i = 0; $i < scalar(@{$sam_type_val_aref}); $i++) {
+
+    my $sam_type_id = $sam_type_val_aref->[$i];
+    my $row_num     = $sam_type_idx_aref->[$i];
+
+    if (! defined $sample_type_lookup->{$sam_type_id}) {
+
+      my $err_msg = "Row ($row_num): SampleType ($sam_type_id) does not exist.";
+
+      my $error_obj = {};
+
+      $error_obj->{'Message'} = $err_msg;
+      $error_obj->{'Row'} = $row_num;
+      $error_obj->{'Type'} = "SampleType";
+      #$error_obj->{'Date'} = $measure_dt;
+      $error_obj->{'ErrorInput'} = "SampleType ($sam_type_id)";
+
+      push(@{$full_error_aref}, $error_obj);
+    }
+  }
+
+  my $trait_validation_error_aref = [];
+
+  $self->logger->debug("Now trying to validate trait values");
+
+  for my $trait_id2val (keys(%{$trait_id2val_href})) {
+    $self->logger->debug("Trait: $trait_id2val");
+  }
+
+  my ($v_trait_val_err, $invalid_error_message,
+      $v_trait_id_href, $trait_validation_error_aref) = validate_trait_db_bulk_v2($dbh_write, $trait_id2val_href,$self);
+
+  $self->logger->debug("Validation Error: $v_trait_val_err");
+  $self->logger->debug("Validation Error: $invalid_error_message");
+  $self->logger->debug("Number of Validation Error: " . scalar(@{$trait_validation_error_aref}));
+
+  if ($v_trait_val_err) {
+
+    foreach my $invalid_obj (@{$trait_validation_error_aref}) {
+
+      my $v_trait_id = $invalid_obj->{'Trait'};
+      my $v_trait_idx = $invalid_obj->{'Index'};
+      my $v_trait_val_msg = $invalid_obj->{'Message'};
+      my $v_trait_val = $invalid_obj->{'Value'};
+
+      $self->logger->debug("Validation error on TraitId: $v_trait_id - index: $v_trait_idx");
+      my $row_num = $trait_id2idx_href->{$v_trait_id}->[$v_trait_idx];
+      my $err_msg = "Row ($row_num): $v_trait_val_msg";
+
+      my $error_obj = {};
+
+      $error_obj->{'Message'} = $err_msg;
+      $error_obj->{'Row'} = $row_num;
+      $error_obj->{'Type'} = "Validation";
+      #$error_obj->{'Date'} = $measure_dt;
+      $error_obj->{'ErrorInput'} = "$v_trait_val (Trait $v_trait_id)";
+
+      push(@{$full_error_aref}, $error_obj);
+    }
+
+  }
+
+  foreach my $error_obj (@{$full_error_aref}) {
+      $self->logger->debug($error_obj->{'Row'}. ": " . $error_obj->{'Message'});
+  }
+
+  if (scalar(@{$full_error_aref}) > 0) {
+    my $err_msg = 'Issues with CSV identified.';
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg,'ErrorList' => $full_error_aref}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $self->logger->debug("Bulk SQL: $bulk_sql");
+
+  my $nrows_inserted = $dbh_write->do($bulk_sql);
+
+  if ($dbh_write->err()) {
+
+    $self->logger->debug("Db err code: " . $dbh_write->err());
+
+    if ($dbh_write->err() == 1062) {
+
+      my $err_str = $dbh_write->errstr();
+
+      $err_str =~ /Duplicate entry '(.+)'/;
+      my $err_msg = "Duplicate Entry: $1";
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+    else {
+
+      $self->logger->debug('Error code: ' . $dbh_write->err());
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  my $info_msg = "$nrows_inserted records of crossingmeasurement have been inserted successfully.";
+  my $info_msg_aref = [{'Message' => $info_msg}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'      => $info_msg_aref};
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub list_cmgroup_runmode {
+
+=pod list_cmgroup_HELP_START
+{
+"OperationName": "List crossingmeasurement groups",
+"Description": "List available crossingmeasurement group.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><RecordMeta TagName='CMGroup' /><CMGroup TrialId='14' OperatorId='0' NumOfMeasurement='3' CMGroupDateTime='2017-04-19 15:22:10' CMGroupId='6' OperatorUserName='admin' CMGroupName='CMG_31217813748' CMGroupStatus='TEST' CMGroupNote='Testing' update='update/cmgroup/6' delete='delete/cmgroup/6' /><StatInfo ServerElapsedTime='0.006' Unit='second' /></DATA>",
+"SuccessMessageJSON": "{'RecordMeta' : [{'TagName' : 'CMGroup'}],'StatInfo' : [{'ServerElapsedTime' : '0.007','Unit' : 'second'}],'CMGroup' : [{'CMGroupId' : '6','CMGroupDateTime' : '2017-04-19 15:22:10','OperatorId' : '0','NumOfMeasurement' : '3','TrialId' : '14','delete' : 'delete/cmgroup/6','CMGroupName' : 'CMG_31217813748','update' : 'update/cmgroup/6','CMGroupNote' : 'Testing','CMGroupStatus' : 'TEST','OperatorUserName' : 'admin'}]}",
+"ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
+"ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing TrialId"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self     = shift;
+  my $trial_id = $self->param('id');
+  my $query    = $self->query();
+
+  my $filtering_csv = '';
+
+  if (defined $query->param('Filtering')) {
+
+    $filtering_csv = $query->param('Filtering');
+  }
+
+  my $data_for_postrun_href = {};
+
+  my $dbh = connect_kdb_read();
+
+  if (!record_existence($dbh, 'trial', 'TrialId', $trial_id)) {
+
+    my $err_msg = "Trial ($trial_id): not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $group_id = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  my ($is_trial_ok, $trouble_trial_id_aref) = check_permission($dbh, 'trial', 'TrialId',
+                                                               [$trial_id], $group_id, $gadmin_status,
+                                                               $READ_PERM);
+
+  if (!$is_trial_ok) {
+
+    my $trouble_trial_id = $trouble_trial_id_aref->[0];
+    my $err_msg = "Permission denied: Group ($group_id) and trial ($trial_id).";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh->disconnect();
+
+  my $sql = 'SELECT cmgroup.*, systemuser.UserName AS OperatorUserName ';
+  $sql   .= 'FROM cmgroup LEFT JOIN systemuser ON cmgroup.OperatorId = systemuser.UserId ';
+  $sql   .= 'WHERE TrialId=?';
+
+  my $filter_field_list = ['CMGroupName', 'OperatorId', 'CMGroupStatus', 'CMGroupDateTime', 'CMGroupNote'];
+
+  my ($filter_err, $filter_msg, $filter_phrase, $where_arg) = parse_filtering('CMGroupId',
+                                                                              'cmgroup',
+                                                                              $filtering_csv,
+                                                                              $filter_field_list);
+
+  if ($filter_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $filter_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (length($filter_phrase) > 0) {
+
+    $sql .= " AND $filter_phrase";
+  }
+
+
+  my ($read_cmgrp_err, $read_cmgrp_msg, $cmgrp_data) = $self->list_cmgroup(1, 0, $sql, [$trial_id, @{$where_arg}]);
+
+  if ($read_cmgrp_err) {
+
+    $self->logger->debug($read_cmgrp_msg);
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'CMGroup'    => $cmgrp_data,
+                                           'RecordMeta' => [{'TagName' => 'CMGroup'}],
+  };
+
+  return $data_for_postrun_href;
+}
+
+sub list_cmgroup {
+
+  my $self            = $_[0];
+  my $extra_attr_yes  = $_[1];
+  my $detail_attr_yes = $_[2];
+  my $sql             = $_[3];
+  my $where_para_aref = $_[4];
+
+  my $err       = 0;
+  my $msg       = '';
+  my $data_aref = [];
+
+  my $dbh = connect_kdb_read();
+
+  ($err, $msg, $data_aref) = read_data($dbh, $sql, $where_para_aref);
+
+  if ($err) {
+
+    return ($err, $msg, []);
+  }
+
+  my $cmgroup_id_aref    = [];
+
+  my $smcount_lookup     = {};
+  my $trait_lookup       = {};
+  my $trial_unit_lookup  = {};
+  my $tu_spec_lookup     = {};
+
+  my $uniq_cmgrp_trait_href   = {};
+  my $uniq_cmgrp_tu_href      = {};
+  my $uniq_cmgrp_tu_spec_href = {};
+
+  if ($extra_attr_yes || $detail_attr_yes) {
+
+    for my $cmgroup_rec (@{$data_aref}) {
+
+      push(@{$cmgroup_id_aref}, $cmgroup_rec->{'CMGroupId'});
+    }
+
+    if (scalar(@{$cmgroup_id_aref}) > 0) {
+
+      my $count_sql = 'SELECT CMGroupId, COUNT(CrossingId) AS NumOfMeasurement ';
+      $count_sql   .= 'FROM crossingmeasurement ';
+      $count_sql   .= 'WHERE CMGroupId IN (' . join(',', @{$cmgroup_id_aref}) . ') ';
+      $count_sql   .= 'GROUP BY CMGroupId';
+
+      $self->logger->debug("COUNT MEASUREMENT SQL: $count_sql");
+
+      $smcount_lookup = $dbh->selectall_hashref($count_sql, 'CMGroupId');
+
+      if ($dbh->err()) {
+
+        $self->logger->debug("Count number of crossingmeasurement failed");
+        $err = 1;
+        $msg = 'Unexpected Error';
+
+        return ($err, $msg, []);
+      }
+
+    }
+  }
+
+  my $extra_attr_cmgroup_data = [];
+
+  my $user_id = $self->authen->user_id();
+
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  if ($extra_attr_yes) {
+
+    for my $cmgroup_rec (@{$data_aref}) {
+
+      my $cmgrp_id     = $cmgroup_rec->{'CMGroupId'};
+      my $operator_id  = $cmgroup_rec->{'OperatorId'};
+
+      if ("$operator_id" eq "$user_id") {
+
+        $cmgroup_rec->{'update'} = "update/cmgroup/${cmgrp_id}";
+        $cmgroup_rec->{'delete'} = "delete/cmgroup/${cmgrp_id}";
+      }
+
+      if (defined $smcount_lookup->{$cmgrp_id}) {
+
+        $cmgroup_rec->{'NumOfMeasurement'} = $smcount_lookup->{$cmgrp_id}->{'NumOfMeasurement'};
+      }
+
+      if ($detail_attr_yes) {
+
+        if (defined $trait_lookup->{$cmgrp_id}) {
+
+          $cmgroup_rec->{'Trait'} = $trait_lookup->{$cmgrp_id};
+        }
+
+        if (defined $trial_unit_lookup->{$cmgrp_id}) {
+
+          $cmgroup_rec->{'Crossing'} = $trial_unit_lookup->{$cmgrp_id};
+        }
+
+        if (defined $tu_spec_lookup->{$cmgrp_id}) {
+
+          $cmgroup_rec->{'TrialUnitSpecimen'} = $tu_spec_lookup->{$cmgrp_id};
+        }
+      }
+
+      push(@{$extra_attr_cmgroup_data}, $cmgroup_rec);
+    }
+  }
+  else {
+
+    $extra_attr_cmgroup_data = $data_aref;
+  }
+
+  $dbh->disconnect();
+
+  return ($err, $msg, $extra_attr_cmgroup_data);
+}
+
+sub get_cmgroup_runmode {
+
+=pod get_cmgroup_HELP_START
+{
+"OperationName": "Get crossingmeasurement group",
+"Description": "Get detail information about a crossingmeasurement group.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><CMGroup update='update/cmgroup/6' NumOfMeasurement='3' CMGroupDateTime='2017-04-19 15:22:10' TrialId='14' OperatorUserName='admin' CMGroupStatus='TEST' CMGroupNote='Testing' CMGroupId='6' delete='delete/cmgroup/6' CMGroupName='CMG_31217813748' OperatorId='0'><Trait TraitId='14' TraitName='Trait_75223850117' /><Crossing CrossingId='14' /></CMGroup><StatInfo Unit='second' ServerElapsedTime='0.015' /><RecordMeta TagName='CMGroup' /></DATA>",
+"SuccessMessageJSON": "{'RecordMeta' : [{'TagName' : 'CMGroup'}],'CMGroup' : [{'NumOfMeasurement' : '3','update' : 'update/cmgroup/6','Trait' : [{'TraitName' : 'Trait_75223850117','TraitId' : '14'}],'Crossing' : [{'CrossingId' : '14'}],'CMGroupDateTime' : '2017-04-19 15:22:10','OperatorUserName' : 'admin','CMGroupStatus' : 'TEST','TrialId' : '14','CMGroupNote' : 'Testing','CMGroupId' : '6','CMGroupName' : 'CMG_31217813748','delete' : 'delete/cmgroup/6','OperatorId' : '0'}],'StatInfo' : [{'ServerElapsedTime' : '0.018','Unit' : 'second'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='CMGroup (7): not found.' /><StatInfo ServerElapsedTime='0.013' Unit='second' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'CMGroup (7): not found.'}],'StatInfo' : [{'Unit' : 'second','ServerElapsedTime' : '0.013'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing CMGroupId"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self       = shift;
+  my $cmgroup_id = $self->param('id');
+  my $query      = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  my $dbh = connect_kdb_read();
+
+  my $trial_id = read_cell_value($dbh, 'cmgroup', 'TrialId', 'CMGroupId', $cmgroup_id);
+
+  if (length($trial_id) == 0) {
+
+    my $err_msg = "CMGroup ($cmgroup_id): not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $group_id = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  my ($is_trial_ok, $trouble_trial_id_aref) = check_permission($dbh, 'trial', 'TrialId',
+                                                               [$trial_id], $group_id, $gadmin_status,
+                                                               $READ_PERM);
+
+  if (!$is_trial_ok) {
+
+    my $trouble_trial_id = $trouble_trial_id_aref->[0];
+    my $err_msg = "Permission denied: Group ($group_id) and trial ($trial_id).";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh->disconnect();
+
+  my $sql = 'SELECT cmgroup.*, systemuser.UserName AS OperatorUserName ';
+  $sql   .= 'FROM cmgroup LEFT JOIN systemuser ON cmgroup.OperatorId = systemuser.UserId ';
+  $sql   .= 'WHERE CMGroupId = ?';
+
+  my ($read_cmgrp_err, $read_cmgrp_msg, $cmgrp_data) = $self->list_cmgroup(1, 1, $sql, [$cmgroup_id]);
+
+  if ($read_cmgrp_err) {
+
+    $self->logger->debug($read_cmgrp_msg);
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'CMGroup'    => $cmgrp_data,
+                                           'RecordMeta' => [{'TagName' => 'CMGroup'}],
+  };
+
+  return $data_for_postrun_href;
+}
+
+sub update_cmgroup_runmode {
+
+=pod update_cmgroup_HELP_START
+{
+"OperationName": "Update crossingmeasurement group",
+"Description": "Update detail information about a crossingmeasurement group.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"KDDArTModule": "main",
+"KDDArTTable": "cmgroup",
+"SkippedField": ["TrialId","OperatorId","CMGroupDateTime"],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><StatInfo Unit='second' ServerElapsedTime='0.047' /><Info Message='CMGroup (9) has been updated successfully.' /></DATA>",
+"SuccessMessageJSON": "{'Info' : [{'Message' : 'CMGroup (10) has been updated successfully.'}],'StatInfo' : [{'Unit' : 'second','ServerElapsedTime' : '0.075'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='CMGroup (7): not found.' /><StatInfo ServerElapsedTime='0.013' Unit='second' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'CMGroup (7): not found.'}],'StatInfo' : [{'Unit' : 'second','ServerElapsedTime' : '0.013'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing CMGroupId"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self       = shift;
+  my $cmgroup_id = $self->param('id');
+  my $query      = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  # Generic required static field checking
+
+  my $dbh_read = connect_kdb_read();
+
+  my $skip_field = {'TrialId'         => 1,
+                    'OperatorId'      => 1,
+                    'CMGroupDateTime' => 1,
+                   };
+
+  my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
+                                                                                'cmgroup', $skip_field);
+
+  if ($chk_sfield_err) {
+
+    $self->logger->debug($chk_sfield_msg);
+
+    return $for_postrun_href;
+  }
+
+  # Finish generic required static field checking
+
+  my $dbh = connect_kdb_read();
+
+  my $chk_sql = 'SELECT TrialId, OperatorId, CMGroupName, CMGroupStatus, CMGroupNote ';
+  $chk_sql   .= 'FROM cmgroup WHERE CMGroupId=?';
+
+  my ($r_cmgrp_err, $r_cmgrp_msg, $cmgrp_data) = read_data($dbh, $chk_sql, [$cmgroup_id]);
+
+  if ($r_cmgrp_err) {
+
+    $self->logger->debug("Get info about existing cmgroup failed: $r_cmgrp_msg");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (scalar(@{$cmgrp_data}) == 0) {
+
+    my $err_msg = "CMGroup ($cmgroup_id): not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $trial_id       = $cmgrp_data->[0]->{'TrialId'};
+  my $operator_id    = $cmgrp_data->[0]->{'OperatorId'};
+  my $db_cmgrp_name  = $cmgrp_data->[0]->{'CMGroupName'};
+
+  my $cmgroup_status = undef;
+
+  if (defined $cmgrp_data->[0]->{'CMGroupStatus'}) {
+
+    if (length($cmgrp_data->[0]->{'CMGroupStatus'}) > 0) {
+
+      $cmgroup_status = $cmgrp_data->[0]->{'CMGroupStatus'};
+    }
+  }
+
+  $cmgroup_status = $query->param('CMGroupStatus');
+
+  if (length($cmgroup_status) == 0) {
+
+    $cmgroup_status = undef;
+  }
+
+  my $cmgroup_note = undef;
+
+  if (defined $cmgrp_data->[0]->{'CMGroupNote'}) {
+
+    if (length($cmgrp_data->[0]->{'CMGroupNote'}) > 0) {
+
+      $cmgroup_note = $cmgrp_data->[0]->{'CMGroupNote'};
+    }
+  }
+
+  $cmgroup_note = $query->param('CMGroupNote');
+
+  if (length($cmgroup_note) == 0) {
+
+    $cmgroup_note = undef;
+  }
+
+  my $group_id = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  my ($is_trial_ok, $trouble_trial_id_aref) = check_permission($dbh, 'trial', 'TrialId',
+                                                               [$trial_id], $group_id, $gadmin_status,
+                                                               $READ_WRITE_PERM);
+
+  if (!$is_trial_ok) {
+
+    my $trouble_trial_id = $trouble_trial_id_aref->[0];
+    my $err_msg = "Permission denied: Group ($group_id) and trial ($trial_id).";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh->disconnect();
+
+  my $user_id = $self->authen->user_id();
+
+  if ("$user_id" ne "0") {
+
+    if ("$user_id" ne "$operator_id") {
+
+      my $err_msg = "Permission denied: User ($user_id).";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  my $dbh_write = connect_kdb_write();
+
+  my $cur_dt = DateTime->now( time_zone => $TIMEZONE );
+  $cur_dt = DateTime::Format::MySQL->format_datetime($cur_dt);
+
+  my $cmgroup_name = $query->param('CMGroupName');
+
+  if ($cmgroup_name ne $db_cmgrp_name) {
+
+    if (record_existence($dbh_write, 'cmgroup', 'CMGroupName', $cmgroup_name)) {
+
+      my $err_msg = "CMGroup ($cmgroup_name): already exists.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'CMGroupName' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  my $sql = 'UPDATE cmgroup SET ';
+  $sql   .= 'CMGroupName=?, ';
+  $sql   .= 'CMGroupStatus=?, ';
+  $sql   .= 'CMGroupDateTime=?, ';
+  $sql   .= 'CMGroupNote=? ';
+  $sql   .= 'WHERE CMGroupId=?';
+
+  my $sth = $dbh_write->prepare($sql);
+  $sth->execute($cmgroup_name, $cmgroup_status, $cur_dt, $cmgroup_note, $cmgroup_id);
+
+  if ($dbh_write->err()) {
+
+    $self->logger->debug("Update CMGroup failed");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+  $sth->finish();
+
+  $dbh_write->disconnect();
+
+  my $info_msg_aref = [{'Message' => "CMGroup ($cmgroup_id) has been updated successfully."}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'      => $info_msg_aref};
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
+
+sub delete_cmgroup_runmode {
+
+=pod delete_cmgroup_HELP_START
+{
+"OperationName": "Delete crossingmeasurement group",
+"Description": "Delete a crossingmeasurement group and its associated crossingmeasurement records.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><StatInfo ServerElapsedTime='0.075' Unit='second' /><Info Message='CMGroup (12) and its crossingmeasurement records have been deleted successfully.' /></DATA>",
+"SuccessMessageJSON": "{'StatInfo' : [{'ServerElapsedTime' : '0.074','Unit' : 'second'}],'Info' : [{'Message' : 'CMGroup (11) and its crossingmeasurement records have been deleted successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='CMGroup (7): not found.' /><StatInfo ServerElapsedTime='0.013' Unit='second' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'CMGroup (7): not found.'}],'StatInfo' : [{'Unit' : 'second','ServerElapsedTime' : '0.013'}]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Existing CMGroupId"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self       = shift;
+  my $cmgroup_id = $self->param('id');
+  my $query      = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  my $dbh_write = connect_kdb_write();
+
+  my $chk_sql = 'SELECT TrialId, OperatorId, CMGroupName, CMGroupStatus, CMGroupNote ';
+  $chk_sql   .= 'FROM cmgroup WHERE CMGroupId=?';
+
+  my ($r_cmgrp_err, $r_cmgrp_msg, $cmgrp_data) = read_data($dbh_write, $chk_sql, [$cmgroup_id]);
+
+  if ($r_cmgrp_err) {
+
+    $self->logger->debug("Get info about existing cmgroup failed: $r_cmgrp_msg");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected Error'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (scalar(@{$cmgrp_data}) == 0) {
+
+    my $err_msg = "CMGroup ($cmgroup_id): not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $trial_id       = $cmgrp_data->[0]->{'TrialId'};
+  my $operator_id    = $cmgrp_data->[0]->{'OperatorId'};
+
+  my $group_id = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  my ($is_trial_ok, $trouble_trial_id_aref) = check_permission($dbh_write, 'trial', 'TrialId',
+                                                               [$trial_id], $group_id, $gadmin_status,
+                                                               $READ_WRITE_PERM);
+
+  if (!$is_trial_ok) {
+
+    my $trouble_trial_id = $trouble_trial_id_aref->[0];
+    my $err_msg = "Permission denied: Group ($group_id) and trial ($trial_id).";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $user_id = $self->authen->user_id();
+
+  if ("$user_id" ne "0") {
+
+    if ("$user_id" ne "$operator_id") {
+
+      my $err_msg = "Permission denied: User ($user_id).";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  my $sql = 'DELETE FROM crossingmeasurement WHERE CMGroupId=?';
+
+  my $sth = $dbh_write->prepare($sql);
+
+  $sth->execute($cmgroup_id);
+
+  if ($dbh_write->err()) {
+
+    $self->logger->debug("Delete crossingmeasurement failed");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+  $sth->finish();
+
+  $sql = 'DELETE FROM cmgroup where CMGroupId=?';
+
+  $sth = $dbh_write->prepare($sql);
+
+  $sth->execute($cmgroup_id);
+
+  if ($dbh_write->err()) {
+
+    $self->logger->debug("Delete cmgroup failed");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+  $sth->finish();
+
+  $dbh_write->disconnect();
+
+  my $info_msg_aref = [{'Message' => "CMGroup ($cmgroup_id) and its crossingmeasurement records have been deleted successfully."}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info'      => $info_msg_aref};
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+}
 
 1;

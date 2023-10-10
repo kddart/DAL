@@ -149,6 +149,8 @@ sub add_survey_runmode {
   my $query = $self->query();
 
   my $data_for_postrun_href = {};
+  my $survey_err = 0;
+  my $survey_err_aref = [];
 
   my $dbh_read = connect_kdb_read();
 
@@ -214,10 +216,8 @@ sub add_survey_runmode {
 
   if ($date_err) {
 
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$date_href]};
-
-    return $data_for_postrun_href;
+    push(@{$survey_err_aref}, $date_href);
+    $survey_err = 1;
   }
 
   if (length($survey_endtime) > 0) {
@@ -226,10 +226,8 @@ sub add_survey_runmode {
 
     if ($date_err) {
 
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [$date_href]};
-
-      return $data_for_postrun_href;
+      push(@{$survey_err_aref}, $date_href);
+      $survey_err = 1;
     }
   }
   else {
@@ -237,7 +235,7 @@ sub add_survey_runmode {
     $survey_endtime = undef;
   }
 
-  my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength ";
+  my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength, FactorValidRuleErrMsg, FactorValidRule  ";
   $sql   .= "FROM factor ";
   $sql   .= "WHERE TableNameOfFactor='surveyfactor'";
 
@@ -247,16 +245,27 @@ sub add_survey_runmode {
   my $vcol_param_data = {};
   my $vcol_len_info   = {};
   my $vcol_param_data_maxlen = {};
+  my $pre_validate_vcol = {};
+
   for my $vcol_id (keys(%{$vcol_data})) {
 
     my $vcol_param_name = "VCol_${vcol_id}";
-    my $vcol_value      = $query->param($vcol_param_name);
+    my $vcol_value      = $query->param($vcol_param_name) ;
     if ($vcol_data->{$vcol_id}->{'CanFactorHaveNull'} != 1) {
 
       $vcol_param_data->{$vcol_param_name} = $vcol_value;
     }
+
     $vcol_len_info->{$vcol_param_name} = $vcol_data->{$vcol_id}->{'FactorValueMaxLength'};
     $vcol_param_data_maxlen->{$vcol_param_name} = $vcol_value;
+
+    $pre_validate_vcol->{$vcol_param_name} = {
+      'Rule' => $vcol_data->{$vcol_id}->{'FactorValidRule'},
+      'Value'=> $vcol_value,
+      'FactorId'=> $vcol_id,
+      'RuleErrorMsg'=> $vcol_data->{$vcol_id}->{'FactorValidRuleErrMsg'},
+      'CanFactorHaveNull' => $vcol_data->{$vcol_id}->{'CanFactorHaveNull'},
+    };
   }
 
   my ($vcol_missing_err, $vcol_missing_href) = check_missing_href( $vcol_param_data );
@@ -286,10 +295,9 @@ sub add_survey_runmode {
     if (!$survey_manager_existence) {
 
       my $err_msg = "Survey Manager ($survey_manager) does not exist.";
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'SurveyManagerId' => $err_msg}]};
 
-      return $data_for_postrun_href;
+      push(@{$survey_err_aref}, {'SurveyManagerId' => $err_msg});
+      $survey_err = 1;
     }
   }
 
@@ -298,9 +306,26 @@ sub add_survey_runmode {
   if (!$survey_type_existence) {
 
     my $err_msg = "Survey Type ($survey_type) does not exist.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'SurveyTypeId' => $err_msg}]};
 
+    push(@{$survey_err_aref}, {'SurveyTypeId' => $err_msg});
+    $survey_err = 1;
+  }
+
+  #prevalidate values to be finished in later version
+
+  my ($vcol_error, $vcol_error_aref) = validate_all_factor_input($pre_validate_vcol);
+
+  if ($vcol_error) {
+    push(@{$survey_err_aref}, @{$vcol_error_aref});
+    $survey_err = 1;
+  }
+
+  if ($survey_err != 0) {
+
+    $dbh_k_read->disconnect();
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => $survey_err_aref};
     return $data_for_postrun_href;
   }
 
@@ -622,6 +647,9 @@ sub update_survey_runmode {
   my $query      = $self->query();
 
   my $data_for_postrun_href = {};
+  my $survey_err = 0;
+  my $survey_err_aref = [];
+
   my $sql;
 
   my $dbh_read = connect_kdb_read();
@@ -712,43 +740,53 @@ sub update_survey_runmode {
 
   if (!$survey_manager_existence) {
 
-    my $err_msg = "Survey Manager ($survey_manager) does not exist.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'SurveyManagerId' => $err_msg}]};
+      my $err_msg = "Survey Manager ($survey_manager) does not exist.";
 
-    return $data_for_postrun_href;
-  }
+      push(@{$survey_err_aref}, {'SurveyManagerId' => $err_msg});
+      $survey_err = 1;
+    }
 
   my $survey_type_existence = type_existence($dbh_k_read, 'survey', $survey_type);
 
   if (!$survey_type_existence) {
 
     my $err_msg = "Survey Type ($survey_type) does not exist.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'SurveyTypeId' => $err_msg}]};
 
-    return $data_for_postrun_href;
+    push(@{$survey_err_aref}, {'SurveyTypeId' => $err_msg});
+    $survey_err = 1;
   }
 
-  $sql    = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength ";
+  $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength, FactorValidRuleErrMsg, FactorValidRule  ";
   $sql   .= "FROM factor ";
   $sql   .= "WHERE TableNameOfFactor='surveyfactor'";
 
+  my $dbh_k_read = connect_kdb_read();
   my $vcol_data = $dbh_k_read->selectall_hashref($sql, 'FactorId');
 
   my $vcol_param_data = {};
   my $vcol_len_info   = {};
   my $vcol_param_data_maxlen = {};
+  my $pre_validate_vcol = {};
+
   for my $vcol_id (keys(%{$vcol_data})) {
 
     my $vcol_param_name = "VCol_${vcol_id}";
-    my $vcol_value      = $query->param($vcol_param_name);
+    my $vcol_value      = $query->param($vcol_param_name) ;
     if ($vcol_data->{$vcol_id}->{'CanFactorHaveNull'} != 1) {
 
       $vcol_param_data->{$vcol_param_name} = $vcol_value;
     }
+
     $vcol_len_info->{$vcol_param_name} = $vcol_data->{$vcol_id}->{'FactorValueMaxLength'};
     $vcol_param_data_maxlen->{$vcol_param_name} = $vcol_value;
+
+    $pre_validate_vcol->{$vcol_param_name} = {
+      'Rule' => $vcol_data->{$vcol_id}->{'FactorValidRule'},
+      'Value'=> $vcol_value,
+      'FactorId'=> $vcol_id,
+      'RuleErrorMsg'=> $vcol_data->{$vcol_id}->{'FactorValidRuleErrMsg'},
+      'CanFactorHaveNull' => $vcol_data->{$vcol_id}->{'CanFactorHaveNull'},
+    };
   }
 
   my ($vcol_missing_err, $vcol_missing_href) = check_missing_href( $vcol_param_data );
@@ -775,11 +813,9 @@ sub update_survey_runmode {
 
   if ($date_err) {
 
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$date_href]};
-
-    return $data_for_postrun_href;
-  }
+      push(@{$survey_err_aref}, $date_href);
+      $survey_err = 1;
+    }
 
   if (length($survey_endtime) > 0) {
 
@@ -787,10 +823,8 @@ sub update_survey_runmode {
 
     if ($date_err) {
 
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [$date_href]};
-
-      return $data_for_postrun_href;
+      push(@{$survey_err_aref}, $date_href);
+      $survey_err = 1;
     }
   }
   else {
@@ -798,7 +832,24 @@ sub update_survey_runmode {
     $survey_endtime = undef;
   }
 
-  $dbh_k_read->disconnect();
+  #prevalidate values to be finished in later version
+
+  my ($vcol_error, $vcol_error_aref) = validate_all_factor_input($pre_validate_vcol);
+
+  if ($vcol_error) {
+    push(@{$survey_err_aref}, @{$vcol_error_aref});
+    $survey_err = 1;
+  }
+
+  if ($survey_err != 0) {
+
+    $dbh_k_read->disconnect();
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => $survey_err_aref};
+    return $data_for_postrun_href;
+  }
+
 
   my $dbh_k_write = connect_kdb_write();
 
@@ -823,75 +874,23 @@ sub update_survey_runmode {
   }
   $sth->finish();
 
+  my $vcol_error = [];
+
   for my $vcol_id (keys(%{$vcol_data})) {
 
     if (defined $query->param('VCol_' . "$vcol_id")) {
 
       my $factor_value = $query->param('VCol_' . "$vcol_id");
 
-      $sql  = 'SELECT Count(*) ';
-      $sql .= 'FROM surveyfactor ';
-      $sql .= 'WHERE SurveyId=? AND FactorId=?';
+      my ($vcol_err, $vcol_msg) = update_factor_value($dbh_k_write, $vcol_id, $factor_value, 'surveyfactor', 'SurveyId', $survey_id);
 
-      my ($read_err, $count) = read_cell($dbh_k_write, $sql, [$survey_id, $vcol_id]);
+      if ($vcol_err) {
 
-      if (length($factor_value) > 0) {
+        $self->logger->debug("VCol_" . "$vcol_id => $vcol_msg" );
 
-        if ($count > 0) {
+        push(@{$survey_err_aref}, {'VCol_' . "$vcol_id" => $vcol_msg});
 
-          $sql  = 'UPDATE surveyfactor SET ';
-          $sql .= 'FactorValue=? ';
-          $sql .= 'WHERE SurveyId=? AND FactorId=?';
-          my $factor_sth = $dbh_k_write->prepare($sql);
-          $factor_sth->execute($factor_value, $survey_id, $vcol_id);
-
-          if ($dbh_k_write->err()) {
-
-            $data_for_postrun_href->{'Error'} = 1;
-            $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-            return $data_for_postrun_href;
-          }
-          $factor_sth->finish();
-        }
-        else {
-
-          $sql  = 'INSERT INTO surveyfactor SET ';
-          $sql .= 'SurveyId=?, ';
-          $sql .= 'FactorId=?, ';
-          $sql .= 'FactorValue=?';
-          my $factor_sth = $dbh_k_write->prepare($sql);
-          $factor_sth->execute($survey_id, $vcol_id, $factor_value);
-
-          if ($dbh_k_write->err()) {
-
-            $data_for_postrun_href->{'Error'} = 1;
-            $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-            return $data_for_postrun_href;
-          }
-          $factor_sth->finish();
-        }
-      }
-      else {
-
-        if ($count > 0) {
-
-          $sql  = 'DELETE FROM surveyfactor ';
-          $sql .= 'WHERE SurveyId=? AND FactorId=?';
-
-          my $factor_sth = $dbh_k_write->prepare($sql);
-          $factor_sth->execute($survey_id, $vcol_id);
-
-          if ($dbh_k_write->err()) {
-
-            $data_for_postrun_href->{'Error'} = 1;
-            $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
-
-            return $data_for_postrun_href;
-          }
-          $factor_sth->finish();
-        }
+        $survey_err = 1;
       }
     }
   }

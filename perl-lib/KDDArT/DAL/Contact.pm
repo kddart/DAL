@@ -730,9 +730,6 @@ sub update_organisation_runmode {
   if ($vcol_missing_err) {
 
     $data_for_postrun_href->{'Error'}       = 1;
-    #$data_for_postrun_href->{'Data'}        = {'Error' => [$vcol_missing_href]};
-
-    #return $data_for_postrun_href;
 
     push(@{$org_error_aref}, $vcol_missing_href);
     $org_err = 1;
@@ -786,12 +783,12 @@ sub update_organisation_runmode {
 
   #prevalidate values to be finished in later version
 
-  #my ($vcol_error, $vcol_error_aref) = validate_all_factor_input($pre_validate_vcol);
+  my ($vcol_error, $vcol_error_aref) = validate_all_factor_input($pre_validate_vcol);
 
-  #if ($vcol_error) {
-  #  push(@{$org_error_aref}, @{$vcol_error_aref});
-  #  $org_err = 1;
-  #}
+  if ($vcol_error) {
+    push(@{$org_error_aref}, @{$vcol_error_aref});
+    $org_err = 1;
+  }
 
 
   if ($org_err == 0) {
@@ -1593,21 +1590,18 @@ sub add_contact_runmode {
 
   if (!$org_existence) {
 
-    #$data_for_postrun_href->{'Error'} = 1;
-    #$data_for_postrun_href->{'Data'}  = {'Error' => [{'OrganisationId' => "Organisation ($org_id) does not exist."}]};
-
     push(@{$contact_err_aref}, {'OrganisationId' => "Organisation ($org_id) does not exist."});
     $contact_err = 1;
   }
 
   #prevalidate values to be finished in later version
 
-  #my ($vcol_error, $vcol_error_aref) = validate_all_factor_input($pre_validate_vcol);
+  my ($vcol_error, $vcol_error_aref) = validate_all_factor_input($pre_validate_vcol);
 
-  #if ($vcol_error) {
-  #  push(@{$contact_err_aref}, @{$vcol_error_aref});
-  #  $contact_err = 1;
-  #}
+  if ($vcol_error) {
+    push(@{$contact_err_aref}, @{$vcol_error_aref});
+    $contact_err = 1;
+  }
 
 
   if ($contact_err != 0) {
@@ -1746,7 +1740,7 @@ sub add_organisation_runmode {
 
   my $dbh_k_write = connect_kdb_write();
 
-  my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength ";
+  my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength, FactorValidRuleErrMsg, FactorValidRule  ";
   $sql   .= "FROM factor ";
   $sql   .= "WHERE TableNameOfFactor='organisationfactor'";
 
@@ -1812,14 +1806,12 @@ if ($org_err == 1) {
     $org_err = 1;
   }
 
-  #prevalidate values to be finished in later version
+  my ($vcol_error, $vcol_error_aref) = validate_all_factor_input($pre_validate_vcol);
 
-  #my ($vcol_error, $vcol_error_aref) = validate_all_factor_input($pre_validate_vcol);
-
-  #if ($vcol_error) {
-  #  push(@{$org_error_aref}, @{$vcol_error_aref});
-  #  $org_err = 1;
-  #}
+  if ($vcol_error) {
+    push(@{$org_error_aref}, @{$vcol_error_aref});
+   $org_err = 1;
+  }
 
 
   if ($org_err == 0) {
@@ -1880,8 +1872,6 @@ if ($org_err == 1) {
 
     return $data_for_postrun_href;
   }
-
-
 
   return $data_for_postrun_href;
 }
@@ -2348,21 +2338,18 @@ sub update_contact_runmode {
 
   if (!$org_existence) {
 
-    #$data_for_postrun_href->{'Error'} = 1;
-    #$data_for_postrun_href->{'Data'}  = {'Error' => [{'OrganisationId' => "Organisation ($org_id) does not exist."}]};
-
     push(@{$contact_err_aref}, {'OrganisationId' => "Organisation ($org_id) does not exist."});
     $contact_err = 1;
   }
   
-  #prevalidate values to be finished in later version
 
-  #my ($vcol_error, $vcol_error_aref) = validate_all_factor_input($pre_validate_vcol);
 
-  #if ($vcol_error) {
-  #  push(@{$contact_err_aref}, @{$vcol_error_aref});
-  #  $contact_err = 1;
-  #}
+  my ($vcol_error, $vcol_error_aref) = validate_all_factor_input($pre_validate_vcol);
+
+  if ($vcol_error) {
+    push(@{$contact_err_aref}, @{$vcol_error_aref});
+    $contact_err = 1;
+  }
 
 
   if ($contact_err != 0) {

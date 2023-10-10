@@ -24,7 +24,7 @@
   <Parent CaseFile="xml/add_data_no_vcol/case_00115_add_specimen2.xml" Order="5" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00116_add_specimen3.xml" Order="6" />
   <Parent CaseFile="xml/add_data_no_vcol/case_00117_add_specimen4.xml" Order="7" />
-  <Parent CaseFile="xml/add_data_no_vcol/case_00119_add_treatment.xml" Force="1" Order="9" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00119_add_treatment.xml" Force="1" Order="8" />
   
   
 </TestCase>

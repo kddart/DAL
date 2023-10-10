@@ -1464,6 +1464,8 @@ sub add_general_type_runmode {
   my $query = $self->query();
 
   my $data_for_postrun_href = {};
+  my $general_type_err_aref = [];
+  my $general_type_err = 0;
 
   # Generic required static field checking
 
@@ -1507,10 +1509,9 @@ sub add_general_type_runmode {
   if ( $is_active !~ /^(1|0){1}$/ ) {
 
     my $err_msg = "IsTypeActive ($is_active): invalid";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'IsTypeActive' => $err_msg}]};
 
-    return $data_for_postrun_href;
+    push(@{$general_type_err_aref}, {'IsTypeActive' => $err_msg});
+    $general_type_err = 1;
   }
 
   my $is_fixed = $query->param('IsFixed');
@@ -1518,11 +1519,19 @@ sub add_general_type_runmode {
   if ( $is_fixed !~ /^(1|0){1}$/ ) {
 
     my $err_msg = "IsFixed ($is_fixed): invalid";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'IsFixed' => $err_msg}]};
 
-    return $data_for_postrun_href;
+    push(@{$general_type_err_aref}, {'IsFixed' => $err_msg});
+    $general_type_err = 1;
   }
+
+  my $type_metadata = "";
+
+  if (defined $query->param('TypeMetaData')) {
+    if (length($query->param('TypeMetaData')) > 0) {
+      $type_metadata = $query->param('TypeMetaData');
+    }
+  }
+
 
   my $class_lookup = { 'site'                 => 1,
                        'item'                 => 1,
@@ -1562,10 +1571,8 @@ sub add_general_type_runmode {
 
     my $err_msg = "Class ($class) not supported.";
 
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-    return $data_for_postrun_href;
+    push(@{$general_type_err_aref}, {'Message' => $err_msg});
+    $general_type_err = 1;
   }
 
   my $dbh_k_read = connect_kdb_read();
@@ -1579,13 +1586,12 @@ sub add_general_type_runmode {
   if (length($check_type_id) > 0) {
 
     my $err_msg = "Type ($type_name) for class ($class) already exists.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'TypeName' => $err_msg}]};
 
-    return $data_for_postrun_href;
+    push(@{$general_type_err_aref}, {'TypeName' => $err_msg});
+    $general_type_err = 1;
   }
 
-  $sql    = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength ";
+  $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength, FactorValidRuleErrMsg, FactorValidRule  ";
   $sql   .= "FROM factor ";
   $sql   .= "WHERE TableNameOfFactor='generaltypefactor'";
 
@@ -1594,16 +1600,27 @@ sub add_general_type_runmode {
   my $vcol_param_data = {};
   my $vcol_len_info   = {};
   my $vcol_param_data_maxlen = {};
+  my $pre_validate_vcol = {};
+
   for my $vcol_id (keys(%{$vcol_data})) {
 
     my $vcol_param_name = "VCol_${vcol_id}";
-    my $vcol_value      = $query->param($vcol_param_name);
+    my $vcol_value      = $query->param($vcol_param_name) ;
     if ($vcol_data->{$vcol_id}->{'CanFactorHaveNull'} != 1) {
 
       $vcol_param_data->{$vcol_param_name} = $vcol_value;
     }
+
     $vcol_len_info->{$vcol_param_name} = $vcol_data->{$vcol_id}->{'FactorValueMaxLength'};
     $vcol_param_data_maxlen->{$vcol_param_name} = $vcol_value;
+
+    $pre_validate_vcol->{$vcol_param_name} = {
+      'Rule' => $vcol_data->{$vcol_id}->{'FactorValidRule'},
+      'Value'=> $vcol_value,
+      'FactorId'=> $vcol_id,
+      'RuleErrorMsg'=> $vcol_data->{$vcol_id}->{'FactorValidRuleErrMsg'},
+      'CanFactorHaveNull' => $vcol_data->{$vcol_id}->{'CanFactorHaveNull'},
+    };
   }
 
   my ($vcol_missing_err, $vcol_missing_msg) = check_missing_value( $vcol_param_data );
@@ -1630,6 +1647,19 @@ sub add_general_type_runmode {
 
   $dbh_k_read->disconnect();
 
+  my ($vcol_error, $vcol_error_aref) = validate_all_factor_input($pre_validate_vcol);
+
+  if ($vcol_error) {
+    push(@{$general_type_err}, @{$vcol_error_aref});
+    $general_type_err = 1;
+  }
+
+  if ($general_type_err != 0) {
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => $general_type_err};
+    return $data_for_postrun_href;
+  }
+
   my $type_id = -1;
   my $dbh_k_write = connect_kdb_write();
 
@@ -1638,10 +1668,11 @@ sub add_general_type_runmode {
   $sql .= 'TypeName=?, ';
   $sql .= 'TypeNote=?, ';
   $sql .= 'IsTypeActive=?, ';
-  $sql .= 'IsFixed=?';
+  $sql .= 'IsFixed=?, ' ;
+  $sql .= 'TypeMetaData=?';
 
   my $sth = $dbh_k_write->prepare($sql);
-  $sth->execute($class, $type_name, $type_note, $is_active, $is_fixed);
+  $sth->execute($class, $type_name, $type_note, $is_active, $is_fixed, $type_metadata);
 
   if (!$dbh_k_write->err()) {
 
@@ -2095,6 +2126,8 @@ sub update_general_type_runmode {
   my $query = $self->query();
 
   my $data_for_postrun_href = {};
+  my $general_type_err_aref = [];
+  my $general_type_err = 0;
 
   # Generic required static field checking
 
@@ -2124,7 +2157,7 @@ sub update_general_type_runmode {
 
   my $dbh_k_read = connect_kdb_read();
 
-  my $read_general_type_sql    =   'SELECT TypeNote, IsTypeActive, IsFixed, TypeName ';
+  my $read_general_type_sql    =   'SELECT TypeNote, IsTypeActive, IsFixed, TypeName, TypeMetaData ';
      $read_general_type_sql   .=   'FROM generaltype WHERE TypeId=? ';
 
   my ($r_df_val_err, $r_df_val_msg, $general_df_val_data) = read_data($dbh_k_read, $read_general_type_sql, [$type_id]);
@@ -2142,6 +2175,7 @@ sub update_general_type_runmode {
   my $is_active          = undef;
   my $db_is_fixed        = undef;
   my $db_type_name       = undef;
+  my $type_metadata      = undef;
 
   my $nb_df_val_rec    =  scalar(@{$general_df_val_data});
 
@@ -2158,6 +2192,7 @@ sub update_general_type_runmode {
   $is_active          =  $general_df_val_data->[0]->{'IsTypeActive'};
   $db_is_fixed        =  $general_df_val_data->[0]->{'IsFixed'};
   $db_type_name       =  $general_df_val_data->[0]->{'TypeName'};
+  $type_metadata      =   $general_df_val_data->[0]->{'TypeMetaData'};
 
 
   if (defined $query->param('IsTypeActive')) {
@@ -2176,24 +2211,28 @@ sub update_general_type_runmode {
   if ( $is_active !~ /^(1|0){1}$/ ) {
 
     my $err_msg = "IsTypeActive ($is_active): invalid";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'IsTypeActive' => $err_msg}]};
 
-    return $data_for_postrun_href;
+    push(@{$general_type_err_aref}, {'IsTypeActive' => $err_msg});
+    $general_type_err = 1;
   }
 
   if ( $is_fixed !~ /^(1|0){1}$/ ) {
 
     my $err_msg = "IsFixed ($is_fixed): invalid";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'IsFixed' => $err_msg}]};
 
-    return $data_for_postrun_href;
+    push(@{$general_type_err_aref}, {'IsFixed' => $err_msg});
+    $general_type_err = 1;
   }
 
   if (defined $query->param('TypeNote')) {
 
     $type_note = $query->param('TypeNote');
+  }
+
+  if (defined $query->param('TypeMetaData')) {
+    if (length($query->param('TypeMetaData')) > 0) {
+      $type_metadata = $query->param('TypeMetaData');
+    }
   }
 
   my $sql = 'SELECT TypeId FROM generaltype WHERE Class=? AND TypeId=?';
@@ -2205,10 +2244,9 @@ sub update_general_type_runmode {
   if (length($check_type_id) == 0) {
 
     my $err_msg = "Type ($type_id) for class ($class) not found.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
-    return $data_for_postrun_href;
+    push(@{$general_type_err_aref}, {'Message' => $err_msg});
+    $general_type_err = 1;
   }
 
   if ("$db_is_fixed" eq '1') {
@@ -2216,10 +2254,9 @@ sub update_general_type_runmode {
     if ($type_name ne $db_type_name) {
 
       my $err_msg = "Type ($type_name) cannot be changed.";
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'TypeName' => $err_msg}]};
-
-      return $data_for_postrun_href;
+ 
+      push(@{$general_type_err_aref}, {'Message' => $err_msg});
+      $general_type_err = 1;
     }
   }
 
@@ -2238,7 +2275,7 @@ sub update_general_type_runmode {
     return $data_for_postrun_href;
   }
 
-  $sql    = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength ";
+  $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength, FactorValidRuleErrMsg, FactorValidRule  ";
   $sql   .= "FROM factor ";
   $sql   .= "WHERE TableNameOfFactor='generaltypefactor'";
 
@@ -2247,16 +2284,27 @@ sub update_general_type_runmode {
   my $vcol_param_data = {};
   my $vcol_len_info   = {};
   my $vcol_param_data_maxlen = {};
+  my $pre_validate_vcol = {};
+
   for my $vcol_id (keys(%{$vcol_data})) {
 
     my $vcol_param_name = "VCol_${vcol_id}";
-    my $vcol_value      = $query->param($vcol_param_name);
+    my $vcol_value      = $query->param($vcol_param_name) ;
     if ($vcol_data->{$vcol_id}->{'CanFactorHaveNull'} != 1) {
 
       $vcol_param_data->{$vcol_param_name} = $vcol_value;
     }
+
     $vcol_len_info->{$vcol_param_name} = $vcol_data->{$vcol_id}->{'FactorValueMaxLength'};
     $vcol_param_data_maxlen->{$vcol_param_name} = $vcol_value;
+
+    $pre_validate_vcol->{$vcol_param_name} = {
+      'Rule' => $vcol_data->{$vcol_id}->{'FactorValidRule'},
+      'Value'=> $vcol_value,
+      'FactorId'=> $vcol_id,
+      'RuleErrorMsg'=> $vcol_data->{$vcol_id}->{'FactorValidRuleErrMsg'},
+      'CanFactorHaveNull' => $vcol_data->{$vcol_id}->{'CanFactorHaveNull'},
+    };
   }
 
   my ($vcol_missing_err, $vcol_missing_msg) = check_missing_value( $vcol_param_data );
@@ -2283,17 +2331,31 @@ sub update_general_type_runmode {
 
   $dbh_k_read->disconnect();
 
+  my ($vcol_error, $vcol_error_aref) = validate_all_factor_input($pre_validate_vcol);
+
+  if ($vcol_error) {
+    push(@{$general_type_err}, @{$vcol_error_aref});
+    $general_type_err = 1;
+  }
+
+  if ($general_type_err != 0) {
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => $general_type_err};
+    return $data_for_postrun_href;
+  }
+
   my $dbh_k_write = connect_kdb_write();
 
   $sql  = 'UPDATE generaltype SET ';
   $sql .= 'TypeName=?, ';
   $sql .= 'TypeNote=?, ';
   $sql .= 'IsTypeActive=?, ';
-  $sql .= 'IsFixed=? ';
+  $sql .= 'IsFixed=?, ';
+  $sql .= 'TypeMetaData=? ';
   $sql .= 'WHERE Class=? AND TypeId=?';
 
   my $sth = $dbh_k_write->prepare($sql);
-  $sth->execute($type_name, $type_note, $is_active, $is_fixed, $class, $type_id);
+  $sth->execute($type_name, $type_note, $is_active, $is_fixed, $type_metadata, $class, $type_id);
 
   if ($dbh_k_write->err()) {
 
@@ -2302,75 +2364,35 @@ sub update_general_type_runmode {
   }
   $sth->finish();
 
+  my $vcol_error = [];
+
   for my $vcol_id (keys(%{$vcol_data})) {
 
     if (defined $query->param('VCol_' . "$vcol_id")) {
 
       my $factor_value = $query->param('VCol_' . "$vcol_id");
 
-      $sql  = 'SELECT Count(*) ';
-      $sql .= 'FROM generaltypefactor ';
-      $sql .= 'WHERE TypeId=? AND FactorId=?';
+      $self->logger->debug("Updating $vcol_id => $factor_value");
 
-      my ($read_err, $count) = read_cell($dbh_k_write, $sql, [$type_id, $vcol_id]);
+      my ($vcol_err, $vcol_msg) = update_factor_value($dbh_k_write, $vcol_id, $factor_value, 'generaltypefactor', 'TypeId', $type_id);
 
-      if (length($factor_value) > 0) {
+      if ($vcol_err) {
 
-        if ($count > 0) {
+        $self->logger->debug("VCol_" . "$vcol_id => $vcol_msg" );
 
-          $sql  = 'UPDATE generaltypefactor SET ';
-          $sql .= 'FactorValue=? ';
-          $sql .= 'WHERE TypeId=? AND FactorId=?';
+        push(@{$general_type_err_aref}, {'VCol_' . "$vcol_id" => $vcol_msg});
 
-          my $factor_sth = $dbh_k_write->prepare($sql);
-          $factor_sth->execute($factor_value, $type_id, $vcol_id);
-
-          if ($dbh_k_write->err()) {
-
-            $self->logger->debug('Unexpected error.');
-            return $self->_set_error('Unexpected Error.');
-          }
-          $factor_sth->finish();
-        }
-        else {
-
-          $sql  = 'INSERT INTO generaltypefactor SET ';
-          $sql .= 'TypeId=?, ';
-          $sql .= 'FactorId=?, ';
-          $sql .= 'FactorValue=?';
-          my $factor_sth = $dbh_k_write->prepare($sql);
-          $factor_sth->execute($type_id, $vcol_id, $factor_value);
-
-          if ($dbh_k_write->err()) {
-
-            $self->logger->debug('Unexpected error.');
-            return $self->_set_error('Unexpected Error.');
-          }
-          $factor_sth->finish();
-        }
-      }
-      else {
-
-        if ($count > 0) {
-
-          $sql  = 'DELETE FROM generaltypefactor ';
-          $sql .= 'WHERE TypeId=? AND FactorId=?';
-
-          my $factor_sth = $dbh_k_write->prepare($sql);
-          $factor_sth->execute($type_id, $vcol_id);
-
-          if ($dbh_k_write->err()) {
-
-            $self->logger->debug('Unexpected error.');
-            return $self->_set_error('Unexpected Error.');
-          }
-          $factor_sth->finish();
-        }
+        $general_type_err = 1;
       }
     }
   }
-
   $dbh_k_write->disconnect();
+
+  if ($general_type_err != 0) {
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => $general_type_err_aref};
+    return $data_for_postrun_href;
+  }
 
   my $info_msg_aref  = [{'Message' => "GeneralType ($type_id) has been updated successfully."}];
 

@@ -535,6 +535,8 @@ sub add_trialevent_runmode {
   my $query                = $self->query();
 
   my $data_for_postrun_href = {};
+  my $trial_event_err_aref = [];
+  my $trial_event_err = 0;
 
   # Generic required static field checking
 
@@ -576,10 +578,8 @@ sub add_trialevent_runmode {
 
   if ($te_date_err) {
 
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$te_date_href]};
-
-    return $data_for_postrun_href;
+    push(@{$trial_event_err_aref}, $te_date_href);
+    $trial_event_err = 1;
   }
 
   my $dbh_k_write = connect_kdb_write();
@@ -587,19 +587,18 @@ sub add_trialevent_runmode {
   if (!type_existence($dbh_k_write, 'trialevent', $trialevent_typeid)) {
 
     my $err_msg = "EventTypeId ($trialevent_typeid): not found or inactive.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'EventTypeId' => $err_msg}]};
 
-    return $data_for_postrun_href;
+    push(@{$trial_event_err_aref}, {'EventTypeId' => $err_msg});
+    $trial_event_err = 1;
+
   }
 
   if (!record_existence($dbh_k_write, 'generalunit', 'UnitId', $unit_id)) {
 
     my $err_msg = "UnitId ($unit_id): not found.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'UnitId' => $err_msg}]};
 
-    return $data_for_postrun_href;
+    push(@{$trial_event_err_aref}, {'UnitId' => $err_msg});
+    $trial_event_err = 1;
   }
 
   my $group_id  = $self->authen->group_id();
@@ -615,10 +614,9 @@ sub add_trialevent_runmode {
   if (length($trial_permission) == 0) {
 
     my $err_msg = "TrialId ($trialevent_trialid): not found.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
-    return $data_for_postrun_href;
+    push(@{$trial_event_err_aref}, {'Message' => $err_msg});
+    $trial_event_err = 1;
   }
   else {
 
@@ -626,34 +624,41 @@ sub add_trialevent_runmode {
 
       my $err_msg = "TrialId ($trialevent_trialid): permission denied.";
 
-      $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-      return $data_for_postrun_href;
+      push(@{$trial_event_err_aref}, {'Message' => $err_msg});
+      $trial_event_err = 1;
     }
   }
 
   # Get the virtual col from the factor table
 
-  my $vcol_sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength ";
+  my $vcol_sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength, FactorValidRuleErrMsg, FactorValidRule  ";
   $vcol_sql   .= "FROM factor WHERE TableNameOfFactor='trialeventfactor'";
 
   my $vcol_data              = $dbh_k_write->selectall_hashref($vcol_sql, 'FactorId');
   my $vcol_param_data        = {};
   my $vcol_len_info          = {};
   my $vcol_param_data_maxlen = {};
+  my $pre_validate_vcol = {};
 
-  for my $vcol_id ( keys( %{$vcol_data} ) ) {
+  for my $vcol_id (keys(%{$vcol_data})) {
 
     my $vcol_param_name = "VCol_${vcol_id}";
-    my $vcol_value      = $query->param($vcol_param_name);
-
-    if ( $vcol_data->{$vcol_id}->{'CanFactorHaveNull'} != 1 ) {
+    my $vcol_value      = $query->param($vcol_param_name) ;
+    if ($vcol_data->{$vcol_id}->{'CanFactorHaveNull'} != 1) {
 
       $vcol_param_data->{$vcol_param_name} = $vcol_value;
     }
-    $vcol_len_info->{$vcol_param_name}          = $vcol_data->{$vcol_id}->{'FactorValueMaxLength'};
+
+    $vcol_len_info->{$vcol_param_name} = $vcol_data->{$vcol_id}->{'FactorValueMaxLength'};
     $vcol_param_data_maxlen->{$vcol_param_name} = $vcol_value;
+
+    $pre_validate_vcol->{$vcol_param_name} = {
+      'Rule' => $vcol_data->{$vcol_id}->{'FactorValidRule'},
+      'Value'=> $vcol_value,
+      'FactorId'=> $vcol_id,
+      'RuleErrorMsg'=> $vcol_data->{$vcol_id}->{'FactorValidRuleErrMsg'},
+      'CanFactorHaveNull' => $vcol_data->{$vcol_id}->{'CanFactorHaveNull'},
+    };
   }
 
   # Validate virtual column for factor
@@ -671,6 +676,19 @@ sub add_trialevent_runmode {
 
     $vcol_maxlen_msg = $vcol_maxlen_msg . ' longer than maximum length.';
     return $self->_set_error($vcol_maxlen_msg);
+  }
+
+  my ($vcol_error, $vcol_error_aref) = validate_all_factor_input($pre_validate_vcol);
+
+  if ($vcol_error) {
+    push(@{$trial_event_err_aref}, @{$vcol_error_aref});
+    $trial_event_err = 1;
+  }
+
+  if ($trial_event_err != 0) {
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => $trial_event_err_aref};
+    return $data_for_postrun_href;
   }
 
   my $insert_statement = "
@@ -719,6 +737,7 @@ sub add_trialevent_runmode {
   };
 }
 
+
 sub update_trialevent_runmode {
 
 =pod update_trialevent_HELP_START
@@ -747,6 +766,8 @@ sub update_trialevent_runmode {
   my $query = $self->query();
 
   my $data_for_postrun_href = {};
+  my $trial_event_err_aref = [];
+  my $trial_event_err = 0;
 
   # Generic required static field checking
 
@@ -799,10 +820,8 @@ sub update_trialevent_runmode {
 
     my $err_msg = "TrialId ($trial_id): permission denied.";
 
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-    return $data_for_postrun_href;
+    push(@{$trial_event_err_aref}, {'Message' => $err_msg});
+    $trial_event_err = 1;
   }
 
   my $trialevent_typeid           = $query->param('EventTypeId');
@@ -821,35 +840,30 @@ sub update_trialevent_runmode {
 
     my $err_msg = "EventTypeId ($trialevent_typeid): not found or inactive.";
 
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'EventTypeId' => $err_msg}]};
+    push(@{$trial_event_err_aref}, {'EventTypeId' => $err_msg});
+    $trial_event_err = 1;
 
-    return $data_for_postrun_href;
   }
 
   if (!record_existence($dbh, 'generalunit', 'UnitId', $unit_id)) {
 
     my $err_msg = "UnitId ($unit_id): not found.";
 
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'UnitId' => $err_msg}]};
-
-    return $data_for_postrun_href;
+    push(@{$trial_event_err_aref}, {'UnitId' => $err_msg});
+    $trial_event_err = 1;
   }
 
   my ( $te_date_err, $te_date_href ) = check_dt_href( { 'TrialEventDate' => $trialevent_trialevent_date } );
 
   if ($te_date_err) {
 
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [$te_date_href]};
-
-    return $data_for_postrun_href;
+    push(@{$trial_event_err_aref}, $te_date_href);
+    $trial_event_err = 1;
   }
 
   # Get the virtual col from the factor table
 
-  my $vcol_sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength ";
+  my $vcol_sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength, FactorValidRuleErrMsg, FactorValidRule  ";
   $vcol_sql   .= "FROM factor WHERE TableNameOfFactor='trialeventfactor'";
 
   my $vcol_data              = $dbh->selectall_hashref($vcol_sql, 'FactorId');
@@ -857,19 +871,27 @@ sub update_trialevent_runmode {
   my $vcol_param_data        = {};
   my $vcol_len_info          = {};
   my $vcol_param_data_maxlen = {};
+  my $pre_validate_vcol = {};
 
-  for my $vcol_id ( keys( %{$vcol_data} ) ) {
+  for my $vcol_id (keys(%{$vcol_data})) {
 
     my $vcol_param_name = "VCol_${vcol_id}";
-    my $vcol_value      = $query->param($vcol_param_name);
+    my $vcol_value      = $query->param($vcol_param_name) ;
+    if ($vcol_data->{$vcol_id}->{'CanFactorHaveNull'} != 1) {
 
-    if ( $vcol_data->{$vcol_id}->{'CanFactorHaveNull'} != 1 ) {
-
-      $vcol_param_data_compul->{$vcol_param_name} = $vcol_value;
+      $vcol_param_data->{$vcol_param_name} = $vcol_value;
     }
-    $vcol_param_data->{$vcol_param_name}        = $vcol_value;
-    $vcol_len_info->{$vcol_param_name}          = $vcol_data->{$vcol_id}->{'FactorValueMaxLength'};
+
+    $vcol_len_info->{$vcol_param_name} = $vcol_data->{$vcol_id}->{'FactorValueMaxLength'};
     $vcol_param_data_maxlen->{$vcol_param_name} = $vcol_value;
+
+    $pre_validate_vcol->{$vcol_param_name} = {
+      'Rule' => $vcol_data->{$vcol_id}->{'FactorValidRule'},
+      'Value'=> $vcol_value,
+      'FactorId'=> $vcol_id,
+      'RuleErrorMsg'=> $vcol_data->{$vcol_id}->{'FactorValidRuleErrMsg'},
+      'CanFactorHaveNull' => $vcol_data->{$vcol_id}->{'CanFactorHaveNull'},
+    };
   }
 
   # Validate virtual column for factor
@@ -890,6 +912,19 @@ sub update_trialevent_runmode {
   }
 
   $dbh->disconnect();
+
+  my ($vcol_error, $vcol_error_aref) = validate_all_factor_input($pre_validate_vcol);
+
+  if ($vcol_error) {
+    push(@{$trial_event_err_aref}, @{$vcol_error_aref});
+    $trial_event_err = 1;
+  }
+
+  if ($trial_event_err != 0) {
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => $trial_event_err_aref};
+    return $data_for_postrun_href;
+  }
 
   my $dbh_k_write = connect_kdb_write();
 
@@ -913,17 +948,36 @@ sub update_trialevent_runmode {
     return $self->_set_error();
   }
 
-  my ($up_vcol_err, $up_vcol_err_msg) = update_vcol_data($dbh_k_write, $vcol_data, $vcol_param_data,
-                                                         'trialeventfactor', 'TrialEventId', $trialevent_id);
+  my $vcol_error = [];
 
-  if ($up_vcol_err) {
+  for my $vcol_id (keys(%{$vcol_data})) {
 
-    $self->logger->debug($up_vcol_err_msg);
-    return $self->_set_error('Unexpected error.');
+    if (defined $query->param('VCol_' . "$vcol_id")) {
+
+      my $factor_value = $query->param('VCol_' . "$vcol_id");
+
+      my ($vcol_err, $vcol_msg) = update_factor_value($dbh_k_write, $vcol_id, $factor_value, 'trialeventfactor', 'TrialEventId', $trialevent_id);
+
+      if ($vcol_err) {
+
+        $self->logger->debug("VCol_" . "$vcol_id => $vcol_msg" );
+
+        push(@{$trial_event_err_aref}, {'VCol_' . "$vcol_id" => $vcol_msg});
+
+        $trial_event_err = 1;
+      }
+    }
   }
+  
 
   $sth->finish();
   $dbh_k_write->disconnect();
+
+  if ($trial_event_err != 0) {
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => $trial_event_err_aref};
+    return $data_for_postrun_href;
+  }
 
   my $info_msg_aref  = [ { 'Message' => "TrialEventId ($trialevent_id) has been updated successfully." } ];
 

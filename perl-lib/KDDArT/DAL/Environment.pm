@@ -972,6 +972,8 @@ sub register_device_runmode {
   my $query = $self->query();
 
   my $data_for_postrun_href = {};
+  my $device_err_aref = [];
+  my $device_err = 0;
 
   # Generic required static field checking
 
@@ -1006,16 +1008,67 @@ sub register_device_runmode {
 
     my $err_msg = "DeviceId cannot have slash (/) or backslash (\\).";
 
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'DeviceId' => $err_msg}]};
-
-    return $data_for_postrun_href;
+    push(@{$device_err_aref}, {'DeviceId' => $err_msg});
+    $device_err = 1;
   }
 
   my $note = undef;
   my $lng  = undef;
   my $lat  = undef;
   my $conf = undef;
+
+  my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength, FactorValidRuleErrMsg, FactorValidRule  ";
+  $sql   .= "FROM factor ";
+  $sql   .= "WHERE TableNameOfFactor='deviceregisterfactor'";
+
+  my $dbh_k_read = connect_kdb_read();
+  my $vcol_data = $dbh_k_read->selectall_hashref($sql, 'FactorId');
+
+  my $vcol_param_data = {};
+  my $vcol_len_info   = {};
+  my $vcol_param_data_maxlen = {};
+  my $pre_validate_vcol = {};
+
+  for my $vcol_id (keys(%{$vcol_data})) {
+
+    my $vcol_param_name = "VCol_${vcol_id}";
+    my $vcol_value      = $query->param($vcol_param_name) ;
+    if ($vcol_data->{$vcol_id}->{'CanFactorHaveNull'} != 1) {
+
+      $vcol_param_data->{$vcol_param_name} = $vcol_value;
+    }
+
+    $vcol_len_info->{$vcol_param_name} = $vcol_data->{$vcol_id}->{'FactorValueMaxLength'};
+    $vcol_param_data_maxlen->{$vcol_param_name} = $vcol_value;
+
+    $pre_validate_vcol->{$vcol_param_name} = {
+      'Rule' => $vcol_data->{$vcol_id}->{'FactorValidRule'},
+      'Value'=> $vcol_value,
+      'FactorId'=> $vcol_id,
+      'RuleErrorMsg'=> $vcol_data->{$vcol_id}->{'FactorValidRuleErrMsg'},
+      'CanFactorHaveNull' => $vcol_data->{$vcol_id}->{'CanFactorHaveNull'},
+    };
+  }
+
+  my ($vcol_missing_err, $vcol_missing_href) = check_missing_href( $vcol_param_data );
+
+  if ($vcol_missing_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$vcol_missing_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  my ($vcol_maxlen_err, $vcol_maxlen_href) = check_maxlen_href($vcol_param_data_maxlen, $vcol_len_info);
+
+  if ($vcol_maxlen_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$vcol_maxlen_href]};
+
+    return $data_for_postrun_href;
+  }
 
   if (length($query->param('DeviceNote')) > 0) { $note = $query->param('DeviceNote'); }
 
@@ -1030,10 +1083,9 @@ sub register_device_runmode {
   if ( !type_existence($dbh_write, 'deviceregister', $device_type_id) ) {
 
     my $err_msg = "DeviceTypeId ($device_type_id): not found or inactive.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'DeviceTypeId' => $err_msg}]};
 
-    return $data_for_postrun_href;
+    push(@{$device_err_aref}, {'DeviceTypeId' => $err_msg});
+    $device_err = 1;
   }
 
   my $dev_exist_status = record_existence($dbh_write, 'deviceregister', 'DeviceId', $device_id);
@@ -1042,13 +1094,26 @@ sub register_device_runmode {
 
     my $err_msg = "Device ($device_id) already exists.";
 
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
-
-    return $data_for_postrun_href;
+    push(@{$device_err_aref}, {'Message' => $err_msg});
+    $device_err = 1;
   }
 
-  my $sql  = 'INSERT INTO deviceregister SET ';
+  my ($vcol_error, $vcol_error_aref) = validate_all_factor_input($pre_validate_vcol);
+
+  if ($vcol_error) {
+    push(@{$device_err_aref}, @{$vcol_error_aref});
+    $device_err = 1;
+  }
+
+  if ($device_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => $device_err_aref};
+    return $data_for_postrun_href;
+
+  }
+
+  $sql  = 'INSERT INTO deviceregister SET ';
   $sql    .= 'DeviceTypeId = ?, ';
   $sql    .= 'DeviceId = ?, ';
   $sql    .= 'DeviceNote = ?, ';
@@ -1073,6 +1138,33 @@ sub register_device_runmode {
   }
 
   $sth->finish();
+
+  for my $vcol_id (keys(%{$vcol_data})) {
+
+    my $vcol_value = $query->param('VCol_' . "$vcol_id");
+
+    if (length($vcol_value) > 0) {
+
+      $sql  = 'INSERT INTO deviceregisterfactor SET ';
+      $sql .= 'DeviceRegisterId=?, ';
+      $sql .= 'FactorId=?, ';
+      $sql .= 'FactorValue=?';
+
+      my $vcol_sth = $dbh_write->prepare($sql);
+      $vcol_sth->execute($device_reg_id, $vcol_id, $vcol_value);
+
+      if ($dbh_write->err()) {
+
+        $self->logger->debug("Add vcol $vcol_id - $vcol_value : failed");
+        $data_for_postrun_href->{'Error'} = 1;
+        $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+        return $data_for_postrun_href;
+      }
+      $vcol_sth->finish();
+    }
+  }
+
   $dbh_write->disconnect();
 
   my $info_msg_aref  = [{'Message' => "Device ($device_reg_id) has been added successfully."}];
@@ -1114,6 +1206,9 @@ sub update_device_registration_runmode {
   my $query  = $self->query();
 
   my $data_for_postrun_href = {};
+  my $device_err_aref = [];
+  my $device_err = 0;
+
 
   # Generic required static field checking
 
@@ -1142,18 +1237,6 @@ sub update_device_registration_runmode {
   my $device_id      = $query->param('DeviceId');
   my $device_type_id = $query->param('DeviceTypeId');
 
-  $device_id = lc($device_id);
-
-  if ($device_id =~ /[\/|\\]/) {
-
-    my $err_msg = "DeviceId cannot have slash (/) or backslash (\\).";
-
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'DeviceId' => $err_msg}]};
-
-    return $data_for_postrun_href;
-  }
-
   my $dbh_write = connect_kdb_write();
 
   my $reg_exist = record_existence($dbh_write, 'deviceregister', 'DeviceRegisterId', $reg_id);
@@ -1168,13 +1251,22 @@ sub update_device_registration_runmode {
     return $data_for_postrun_href;
   }
 
+  $device_id = lc($device_id);
+
+  if ($device_id =~ /[\/|\\]/) {
+
+    my $err_msg = "DeviceId cannot have slash (/) or backslash (\\).";
+
+    push(@{$device_err_aref}, {'DeviceId' => $err_msg});
+    $device_err = 1;
+  }
+
   if ( !type_existence($dbh_write, 'deviceregister', $device_type_id) ) {
 
     my $err_msg = "DeviceTypeId ($device_type_id): not found or inactive.";
-    $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'DeviceTypeId' => $err_msg}]};
 
-    return $data_for_postrun_href;
+    push(@{$device_err_aref}, {'DeviceTypeId' => $err_msg});
+    $device_err = 1;
   }
 
   my $chk_dev_id_sql = 'SELECT DeviceRegisterId FROM deviceregister ';
@@ -1196,11 +1288,77 @@ sub update_device_registration_runmode {
 
     my $err_msg = "DeviceId ($device_id): already exists.";
 
+    push(@{$device_err_aref}, {'Message' => $err_msg});
+    $device_err = 1;
+  }
+
+  my $sql = "SELECT FactorId, CanFactorHaveNull, FactorValueMaxLength, FactorValidRuleErrMsg, FactorValidRule  ";
+  $sql   .= "FROM factor ";
+  $sql   .= "WHERE TableNameOfFactor='deviceregisterfactor'";
+
+  my $vcol_data = $dbh_write->selectall_hashref($sql, 'FactorId');
+
+  my $vcol_param_data = {};
+  my $vcol_len_info   = {};
+  my $vcol_param_data_maxlen = {};
+  my $pre_validate_vcol = {};
+
+  for my $vcol_id (keys(%{$vcol_data})) {
+
+    my $vcol_param_name = "VCol_${vcol_id}";
+    my $vcol_value      = $query->param($vcol_param_name) ;
+    if ($vcol_data->{$vcol_id}->{'CanFactorHaveNull'} != 1) {
+
+      $vcol_param_data->{$vcol_param_name} = $vcol_value;
+    }
+
+    $vcol_len_info->{$vcol_param_name} = $vcol_data->{$vcol_id}->{'FactorValueMaxLength'};
+    $vcol_param_data_maxlen->{$vcol_param_name} = $vcol_value;
+
+    $pre_validate_vcol->{$vcol_param_name} = {
+      'Rule' => $vcol_data->{$vcol_id}->{'FactorValidRule'},
+      'Value'=> $vcol_value,
+      'FactorId'=> $vcol_id,
+      'RuleErrorMsg'=> $vcol_data->{$vcol_id}->{'FactorValidRuleErrMsg'},
+      'CanFactorHaveNull' => $vcol_data->{$vcol_id}->{'CanFactorHaveNull'},
+    };
+  }
+
+  my ($vcol_missing_err, $vcol_missing_href) = check_missing_href( $vcol_param_data );
+
+  if ($vcol_missing_err) {
+
     $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'DeviceId' => $err_msg}]};
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$vcol_missing_href]};
 
     return $data_for_postrun_href;
   }
+
+  my ($vcol_maxlen_err, $vcol_maxlen_href) = check_maxlen_href($vcol_param_data_maxlen, $vcol_len_info);
+
+  if ($vcol_maxlen_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$vcol_maxlen_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  my ($vcol_error, $vcol_error_aref) = validate_all_factor_input($pre_validate_vcol);
+
+  if ($vcol_error) {
+    push(@{$device_err_aref}, @{$vcol_error_aref});
+    $device_err = 1;
+  }
+
+  if ($device_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => $device_err_aref};
+    return $data_for_postrun_href;
+
+  }
+
 
   my $read_device_sql  = 'SELECT DeviceNote, Longitude, Latitude, DeviceConf ';
   $read_device_sql    .= 'FROM deviceregister WHERE DeviceRegisterId=? ';
@@ -1327,7 +1485,36 @@ sub update_device_registration_runmode {
   }
 
   $sth->finish();
+
+  for my $vcol_id (keys(%{$vcol_data})) {
+
+    if (defined $query->param('VCol_' . "$vcol_id")) {
+
+      my $factor_value = $query->param('VCol_' . "$vcol_id");
+
+      my ($vcol_err, $vcol_msg) = update_factor_value($dbh_write, $vcol_id, $factor_value, 'deviceregisterfactor', 'DeviceRegisterId', $reg_id);
+
+      if ($vcol_err) {
+
+        $self->logger->debug("VCol_" . "$vcol_id => $vcol_msg" );
+
+        push(@{$device_err_aref}, {'VCol_' . "$vcol_id" => $vcol_msg});
+
+        $device_err = 1;
+      }
+    }
+  }
+  
   $dbh_write->disconnect();
+
+  if ($device_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => $device_err_aref};
+    return $data_for_postrun_href;
+
+  }
+
 
   my $info_msg_aref = [{'Message' => "Device registration ($reg_id) has been updated successfully."}];
 
@@ -8759,6 +8946,7 @@ sub add_tileset_runmode {
 
   my $uploadfile  = $self->authen->get_upload_file();
 
+  my $geometry    = $query->param("geometry") // "";
   my $description = $query->param('description') // "";
   my $spectrum    = $query->param('spectrum') // "";
   my $metadata    = $query->param("metadata") // "";
@@ -8843,22 +9031,6 @@ sub add_tileset_runmode {
       }
     }
 
-    if (!length($spectrum)) {
-      $spectrum = $tileset->{spectrum};
-    }
-
-    if (!length($description)) {
-      $description = $tileset->{description};
-    }
-
-    if (!length($metadata)) {
-      $metadata = $tileset->{metadata};
-    }
-
-    if (!length($source)) {
-      $source = $tileset->{source};
-    }
-
     my $status = $tileset->{tilestatus};
     if (lc($status) eq "completed") {
       if (!$override) {
@@ -8868,6 +9040,17 @@ sub add_tileset_runmode {
       my $sql = "DELETE FROM tiles WHERE tileset=?";
       my $sth = $dbh_write->prepare($sql);
       my $rv = $sth->execute($tileset_id);
+    }
+
+    if (length($geometry)) {
+      eval {
+        is_valid_wkt_href($dbh_write, {'geometry' => $geometry});
+      } or do {
+        $data_for_postrun_href = _set_error("geometry is not valid.");
+        return 1;
+      }
+    } else {
+      $geometry = "POLYGON EMPTY";
     }
 
     my $tiles_public_path = "";
@@ -8901,6 +9084,7 @@ sub add_tileset_runmode {
 
     my $sql = "";
     $sql   .= 'UPDATE tileset SET ';
+    $sql   .= 'geometry = ?, ';
     $sql   .= 'resolution = ?, ';
     $sql   .= 'minzoom = ?, ';
     $sql   .= 'maxzoom = ?, ';
@@ -8913,7 +9097,8 @@ sub add_tileset_runmode {
     $sql   .= 'source = ? ';
     $sql   .= 'WHERE id=?';
     my $sth = $dbh_write->prepare($sql);
-    my $rv = $sth->execute($resolution, $minzoom, $maxzoom, $tiles_public_path, $spectrum, "completed", $imagetype, $description, $metadata, $source, $tileset_id);
+    my $rv = $sth->execute($geometry, $resolution, $minzoom, $maxzoom, $tiles_public_path, $spectrum, "completed", $imagetype, $description, $metadata, $source, $tileset_id);
+
     $dbh_write->commit;
 
     $data_for_postrun_href = {};
@@ -9071,11 +9256,12 @@ sub update_tileset_runmode {
     if (!length($geometry)) {
       $geometry = $tileset->{geometry};
     } else {
-      my ($is_wkt_err, undef) = is_valid_wkt_href($dbh_write, {'geometry' => $geometry}, 'polygon');
-      if ($is_wkt_err) {
+      eval {
+        is_valid_wkt_href($dbh_write, {'geometry' => $geometry});
+      } or do {
         $data_for_postrun_href = _set_error("geometry is not valid.");
         return 1;
-      }
+      };
     }
 
     my $spectrum = $query->param('spectrum') // '';

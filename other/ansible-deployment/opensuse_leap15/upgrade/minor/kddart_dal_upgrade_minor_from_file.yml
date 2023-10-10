@@ -62,3 +62,6 @@
         cp {{local_dir}}/cgi-bin/kddart/* {{ apache_base_dir }}/cgi-bin/kddart;
         
     - include_tasks: "{{ task_file }}"
+
+    - name: Restart apache
+      shell: systemctl restart apache2

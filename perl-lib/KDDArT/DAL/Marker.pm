@@ -654,6 +654,10 @@ sub import_markerdata_dart_runmode {
 
   my @monetdb_col_sql_list;
 
+  my $check_uniqueness = {};
+  my @non_unique_columns;
+  my $non_unique_err = 0;
+
   for (my $i = 0; $i < $num_of_col; $i++) {
 
     my $field_name        = $matched_col->{"$i"};
@@ -661,7 +665,27 @@ sub import_markerdata_dart_runmode {
 
     my $sql_phrase        = qq|"$field_name" $monetdb_datatype NULL|;
     push(@monetdb_col_sql_list, $sql_phrase);
+
+    if (defined $check_uniqueness->{$field_name}) {
+
+      $self->logger->debug("$field_name already used as a column. Will cause crash.");
+      $non_unique_err = 1;
+
+      push(@non_unique_columns, $field_name);
+    }
+
+    $check_uniqueness->{$field_name} = $i;
   }
+
+  if ($non_unique_err == 1) {
+    my $err_msg = "Columns (" . join(',', @non_unique_columns) . ') in upload are not unique.';
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+
 
   my $field_sql = join(",\n", @monetdb_col_sql_list);
 
@@ -5939,6 +5963,10 @@ sub append_markerdata_csv_runmode {
   my $create_tmp_sql = qq|CREATE LOCAL TEMPORARY TABLE "$tmp_tablename" (|;
 
   my @field_sql_def_list;
+  my $check_uniqueness = {};
+  my @non_unique_columns;
+  my $non_unique_err = 0;
+
   for (my $i = 0; $i < $num_of_col; $i++) {
 
     my $fieldname      = $matched_col->{"$i"};
@@ -5953,9 +5981,28 @@ sub append_markerdata_csv_runmode {
       $full_datatype = qq|${field_datatype}(${field_colsize})|;
     }
 
+    if (defined $check_uniqueness->{$fieldname}) {
+
+      $self->logger->debug("$fieldname already used as a column. Will cause crash.");
+      $non_unique_err = 1;
+
+      push(@non_unique_columns, $fieldname);
+    }
+
+    $check_uniqueness->{$fieldname} = $i;
+
     my $field_sql = qq|"$fieldname" $full_datatype NULL|;
     push(@field_sql_def_list, $field_sql);
   }
+
+if ($non_unique_err == 1) {
+    my $err_msg = "Columns (" . join(',', @non_unique_columns) . ') in marker data are not unique.';
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
 
   $create_tmp_sql   .= join(',', @field_sql_def_list);
 

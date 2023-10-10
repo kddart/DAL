@@ -3,7 +3,7 @@
   <INPUT ParaName="TrialUnitId" SrcValue="xml/add_data_no_vcol/case_00358_add_trialunit.xml" />
   <INPUT ParaName="SpecimenId" SrcValue="xml/add_data_no_vcol/case_00108_add_specimen.xml" />
   <INPUT ParaName="SpecimenNumber" Value="1" />
-  <INPUT ParaName="TUSLabel" Value="Test" />
+  <INPUT ParaName="TUSLabel" Value="Male" />
   <INPUT ParaName="Notes" Value="Note" />
   <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
   <Match Attr="ParaName" Tag="ReturnId" Value="TrialUnitSpecimenId" />
