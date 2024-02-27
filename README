@@ -23,19 +23,19 @@ More information about KDDart system can be found at: http://www.kddart.org
 
 ## Supported Operating Systems 
 
-Currently DAL can be deployed on CentOS07 and openSUSE 15. However, to prepare for Cent0S7 end of life in June 30 2024, it is recommended that DAL only be install on openSUSE 15. As of June 2023, plans are underway to support a Debian deployment of DAL.
+Currently DAL can be deployed on CentOS07 and openSUSE 15. However, to prepare for Cent0S7 end of life in June 30 2024, it is recommended that DAL only be installed on openSUSE 15. As of June 2023, plans are underway to support a Debian deployment of DAL.
 
 ## Supporting Documentations
 
-A full API specifications can be found at https://www.kddart.org/reference.html
+A full API specifications can be found at: https://www.kddart.org/reference.html
 
-General information and guides for developers can be found at https://www.kddart.org/ under Developers
+General information and guides for developers can be found at: https://www.kddart.org/ under Developers
 
-General information about use cases and overview can be found at https://www.kddart.org/introduction.html
+General information about use cases and overview can be found at: https://www.kddart.org/introduction.html
 
 ## Contributors
 
-KDDart has had the privilege of having many contributors to it's development and evolution. Specific to to DAL, we have see contributions and development work done by: 
+KDDart has had the privilege of having many contributors to its development and evolution. Specific to DAL, we have seen contributions and development work done by: 
 
 * Grzegorz Uszynski
 * Puthick Hok
