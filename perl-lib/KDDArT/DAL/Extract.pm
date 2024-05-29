@@ -8465,7 +8465,7 @@ sub import_extract_csv_runmode {
 "UploadFileFormat": "CSV",
 "UploadFileParameterName": "uploadfile",
 "HTTPParameter":  [{"Required": 0, "Name": "ParentExtractId", "Description": "Column number starting from zero for the column in the CSV file that contains ParentExtractId value"},{"Required": 0, "Name": "ItemGroupId", "Description": "Column number starting from zero for the column in the CSV file that contains ItemGroupId value"},{"Required": 0, "Name": "GenotypeId", "Description": "Column number starting from zero for the column in the CSV file that contains GenotypeId value"},{"Required": 0, "Name": "Quality", "Description": "Column number starting from zero for the column in the CSV file that contains Quality value"},{"Required": 0, "Name": "Status", "Description": "Column number starting from zero for the column in the CSV file that contains Status value"},{"Required": 1, "Name": "TissueTypeId", "Description": "Column number starting from zero for the column in the CSV file that contains TissueTypeId value"}],
-+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
 =cut
 
