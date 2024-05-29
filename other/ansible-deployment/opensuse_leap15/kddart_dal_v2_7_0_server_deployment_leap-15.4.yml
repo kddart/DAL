@@ -232,6 +232,9 @@
         - HTTP::CookieJar::LWP
         - File::Copy::Recursive
         - Crypt::JWT
+        - File::Lockfile
+        - Data::Dumper
+        - Digest::MD5
 
     - name: Install Geo::Shapelib manually
       shell: >

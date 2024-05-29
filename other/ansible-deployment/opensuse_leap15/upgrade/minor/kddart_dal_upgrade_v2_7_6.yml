@@ -10,6 +10,9 @@
   cpanm: name={{item}}
   with_items:
     - Crypt::JWT
+    - File::Lockfile
+    - Data::Dumper
+    - Digest::MD5
 
 - name: Add Log Activity in config file
   shell: echo '[RECORD_ACTIVITY_CFG]' >> {{ apache_base_dir }}/secure/kddart_dal.cfg; echo 'RECORD_ACTIVITY_CFG=0' >> {{ apache_base_dir }}/secure/kddart_dal.cfg;
