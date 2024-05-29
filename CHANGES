@@ -8,7 +8,7 @@ Description: Bug Fixing Patch and Improvements
 
 + Configuration support added for OpenID authentication model. A key change is that now the session name is now defined by configuration, rather than hard coded as it was previously. 
 
-+ Wider activity logging based on confiugration.
++ Wider activity logging based on configuration.
 
 + Fixing issue with user directory not being created correctly with wrong permission settings.
 
