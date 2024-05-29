@@ -2,7 +2,7 @@
   <CaseInfo CustomMethod="add_record" Description="Add Genotype" TargetURL="add/genotype" Type="BLOCKING" />
   <Delete TargetURL="delete/genotype/:GenotypeId" />
   <INPUT ParaName="GenotypeName" PrefixVal="698_" Random="1" />
-  <INPUT ParaName="GenusId" SrcValue="xml/add_data_no_vcol/case_00105_add_genus.xml" />
+  <INPUT ParaName="GenusId" SrcValue="xml/add_data_no_vcol/germplasm/case_00105_add_genus.xml" />
   <INPUT ParaName="SpeciesName" Value="Testing" />
   <INPUT ParaName="GenotypeAcronym" Value="T" />
   <INPUT ParaName="FemaleParentId" Value="0" />
@@ -21,7 +21,7 @@
   <Match Attr="ParaName" Tag="ReturnId" Value="GenotypeId" />
   <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
-  <Parent CaseFile="xml/add_data_no_vcol/case_00105_add_genus.xml" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/germplasm/case_00105_add_genus.xml" Order="3" />
   <ReturnId ParaName="GenotypeId" Value="241" />
   
 </TestCase>

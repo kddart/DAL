@@ -1,0 +1,19 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Update TrialGroup" TargetURL="update/trialgroup/:TrialGroupId" Type="BLOCKING" />
+  <Delete TargetURL="delete/trialgroup/:TrialGroupId" />
+  <INPUT ParaName="TrialGroupId" SrcValue="xml/add_data_no_vcol/experiments/case_00505_add_trialgroup.xml" />
+  <INPUT ParaName="TrialGroupName" PrefixVal="UPDATE TrialGroupName_" Random="1" />
+  <INPUT ParaName="TrialGroupType" SrcValue="xml/add_data_no_vcol/experiments/case_00428_add_trialgroup_type.xml" />
+  <INPUT ParaName="TrialGroupStart" Value="2015-08-27" />
+  <INPUT ParaName="TrialGroupNote" Value="Upated by automatic testing framework" />
+  <INPUT ParaName="TrialGroupLayout" Value="" />
+  <INPUT SrcName="xml/add_data_vcol/case_01111_add_vcol_trialgroup.xml" Value="Update Test Factor" Virtual="1" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/experiments/case_00428_add_trialgroup_type.xml" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/experiments/case_00505_add_trialgroup.xml" Order="4" />
+  <Parent CaseFile="xml/add_data_vcol/case_01111_add_vcol_trialgroup.xml" Order="5" />
+  
+</TestCase>

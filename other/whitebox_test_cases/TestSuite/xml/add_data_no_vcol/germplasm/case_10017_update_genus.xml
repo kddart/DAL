@@ -1,0 +1,11 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Update Genus" TargetURL="update/genus/:GenusId" Type="BLOCKING" />
+  <Delete TargetURL="delete/genus/:GenusId" />
+  <INPUT ParaName="GenusId" SrcValue="xml/add_data_no_vcol/germplasm/case_00105_add_genus.xml" />
+  <INPUT ParaName="GenusName" PrefixVal="Genus_" Random="1" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  
+</TestCase>

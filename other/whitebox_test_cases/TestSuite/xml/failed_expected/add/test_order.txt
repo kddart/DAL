@@ -32,7 +32,7 @@ xml/failed_expected/add/case_00100_add_trait_invalid_range_exp.xml
 xml/failed_expected/add/case_00217_add_pedigree.xml
 xml/failed_expected/add/case_00108_add_specimen.xml
 xml/failed_expected/add/case_00464_add_marker_map.xml
-xml/failed_expected/add/case_00201_add_sampletype.xml
+xml/failed_expected/add/vocabularies/case_00201_add_sampletype.xml
 xml/failed_expected/add/case_00300_add_device_type.xml
 xml/failed_expected/add/case_00105_add_genus.xml
 xml/failed_expected/add/case_00358_add_trialunit.xml

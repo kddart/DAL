@@ -1,0 +1,15 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Add Genotype Trait" TargetURL="genotype/:GenotypeId/add/trait" Type="BLOCKING" />
+  <INPUT ParaName="GenotypeId" SrcValue="xml/add_data_no_vcol/germplasm/case_00104_add_geno.xml" />
+  <INPUT ParaName="TraitId" SrcValue="xml/add_data_no_vcol/vocabularies/case_00359_add_trait.xml" />
+  <INPUT ParaName="TraitValue" Value="123" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Match Attr="ParaName" Tag="ReturnId" Value="GenotypeTraitId" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/germplasm/case_00104_add_geno.xml" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/vocabularies/case_00359_add_trait.xml" Force="1" Order="4" />
+  <ReturnId ParaName="GenotypeTraitId" Value="3" />
+  
+</TestCase>

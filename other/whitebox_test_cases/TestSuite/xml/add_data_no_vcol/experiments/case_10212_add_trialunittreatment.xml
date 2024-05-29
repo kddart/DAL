@@ -1,0 +1,15 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Add TrialUnitTreatment" TargetURL="trialunit/:TrialUnitId/add/treatment" Type="BLOCKING" />
+  <INPUT ParaName="TrialUnitId" SrcValue="xml/add_data_no_vcol/experiments/case_00358_add_trialunit.xml" />
+  <INPUT ParaName="TreatmentId" SrcValue="xml/add_data_no_vcol/vocabularies/case_00119_add_treatment.xml" />
+  <INPUT ParaName="TreatmentDateTime" Value="2011-01-15 14:28:37" />
+  <INPUT ParaName="TrialUnitTreatmentNote" Value="Testing Note" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Match Attr="ParaName" Tag="ReturnId" Value="TrialUnitTreatmentId" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/experiments/case_00358_add_trialunit.xml" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/vocabularies/case_00119_add_treatment.xml" Order="4" />
+  <ReturnId ParaName="TrialUnitTreatmentId" Value="1" />
+</TestCase>

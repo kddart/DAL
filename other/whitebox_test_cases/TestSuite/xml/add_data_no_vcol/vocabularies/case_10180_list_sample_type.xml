@@ -1,0 +1,9 @@
+<TestCase>
+  <CaseInfo Description="List Sample Type" TargetURL="list/type/sample/all" Type="BLOCKING" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="COUNT" Tag="GeneralType" TargetDataType="MULTI" Value="boolex(x&gt;0)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/vocabularies/case_00344_add_sampletype.xml" Order="3" />
+  
+</TestCase>

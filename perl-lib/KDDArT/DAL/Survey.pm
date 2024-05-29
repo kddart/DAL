@@ -1,7 +1,7 @@
 #$Id$
 #$Author$
 
-# Copyright (c) 2011, Diversity Arrays Technology, All rights reserved.
+# Copyright (c) 2024, Diversity Arrays Technology, All rights reserved.
 
 # Author    : Puthick Hok
 # Created   : 02/06/2010
@@ -42,7 +42,7 @@ sub setup {
 
   my $self = shift;
 
-  CGI::Session->name("KDDArT_DAL_SESSID");
+  CGI::Session->name($COOKIE_NAME);
 
   __PACKAGE__->authen->init_config_parameters();
   __PACKAGE__->authen->check_login_runmodes(':all');
@@ -64,12 +64,13 @@ sub setup {
                                                 'update_survey',
                                                 'delete_survey',
                                                 'update_survey_trial_unit',
+                                                'add_survey_trial_unit',
                                                 'delete_survey_trial_unit',
                                                 'delete_survey_trait',
                                                 'update_survey_trait',
   );
   __PACKAGE__->authen->check_gadmin_runmodes();
-  __PACKAGE__->authen->check_sign_upload_runmodes('add_survey_trial_unit',
+  __PACKAGE__->authen->check_sign_upload_runmodes(
                                                   'add_survey_trial_unit_bulk',
   );
 
@@ -1470,7 +1471,7 @@ sub add_survey_trial_unit_runmode {
 
   my $dbh_read = connect_kdb_read();
 
-  my $skip_field = {};
+  my $skip_field = {'SurveyId' => 1};
 
   my ($chk_sfield_err, $chk_sfield_msg, $for_postrun_href) = check_static_field($query, $dbh_read,
                                                                                 'surveytrialunit', $skip_field);
@@ -1596,6 +1597,8 @@ sub list_survey_trial_unit {
   my $data_aref = [];
   my $extra_attr_survey_data = [];
 
+  my $tu_specimen_href = {};
+
   my $dbh = connect_kdb_read();
 
   ($err, $msg, $data_aref) = read_data($dbh, $sql, $where_para_aref);
@@ -1612,9 +1615,19 @@ sub list_survey_trial_unit {
     push(@survey_trial_unit_id_list, $survey_trialunit_rec->{'SurveyTrialUnitId'});
   }
 
-  if ($extra_attr_yes) {
-    #extra attributes for survey trial unit
+  my $field_list_loc_href = {};
+
+  for my $field (@{$gis_field_list}) {
+
+    if ($field eq 'Longitude' || $field eq 'Latitude' || $field eq 'LCol*' || $field eq 'trialunitlocation') {
+
+      $field_list_loc_href->{$field} = 1;
+    }
   }
+
+  my $trial_unit_loc_gis = {};
+  my @trial_unit_id_list;
+
 
   for my $row (@{$data_aref}) {
 
@@ -1625,13 +1638,156 @@ sub list_survey_trial_unit {
       $row->{'update'} = "update/surveytrialunit/$survey_trial_unit_id";
     }
 
+    $self->logger->debug($row->{'TrialUnitId'});
+
+    push(@trial_unit_id_list, $row->{'TrialUnitId'});
+
     push(@{$extra_attr_survey_data}, $row);
 
   }
 
+  if ($extra_attr_yes) {
+    #extra attributes for survey trial unit
+
+    my $tu_specimen_sql = '';
+
+    $self->logger->debug("Number of TrialUnitId: " . scalar(@trial_unit_id_list));
+    $self->logger->debug("TrialUnitId list: " . join(',', @trial_unit_id_list));
+
+    $self->logger->debug(scalar(@trial_unit_id_list));
+
+    if (scalar(@trial_unit_id_list) > 0) {
+
+      $tu_specimen_sql   .= 'SELECT trialunitspecimen.*, specimen.SpecimenName, specimen.Pedigree ';
+      $tu_specimen_sql   .= 'FROM trialunitspecimen LEFT JOIN specimen ON ';
+      $tu_specimen_sql   .= 'trialunitspecimen.SpecimenId = specimen.SpecimenId ';
+      $tu_specimen_sql   .= 'WHERE TrialUnitId IN (' . join(',', @trial_unit_id_list) . ')';
+
+      my $tu_spec_data_aref = [];
+
+      ($err, $msg, $tu_spec_data_aref) = read_data($dbh, $tu_specimen_sql, []);
+
+      $self->logger->debug("$tu_specimen_sql");
+
+      if ($err) {
+
+        return ($err, $msg, []);
+      }
+
+      for my $tu_spec_rec (@{$tu_spec_data_aref}) {
+
+        my $tu_id = $tu_spec_rec->{'TrialUnitId'};
+
+        my $specimen_aref = [];
+
+        if (defined($tu_specimen_href->{$tu_id})) {
+
+          $specimen_aref = $tu_specimen_href->{$tu_id};
+        }
+
+        push(@{$specimen_aref}, $tu_spec_rec);
+
+        $tu_specimen_href->{$tu_id} = $specimen_aref;
+      }
+    }
+
+  }
+
+  if (scalar(keys(%{$field_list_loc_href})) > 0) {
+
+    if (scalar(@trial_unit_id_list) > 0) {
+
+      my $dbh_gis = connect_gis_read();
+
+      my $gis_where = "WHERE trialunitid IN (" . join(',', @trial_unit_id_list) . ") AND currentloc = 1";
+
+      my $trialunitloc_sql = 'SELECT trialunitid, trialunitlocdt, description, ST_AsText(trialunitlocation) AS trialunitlocation, ';
+      $trialunitloc_sql   .= 'ST_AsText(ST_Centroid(geometry(trialunitlocation))) AS trialunitcentroid ';
+      $trialunitloc_sql   .= 'FROM trialunitloc ';
+      $trialunitloc_sql   .= $gis_where;
+
+      $self->logger->debug("Trial Unit Location $trialunitloc_sql");
+
+      my $sth_gis = $dbh_gis->prepare($trialunitloc_sql);
+      $sth_gis->execute();
+
+      if (!$dbh_gis->err()) {
+
+        my $gis_href = $sth_gis->fetchall_hashref('trialunitid');
+
+        if (!$sth_gis->err()) {
+
+          $trial_unit_loc_gis = $gis_href;
+        }
+        else {
+
+          $err = 1;
+          $msg = 'Unexpected error';
+          $self->logger->debug('Err: ' . $dbh_gis->errstr());
+        }
+      }
+      else {
+
+        $err = 1;
+        $msg = 'Unexpected error';
+        $self->logger->debug('Err: ' . $dbh_gis->errstr());
+      }
+
+      $dbh_gis->disconnect();
+    }
+  }
+
+  
+  my $survey_trialunit_linked_data = [];
+
+  for my $row (@{$extra_attr_survey_data}) {
+
+    my $trial_unit_id = $row->{'TrialUnitId'};
+    my $permission    = $row->{'UltimatePerm'};
+
+    my $trial_unit_centroid = $trial_unit_loc_gis->{$trial_unit_id}->{'trialunitcentroid'};
+    $trial_unit_centroid    =~ /POINT\((.+) (.+)\)/;
+    my $longitude     = $1;
+    my $latitude      = $2;
+
+    if ($field_list_loc_href->{'LCol*'} || $field_list_loc_href->{'Longitude'}) {
+
+      $row->{'Longitude'} = $longitude;
+    }
+
+    if ($field_list_loc_href->{'LCol*'} || $field_list_loc_href->{'Latitude'}) {
+
+      $row->{'Latitude'}  = $latitude;
+    }
+
+    if ($field_list_loc_href->{'LCol*'} || $field_list_loc_href->{'trialunitlocation'}) {
+
+      $row->{'trialunitlocation'} = $trial_unit_loc_gis->{$trial_unit_id}->{'trialunitlocation'};
+    }
+
+    $row->{'trialunitlocdt'} = $trial_unit_loc_gis->{$trial_unit_id}->{'trialunitlocdt'};
+
+    $row->{'trialunitlocdescription'} = $trial_unit_loc_gis->{$trial_unit_id}->{'description'};
+
+     if ($extra_attr_yes) {
+
+      if (defined($tu_specimen_href->{$trial_unit_id})) {
+
+        my $specimen_aref  = $tu_specimen_href->{$trial_unit_id};
+        $row->{'Specimen'} = $specimen_aref;
+  
+      }
+    }
+
+    push(@{$survey_trialunit_linked_data}, $row);
+  }
+
   $dbh->disconnect();
 
-  return ($err, $msg, $extra_attr_survey_data);
+  my $trial_unit_loc_gis_count = scalar(keys(%{$trial_unit_loc_gis}));
+  $self->logger->debug("GIS trial unit loc count: $trial_unit_loc_gis_count");
+
+  return ($err, $msg, $survey_trialunit_linked_data);
 }
 
 sub get_survey_trial_unit_runmode {
@@ -1678,7 +1834,7 @@ sub get_survey_trial_unit_runmode {
   $sql   .= 'FROM surveytrialunit ';
   $sql   .= "WHERE surveytrialunit.SurveyTrialUnitId=? ";
 
-  my ($survey_trial_unit_err, $survey_trial_unit_msg, $survey_trial_unit_data) = $self->list_survey_trial_unit(1, [], $sql, [$survey_trial_unit_id]);
+  my ($survey_trial_unit_err, $survey_trial_unit_msg, $survey_trial_unit_data) = $self->list_survey_trial_unit(1, ['LCol*'], $sql, [$survey_trial_unit_id]);
 
   if ($survey_trial_unit_err) {
 
@@ -2058,7 +2214,7 @@ sub list_survey_trial_unit_runmode {
 
   my $sql = 'SELECT * FROM surveytrialunit LIMIT 1';
 
-  my ($survey_tu_err, $survey_tu_msg, $survey_tu_data) = $self->list_survey_trial_unit(0, $field_list, $sql);
+  my ($survey_tu_err, $survey_tu_msg, $survey_tu_data) = $self->list_survey_trial_unit(0, ['LCol*'], $sql);
 
   if ($survey_tu_err) {
 
@@ -2170,9 +2326,9 @@ sub list_survey_trial_unit_runmode {
     $field_lookup->{$fd_name} = 1;
   }
 
-  my $other_join = '';
+  my $other_join = ' LEFT JOIN trialunit on surveytrialunit.TrialUnitId = trialunit.TrialUnitId  ';
 
-  $sql  = "SELECT surveytrialunit.* ";
+  $sql  = "SELECT surveytrialunit.*, trialunit.TrialUnitBarcode, trialunit.TrialUnitX, trialunit.TrialUnitY, trialunit.TrialUnitZ, trialunit.TrialUnitEntryId, trialunit.TrialUnitPosition ";
   $sql .= 'FROM surveytrialunit';
 
   my ($filter_err, $filter_msg, $filter_phrase, $where_arg) = parse_filtering('SurveyTrialUnitId',
@@ -2201,6 +2357,7 @@ sub list_survey_trial_unit_runmode {
 
   $dbh->disconnect();
 
+  $sql .= "$other_join"; 
   $sql .= "$filtering_exp";
 
   my ($sort_err, $sort_msg, $sort_sql) = parse_sorting($sorting, $final_field_list);
@@ -2238,6 +2395,13 @@ sub list_survey_trial_unit_runmode {
   }
 
   $data_for_postrun_href->{'Error'} = 0;
+
+  $data_for_postrun_href->{'geojson'}   = 1;
+  $data_for_postrun_href->{'GJSonInfo'} = {'GeometryField'      => 'trialunitlocation',
+                                           'FeatureName'        => 'Specimen->SpecimenName ',
+                                           'FeatureId'          => 'TrialUnitId',
+                                           'ExtraProperties'    => ["VisitOrder","VisitTime"],
+  };
   $data_for_postrun_href->{'Data'}  = {'SurveyTrialUnit' => $tu_data,
                                        'RecordMeta' => [{'TagName' => 'SurveyTrialUnit'}]};
 
@@ -2694,6 +2858,8 @@ sub list_survey_trait {
     }
   }
 
+  $self->logger->debug($where_clause);
+
   my $dbh = connect_kdb_read();
 
   my $sql = 'SELECT trait.TraitName, surveytrait.SurveyTraitId, surveytrait.SurveyId, surveytrait.TraitId, surveytrait.Compulsory, generalunit.UnitName ';
@@ -2855,39 +3021,39 @@ sub get_survey_trait_runmode {
 }
 =cut
 
-  my $self            = shift;
+  my $self          = shift;
   my $survey_trait_id = $self->param('id');
 
   my $data_for_postrun_href = {};
-  my $sql;
 
   my $dbh = connect_kdb_read();
 
-  my $read_survey_trait_id = read_cell_value($dbh, 'surveytrait', 'SurveyId', 'SurveyTraitId', $survey_trait_id);
+  my $group_id = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
 
-  $self->logger->debug($survey_trait_id);
+  my $survey_id = read_cell_value($dbh, 'surveytrait', 'SurveyId', 'SurveyTraitId', $survey_trait_id);
 
-  if (length($read_survey_trait_id) == 0) {
+  if (length($survey_id) == 0) {
 
-    my $err_msg = "SurveyTrait ($survey_trait_id) not found.";
+    my $err_msg = "SurveyTraitId ($survey_trait_id) not found.";
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
     return $data_for_postrun_href;
   }
 
-  my $msg = '';
+  $dbh->disconnect();
 
-  $sql    = 'SELECT surveytrait.* ';
-  $sql   .= 'FROM surveytrait ';
-  $sql   .= "WHERE surveytrait.SurveyTraitId=? ";
-
-  my ($survey_trait_err, $survey_trait_msg, $survey_trait_data) = $self->list_survey_trial_unit(1, [], $sql, [$survey_trait_id]);
+  my $where_clause = 'WHERE SurveyTraitId=?';
+  my ($survey_trait_err, $survey_trait_msg, $survey_trait_data) = $self->list_survey_trait(1,
+                                                                                       "",
+                                                                                       $where_clause,
+                                                                                       $survey_trait_id);
 
   if ($survey_trait_err) {
 
     $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $survey_trait_msg}]};
 
     return $data_for_postrun_href;
   }

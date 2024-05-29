@@ -1,0 +1,19 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Add Trial Event" TargetURL="trial/:TrialId/add/trialevent" Type="BLOCKING" />
+  <Delete TargetURL="delete/trialevent/:TrialEventId" />
+  <INPUT ParaName="TrialId" SrcValue="xml/add_data_no_vcol/experiments/case_00007_add_trial.xml" />
+  <INPUT ParaName="UnitId" SrcValue="xml/add_data_no_vcol/vocabularies/case_00225_add_item_unit.xml" />
+  <INPUT ParaName="EventTypeId" SrcValue="xml/add_data_no_vcol/experiments/case_00338_add_trialevent_type.xml" />
+  <INPUT ParaName="TrialEventValue" Value="TEST" />
+  <INPUT ParaName="TrialEventDate" Value="2012-08-16" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Match Attr="ParaName" Tag="ReturnId" Value="TrialEventId" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/experiments/case_00007_add_trial.xml" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/experiments/case_00338_add_trialevent_type.xml" Force="1" Order="4" />
+  <Parent CaseFile="xml/add_data_no_vcol/vocabularies/case_00225_add_item_unit.xml" Order="5" />
+  <ReturnId ParaName="TrialEventId" Value="3" />
+  
+</TestCase>

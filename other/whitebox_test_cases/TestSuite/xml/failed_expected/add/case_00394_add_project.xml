@@ -1,15 +1,15 @@
 <TestCase>
   <CaseInfo CustomMethod="add_record" Description="Add a project" TargetURL="add/project" Type="BLOCKING" />
   <Delete TargetURL="delete/project/:ProjectId" />
-  <INPUT ParaName="ProjectManagerId" SrcValue="xml/add_data_no_vcol/case_00102_add_con.xml" />
-  <INPUT ParaName="TypeId" SrcValue="xml/add_data_no_vcol/case_00395_add_project_type.xml" />
+  <INPUT ParaName="ProjectManagerId" SrcValue="xml/add_data_no_vcol/configuration/case_00102_add_con.xml" />
+  <INPUT ParaName="TypeId" SrcValue="xml/add_data_no_vcol/vocabularies/case_00395_add_project_type.xml" />
   <INPUT ParaName="ProjectName" PrefixVal="Project_to fail ttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt" Random="1" />
   <Match Attr="StatusCode" Value="420" />
   <Match Attr="ProjectName" Tag="Error" Value="regex(longer than)" />
   <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
-  <Parent CaseFile="xml/add_data_no_vcol/case_00395_add_project_type.xml" Order="3" />
-  <Parent CaseFile="xml/add_data_no_vcol/case_00102_add_con.xml" Order="4" />
+  <Parent CaseFile="xml/add_data_no_vcol/vocabularies/case_00395_add_project_type.xml" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/configuration/case_00102_add_con.xml" Order="4" />
   
   
 </TestCase>

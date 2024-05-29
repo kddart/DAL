@@ -1,7 +1,7 @@
 #$Id$
 #$Author$
 
-# Copyright (c) 2011, Diversity Arrays Technology, All rights reserved.
+# Copyright (c) 2024, Diversity Arrays Technology, All rights reserved.
 
 # Author    : Puthick Hok
 # Created   : 17/05/2014

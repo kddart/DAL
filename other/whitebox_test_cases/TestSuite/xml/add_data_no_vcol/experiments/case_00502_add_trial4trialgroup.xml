@@ -1,0 +1,34 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Add a trial" TargetURL="add/trial" Type="BLOCKING" />
+  <Delete TargetURL="delete/trial/:TrialId" />
+  <INPUT ParaName="SiteId" SrcValue="xml/add_data_no_vcol/experiments/case_00006_add_site.xml" />
+  <INPUT ParaName="SeasonId" SrcValue="xml/add_data_no_vcol/vocabularies/case_00619_add_season.xml" />
+  <INPUT ParaName="CurrentWorkflowId" SrcValue="xml/add_data_no_vcol/configuration/case_00495_add_workflow.xml" />
+  <INPUT ParaName="TrialName" PrefixVal="Trial_" Random="1" />
+  <INPUT ParaName="TrialTypeId" SrcValue="xml/add_data_no_vcol/vocabularies/case_00339_add_trialtype.xml" />
+  <INPUT ParaName="TrialNumber" Value="1" />
+  <INPUT ParaName="TrialAcronym" Value="TEST" />
+  <INPUT ParaName="DesignTypeId" SrcValue="xml/add_data_no_vcol/experiments/case_00118_add_designtype.xml" />
+  <INPUT ParaName="TrialManagerId" SrcValue="xml/add_data_no_vcol/configuration/case_00102_add_con.xml" />
+  <INPUT ParaName="TrialStartDate" Value="2010-10-15" />
+  <INPUT ParaName="TrialEndDate" Value="2011-03-31" />
+  <INPUT ParaName="TrialNote" Value="none" />
+  <INPUT ParaName="OwnGroupPerm" Value="7" />
+  <INPUT ParaName="AccessGroupId" SrcValue="xml/add_data_no_vcol/owngroup.xml" />
+  <INPUT ParaName="AccessGroupPerm" Value="5" />
+  <INPUT ParaName="OtherPerm" Value="5" />
+  <INPUT ParaName="triallocation" Value="POLYGON((149.09266690450195 -35.304781904130806,149.0927849217055 -35.304781904130806,149.09276882845003 -35.304974529058526,149.0926508112555 -35.304974529058526,149.09266690450195 -35.304781904130806))" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Match Attr="ParaName" Tag="ReturnId" Value="TrialId" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/experiments/case_00006_add_site.xml" Force="1" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/vocabularies/case_00339_add_trialtype.xml" Force="1" Order="4" />
+  <Parent CaseFile="xml/add_data_no_vcol/experiments/case_00118_add_designtype.xml" Force="1" Order="5" />
+  <Parent CaseFile="xml/add_data_no_vcol/configuration/case_00102_add_con.xml" Order="6" />
+  <Parent CaseFile="xml/add_data_no_vcol/configuration/case_00495_add_workflow.xml" Order="7" />
+  <Parent CaseFile="xml/add_data_no_vcol/vocabularies/case_00619_add_season.xml" Order="8" />
+  <ReturnId ParaName="TrialId" Value="3" />
+  
+</TestCase>

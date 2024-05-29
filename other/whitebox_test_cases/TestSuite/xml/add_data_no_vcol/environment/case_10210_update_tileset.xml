@@ -1,0 +1,19 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Update Tileset" TargetURL="update/tileset/:LayerId" Type="BLOCKING" />
+  <INPUT ParaName="LayerId" SrcValue="xml/add_data_no_vcol/environment/case_10207_add_layer_layertiles.xml" />
+  <INPUT ParaName="minzoom" Value="7" />
+  <INPUT ParaName="maxzoom" Value="13" />
+  <INPUT ParaName="resolution" Value="10" />
+  <INPUT ParaName="geometry" Value="POLYGON ((149.08462111868045 -35.236666351700535, 149.08463184999385 -35.236924858974234, 149.08498598333597 -35.23692924044635, 149.08500744596276 -35.236626918315146, 149.08462111868045 -35.236666351700535))" />
+  <INPUT ParaName="spectrum" Value="True Color" />
+  <INPUT ParaName="tilestatus" Value="created" />
+  <INPUT ParaName="imagetype" Value="png" />
+  <INPUT ParaName="description" Value="Created by the automatic test." />
+  <INPUT ParaName="metadata" Value=""/>
+  <INPUT ParaName="source" Value="" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/environment/case_10207_add_layer_layertiles.xml" Order="3" />
+</TestCase>

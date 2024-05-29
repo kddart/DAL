@@ -1,0 +1,9 @@
+<TestCase>
+  <CaseInfo Description="Get Tileset" TargetURL="tileset/:LayerId/get/tile/3/7/4" Type="BLOCKING" />
+  <INPUT ParaName="LayerId" SrcValue="xml/add_data_no_vcol/environment/case_10207_add_layer_layertiles.xml" />
+  <Match Attr="StatusCode" Value="200" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/environment/case_10207_add_layer_layertiles.xml" Force="1" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/environment/case_10208_add_tileset.xml" Force="1" Order="4" />
+</TestCase>

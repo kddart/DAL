@@ -1,0 +1,13 @@
+<TestCase>
+  <CaseInfo Description="Export Marker Map Position" TargetURL="markermap/:MarkerMapId/export/mapposition/csv" Type="BLOCKING" />
+  <INPUT ParaName="MarkerMapId" SrcValue="xml/add_data_no_vcol/markers/case_00464_add_marker_map.xml" />
+  <INPUT ParaName="Filtering" Value="ContigName like 'chrA0%'" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="csv" MatchingVar="LINE_COUNT" Tag="OutputFile" TargetDataType="CSV_FILE" Value="boolex(x&gt;5)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/markers/case_00462_import_marker_brassica.xml" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/markers/case_00464_add_marker_map.xml" Order="4" />
+  <Parent CaseFile="xml/add_data_no_vcol/markers/case_00474_import_markermap_brassica.xml" Order="5" />
+  
+</TestCase>

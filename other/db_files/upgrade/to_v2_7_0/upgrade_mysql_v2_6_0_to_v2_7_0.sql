@@ -18,8 +18,8 @@ CREATE TABLE cmgroup (
   INDEX xcmg_CMGroupStatus (CMGroupStatus),
   INDEX xcmg_CMGroupDateTime (CMGroupDateTime),
   PRIMARY KEY (CMGroupId),
-  CONSTRAINT cmgroup_fk FOREIGN KEY (TrialId) REFERENCES trial (TrialId) ON DELETE NO ACTION ON UPDATE NO ACTION,
-  CONSTRAINT cmgroup_fk_1 FOREIGN KEY (OperatorId) REFERENCES systemuser (UserId) ON DELETE NO ACTION ON UPDATE NO ACTION
+  CONSTRAINT cmgroup_fk_1 FOREIGN KEY (TrialId) REFERENCES trial (TrialId) ON DELETE NO ACTION ON UPDATE NO ACTION,
+  CONSTRAINT cmgroup_fk_2 FOREIGN KEY (OperatorId) REFERENCES systemuser (UserId) ON DELETE NO ACTION ON UPDATE NO ACTION
 ) ENGINE=InnoDB comment='Crossing measurements for some portions of the trials may be grouped to distinct them from the same measurements, which were done before, but need to be retained or to have two sets which can be compared. It can also be used as means to keep several versions of the same dataset.';
 
 CREATE TABLE crossingmeasurement (
@@ -80,7 +80,7 @@ CREATE TABLE itemmeasurement (
   CONSTRAINT itemmeasurement_fk_1 FOREIGN KEY (ItemId) REFERENCES item (ItemId) ON DELETE NO ACTION ON UPDATE NO ACTION,
   CONSTRAINT itemmeasurement_fk_2 FOREIGN KEY (TraitId) REFERENCES trait (TraitId) ON DELETE NO ACTION ON UPDATE NO ACTION,
   CONSTRAINT itemmeasurement_fk_3 FOREIGN KEY (OperatorId) REFERENCES systemuser (UserId) ON DELETE NO ACTION ON UPDATE NO ACTION,
-  CONSTRAINT itemmeasurement_fk_4 FOREIGN KEY (SampleTypeId) REFERENCES generaltype (TypeId) ON DELETE NO ACTION ON UPDATE NO ACTION,
+  CONSTRAINT itemmeasurement_fk_4 FOREIGN KEY (SampleTypeId) REFERENCES generaltype (TypeId) ON DELETE NO ACTION ON UPDATE NO ACTION
 ) ENGINE=InnoDB comment='Measurement of the sample from item inventory for a particular trait/variate, by the operator on certain date/time. Measurement can be done for sample type if it does not refer to the entire inventory item.';
 
 CREATE TABLE survey (

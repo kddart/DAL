@@ -1,0 +1,19 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record_upload" Description="Import Item csv" TargetURL="import/item/csv " Type="NON-BLOCKING" />
+  <INPUT ParaName="SpecimenId" Value="0" />
+  <INPUT ParaName="ItemTypeId" Value="1" />
+  <INPUT ParaName="UnitId" Value="2"/>
+  <INPUT ParaName="Specimen1" SrcValue="xml/add_data_no_vcol/germplasm/case_00108_add_specimen.xml" />
+  <INPUT ParaName="RealItemTypeId" SrcValue="xml/add_data_no_vcol/inventories/case_00308_add_item_type.xml" />
+  <INPUT ParaName="RealUnitId" SrcValue="xml/add_data_no_vcol/vocabularies/case_10652_add_generalunit.xml" />
+<INPUT ParaName="uploadfile" SrcFile="xml/add_data_no_vcol/import_item_src1.csv" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/germplasm/case_00108_add_specimen.xml" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/inventories/case_00308_add_item_type.xml" Order="4" />
+  <Parent CaseFile="xml/add_data_no_vcol/vocabularies/case_10652_add_generalunit.xml" Order="5" />
+ <ReturnId FileFormat="xml" IdFile="./import_extract_csv_return_id_238.xml" />
+</TestCase>
+

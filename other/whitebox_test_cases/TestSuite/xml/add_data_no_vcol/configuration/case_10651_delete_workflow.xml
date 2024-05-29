@@ -1,0 +1,10 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Delete Workflow" TargetURL="delete/workflow/:WorkflowId" Type="BLOCKING" />
+  <INPUT ParaName="WorkflowId" SrcValue="xml/add_data_no_vcol/configuration/case_00495_add_workflow.xml" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/configuration/case_00495_add_workflow.xml" Force="1" Order="3" />
+
+</TestCase>

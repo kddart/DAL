@@ -1,17 +1,17 @@
 <TestCase>
   <CaseInfo CustomMethod="add_record" Description="Update Plate" TargetURL="update/plate/:PlateId" Type="BLOCKING" />
   <Delete TargetURL="delete/plate/:PlateId" />
-  <INPUT ParaName="PlateId" SrcValue="xml/add_data_no_vcol/case_00301_add_plate.xml" />
+  <INPUT ParaName="PlateId" SrcValue="xml/add_data_no_vcol/markers/case_00301_add_plate.xml" />
   <INPUT ParaName="PlateDescription" Value="Plate Testing" />
   <INPUT ParaName="PlateName" PrefixVal="Update Plate_to fail tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt" Random="1" />
-  <INPUT ParaName="PlateType" SrcValue="xml/add_data_no_vcol/case_00373_add_platetype1.xml" />
+  <INPUT ParaName="PlateType" SrcValue="xml/add_data_no_vcol/vocabularies/case_00373_add_platetype1.xml" />
   <INPUT ParaName="OperatorId" Value="0" />
   <Match Attr="StatusCode" Value="420" />
   <Match Attr="PlateName" Tag="Error" Value="regex(longer than)" />
   <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
-  <Parent CaseFile="xml/add_data_no_vcol/case_00301_add_plate.xml" Order="3" />
-  <Parent CaseFile="xml/add_data_no_vcol/case_00373_add_platetype1.xml" Order="4" />
+  <Parent CaseFile="xml/add_data_no_vcol/markers/case_00301_add_plate.xml" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/vocabularies/case_00373_add_platetype1.xml" Order="4" />
   
   
 </TestCase>

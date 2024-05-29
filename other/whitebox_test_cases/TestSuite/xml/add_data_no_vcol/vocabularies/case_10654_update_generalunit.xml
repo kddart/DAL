@@ -1,0 +1,15 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Update General Unit" TargetURL="update/storage/:GeneralUnitId" Type="BLOCKING" />
+  <INPUT ParaName="GeneralunitId" SrcValue="xml/add_data_no_vcol/vocabularies/case_10652_add_generalunit.xml" />
+  <INPUT ParaName="UnitName" PrefixVal="S_"  Random="1" />
+
+  <INPUT ParaName="UseByItem" Value="Update" />
+   <INPUT ParaName="UseByTrait" Value="1" />
+<INPUT ParaName="UseByTrialEvent"  Value="1" />
+<INPUT ParaName="UseBylayerattrib"  Value="1" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/vocabularies/case_10652_add_generalunit.xml" Order="3" />
+
+</TestCase>
+

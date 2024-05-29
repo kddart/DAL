@@ -1,0 +1,19 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record_upload" Description="Add Trial Group" TargetURL="add/trialgroup" Type="BLOCKING" />
+  <Delete TargetURL="delete/trialgroup/:TrialGroupId" />
+  <INPUT ParaName="TrialGroupName" PrefixVal="MultiLocTrialName_" Random="1" />
+  <INPUT ParaName="TrialGroupType" SrcValue="xml/add_data_no_vcol/experiments/case_00428_add_trialgroup_type.xml" />
+  <INPUT ParaName="TrialGroupLayout" Value='{"Test": "abc"}' />
+  <INPUT ParaName="trialgroupentry" Process="1" SrcFile="xml/add_data_no_vcol/trialgroupentry.xml" />
+  <INPUT SrcName="xml/add_data_vcol/case_01111_add_vcol_trialgroup.xml" Value="Test Factor" Virtual="1" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Match Attr="ParaName" Tag="ReturnId" Value="TrialGroupId" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/experiments/case_00428_add_trialgroup_type.xml" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/experiments/case_00502_add_trial4trialgroup.xml" Order="4" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00503_add_trial4trialgroup1.xml" Order="5" />
+  <Parent CaseFile="xml/add_data_vcol/case_01111_add_vcol_trialgroup.xml" Order="6" />
+  <ReturnId ParaName="TrialGroupId" Value="2" />
+</TestCase>

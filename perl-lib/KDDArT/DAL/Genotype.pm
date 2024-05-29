@@ -1,7 +1,7 @@
 #$Id$
 #$Author$
 
-# Copyright (c) 2011, Diversity Arrays Technology, All rights reserved.
+# Copyright (c) 2024, Diversity Arrays Technology, All rights reserved.
 
 # Author    : Puthick Hok
 # Created   : 02/06/2010
@@ -43,7 +43,7 @@ sub setup {
 
   my $self = shift;
 
-  CGI::Session->name("KDDArT_DAL_SESSID");
+  CGI::Session->name($COOKIE_NAME);
 
   __PACKAGE__->authen->init_config_parameters();
   __PACKAGE__->authen->check_login_runmodes(':all');
@@ -1003,9 +1003,11 @@ sub list_genotype {
         $row->{'GenusName'} = $genus_lookup->{$genus_id}->{'GenusName'};
       }
 
-      my $taxonomy_id = $row->{'TaxonomyId'};
-      if (defined $taxonomy_lookup->{$taxonomy_id}) {
-        $row->{'TaxonomyName'} = $taxonomy_lookup->{$taxonomy_id}->{'TaxonomyName'};
+      if (defined $row->{'TaxonomyId'}) {
+        my $taxonomy_id = $row->{'TaxonomyId'};
+        if (defined $taxonomy_lookup->{$taxonomy_id}) {
+          $row->{'TaxonomyName'} = $taxonomy_lookup->{$taxonomy_id}->{'TaxonomyName'};
+        }
       }
 
       $row->{'OwnGroupName'}          = $group_lookup->{$own_grp_id}->{'SystemGroupName'};
@@ -2427,10 +2429,11 @@ sub list_specimen_advanced_runmode {
 
   $self->logger->debug("Filtering CSV: $filtering_csv");
 
-  my ($filter_err, $filter_msg, $filter_phrase, $where_arg) = parse_filtering('SpecimenId',
+  my ($filter_err, $filter_msg, $filter_phrase, $where_arg) = parse_filtering_v2('SpecimenId',
                                                                               'specimen',
                                                                               $filtering_csv,
                                                                               $final_field_list,
+                                                                              $vcol_list,
                                                                               $validation_func_lookup,
                                                                               $field_name2table_name);
 
@@ -16236,11 +16239,21 @@ sub add_taxonomy_runmode {
 
   my $parent_taxonomy_id = undef;
 
-  if ( length($query->param('ParentTaxonomyId')) > 0 ) {
+  if (defined $query->param('ParentTaxonomyId')) {
+    if ( length($query->param('ParentTaxonomyId')) > 0 ) {
 
-    $parent_taxonomy_id = $query->param('ParentTaxonomyId');
-    $chk_int_href->{'ParentTaxonomyId'} = $parent_taxonomy_id;
+      $parent_taxonomy_id = $query->param('ParentTaxonomyId');
+      $chk_int_href->{'ParentTaxonomyId'} = $parent_taxonomy_id;
+
+      if ($parent_taxonomy_id eq '0') {
+
+        $parent_taxonomy_id = undef;
+      }
+    }
+
   }
+
+  
 
   my ($int_err, $int_err_href) = check_integer_href( $chk_int_href );
 
@@ -16252,10 +16265,7 @@ sub add_taxonomy_runmode {
     return $data_for_postrun_href;
   }
 
-  if ($parent_taxonomy_id eq '0') {
-
-    $parent_taxonomy_id = undef;
-  }
+  
 
 
   if (defined $parent_taxonomy_id) {

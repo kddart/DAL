@@ -1,7 +1,7 @@
 <TestCase>
   <CaseInfo CustomMethod="add_record_upload" Description="Add Plate" TargetURL="add/plate" Type="BLOCKING" />
   <Delete TargetURL="delete/plate/:PlateId" />
-  <INPUT ParaName="PlateType" SrcValue="xml/add_data_no_vcol/case_00372_add_platetype.xml" />
+  <INPUT ParaName="PlateType" SrcValue="xml/add_data_no_vcol/vocabularies/case_00372_add_platetype.xml" />
   <INPUT ParaName="PlateDescription" Value="Target Plate" />
   <INPUT ParaName="StorageId" Value="2" />
   <INPUT ParaName="PlateWells" Value="96" />

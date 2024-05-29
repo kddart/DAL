@@ -1,0 +1,20 @@
+<DATA>
+<ROW>
+<CrossingId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/experiments/case_00631_add_crossing.xml" />
+<SampleTypeId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/vocabularies/case_00201_add_sampletype.xml" />
+<TraitId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/vocabularies/case_00359_add_trait.xml" />
+<MeasurementDateTime Value="2011-01-15 14:28:37" />
+<InstanceNumber Value="5" />
+<TraitValue Value="11" />
+<StateReason Value="TEST" />
+</ROW>
+<ROW>
+<CrossingId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/experiments/case_00631_add_crossing.xml" />
+<SampleTypeId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/vocabularies/case_00201_add_sampletype.xml" />
+<TraitId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/vocabularies/case_00606_add_trait_text.xml" />
+<MeasurementDateTime Value="2011-01-15 14:28:37" />
+<InstanceNumber Value="5" />
+<TraitValue Value="This is a trait." />
+<StateReason Value="TEST is test" />
+</ROW>
+</DATA>

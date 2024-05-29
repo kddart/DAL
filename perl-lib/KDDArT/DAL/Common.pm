@@ -1,7 +1,7 @@
 #$Id$
 #$Author$
 
-# Copyright (c) 2011, Diversity Arrays Technology, All rights reserved.
+# Copyright (c) 2024, Diversity Arrays Technology, All rights reserved.
 
 # Author    : Puthick Hok
 # Created   : 02/06/2010
@@ -58,16 +58,16 @@ our @EXPORT   = qw($DTD_PATH $RPOSTGRES_UP_FILE $GIS_BUFFER_DISTANCE
                    $GENOTYPE2SPECIMEN_CFG $MULTIMEDIA_STORAGE_PATH $EXTRACTDATAFILE_STORAGE_PATH $ERR_INFO_AREF
                    $CFG_FILE_PATH $DSN_KDB_READ $DSN_KDB_WRITE $DSN_MDB_READ
                    $DSN_MDB_WRITE $DSN_GIS_READ $DSN_GIS_WRITE $RMYSQL_UP_FILE
-                   $MONETDB_UP_FILE $GENOTYPE2SPECIMEN_CFG $GENOTYPEFACTORFILTERING_CFG $TRIALUNITFACTORFILTERING_CFG $OAUTH2_SITE
+                   $MONETDB_UP_FILE $GENOTYPE2SPECIMEN_CFG $GENOTYPEFACTORFILTERING_CFG $RECORD_ACTIVITY_CFG $TRIALUNITFACTORFILTERING_CFG $OAUTH2_SITE
                    $OAUTH2_AUTHORIZE_PATH $OAUTH2_CLIENT_ID $OAUTH2_CLIENT_SECRET
                    $OAUTH2_SCOPE $OAUTH2_ACCESS_TOKEN_URL $JSON_SCHEMA_PATH
                    $SOLR_URL $POINT2POLYGON_BUFFER4SITE $POINT2POLYGON_BUFFER4TRIAL
                    $MAX_RECURSIVE_ANCESTOR_LEVEL $MAX_RECURSIVE_DESCENDANT_LEVEL
-                   $WHO_CAN_CREATE_GENOTYPE $NURSERY_TYPE_LIST_CSV $ALLOWDUPLICATETRIALNAME_CFG $RESTRICTEDFACTORNAME_CFG $SECRETKEY_CFG
+                   $WHO_CAN_CREATE_GENOTYPE $NURSERY_TYPE_LIST_CSV $ALLOWDUPLICATETRIALNAME_CFG $RESTRICTEDFACTORNAME_CFG $SECRETKEY_CFG $COOKIE_NAME $OPENID_URL $CLIENTID4OPENID_URL $DSN_SESSION_DB $AUTHENTICATOR_SOURCE
                    trim ltrim rtrim read_uname_pass connect_kdb_read
                    execute_sql read_cell permission_phrase
                    read_cookie arrayref2csvfile arrayref2xml reconstruct_server_url
-                   read_dispatch_table dispatch_table2xml merge_xml
+                   read_dispatch_table dispatch_table2xml merge_xml connect_session_db
                    connect_kdb_write record_existence read_cell_value
                    generate_factor_sql generate_factor_columns_sql make_empty_xml connect_gis_read connect_gis_write
                    geocode check_missing_value check_datatype is_unsigned_int
@@ -96,6 +96,8 @@ our @EXPORT   = qw($DTD_PATH $RPOSTGRES_UP_FILE $GIS_BUFFER_DISTANCE
                  );
 
 our $COOKIE_DOMAIN            = {};
+
+our $DSN_SESSION_DB           = {};
 
 our $DSN_KDB_READ             = {};
 
@@ -141,6 +143,16 @@ our $TMP_DATA_PATH            = "FROM CFG_FILE";
 
 our $SESSION_STORAGE_PATH     = "FROM CFG_FILE";
 
+our $COOKIE_NAME = "FROM CFG_FILE";
+
+our $RECORD_ACTIVITY_CFG = "FROM CFG_FILE";
+
+our $OPENID_URL = "FROM CFG_FILE";
+
+our $CLIENTID4OPENID_URL = "FROM CFG_FILE";
+
+our $AUTHENTICATOR_SOURCE = "FROM CFG_FILE";
+
 our $CFG_FILE_PATH            = "$main::kddart_base_dir/secure/kddart_dal.cfg";
 
 our $MAP_TILES_PATH           = "FROM CFG_FILE";
@@ -180,8 +192,8 @@ our $ACCEPT_HEADER_LOOKUP   = { 'application/json' => 'JSON',
 
 our $VALID_CTYPE            = {'xml' => 1, 'json' => 1, 'geojson' => 1};
 
-our $DAL_VERSION            = '2.7.5';
-our $DAL_COPYRIGHT          = 'Copyright (c) 2023, Diversity Arrays Technology, All rights reserved.';
+our $DAL_VERSION            = '2.7.6';
+our $DAL_COPYRIGHT          = 'Copyright (c) 2024, Diversity Arrays Technology, All rights reserved.';
 our $DAL_ABOUT              = 'Data Access Layer';
 
 our $GENO_SPEC_ONE2ONE      = '1-TO-1';
@@ -382,6 +394,15 @@ sub connect_gis_write {
 
   return $dbh;
 }
+
+sub connect_session_db {
+
+  my ($mysql_uname, $mysql_pass) = read_uname_pass($RMYSQL_UP_FILE->{$ENV{DOCUMENT_ROOT}});
+  my $dsn = $DSN_SESSION_DB->{$ENV{DOCUMENT_ROOT}};
+  my $dbh = DBI->connect($dsn, $mysql_uname, $mysql_pass);
+  return $dbh;
+}
+
 
 
 sub execute_sql  {
@@ -1627,7 +1648,7 @@ sub generate_factor_sql_v3 {
 
     if (length($vcol_field_part) > 0) {
 
-      $returned_sql = "SELECT $table_name.*, ${vcol_field_part} ";
+      $returned_sql = "SELECT ${select_field_part}, ${vcol_field_part} ";
       $factor_table_sql = "SELECT ${id_fieldname}, $factor_table_fields_sql";
     }
     else {
@@ -1646,6 +1667,7 @@ sub generate_factor_sql_v3 {
     }
 
   }
+
 
   $returned_sql   .= "FROM ${table_name} ";
 

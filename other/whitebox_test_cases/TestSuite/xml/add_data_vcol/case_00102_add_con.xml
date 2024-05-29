@@ -1,7 +1,7 @@
 <TestCase>
   <CaseInfo CustomMethod="add_record" Description="Add Contact" TargetURL="add/contact" Type="BLOCKING" />
   <Delete TargetURL="delete/contact/:ContactId" />
-  <INPUT ParaName="OrganisationId" SrcValue="xml/add_data_no_vcol/case_00101_add_org.xml" />
+  <INPUT ParaName="OrganisationId" SrcValue="xml/add_data_no_vcol/configuration/case_00101_add_org.xml" />
   <INPUT ParaName="ContactLastName" PrefixVal="User-" Random="1" />
   <INPUT ParaName="ContactFirstName" Value="Testing" />
   <INPUT ParaName="ContactAcronym" Value="TU" />
@@ -17,7 +17,7 @@
   <Match Attr="ParaName" Tag="ReturnId" Value="ContactId" />
   <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
-  <Parent CaseFile="xml/add_data_no_vcol/case_00101_add_org.xml" Force="1" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/configuration/case_00101_add_org.xml" Force="1" Order="3" />
   <Parent CaseFile="xml/add_data_vcol/case_01001_add_vcol_contact.xml" Force="1" Order="3" />
   <ReturnId ParaName="ContactId" Value="14" />
 </TestCase>

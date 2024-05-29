@@ -1,0 +1,17 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Update Site" TargetURL="update/site/:SiteId" Type="BLOCKING" />
+  <Delete TargetURL="delete/site/:SiteId" />
+  <INPUT ParaName="SiteId" SrcValue="xml/add_data_no_vcol/experiments/case_00006_add_site.xml" />
+  <INPUT ParaName="SiteName" Value="DArT Test Site (Updated)" />
+  <INPUT ParaName="SiteTypeId" SrcValue="xml/add_data_no_vcol/vocabularies/case_00005_add_sitetype.xml" />
+  <INPUT ParaName="SiteAcronym" Value="GH" />
+  <INPUT ParaName="CurrentSiteManagerId" SrcValue="xml/add_data_no_vcol/configuration/case_00102_add_con.xml" />
+  <INPUT ParaName="CurrentMetStationId" Value="0" />
+  <INPUT ParaName="sitelocation" Value="POLYGON((148.99658 -35.48192,149.2067 -35.48192,149.2067 -35.19626,148.99658 -35.19626,148.99658 -35.48192))" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/experiments/case_00006_add_site.xml" />
+  
+</TestCase>

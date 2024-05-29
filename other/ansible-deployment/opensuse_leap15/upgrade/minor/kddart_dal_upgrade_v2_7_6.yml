@@ -1,0 +1,32 @@
+#
+# DAL upgrade script for Opensuse
+# Copyright (c) 2024, Diversity Arrays Technology, All rights reserved.
+#
+# Author: George Xiyue Huang
+# Date: 28/05/2024
+# Description: DAL upgrade script from 2.7.5 to 2.7.6
+
+- name: Install new Perl packages for OpenID authentication 
+  cpanm: name={{item}}
+  with_items:
+    - Crypt::JWT
+
+- name: Add Log Activity in config file
+  shell: echo '[RECORD_ACTIVITY_CFG]' >> {{ apache_base_dir }}/secure/kddart_dal.cfg; echo 'RECORD_ACTIVITY_CFG=0' >> {{ apache_base_dir }}/secure/kddart_dal.cfg;
+
+
+- name: Add cookie settings in config file
+  shell: echo '[COOKIE_NAME]' >> {{ apache_base_dir }}/secure/kddart_dal.cfg; echo 'COOKIE_NAME=KDDArT_DAL_SESSID' >> {{ apache_base_dir }}/secure/kddart_dal.cfg;
+
+- name: Add authentication source setting in config file
+  shell: echo '[AUTHENTICATOR_SOURCE]' >> {{ apache_base_dir }}/secure/kddart_dal.cfg; echo 'AUTHENTICATOR_SOURCE=""' >> {{ apache_base_dir }}/secure/kddart_dal.cfg;
+
+- name: Add openid url setting in config file
+  shell: echo '[OPENID_URL]' >> {{ apache_base_dir }}/secure/kddart_dal.cfg; echo 'OPENID_URL=""' >> {{ apache_base_dir }}/secure/kddart_dal.cfg;
+
+- name: Add Client ID for OpenID source setting in config file
+  shell: echo '[CLIENTID4OPENID_URL]' >> {{ apache_base_dir }}/secure/kddart_dal.cfg; echo 'CLIENTID4OPENID_URL=""' >> {{ apache_base_dir }}/secure/kddart_dal.cfg;
+
+- name: Add Session database setting in config file
+  shell: echo '[DSN_SESSION_DB]' >> {{ apache_base_dir }}/secure/kddart_dal.cfg; echo 'DSN_SESSION_DB="DBI:mysql:database=onedart_session:host=keycloak.example.com:mysql_connect_timeout=6000:mysql_write_timeout=600:mysql_read_timeout=300"' >> {{ apache_base_dir }}/secure/kddart_dal.cfg;
+

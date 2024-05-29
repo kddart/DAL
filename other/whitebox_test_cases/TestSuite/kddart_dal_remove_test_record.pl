@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# Copyright (c) 2011, Diversity Arrays Technology, All rights reserved.
+# Copyright (c) 2024, Diversity Arrays Technology, All rights reserved.
 
 # Author    : Puthick Hok
 # Created   : 18/12/2011

@@ -1,0 +1,28 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record_upload" Description="Import Marker Data" TargetURL="analysisgroup/:AnalysisGroupId/import/markerdata/csv" Type="BLOCKING" />
+  <INPUT ParaName="AnalysisGroupId" SrcValue="xml/add_data_no_vcol/markers/case_00303_add_analysisgroup.xml" />
+  <INPUT ParaName="Forced" Value="1" />
+  <INPUT ParaName="DataSetType" SrcValue="xml/add_data_no_vcol/vocabularies/case_00473_add_datasettype.xml" />
+  <INPUT ParaName="HeaderRow" Value="1" />
+  <INPUT ParaName="MarkerNameCol" Value="0" />
+  <INPUT ParaName="SequenceCol" Value="1" />
+  <INPUT ParaName="MarkerMetaColStart" Value="2" />
+  <INPUT ParaName="MarkerMetaColEnd" Value="19" />
+  <INPUT ParaName="MarkerDataColStart" Value="20" />
+  <INPUT ParaName="MarkerDataColEnd" Value="25" />
+  <INPUT ParaName="ExtractId" SrcValue="xml/add_data_no_vcol/markers/case_00302_add_extract.xml" />
+  <INPUT ParaName="ExtractId1" SrcValue="xml/add_data_no_vcol/markers/case_00375_add_extract1.xml" />
+  <INPUT ParaName="ExtractId2" SrcValue="xml/add_data_no_vcol/markers/case_00376_add_extract2.xml" />
+  <INPUT ParaName="ExtractId3" SrcValue="xml/add_data_no_vcol/markers/case_00377_add_extract3.xml" />
+  <INPUT ParaName="ExtractId4" SrcValue="xml/add_data_no_vcol/markers/case_00378_add_extract4.xml" />
+  <INPUT ParaName="ExtractId5" SrcValue="xml/add_data_no_vcol/markers/case_00379_add_extract5.xml" />
+  <INPUT ParaName="uploadfile" SrcFile="xml/add_data_no_vcol/marker.csv" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successful)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/markers/case_00303_add_analysisgroup.xml" Force="1" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/vocabularies/case_00473_add_datasettype.xml" Order="4" />
+  <ReturnId ParaName="DataSetId" Value="3" />
+  
+</TestCase>

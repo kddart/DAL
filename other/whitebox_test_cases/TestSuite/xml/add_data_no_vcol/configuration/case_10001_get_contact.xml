@@ -1,0 +1,9 @@
+<TestCase>
+  <CaseInfo Description="Get Contact" TargetURL="get/contact/:ContactId" Type="BLOCKING" />
+  <INPUT ParaName="ContactId" SrcValue="xml/add_data_no_vcol/configuration/case_00102_add_con.xml" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="COUNT" Tag="Contact" TargetDataType="MULTI" Value="boolex(x&gt;0)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/configuration/case_00102_add_con.xml" Order="3" Force="1" /> 
+</TestCase>

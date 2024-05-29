@@ -1,0 +1,16 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Add Survey Trait1" TargetURL="survey/:SurveyId/add/trait" Type="BLOCKING" />
+  <Delete TargetURL="delete/surveytrait/:SurveyTraitId" />
+  <INPUT ParaName="SurveyId" SrcValue="xml/add_data_no_vcol/experiments/case_10600_add_survey.xml" />
+  <INPUT ParaName="TraitId" SrcValue="xml/add_data_no_vcol/vocabularies/case_00359_add_trait.xml" />
+  <INPUT ParaName="Compulsory" Value="1" />
+  <Match Attr="TraitId" Exception="1" Order="1" Tag="Error" Value="regex(already exists)" />
+  <Match Attr="StatusCode" Order="2" Value="200" />
+  <Match Attr="Message" Order="3" Tag="Info" Value="regex(successfully)" />
+  <Match Attr="ParaName" Order="4" Tag="ReturnId" Value="SurveyTraitId" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/experiments/case_10600_add_survey.xml" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/vocabularies/case_00359_add_trait.xml" Order="4" />
+  
+</TestCase>

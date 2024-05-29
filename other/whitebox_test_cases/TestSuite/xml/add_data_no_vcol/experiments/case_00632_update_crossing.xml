@@ -1,0 +1,16 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Update crossing" TargetURL="update/crossing/:CrossingId" Type="BLOCKING" OutputFormat="JSON" />
+  <INPUT ParaName="CrossingId" SrcValue="xml/add_data_no_vcol/experiments/case_00631_add_crossing.xml" />
+  <INPUT ParaName="BreedingMethodId" SrcValue="xml/add_data_no_vcol/vocabularies/case_00208_add_breeding_method.xml" />
+  <INPUT ParaName="MaleParentId" SrcValue="xml/add_data_no_vcol/experiments/case_00626_add_trialunitspecimen_extra.xml" />
+  <INPUT ParaName="FemaleParentId" SrcValue="xml/add_data_no_vcol/experiments/case_00630_add_trialunitspecimen_extra1.xml" />
+  <INPUT ParaName="UserId" Value="0" />
+  <INPUT ParaName="CrossingNote" Value="Update crossing" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/experiments/case_00631_add_crossing.xml" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/vocabularies/case_00208_add_breeding_method.xml" Order="4" />
+  <Parent CaseFile="xml/add_data_no_vcol/experiments/case_00626_add_trialunitspecimen_extra.xml" Order="5" />
+  <Parent CaseFile="xml/add_data_no_vcol/experiments/case_00630_add_trialunitspecimen_extra1.xml" Order="6" />
+</TestCase>

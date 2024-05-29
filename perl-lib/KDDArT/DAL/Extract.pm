@@ -1,7 +1,7 @@
 #$Id$
 #$Author$
 
-# Copyright (c) 2011, Diversity Arrays Technology, All rights reserved.
+# Copyright (c) 2024, Diversity Arrays Technology, All rights reserved.
 
 # Author    : Puthick Hok
 # Created   : 02/09/2013
@@ -43,7 +43,7 @@ sub setup {
 
   my $self = shift;
 
-  CGI::Session->name("KDDArT_DAL_SESSID");
+  CGI::Session->name($COOKIE_NAME);
 
   __PACKAGE__->authen->init_config_parameters();
   __PACKAGE__->authen->check_login_runmodes(':all');
@@ -61,7 +61,8 @@ sub setup {
                                            'import_plate_n_extract_gadmin',
                                            'del_analysisgroup_gadmin',
                                            'add_extractdata',
-                                           'add_extractdata_file'
+                                           'add_extractdata_file',
+                                           'import_extract_csv'
       );
   __PACKAGE__->authen->count_session_request_runmodes(':all');
 
@@ -89,7 +90,8 @@ sub setup {
                                                   'add_plate_n_extract_gadmin',
                                                   'add_plate_gadmin',
                                                   'import_plate_n_extract_gadmin',
-                                                  'add_extractdata_file'
+                                                  'add_extractdata_file',
+                                                  'import_extract_csv'
       );
 
   $self->run_modes(
@@ -118,7 +120,8 @@ sub setup {
     'update_extractdata'            => 'update_extractdata_runmode',
     'delete_extractdata'            => 'delete_extractdata_runmode',
     'add_extractdata_file'          => 'add_extractdata_file_runmode',
-    'list_extractdata_file'         => 'list_extractdata_file_runmode'
+    'list_extractdata_file'         => 'list_extractdata_file_runmode',
+    'import_extract_csv'            => 'import_extract_csv_runmode'
       );
 
   my $logger = get_logger();
@@ -8441,6 +8444,628 @@ sub delete_extractdata_runmode {
 
 }
 
+
+
+sub import_extract_csv_runmode {
+
+=pod import_extract_csv_HELP_START
+{
+"OperationName": "Import Extracts",
+"Description": "Import extracts from a csv file formatted as a sparse matrix of extract data without association with plate",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 1,
+"SignatureRequired": 1,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "ALWAYS"}, {"MethodName": "POST"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Info Message='3 records of extracts have been inserted successfully.' /><StatInfo Unit='second' ServerElapsedTime='0.053' /><ReturnOther Value='2017-04-24 16:29:41' ParaName='LastUpdateTimeStamp' /><ReturnIdFile xml='http://blackbox.diversityarrays.com/data/admin/import_extract_csv_return_id_182.xml' /></DATA>",
+"SuccessMessageJSON": "{'ReturnIdFile' : [{'json' : 'http://blackbox.diversityarrays.com/data/admin/import_extract_csv_return_id_206.json'}],'ReturnOther' : [{'Value' : '2017-04-24 16:36:21','ParaName' : 'LastUpdateTimeStamp'}],'StatInfo' : [{'ServerElapsedTime' : '0.064','Unit' : 'second'}],'Info' : [{'Message' : '3 records of extracts have been inserted successfully.'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Row (1): SpecimenId (872) not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Row (1): SpecimenId (872) not found.'}]}"}],
+"RequiredUpload": 1,
+"UploadFileFormat": "CSV",
+"UploadFileParameterName": "uploadfile",
+"HTTPParameter":  [{"Required": 0, "Name": "ParentExtractId", "Description": "Column number starting from zero for the column in the CSV file that contains ParentExtractId value"},{"Required": 0, "Name": "ItemGroupId", "Description": "Column number starting from zero for the column in the CSV file that contains ItemGroupId value"},{"Required": 0, "Name": "GenotypeId", "Description": "Column number starting from zero for the column in the CSV file that contains GenotypeId value"},{"Required": 0, "Name": "Quality", "Description": "Column number starting from zero for the column in the CSV file that contains Quality value"},{"Required": 0, "Name": "Status", "Description": "Column number starting from zero for the column in the CSV file that contains Status value"},{"Required": 1, "Name": "TissueTypeId", "Description": "Column number starting from zero for the column in the CSV file that contains TissueTypeId value"}],
++"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self  = shift;
+  my $query = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  my $data_csv_file = $self->authen->get_upload_file();
+
+  my $num_of_col = get_csvfile_num_of_col($data_csv_file);
+
+  $self->logger->debug("Number of columns: $num_of_col");
+
+   my $TissueTypeId_col = $query->param('TissueTypeId');
+
+  my ($col_def_err, $col_def_err_href) = check_col_def_href( { 'TissueTypeId' => $TissueTypeId_col }, $num_of_col );
+
+  if ($col_def_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$col_def_err_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $matched_col = {};
+
+  $matched_col->{$TissueTypeId_col} = 'TissueTypeId';
+
+  # Checking optional columns
+
+  my $ParentExtractId_col     = '';
+  my $ItemGroupId_col         = '';
+  my $GenotypeId_col          = '';
+  my $Quality_col             = '';
+  my $Status_col              = '';
+
+  my $chk_optional_col_href = {};
+
+  if (defined $query->param('ParentExtractId')) {
+
+    if (length($query->param('ParentExtractId')) > 0) {
+
+      $ParentExtractId_col = $query->param('ParentExtractId');
+
+      $chk_optional_col_href->{'ParentExtractId'} = $ParentExtractId_col;
+      $matched_col->{$ParentExtractId_col}        = 'ParentExtractId';
+    }
+  }
+
+  if (defined $query->param('ItemGroupId')) {
+
+    if (length($query->param('ItemGroupId')) > 0) {
+
+      $ItemGroupId_col = $query->param('ItemGroupId');
+
+      $chk_optional_col_href->{'ItemGroupId'} = $ItemGroupId_col;
+      $matched_col->{$ItemGroupId_col}        = 'ItemGroupId';
+    }
+  }
+
+  if (defined $query->param('GenotypeId')) {
+
+    if (length($query->param('GenotypeId')) > 0) {
+
+      $GenotypeId_col = $query->param('GenotypeId');
+
+      $chk_optional_col_href->{'GenotypeId'} = $GenotypeId_col;
+      $matched_col->{$GenotypeId_col}        = 'GenotypeId';
+    }
+  }
+
+  if (defined $query->param('Quality')) {
+
+    if (length($query->param('Quality')) > 0) {
+
+      $Quality_col = $query->param('Quality');
+
+      $chk_optional_col_href->{'Quality'} = $Quality_col;
+      $matched_col->{$Quality_col}        = 'Quality';
+    }
+  }
+
+  if (defined $query->param('Status')) {
+
+    if (length($query->param('Status')) > 0) {
+
+      $Status_col = $query->param('Status');
+
+      $chk_optional_col_href->{'Status'} = $Status_col;
+      $matched_col->{$Status_col}        = 'Status';
+    }
+  }
+
+  ($col_def_err, $col_def_err_href) = check_col_def_href( $chk_optional_col_href, $num_of_col );
+
+  if ($col_def_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [$col_def_err_href]};
+
+    return $data_for_postrun_href;
+  }
+
+  my @fieldname_list;
+
+  for (my $i = 0; $i < $num_of_col; $i++) {
+
+    if ($matched_col->{$i}) {
+
+      push(@fieldname_list, $matched_col->{$i});
+    }
+    else {
+
+      push(@fieldname_list, 'null');
+    }
+  }
+
+  my ($data_aref, $csv_err, $err_msg) = csvfile2arrayref($data_csv_file, \@fieldname_list, 0);
+
+  if ($csv_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (scalar(@{$data_aref}) == 0) {
+
+    $self->logger->debug("No data provided");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $user_id       = $self->authen->user_id();
+  my $group_id      = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+  my $perm_str      = permission_phrase($group_id, 0, $gadmin_status, 'genotype');
+
+  my $sql;
+  my $sth;
+
+  my $cur_dt = DateTime->now( time_zone => $TIMEZONE );
+  $cur_dt = DateTime::Format::MySQL->format_datetime($cur_dt);
+
+  my $dbh_write = connect_kdb_write();
+  my $dbh_m_write = connect_mdb_write();
+
+  my $uniq_parentextract_id_href    = {};
+  my $uniq_itemgroup_id_href    = {};
+  my $uniq_genotype_id_href    = {};
+  my $uniq_tissuetype_id_href    = {};
+
+  $cur_dt = DateTime->now( time_zone => $TIMEZONE );
+
+  my $row_counter = 1;
+
+  
+
+  my $return_id_aref = [];
+
+  my @extract_sql_list;
+
+  for my $data_row (@{$data_aref}) {
+  
+    my $parentextract_id = '';
+
+    if (defined $data_row->{'ParentExtractId'}) {
+
+      if (length($data_row->{'ParentExtractId'}) > 0) {
+
+        $parentextract_id = $data_row->{'ParentExtractId'};
+        $uniq_parentextract_id_href->{$parentextract_id} = $row_counter;
+      }
+    }
+
+    my $itemgroup_id = '';
+
+    if (defined $data_row->{'ItemGroupdId'}) {
+
+      if (length($data_row->{'ItemGroupdId'}) > 0) {
+
+        $itemgroup_id = $data_row->{'ItemGroupdId'};
+        $uniq_itemgroup_id_href->{$itemgroup_id} = $row_counter;
+      }
+    }
+
+    my $genotype_id = '';
+
+    if (defined $data_row->{'GenotypeId'}) {
+
+      if (length($data_row->{'GenotypeId'}) > 0) {
+
+        $genotype_id = $data_row->{'GenotypeId'};
+        $uniq_genotype_id_href->{$genotype_id} = $row_counter;
+      }
+    }
+
+    my $tissuetype_id = '';
+
+    if (defined $data_row->{'TissueTypeId'}) {
+
+      if (length($data_row->{'TissueTypeId'}) > 0) {
+
+        $tissuetype_id = $data_row->{'TissueTypeId'};
+        $uniq_tissuetype_id_href->{$tissuetype_id} = $row_counter;
+      }
+    }
+
+    my $extract_quality = '';
+
+    if (defined $data_row->{'Quality'}) {
+
+      if (length($data_row->{'Quality'}) > 0) {
+
+        $extract_quality = $data_row->{'Quality'};
+      }
+    }
+
+    my $extract_status = '';
+
+    if (defined $data_row->{'Status'}) {
+
+      if (length($data_row->{'Status'}) > 0) {
+
+        $extract_status = $data_row->{'Status'};
+      }
+    }
+
+    if (length($parentextract_id) == 0) {
+
+      $parentextract_id = 'NULL';
+    }
+
+    if (length($itemgroup_id) == 0) {
+
+      $itemgroup_id = 'NULL';
+    }
+
+    if (length($genotype_id) == 0) {
+
+      $genotype_id = 'NULL';
+    }
+
+    if (length($extract_quality) == 0) {
+
+      $extract_quality = 'NULL';
+    }
+
+    if (length($extract_status) == 0) {
+
+      $extract_status = 'NULL';
+    }
+
+
+    if (length($tissuetype_id) == 0) {
+
+      #ERROR
+    }
+
+
+    
+    
+
+    my ($next_val_err, $next_val_msg, $ext_id) = get_next_value_for($dbh_m_write, 'extract', 'ExtractId');
+
+    if ($next_val_err) {
+
+      $self->logger->debug($next_val_msg);
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my $returned_extract_rec = {'ExtractId' => $ext_id,
+                                };
+    my $ext_sql_row = qq|($ext_id,$parentextract_id,$itemgroup_id,$genotype_id,$tissuetype_id,'$extract_quality', '$extract_status')|;
+    push(@{$return_id_aref}, $returned_extract_rec);
+    push(@extract_sql_list, $ext_sql_row);
+  }
+
+  my $bulk_sql = qq|INSERT INTO "extract" |;
+  $bulk_sql .= qq|("ExtractId","ParentExtractId","ItemGroupId","GenotypeId","Tissue","Quality","Status") |;
+  $bulk_sql .= qq|VALUES | . join(',', @extract_sql_list);
+
+  #search for extracts in monetdb
+  my @uniq_parentextract_id_list = keys(%{$uniq_parentextract_id_href});
+
+  my $dbh_m_read = connect_mdb_read();
+
+
+  if (scalar(@uniq_parentextract_id_list) > 0) {
+
+    $sql = 'SELECT ExtractId FROM "extract" WHERE ExtractId IN (' . join(',', @uniq_parentextract_id_list) . ')';
+    $sth = $dbh_m_read->prepare($sql);
+    $sth->execute();
+
+    if ($dbh_m_read->err()) {
+
+      $self->logger->debug("Read ExtractId failed");
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my $db_parentextract_id_href = $sth->fetchall_hashref('ExtractId');
+
+    if ($sth->err()) {
+
+      $self->logger->debug("Fetch ExtractId failed");
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my @not_found_parentextract_id_list;
+    my @not_found_row_list;
+
+    foreach my $parentextract_id (@uniq_parentextract_id_list) {
+
+      if (! (defined $db_parentextract_id_href->{$parentextract_id}) ) {
+
+        push(@not_found_parentextract_id_list, $parentextract_id);
+        push(@not_found_row_list, $uniq_parentextract_id_href->{$parentextract_id});
+      }
+    }
+
+    if (scalar(@not_found_parentextract_id_list) > 0) {
+
+      my $err_msg = "Row (" . join(',', @not_found_row_list) . ' ExtractId (';
+      $err_msg   .= join(',', @not_found_parentextract_id_list) . ') not found';
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  $dbh_m_read->disconnect();
+
+  my @uniq_genotype_id_list = keys(%{$uniq_genotype_id_href});
+
+  if (scalar(@uniq_genotype_id_list) > 0) {
+
+    $sql = "SELECT GenotypeId FROM genotype WHERE GenotypeId IN (" . join(",", @uniq_genotype_id_list) . ")";
+    $sth = $dbh_write->prepare($sql);
+    $sth->execute();
+
+    if ($dbh_write->err()) {
+
+      $self->logger->debug("Read GenotypeId failed");
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my $db_genotype_id_href = $sth->fetchall_hashref('GenotypeId');
+
+    if ($sth->err()) {
+
+      $self->logger->debug("Fetch GenotypeId failed");
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my @not_found_genotype_id_list;
+    my @not_found_row_list;
+
+    foreach my $genotype_id (@uniq_genotype_id_list) {
+
+      if (! (defined $db_genotype_id_href->{$genotype_id}) ) {
+
+        push(@not_found_genotype_id_list, $genotype_id);
+        push(@not_found_row_list, $uniq_genotype_id_href->{$genotype_id});
+      }
+    }
+
+    if (scalar(@not_found_genotype_id_list) > 0) {
+
+      my $err_msg = "Row (" . join(',', @not_found_row_list) . ') GenotypeId (';
+      $err_msg   .= join(',', @not_found_genotype_id_list) . ') not found';
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  my @uniq_itemgroup_id_list = keys(%{$uniq_itemgroup_id_href});
+
+  if (scalar(@uniq_itemgroup_id_list) > 0) {
+
+    $sql = "SELECT ItemGroupId FROM itemgroupi WHERE ItemGroupId IN (" . join(",", @uniq_itemgroup_id_list) . ")";
+    $sth = $dbh_write->prepare($sql);
+    $sth->execute();
+
+    if ($dbh_write->err()) {
+
+      $self->logger->debug("Read ItemGroupId failed");
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my $db_itemgroup_id_href = $sth->fetchall_hashref('ItemGroupId');
+
+    if ($sth->err()) {
+
+      $self->logger->debug("Fetch ItemGroupId failed");
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my @not_found_itemgroup_id_list;
+    my @not_found_row_list;
+
+    foreach my $itemgroup_id (@uniq_itemgroup_id_list) {
+
+      if (! (defined $db_itemgroup_id_href->{$itemgroup_id}) ) {
+
+        push(@not_found_itemgroup_id_list, $itemgroup_id);
+        push(@not_found_row_list, $uniq_itemgroup_id_href->{$itemgroup_id});
+      }
+    }
+
+    if (scalar(@not_found_itemgroup_id_list) > 0) {
+
+      my $err_msg = "Row (" . join(',', @not_found_row_list) . ') ItemGroupId (';
+      $err_msg   .= join(',', @not_found_itemgroup_id_list) . ') not found';
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  my @uniq_tissuetype_id_list = keys(%{$uniq_tissuetype_id_href});
+
+  if (scalar(@uniq_tissuetype_id_list) > 0) {
+
+    $sql = "SELECT TypeId FROM generaltype WHERE TypeId IN (" . join(",", @uniq_tissuetype_id_list) . ")";
+    $sth = $dbh_write->prepare($sql);
+    $sth->execute();
+
+    if ($dbh_write->err()) {
+
+      $self->logger->debug("Read TissueTypeId failed");
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my $db_tissuetype_id_href = $sth->fetchall_hashref('TypeId');
+
+    if ($sth->err()) {
+
+      $self->logger->debug("Fetch TissueTypeId failed");
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+      return $data_for_postrun_href;
+    }
+
+    my @not_found_tissuetype_id_list;
+    my @not_found_row_list;
+
+    foreach my $tissuetype_id (@uniq_tissuetype_id_list) {
+
+      if (! (defined $db_tissuetype_id_href->{$tissuetype_id}) ) {
+
+        push(@not_found_tissuetype_id_list, $tissuetype_id);
+        push(@not_found_row_list, $uniq_tissuetype_id_href->{$tissuetype_id});
+      }
+    }
+
+    if (scalar(@not_found_tissuetype_id_list) > 0) {
+
+      my $err_msg = "Row (" . join(',', @not_found_row_list) . ') TypeId (';
+      $err_msg   .= join(',', @not_found_tissuetype_id_list) . ') not found';
+
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  #chop($bulk_sql);        # remove excessive trailling comma
+
+  $self->logger->debug("Bulk SQL: $bulk_sql");
+
+  my ($imp_ext_err, $imp_ext_msg) = execute_sql($dbh_m_write, $bulk_sql, []);
+
+  if ($imp_ext_err) {
+
+    $self->logger->debug("Import extract failed: $imp_ext_msg");
+    my $err_msg = "Unexpected Error.";
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $dbh_m_write->disconnect();
+
+
+  my $nb_extract  = scalar(@{$data_aref});
+
+  my $return_id_data = {};
+  $return_id_data->{'ReturnId'}     = $return_id_aref;
+
+  my $content_type = '';
+
+  if ($self->authen->is_content_type_valid()) {
+
+    $content_type = $self->authen->get_content_type();
+  }
+
+  if (length($content_type) == 0) {
+
+    $content_type = 'xml';
+  }
+  else {
+
+    $content_type = lc($content_type);
+  }
+
+  my $file_rand            = makerandom(Size => 8, Strength => 0);
+  my $username             = $self->authen->username();
+  my $doc_root             = $ENV{'DOCUMENT_ROOT'};
+  my $export_data_path     = "${doc_root}/data/$username";
+  my $return_id_filename   = $self->get_current_runmode() . "_return_id_${file_rand}.${content_type}";
+  my $return_id_file       = "${export_data_path}/$return_id_filename";
+
+  if ( !(-e $export_data_path) ) {
+
+    mkdir($export_data_path);
+  }
+
+  my $return_id_content = '';
+
+  $self->logger->debug("Content type: $content_type");
+
+  if ($content_type eq 'xml') {
+
+    $return_id_content = make_empty_xml();
+    for my $xml_tag (keys(%{$return_id_data})) {
+
+      my $this_xml_content = arrayref2xml($return_id_data->{$xml_tag}, $xml_tag);
+      $return_id_content = merge_xml($this_xml_content, $return_id_content);
+    }
+  }
+  elsif ($content_type eq 'json') {
+
+    my $json_encoder = JSON::XS->new();
+    $json_encoder->pretty(1);
+    $json_encoder->utf8(1);
+    $return_id_content = $json_encoder->encode($return_id_data);
+  }
+
+  #$self->logger->debug("Return ID content: $return_id_content");
+
+  my $return_id_fh;
+  open($return_id_fh, ">:encoding(utf8)", "$return_id_file") or die "$return_id_file: $!";
+  print $return_id_fh $return_id_content;
+  close($return_id_fh);
+
+  my $url = reconstruct_server_url();
+  my $output_file_href = { "$content_type"  => "$url/data/$username/$return_id_filename" };
+
+  my $info_msg = "$nb_extract extracts have been inserted successfully.";
+
+  my $info_msg_aref = [{'Message' => $info_msg}];
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Info' => $info_msg_aref, 'ReturnIdFile' => [$output_file_href]};
+  $data_for_postrun_href->{'ExtraData'} = 0;
+
+  return $data_for_postrun_href;
+
+}
 
 
 

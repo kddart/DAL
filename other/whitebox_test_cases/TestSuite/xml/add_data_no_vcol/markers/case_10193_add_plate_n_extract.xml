@@ -1,0 +1,22 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record_upload" Description="Add Plate n Extract" TargetURL="add/plate/n/extract" Type="BLOCKING" />
+  <Delete TargetURL="delete/plate/n/extract/:PlateId" />
+  <INPUT ParaName="PlateName" PrefixVal="Plate_" Random="1" />
+  <INPUT ParaName="PlateDescription" Value="Testing Plate" />
+  <INPUT ParaName="PlateType" SrcValue="xml/add_data_no_vcol/vocabularies/case_10196_add_plate_type.xml" />
+  <INPUT ParaName="OperatorId" Value="0" />
+  <INPUT ParaName="DateCreated" Value="2015-12-16" />
+  <INPUT ParaName="Tissue" SrcValue="xml/add_data_no_vcol/vocabularies/case_00419_add_tissue_type.xml" />
+  <INPUT ParaName="extract" Process="1" SrcFile="xml/add_data_no_vcol/plate_extract.xml" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Match Attr="ParaName" Tag="ReturnId" Value="PlateId" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/vocabularies/case_10196_add_plate_type.xml" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/inventories/case_10194_add_itemgroup1_plate_extract.xml" Order="4" />
+  <Parent CaseFile="xml/add_data_no_vcol/inventories/case_10195_add_itemgroup2_plate_extract.xml" Order="5" />
+  <Parent CaseFile="xml/add_data_no_vcol/vocabularies/case_00419_add_tissue_type.xml" Order="6" />
+  
+  
+</TestCase>

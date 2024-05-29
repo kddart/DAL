@@ -68,7 +68,7 @@ sub authenticate {
 
         my ($arg_name, $arg_val) = split(/=/, $args_pair);
 
-        if (uc($arg_name) eq 'KDDART_DAL_SESSID') {
+        if (uc($arg_name) eq $COOKIE_NAME) {
 
           $session_id = $arg_val;
         }

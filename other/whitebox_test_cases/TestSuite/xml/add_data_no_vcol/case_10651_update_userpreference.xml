@@ -1,0 +1,9 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Add User Preference" TargetURL="update/userpreference" Type="BLOCKING" />
+  <INPUT ParaName="UserPreference" Value='[{"title":"KDCompute","name":"kdcompute","template":"modules/kdcompute-list.tt","js":"vendors/kdcompute-list/js/kdcompute-obj.js","description":"Module to show KDCompute Jobs"},{"description":"Module to show KDDart Counts","type":"topbar","js":"vendors/kddart-count/js/kddart-count-obj.js","start":{"init":"DashboardCount","run":"display_count","data":[{"url":"list/genotype/50/page/1","name":"genotype","id":"genotype"},{"url":"list/samplemeasurement/50/page/1","name":"sample measurement","id":"samplemeasurement"},{"name":"trial","url":"list/trial/50/page/1","id":"trial"},{"name":"plate","url":"list/plate/50/page/1","id":"plate"}]},"name":"kddartcount","template":"modules/kddart-count.tt","title":"KDDart Count"},{"title":"OneDart Orders","name":"onedart-orders","template":"modules/onedart-orders.tt","js":"vendors/onedart-orders/js/onedart-obj.js","description":"OneDart","css":"vendors/onedart-orders/css/style.css"},{"title":"KDX Import","name":"kdximport","template":"modules/kdx-import.tt","js":"vendors/kdximport/js/kdximport-object.js","description":"Module to Show KDX Import Plugin","css":"vendors/kdximport/css/style.css"}]' />
+  <INPUT ParaName="EntityName" Value="modules" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+</TestCase>

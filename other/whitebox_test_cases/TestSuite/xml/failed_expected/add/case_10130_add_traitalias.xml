@@ -1,7 +1,7 @@
 <TestCase>
   <CaseInfo CustomMethod="add_record" Description="Add Traitalias" TargetURL="trait/:TraitId/add/alias" Type="BLOCKING" />
   <Delete TargetURL=":TraitId/delete/traitalias/:TraitAliasId" />
-  <INPUT ParaName="TraitId" SrcValue="xml/add_data_no_vcol/case_00359_add_trait.xml" />
+  <INPUT ParaName="TraitId" SrcValue="xml/add_data_no_vcol/vocabularies/case_00359_add_trait.xml" />
   <INPUT ParaName="TraitAliasName" Random="1" Value="Trait Alias Name - " />
   <INPUT ParaName="TraitAliasCaption" Value="Testing Caption tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt" />
   <INPUT ParaName="TraitAliasDescription" Value="Testing Description" />
@@ -11,7 +11,7 @@
   <Match Attr="TraitAliasCaption" Tag="Error" Value="regex(longer than)" />
   <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
-  <Parent CaseFile="xml/add_data_no_vcol/case_00359_add_trait.xml" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/vocabularies/case_00359_add_trait.xml" Order="3" />
   
   
 </TestCase>

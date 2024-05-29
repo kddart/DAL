@@ -1,7 +1,7 @@
 #$Id$
 #$Author$
 
-# Copyright (c) 2011, Diversity Arrays Technology, All rights reserved.
+# Copyright (c) 2024, Diversity Arrays Technology, All rights reserved.
 
 # Author    : Puthick Hok
 # Created   : 19/04/2012
@@ -47,7 +47,7 @@ sub setup {
 
   my $self   = shift;
 
-  CGI::Session->name("KDDArT_DAL_SESSID");
+  CGI::Session->name($COOKIE_NAME);
 
   __PACKAGE__->authen->init_config_parameters();
   __PACKAGE__->authen->init_config_parameters();
@@ -689,7 +689,7 @@ sub list_itemgroup_advanced_runmode {
 
       my $err_msg = $sel_field_msg;
       $data_for_postrun_href->{'Error'} = 1;
-      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => "$err_msg"}]};
 
       return $data_for_postrun_href;
     }
@@ -713,6 +713,8 @@ sub list_itemgroup_advanced_runmode {
   $sql .= "FROM itemgroup $join ";
 
   my $field_name2table_name  = { 'ItemId' => 'itemgroupentry' };
+
+  push(@{$final_field_list}, "ItemId");
   my $validation_func_lookup = {};
 
   my ( $filter_err, $filter_msg, $filter_phrase, $where_arg ) = parse_filtering('ItemGroupId',

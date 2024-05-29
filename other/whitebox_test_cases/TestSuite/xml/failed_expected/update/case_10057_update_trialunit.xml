@@ -1,7 +1,7 @@
 <TestCase>
   <CaseInfo CustomMethod="add_record" Description="Update Trialunit" TargetURL="update/trialunit/:TrialUnitId" Type="BLOCKING" />
   <Delete TargetURL="delete/trial/:TrialId" />
-  <INPUT ParaName="TrialUnitId" SrcValue="xml/add_data_no_vcol/case_00358_add_trialunit.xml" />
+  <INPUT ParaName="TrialUnitId" SrcValue="xml/add_data_no_vcol/experiments/case_00358_add_trialunit.xml" />
   <INPUT ParaName="UnitPositionId" SrcValue="xml/add_data_no_vcol/case_00200_add_unitposition.xml" />
   <INPUT ParaName="SampleSupplierId" Value="1" />
   <INPUT ParaName="ReplicateNumber" Value="2" />
@@ -14,7 +14,7 @@
   <Match Attr="TrialUnitNote" Tag="Error" Value="regex(longer than)" />
   <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
-  <Parent CaseFile="xml/add_data_no_vcol/case_00358_add_trialunit.xml" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/experiments/case_00358_add_trialunit.xml" Order="3" />
   
   
 </TestCase>

@@ -1,0 +1,13 @@
+<TestCase>
+  <CaseInfo Description="List Trial Trait" TargetURL="trial/:TrialId/list/trait" Type="BLOCKING" />
+  <Delete TargetURL="delete/trial/:TrialId" />
+  <INPUT ParaName="TrialId" SrcValue="xml/add_data_no_vcol/experiments/case_00007_add_trial.xml" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="COUNT" Tag="TrialTrait" TargetDataType="MULTI" Value="boolex(x&gt;0)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/experiments/case_00007_add_trial.xml" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/experiments/case_00365_add_trialtrait1.xml" Order="4" />
+  <Parent CaseFile="xml/add_data_no_vcol/experiments/case_00366_add_trialtrait2.xml" Order="5" />
+  
+</TestCase>

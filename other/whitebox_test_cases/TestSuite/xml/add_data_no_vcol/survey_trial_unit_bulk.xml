@@ -1,7 +1,7 @@
 <DATA>
-<surveytrialunit TrialUnitId="" ParaName="TrialUnitId" SrcValue="xml/add_data_no_vcol/case_00358_add_trialunit.xml" VisitTime="2023-03-15" VisitOrder="1" CollectorId="|:CollectorId:|"></surveytrialunit>
-<surveytrialunit TrialUnitId="" ParaName="TrialUnitId" SrcValue="xml/add_data_no_vcol/case_00358_add_trialunit.xml" VisitTime="2023-03-15" VisitOrder="1" CollectorId="|:CollectorId:|"></surveytrialunit>
-<surveytrialunit TrialUnitId="" ParaName="TrialUnitId" SrcValue="xml/add_data_no_vcol/case_00358_add_trialunit.xml" VisitTime="2023-03-15" VisitOrder="1" CollectorId="|:CollectorId:|"></surveytrialunit>
-<surveytrialunit TrialUnitId="" ParaName="TrialUnitId" SrcValue="xml/add_data_no_vcol/case_00358_add_trialunit.xml" VisitTime="2023-03-15" VisitOrder="1" CollectorId="|:CollectorId:|"></surveytrialunit>
-<surveytrialunit TrialUnitId="" ParaName="TrialUnitId" SrcValue="xml/add_data_no_vcol/case_00358_add_trialunit.xml" VisitTime="2023-03-15" VisitOrder="1" CollectorId="|:CollectorId:|"></surveytrialunit>
+<surveytrialunit TrialUnitId="" ParaName="TrialUnitId" SrcValue="xml/add_data_no_vcol/experiments/case_00358_add_trialunit.xml" VisitTime="2023-03-15" VisitOrder="1" CollectorId="|:CollectorId:|"></surveytrialunit>
+<surveytrialunit TrialUnitId="" ParaName="TrialUnitId" SrcValue="xml/add_data_no_vcol/experiments/case_00358_add_trialunit.xml" VisitTime="2023-03-15" VisitOrder="2" CollectorId="|:CollectorId:|"></surveytrialunit>
+<surveytrialunit TrialUnitId="" ParaName="TrialUnitId" SrcValue="xml/add_data_no_vcol/experiments/case_00358_add_trialunit.xml" VisitTime="2023-03-15" VisitOrder="3" CollectorId="|:CollectorId:|"></surveytrialunit>
+<surveytrialunit TrialUnitId="" ParaName="TrialUnitId" SrcValue="xml/add_data_no_vcol/experiments/case_00358_add_trialunit.xml" VisitTime="2023-03-15" VisitOrder="4" CollectorId="|:CollectorId:|"></surveytrialunit>
+<surveytrialunit TrialUnitId="" ParaName="TrialUnitId" SrcValue="xml/add_data_no_vcol/experiments/case_00358_add_trialunit.xml" VisitTime="2023-03-15" VisitOrder="5" CollectorId="|:CollectorId:|"></surveytrialunit>
 </DATA>

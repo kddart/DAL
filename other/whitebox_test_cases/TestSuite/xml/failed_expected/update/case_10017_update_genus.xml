@@ -1,7 +1,7 @@
 <TestCase>
   <CaseInfo CustomMethod="add_record" Description="Update Genus" TargetURL="update/genus/:GenusId" Type="BLOCKING" />
   <Delete TargetURL="delete/genus/:GenusId" />
-  <INPUT ParaName="GenusId" SrcValue="xml/add_data_no_vcol/case_00105_add_genus.xml" />
+  <INPUT ParaName="GenusId" SrcValue="xml/add_data_no_vcol/germplasm/case_00105_add_genus.xml" />
   <INPUT ParaName="GenusName" PrefixVal="Genus_to fail ttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt" Random="1" />
   <Match Attr="StatusCode" Value="420" />
   <Match Attr="GenusName" Tag="Error" Value="regex(longer than)" />

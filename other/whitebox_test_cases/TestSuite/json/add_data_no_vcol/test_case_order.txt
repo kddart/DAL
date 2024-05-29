@@ -19,5 +19,5 @@ json/add_data_no_vcol/case_00119_add_treatment.xml
 json/add_data_no_vcol/case_00200_add_unitposition.xml
 json/add_data_no_vcol/add_trialunit.xml
 json/add_data_no_vcol/add_trait.xml
-json/add_data_no_vcol/case_00201_add_sampletype.xml
+json/add_data_no_vcol/vocabularies/case_00201_add_sampletype.xml
 #json/add_data_no_vcol/import_samplemeasurement.xml

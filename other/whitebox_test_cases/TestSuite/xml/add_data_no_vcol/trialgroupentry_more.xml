@@ -1,4 +1,4 @@
 <DATA>
-<trialgroupentry TrialId="" ParaName="TrialId" SrcValue="xml/add_data_no_vcol/case_00507_add_trial4trialgroup2.xml" />
-<trialgroupentry TrialId="" ParaName="TrialId" SrcValue="xml/add_data_no_vcol/case_00508_add_trial4trialgroup3.xml" />
+<trialgroupentry TrialId="" ParaName="TrialId" SrcValue="xml/add_data_no_vcol/experiments/case_00507_add_trial4trialgroup2.xml" />
+<trialgroupentry TrialId="" ParaName="TrialId" SrcValue="xml/add_data_no_vcol/experiments/case_00508_add_trial4trialgroup3.xml" />
 </DATA>

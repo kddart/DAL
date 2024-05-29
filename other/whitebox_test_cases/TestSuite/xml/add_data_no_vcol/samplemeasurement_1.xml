@@ -1,50 +1,50 @@
 <DATA>
 <ROW>
-<TrialUnitId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/case_00358_add_trialunit.xml" />
-<SampleTypeId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/case_00201_add_sampletype.xml" />
-<TraitId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/case_00359_add_trait.xml" />
+<TrialUnitId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/experiments/case_00358_add_trialunit.xml" />
+<SampleTypeId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/vocabularies/case_00201_add_sampletype.xml" />
+<TraitId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/vocabularies/case_00359_add_trait.xml" />
 <MeasurementDateTime Value="2011-01-15 14:28:37" />
 <InstanceNumber Value="5" />
 <TraitValue Value="11" />
 <StateReason Value="TEST" />
 </ROW>
 <ROW>
-<TrialUnitId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/case_00358_add_trialunit.xml" />
-<SampleTypeId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/case_00201_add_sampletype.xml" />
-<TraitId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/case_00606_add_trait_text.xml" />
+<TrialUnitId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/experiments/case_00358_add_trialunit.xml" />
+<SampleTypeId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/vocabularies/case_00201_add_sampletype.xml" />
+<TraitId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/vocabularies/case_00606_add_trait_text.xml" />
 <MeasurementDateTime Value="2011-01-15 14:28:37" />
 <InstanceNumber Value="5" />
 <TraitValue Value="It's not growing." />
 <StateReason Value="TEST's is test" />
 </ROW>
 <ROW>
-<TrialUnitId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/case_00358_add_trialunit.xml" />
-<SampleTypeId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/case_00201_add_sampletype.xml" />
-<TraitId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/case_00359_add_trait.xml" />
+<TrialUnitId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/experiments/case_00358_add_trialunit.xml" />
+<SampleTypeId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/vocabularies/case_00201_add_sampletype.xml" />
+<TraitId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/vocabularies/case_00359_add_trait.xml" />
 <MeasurementDateTime Value="2011-01-15 14:28:37" />
 <InstanceNumber Value="6" />
 <TraitValue Value="40" />
 <StateReason Value="TEST" />
-<TrialUnitSpecimenId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/case_00525_get_trial_unit_spec_id.xml" />
+<TrialUnitSpecimenId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/experiments/case_00525_get_trial_unit_spec_id.xml" />
 </ROW>
 <ROW>
-<TrialUnitId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/case_00358_add_trialunit.xml" />
-<SampleTypeId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/case_00201_add_sampletype.xml" />
-<TraitId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/case_00606_add_trait_text.xml" />
+<TrialUnitId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/experiments/case_00358_add_trialunit.xml" />
+<SampleTypeId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/vocabularies/case_00201_add_sampletype.xml" />
+<TraitId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/vocabularies/case_00606_add_trait_text.xml" />
 <MeasurementDateTime Value="2011-01-15 14:28:37" />
 <InstanceNumber Value="6" />
 <TraitValue Value="It's not growing " />
 <StateReason Value="I was told it's &quot;&quot;Good&quot;&quot;" />
-<TrialUnitSpecimenId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/case_00525_get_trial_unit_spec_id.xml" />
+<TrialUnitSpecimenId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/experiments/case_00525_get_trial_unit_spec_id.xml" />
 </ROW>
 <ROW>
-<TrialUnitId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/case_00358_add_trialunit.xml" />
-<SampleTypeId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/case_00201_add_sampletype.xml" />
-<TraitId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/case_00359_add_trait.xml" />
+<TrialUnitId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/experiments/case_00358_add_trialunit.xml" />
+<SampleTypeId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/vocabularies/case_00201_add_sampletype.xml" />
+<TraitId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/vocabularies/case_00359_add_trait.xml" />
 <MeasurementDateTime Value="2011-01-15 14:28:37" />
 <InstanceNumber Value="6" />
 <TraitValue Value="16" />
 <StateReason Value="TEST" />
-<TrialUnitSpecimenId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/case_00590_get_trial_unit_spec_id_2.xml" />
+<TrialUnitSpecimenId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/experiments/case_00590_get_trial_unit_spec_id_2.xml" />
 </ROW>
 </DATA>

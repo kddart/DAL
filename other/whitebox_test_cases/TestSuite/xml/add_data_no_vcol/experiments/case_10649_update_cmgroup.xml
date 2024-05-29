@@ -1,0 +1,13 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Update Crossing Measurement Group" TargetURL="update/cmgroup/:CMGroupId" Type="BLOCKING" OutputFormat="JSON" />
+  <Delete TargetURL="delete/cmgroup/:CMGroupId" />
+  <INPUT ParaName="CMGroupId" SrcValue="xml/add_data_no_vcol/experiments/case_10646_import_cmgroup.xml" />
+  <INPUT ParaName="CMGroupName" PrefixVal="UPDATE_" Random="1" />
+  <INPUT ParaName="CMGroupNote" Value="" />
+  <INPUT ParaName="CMGroupStatus" Value="disable" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/experiments/case_10646_import_cmgroup.xml" Order="3" />
+</TestCase>

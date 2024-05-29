@@ -1,3 +1,33 @@
+Version 2.7.6
+Date: 29/05/2023
+Description: Bug Fixing Patch and Improvements
+
++ New import/extract/csv endpoint that will allow for extracts to be imported without plates.
+
++ Deployment scripts added for Debian 11. 
+
++ Configuration support added for OpenID authentication model. A key change is that now the session name is now defined by configuration, rather than hard coded as it was previously. 
+
++ Wider activity logging based on confiugration.
+
++ Fixing issue with user directory not being created correctly with wrong permission settings.
+
++ Fixed issue with Adding Taxonomy without parent.
+
++ Fixed issue with List Survey Trial unit related to locations and inclusion of Trial unit Specimens.
+
++ Updated import sample measurements to be more strict when involved with Surveys to ensure that the Trial Unit is attached to Survey given.
+
++ Updates to list trial unit specimen to include more information from Specimen table.
+
++ Fix to v2.6.0 to v2.7.0 upgrade script
+
+Instance Testing 
+
++ Tests have been reorganised in folders for more convenient access. 
+
++ Tests updated to test_order_all.txt. The number of tests that can be run at the start of deploy remains 482. VCol realted test remain at 47.  
+
 Version 2.7.5
 Date: 10/10/2023
 Description: Bug Fixing Patch and Improvements

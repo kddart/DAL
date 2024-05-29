@@ -1,14 +1,14 @@
 <TestCase>
   <CaseInfo CustomMethod="add_record" Description="Update humidity parameter mapping on autotest-wst01" TargetURL="update/parametermapping/:deviceid/:deviceparam/:layerattrib" Type="BLOCKING" />
   <INPUT ParaName="deviceid" Value="autotest-wst01" />
-  <INPUT ParaName="layerattrib" SrcValue="xml/add_data_no_vcol/case_00348_add_layer_attribute_hum.xml" />
+  <INPUT ParaName="layerattrib" SrcValue="xml/add_data_no_vcol/environment/case_00348_add_layer_attribute_hum.xml" />
   <INPUT ParaName="active" Value="0" />
   <INPUT ParaName="deviceparam" Value="humidity" />
   <Match Attr="StatusCode" Value="200" />
   <Match Attr="Message" Tag="Info" Value="regex(has been updated)" />
   <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
-  <Parent CaseFile="xml/add_data_no_vcol/case_00348_add_layer_attribute_hum.xml" Force="1" Order="3" />
-  <Parent CaseFile="xml/add_data_no_vcol/case_00352_map_dev_para_hum.xml" Force="1" Order="4" />
+  <Parent CaseFile="xml/add_data_no_vcol/environment/case_00348_add_layer_attribute_hum.xml" Force="1" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/configuration/case_00352_map_dev_para_hum.xml" Force="1" Order="4" />
   
 </TestCase>

@@ -1,31 +1,31 @@
 <DATA>
 <ROW>
-<ItemSourceId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/case_00102_add_con.xml" />
-<SpecimenId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/case_00446_add_specimen_1geno.xml" />
-<UnitId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/case_00225_add_item_unit.xml" />
-<ItemTypeId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/case_00308_add_item_type.xml" />
+<ItemSourceId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/configuration/case_00102_add_con.xml" />
+<SpecimenId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/germplasm/case_00446_add_specimen_1geno.xml" />
+<UnitId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/vocabularies/case_00225_add_item_unit.xml" />
+<ItemTypeId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/inventories/case_00308_add_item_type.xml" />
 <Amount Value="200" />
-<ItemStateId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/case_00309_add_item_state.xml" />
+<ItemStateId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/inventories/case_00309_add_item_state.xml" />
 <ItemNote Value="Note1" />
 <ItemBarcode Value="" ParaName="Value" PrefixVal="ITM_BAR_" Random="1" />
 </ROW>
 <ROW>
-<ItemSourceId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/case_00102_add_con.xml" />
-<SpecimenId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/case_00447_add_specimen_1geno_1.xml" />
-<UnitId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/case_00225_add_item_unit.xml" />
-<ItemTypeId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/case_00308_add_item_type.xml" />
+<ItemSourceId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/configuration/case_00102_add_con.xml" />
+<SpecimenId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/germplasm/case_00447_add_specimen_1geno_1.xml" />
+<UnitId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/vocabularies/case_00225_add_item_unit.xml" />
+<ItemTypeId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/inventories/case_00308_add_item_type.xml" />
 <Amount Value="200" />
-<ItemStateId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/case_00309_add_item_state.xml" />
+<ItemStateId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/inventories/case_00309_add_item_state.xml" />
 <ItemNote Value="Note2" />
 <ItemBarcode Value="" ParaName="Value" PrefixVal="ITM_BAR_" Random="1" />
 </ROW>
 <ROW>
-<ItemSourceId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/case_00102_add_con.xml" />
-<SpecimenId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/case_00447_add_specimen_1geno_1.xml" />
-<UnitId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/case_00225_add_item_unit.xml" />
-<ItemTypeId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/case_00308_add_item_type.xml" />
+<ItemSourceId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/configuration/case_00102_add_con.xml" />
+<SpecimenId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/germplasm/case_00447_add_specimen_1geno_1.xml" />
+<UnitId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/vocabularies/case_00225_add_item_unit.xml" />
+<ItemTypeId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/inventories/case_00308_add_item_type.xml" />
 <Amount Value="820" />
-<ItemStateId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/case_00309_add_item_state.xml" />
+<ItemStateId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/inventories/case_00309_add_item_state.xml" />
 <ItemNote Value="Note2" />
 <ItemBarcode Value="" />
 </ROW>

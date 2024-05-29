@@ -8,7 +8,7 @@ json/add_data_vcol/case_00006_add_site.xml
 json/add_data_vcol/case_01003_add_vcol_unitposition.xml
 json/add_data_vcol/case_00200_add_unitposition.xml
 json/add_data_vcol/case_01006_add_vcol_sampletype.xml
-json/add_data_vcol/case_00201_add_sampletype.xml
+json/add_data_vcol/vocabularies/case_00201_add_sampletype.xml
 json/add_data_vcol/case_01005_add_vcol_treatment.xml
 json/add_data_vcol/case_00119_add_treatment.xml
 json/add_data_vcol/case_00103_add_vcol_geno.xml

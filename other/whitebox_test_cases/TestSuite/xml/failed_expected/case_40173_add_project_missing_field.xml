@@ -11,7 +11,7 @@
   <Match Attr="TypeId" Tag="Error" Value="regex(missing)" />
   <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
-  <Parent CaseFile="xml/add_data_no_vcol/case_00394_add_project.xml" Force="1" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/configuration/case_00394_add_project.xml" Force="1" Order="3" />
   
   
 </TestCase>

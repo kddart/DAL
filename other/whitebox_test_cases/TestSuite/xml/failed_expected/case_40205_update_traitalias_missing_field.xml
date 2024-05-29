@@ -1,7 +1,7 @@
 <TestCase>
   <CaseInfo CustomMethod="add_record" Description="Update Traitalias" TargetURL="update/traitalias/_id" Type="BLOCKING" />
   <Delete TargetURL=":TraitId/delete/traitalias/:TraitAliasId" />
-  <INPUT ParaName="TraitId" SrcValue="xml/add_data_no_vcol/case_00359_add_trait.xml" />
+  <INPUT ParaName="TraitId" SrcValue="xml/add_data_no_vcol/vocabularies/case_00359_add_trait.xml" />
   <INPUT ParaName="TraitAliasCaption" Value="Testing Caption" />
   <INPUT ParaName="TraitAliasDescription" Value="Testing Description" />
   <INPUT ParaName="TraitAliasValueRuleErrMsg" Value="None" />
@@ -10,7 +10,7 @@
   <Match Attr="TraitAliasName" Tag="Error" Value="regex(missing)" />
   <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
-  <Parent CaseFile="xml/add_data_no_vcol/case_00359_add_trait.xml" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/vocabularies/case_00359_add_trait.xml" Order="3" />
   
   
 </TestCase>

@@ -1,0 +1,27 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Add a trait" TargetURL="add/trait" Type="BLOCKING" />
+  <Delete TargetURL="delete/trait/:TraitId" />
+  <INPUT ParaName="TraitName" PrefixVal="Trait_" Random="1" />
+  <INPUT ParaName="TraitLevel" Value="trialunit" />
+  <INPUT ParaName="TraitCaption" Value="Automatic testing trait" />
+  <INPUT ParaName="TraitDescription" Value="Trait used for automatic testing" />
+  <INPUT ParaName="TraitDataType" SrcValue="xml/add_data_no_vcol/vocabularies/case_00574_add_trait_data_type.xml" />
+  <INPUT ParaName="TraitValueMaxLength" Value="20" />
+  <INPUT ParaName="UnitId" SrcValue="xml/add_data_no_vcol/experiments/case_00397_add_item_unit4add_trait.xml" />
+  <INPUT ParaName="IsTraitUsedForAnalysis" Value="0" />
+  <INPUT ParaName="TraitValRule" Value="REGEX(.*)" />
+  <INPUT ParaName="TraitValRuleErrMsg" Value="Invalid value" />
+  <INPUT ParaName="AccessGroupId" SrcValue="xml/add_data_no_vcol/owngroup.xml" />
+  <INPUT ParaName="OwnGroupPerm" Value="7" />
+  <INPUT ParaName="AccessGroupPerm" Value="5" />
+  <INPUT ParaName="OtherPerm" Value="0" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Match Attr="ParaName" Tag="ReturnId" Value="TraitId" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/experiments/case_00397_add_item_unit4add_trait.xml" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/vocabularies/case_00574_add_trait_data_type.xml" Order="4" />
+  <ReturnId ParaName="TraitId" Value="4" />
+  
+</TestCase>

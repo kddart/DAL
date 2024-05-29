@@ -1,0 +1,20 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Update Specimen" TargetURL="update/specimen/:SpecimenId" Type="BLOCKING" />
+  <Delete TargetURL="delete/specimen/:SpecimenId" />
+  <INPUT ParaName="SpecimenId" SrcValue="xml/add_data_no_vcol/germplasm/case_00108_add_specimen.xml" />
+  <INPUT ParaName="SpecimenName" PrefixVal="Specimen_" Random="1" />
+  <INPUT ParaName="SpecimenBarcode" PrefixVal="" Random="1" />
+  <INPUT ParaName="BreedingMethodId" SrcValue="xml/add_data_no_vcol/germplasm/case_00380_add_breedmeth_4update_spec.xml" />
+  <INPUT ParaName="IsActive" Value="1" />
+  <INPUT ParaName="Pedigree" Value="" />
+  <INPUT ParaName="SelectionHistory" Value="" />
+  <INPUT ParaName="FilialGeneration" Value="" />
+  <INPUT ParaName="SpecimenNote" Value="Empty" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/germplasm/case_00108_add_specimen.xml" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/germplasm/case_00380_add_breedmeth_4update_spec.xml" Order="4" />
+  
+</TestCase>

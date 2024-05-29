@@ -14,12 +14,12 @@
   <Match Attr="ParaName" Tag="ReturnId" Value="AnalysisGroupId" />
   <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
-  <Parent CaseFile="xml/add_data_no_vcol/case_00302_add_extract.xml" Order="3" />
-  <Parent CaseFile="xml/add_data_no_vcol/case_00375_add_extract1.xml" Order="4" />
-  <Parent CaseFile="xml/add_data_no_vcol/case_00376_add_extract2.xml" Order="5" />
-  <Parent CaseFile="xml/add_data_no_vcol/case_00377_add_extract3.xml" Order="6" />
-  <Parent CaseFile="xml/add_data_no_vcol/case_00378_add_extract4.xml" Order="7" />
-  <Parent CaseFile="xml/add_data_no_vcol/case_00379_add_extract5.xml" Order="8" />
+  <Parent CaseFile="xml/add_data_no_vcol/markers/case_00302_add_extract.xml" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/markers/case_00375_add_extract1.xml" Order="4" />
+  <Parent CaseFile="xml/add_data_no_vcol/markers/case_00376_add_extract2.xml" Order="5" />
+  <Parent CaseFile="xml/add_data_no_vcol/markers/case_00377_add_extract3.xml" Order="6" />
+  <Parent CaseFile="xml/add_data_no_vcol/markers/case_00378_add_extract4.xml" Order="7" />
+  <Parent CaseFile="xml/add_data_no_vcol/markers/case_00379_add_extract5.xml" Order="8" />
   <Parent CaseFile="xml/add_data_vcol/case_01019_add_vcol_analysisgroup.xml" Force="1" Order="9" />
   <ReturnId ParaName="AnalysisGroupId" Value="4" />
 

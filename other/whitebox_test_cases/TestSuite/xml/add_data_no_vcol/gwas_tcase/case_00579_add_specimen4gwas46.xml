@@ -3,7 +3,7 @@
   <Delete TargetURL="delete/specimen/:SpecimenId" />
   <INPUT ParaName="SpecimenName" PrefixVal="86_" Random="1" />
   <INPUT ParaName="SpecimenBarcode" PrefixVal="" Random="1" />
-  <INPUT ParaName="BreedingMethodId" SrcValue="xml/add_data_no_vcol/case_00208_add_breeding_method.xml" />
+  <INPUT ParaName="BreedingMethodId" SrcValue="xml/add_data_no_vcol/vocabularies/case_00208_add_breeding_method.xml" />
   <INPUT ParaName="IsActive" Value="1" />
   <INPUT ParaName="Pedigree" Value="" />
   <INPUT ParaName="SelectionHistory" Value="" />
@@ -15,7 +15,7 @@
   <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
   <Parent CaseFile="xml/add_data_no_vcol/gwas_tcase/case_00580_add_geno4gwas46.xml" Order="3" />
-  <Parent CaseFile="xml/add_data_no_vcol/case_00208_add_breeding_method.xml" Order="5" />
+  <Parent CaseFile="xml/add_data_no_vcol/vocabularies/case_00208_add_breeding_method.xml" Order="5" />
   <ReturnId ParaName="SpecimenId" Value="19" />
   
 </TestCase>

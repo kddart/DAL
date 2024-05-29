@@ -1,0 +1,23 @@
+#
+# DAL Deployment script for CentOS 7
+# Copyright (c) 2023, Diversity Arrays Technology, All rights reserved.
+#
+# Author: Puthick Hok
+# Date: 23/06/2017
+# Description: Supporting ansible playbook script
+#
+
+- name: Change ower and group manually for config file
+  shell: chown apache:apache {{ apache_base_dir }}/secure/kddart_dal.cfg
+
+- name: Restart mysql
+  shell: systemctl restart mysqld
+
+- name: Restart postgresql
+  shell: systemctl restart postgresql-9.5
+
+- name: Restart apache
+  shell: systemctl restart httpd
+
+- name: Restart solr
+  shell: /etc/init.d/solr restart

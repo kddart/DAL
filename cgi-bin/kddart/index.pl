@@ -3,7 +3,7 @@
 #$Id$
 #$Author$
 
-# Copyright (c) 2011, Diversity Arrays Technology, All rights reserved.
+# Copyright (c) 2024, Diversity Arrays Technology, All rights reserved.
 
 # Author    : Puthick Hok
 # Created   : 02/06/2010
@@ -843,6 +843,10 @@ CGI::Application::Dispatch->dispatch(
 
     'add/plate/n/extract'                               => { app => 'KDDArT::DAL::Extract',
                                                              rm  => 'add_plate_n_extract_gadmin' },
+
+    'import/extract/csv'                                => { app => 'KDDArT::DAL::Extract',
+                                                             rm  => 'import_extract_csv' },
+
 
     'import/plate/n/extract/xml'                        => { app => 'KDDArT::DAL::Extract',
                                                              rm  => 'import_plate_n_extract_gadmin' },

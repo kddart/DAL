@@ -1,0 +1,17 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Update Breeding Method" TargetURL="update/breedingmethod/:BreedingMethodId" Type="BLOCKING" />
+  <Delete TargetURL="delete/breedingmethod/:BreedingMethodId" />
+  <INPUT ParaName="BreedingMethodId" SrcValue="xml/add_data_no_vcol/case_00208_add_breeding_method.xml" />
+  <INPUT ParaName="BreedingMethodName" PrefixVal="Updated BreedMethod_" Random="1" />
+  <INPUT ParaName="BreedingMethodTypeId" SrcValue="xml/add_data_no_vcol/vocabularies/case_00481_add_breedingmethod_type.xml" />
+  <INPUT ParaName="BreedingMethodSymbol" Value="*" />
+  <INPUT SrcName="xml/add_data_vcol/case_01225_add_vcol_breedingmethod.xml" Value="Extra data" Virtual="1" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/case_00208_add_breeding_method.xml" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/vocabularies/case_00481_add_breedingmethod_type.xml" Order="4" />
+  <Parent CaseFile="xml/add_data_vcol/case_01225_add_vcol_breedingmethod.xml" Order="5" />
+  
+</TestCase>

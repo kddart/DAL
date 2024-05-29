@@ -1,0 +1,25 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record_upload" Description="Import sample measurement" TargetURL="import/samplemeasurement/csv" Type="BLOCKING" />
+  <INPUT ParaName="TrialUnitId" Value="0" />
+  <INPUT ParaName="SampleTypeId" Value="1" />
+  <INPUT ParaName="TraitId" Value="2"  />
+  <INPUT ParaName="MeasureDateTime" Value="3" />
+  <INPUT ParaName="InstanceNumber" Value="4" />
+  <INPUT ParaName="TraitValue" Value="5" />
+  <INPUT ParaName="StateReason" Value="6" />
+  <INPUT ParaName="TrialUnitSpecimenId" Value="7" />
+  <INPUT SrcXML="xml/add_data_no_vcol/samplemeasurement_1.xml" Transform="1" XSL="xml/add_data_no_vcol/samplemeasurement_1.xsl" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/experiments/case_00358_add_trialunit.xml" Force="1" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/experiments/case_00525_get_trial_unit_spec_id.xml" Force="1" Order="4" />
+  <Parent CaseFile="xml/add_data_no_vcol/experiments/case_00590_get_trial_unit_spec_id_2.xml" Force="1" Order="5" />
+  <Parent CaseFile="xml/add_data_no_vcol/vocabularies/case_00359_add_trait.xml" Force="1" Order="6" />
+  <Parent CaseFile="xml/add_data_no_vcol/vocabularies/case_00606_add_trait_text.xml" Order="7" />
+  <Parent CaseFile="xml/add_data_no_vcol/vocabularies/case_00201_add_sampletype.xml" Order="8" />
+  <Parent CaseFile="xml/add_data_no_vcol/vocabularies/case_00467_add_trialtrait4import_samplemeasurement.xml" Force="1" Order="9" />
+  <Parent CaseFile="xml/add_data_no_vcol/vocabularies/case_00607_add_trialtrait4import_samplemeasurement.xml" Force="1" Order="10" />
+  <Parent CaseFile="xml/add_data_no_vcol/experiments/case_00525_get_trial_unit_spec_id.xml" Force="1" Order="11" />
+</TestCase>

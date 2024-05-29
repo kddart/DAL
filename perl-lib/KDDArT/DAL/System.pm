@@ -1,7 +1,7 @@
 #$Id$
 #$Author$
 
-# Copyright (c) 2011, Diversity Arrays Technology, All rights reserved.
+# Copyright (c) 2024, Diversity Arrays Technology, All rights reserved.
 
 # Author    : Puthick Hok
 # Created   : 02/06/2010
@@ -39,13 +39,14 @@ use Crypt::Random qw( makerandom );
 use JSON::XS qw(encode_json decode_json);
 use XML::Checker::Parser;
 use Config::Simple;
+use File::Lockfile;
 
 
 sub setup {
 
   my $self = shift;
 
-  CGI::Session->name("KDDArT_DAL_SESSID");
+  CGI::Session->name($COOKIE_NAME);
 
   __PACKAGE__->authen->init_config_parameters();
   __PACKAGE__->authen->check_login_runmodes(':all');
@@ -384,6 +385,52 @@ sub add_user_runmode {
     $user_id = $dbh_write->last_insert_id(undef, undef, 'systemuser', 'UserId');
     $self->logger->debug("UserId: $user_id");
   }
+
+  my $doc_root            = $ENV{'DOCUMENT_ROOT'};
+  my $htaccess_file_path  = "${doc_root}/data/$username";
+  my $current_runmode     = $self->get_current_runmode();
+  my $lock_filename       = "${current_runmode}.lock";
+  my $filename            = ".htaccess";
+  my $htaccess_file       = "${htaccess_file_path}/${filename}";
+    
+  $self->logger->debug("User Name: $username");
+  $self->logger->debug("Document root: $doc_root");
+  $self->logger->debug("htaccess_file_path: $htaccess_file_path");
+  $self->logger->debug("filename: $filename");
+  if ( !(-e $htaccess_file_path) ) {
+
+    mkdir($htaccess_file_path) or die "Cannot create directory $htaccess_file_path: $!";
+  }
+
+  my $lockfile = File::Lockfile->new($lock_filename, $htaccess_file_path);
+
+  my $pid = $lockfile->check();
+
+  if ($pid) {
+
+    $self->logger->debug("$lock_filename exists in $htaccess_file_path");
+    my $msg = 'Lockfile exists: either another process of this export   is running or ';
+    $msg   .= 'there was an unexpected error regarding clearing this  lockfile.';
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' =>  $msg}]};
+
+    return $data_for_postrun_href;
+  }
+  $lockfile->write();
+
+  $self->logger->debug("htaccess: $htaccess_file");
+
+  # Open the file for writing
+  open(my $fh, ">$htaccess_file") or die "Can't open $htaccess_file for writing: $!";
+
+  # Write the content to the file
+  print $fh "require user $username\n";
+
+  # Close the file handle
+  close ($fh);
+
+  $self->logger->debug("File $htaccess_file created successfully.");
 
   $sth->finish();
 

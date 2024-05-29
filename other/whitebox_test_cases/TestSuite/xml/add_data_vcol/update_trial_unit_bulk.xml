@@ -1,7 +1,7 @@
 <DATA>
-<trialunit TrialUnitId="" ParaName="TrialUnitId" SrcValue="xml/add_data_no_vcol/case_00358_add_trialunit.xml" TrialUnitX="1" TrialUnitY="1" SampleSupplierId="0" TrialUnitNote="Bulk Update" ReplicateNumber="0" trialunitlocation="POINT(149.09269513467962 -35.30485280695332)" NextLevelProccessTag="trialunitspecimen trialunitfactor" >
-<trialunitspecimen SpecimenId="" ParaName="SpecimenId" SrcValue="xml/add_data_no_vcol/case_00114_add_specimen1.xml" Notes="none" HarvestDate="2015-12-01" PlantDate="2011-09-01" SpecimenNumber="1" TUSLabel="Plant1" />
-<trialunitspecimen SpecimenId="" ParaName="SpecimenId" SrcValue="xml/add_data_no_vcol/case_00114_add_specimen1.xml" Notes="none" HarvestDate="2015-12-01" PlantDate="2011-09-01" SpecimenNumber="2" TUSLabel="Plant2" />
+<trialunit TrialUnitId="" ParaName="TrialUnitId" SrcValue="xml/add_data_no_vcol/experiments/case_00358_add_trialunit.xml" TrialUnitX="1" TrialUnitY="1" SampleSupplierId="0" TrialUnitNote="Bulk Update" ReplicateNumber="0" trialunitlocation="POINT(149.09269513467962 -35.30485280695332)" NextLevelProccessTag="trialunitspecimen trialunitfactor" >
+<trialunitspecimen SpecimenId="" ParaName="SpecimenId" SrcValue="xml/add_data_no_vcol/germplasm/case_00114_add_specimen1.xml" Notes="none" HarvestDate="2015-12-01" PlantDate="2011-09-01" SpecimenNumber="1" TUSLabel="Plant1" />
+<trialunitspecimen SpecimenId="" ParaName="SpecimenId" SrcValue="xml/add_data_no_vcol/germplasm/case_00114_add_specimen1.xml" Notes="none" HarvestDate="2015-12-01" PlantDate="2011-09-01" SpecimenNumber="2" TUSLabel="Plant2" />
 <trialunitfactor FactorId="" ParaName="FactorId" SrcValue="xml/add_data_vcol/case_01104_add_vcol_trialunit.xml" FactorValue="Update Trial Unit Extra Data"/>
 </trialunit>
 </DATA>

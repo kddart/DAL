@@ -1,0 +1,12 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Update Treatment" TargetURL="update/treatment/:TreatmentId" Type="BLOCKING" />
+  <Delete TargetURL="delete/treatment/:TreatmentId" />
+  <INPUT ParaName="TreatmentId" SrcValue="xml/add_data_no_vcol/vocabularies/case_00119_add_treatment.xml" />
+  <INPUT ParaName="TreatmentText" PrefixVal="Removing weeds (UPDATED)" Random="1" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/vocabularies/case_00119_add_treatment.xml" />
+  
+</TestCase>

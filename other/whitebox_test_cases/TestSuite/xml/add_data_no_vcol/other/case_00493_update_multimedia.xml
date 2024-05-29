@@ -1,0 +1,17 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Update Multimedia" TargetURL="update/multimedia/:MultimediaId" Type="BLOCKING" />
+  <INPUT ParaName="MultimediaId" SrcValue="xml/add_data_no_vcol/other/case_00400_add_multimedia.xml" />
+  <INPUT ParaName="FileType" SrcValue="xml/add_data_no_vcol/vocabularies/case_00401_add_filetype.xml" />
+  <INPUT ParaName="RecordId" SrcValue="xml/add_data_no_vcol/germplasm/case_00361_add_geno3.xml" />
+  <INPUT ParaName="MultimediaNote" Value="Testing framework - UPDATED NOTE" />
+  <INPUT ParaName="Force" Value="1" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successful)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/germplasm/case_00361_add_geno3.xml" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/vocabularies/case_00401_add_filetype.xml" Order="4" />
+  <Parent CaseFile="xml/add_data_no_vcol/other/case_00400_add_multimedia.xml" Order="5" />
+  
+  
+</TestCase>

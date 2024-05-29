@@ -2,7 +2,7 @@ README file for KDDart deployment using ansible on RedHat 7 based distribution
 ==============================================================================
 This document provides a basic explanation on how to run a Ansible playbook script to deploy KDDart DAL in RedHat 7 based distribution. It also lists the basic requirements to run the Ansible playbook script. This deployment script has been tested on OpenSuse Leap 15.4.
 
-The main Ansible playbook script is kddart_dal_v2_6_0_server_deployment_leap15.yml in this directory.
+The main Ansible playbook script is kddart_dal_v2_7_0_server_deployment_leap15.yml in this directory.
 
 Basic Requirements
 ------------------
@@ -58,7 +58,7 @@ and replace x.x.x.x with the IP address of the target machine
 
 8. Run ansible-playbook kddart_dal_v2_7_0_server_deployment_leap15.yml or kddart_dal_v2_7_0_server_deployment_leap1-15.4.yml (for OpenSuse 15.4 due to differences in Python) It is recommended you use --extra-vars flag to streamline some of the variables that need to be changed.
 
-ansible-playbook kddart_dal_v2_7_0_server_deployment_leap.yml --extra-vars="local_tar_gz_file='dal.tar.gz' dbpass='securepassword2023$' ip_network='192.18.18.18/23' dal_address_name='kddart.example.com'"
+ansible-playbook kddart_dal_v2_7_0_server_deployment_leap.yml --extra-vars="local_tar_gz_file='dal.tar.gz' ip_network='192.18.18.18/23' dal_address_name='kddart.example.com'"
 
 Note: ip_network in the ansible script should include the subnet mask (e.g. 192.18.18.18/23)
 

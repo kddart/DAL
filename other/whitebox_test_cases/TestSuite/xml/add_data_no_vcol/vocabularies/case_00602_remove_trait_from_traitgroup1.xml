@@ -1,0 +1,11 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Remove Trait from Trait Group" TargetURL="traitgroup/:TraitGroupId/remove/trait/:TraitId" Type="BLOCKING" />
+  <INPUT ParaName="TraitGroupId" SrcValue="xml/add_data_no_vcol/vocabularies/case_00595_add_traitgroup.xml" />
+  <INPUT ParaName="TraitId" SrcValue="xml/add_data_no_vcol/experiments/case_00364_add_trait4trial2.xml" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/vocabularies/case_00595_add_traitgroup.xml" Order="3" />
+  
+</TestCase>

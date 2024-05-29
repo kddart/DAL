@@ -22,7 +22,7 @@ xml/failed_expected/update/case_10174_update_parent_type.xml
 xml/failed_expected/update/case_10089_update_trialtrait.xml
 xml/failed_expected/update/case_00437_update_trait_no_trait_group_type.xml
 xml/failed_expected/update/case_00220_update_pedigree.xml
-xml/failed_expected/update/case_10150_update_sample_type.xml
+xml/failed_expected/update/vocabularies/case_10150_update_sample_type.xml
 xml/failed_expected/update/case_10153_update_container_type.xml
 xml/failed_expected/update/case_00380_add_breedmeth_4update_spec.xml
 xml/failed_expected/update/case_20002_update_project.xml

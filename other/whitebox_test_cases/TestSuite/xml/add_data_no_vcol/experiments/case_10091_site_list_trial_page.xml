@@ -1,0 +1,13 @@
+<TestCase>
+  <CaseInfo Description="List Site Trial Page" TargetURL="site/:SiteId/list/trial/:nperpage/page/:num" Type="BLOCKING" />
+  <Delete TargetURL="delete/site/:SiteId" />
+  <INPUT ParaName="num" Value="1" />
+  <INPUT ParaName="nperpage" Value="50" />
+  <INPUT ParaName="SiteId" SrcValue="xml/add_data_no_vcol/experiments/case_00006_add_site.xml" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="COUNT" Tag="Trial" TargetDataType="MULTI" Value="boolex(x&gt;0)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/experiments/case_00006_add_site.xml" Order="3" />
+  
+</TestCase>

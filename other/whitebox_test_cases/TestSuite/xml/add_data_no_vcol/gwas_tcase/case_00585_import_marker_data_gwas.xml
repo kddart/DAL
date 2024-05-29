@@ -1,7 +1,7 @@
 <TestCase>
   <CaseInfo CustomMethod="add_record_upload" Description="Import Marker Data" TargetURL="analysisgroup/:AnalysisGroupId/import/markerdata/csv" Type="BLOCKING" />
   <INPUT ParaName="AnalysisGroupId" SrcValue="xml/add_data_no_vcol/gwas_tcase/case_00584_add_analysisgroup_gwas.xml" />
-  <INPUT ParaName="DataSetType" SrcValue="xml/add_data_no_vcol/case_00473_add_datasettype.xml" />
+  <INPUT ParaName="DataSetType" SrcValue="xml/add_data_no_vcol/vocabularies/case_00473_add_datasettype.xml" />
   <INPUT ParaName="Forced" Value="1" />
   <INPUT ParaName="HeaderRow" Value="0" />
   <INPUT ParaName="MarkerNameCol" Value="0" />
@@ -434,7 +434,7 @@
   <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
   <Parent CaseFile="xml/add_data_no_vcol/gwas_tcase/case_00584_add_analysisgroup_gwas.xml" Order="423" />
-  <Parent CaseFile="xml/add_data_no_vcol/case_00473_add_datasettype.xml" Order="424" />
+  <Parent CaseFile="xml/add_data_no_vcol/vocabularies/case_00473_add_datasettype.xml" Order="424" />
   <Parent CaseFile="xml/add_data_no_vcol/gwas_tcase/case_00583_add_extract4gwas2.xml" Order="5" />
   <Parent CaseFile="xml/add_data_no_vcol/gwas_tcase/case_00583_add_extract4gwas3.xml" Order="6" />
   <Parent CaseFile="xml/add_data_no_vcol/gwas_tcase/case_00583_add_extract4gwas4.xml" Order="7" />

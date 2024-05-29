@@ -1,0 +1,12 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Delete KeywordGroup" TargetURL="delete/keywordgroup/:KeywordGroupId" Type="BLOCKING" />
+  <INPUT ParaName="KeywordGroupId" SrcValue="xml/add_data_no_vcol/vocabularies/case_00522_add_keyword_group4deletion.xml" />
+  <INPUT ParaName="KeywordId" SrcValue="xml/add_data_no_vcol/vocabularies/case_00515_add_keyword.xml" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/vocabularies/case_00522_add_keyword_group4deletion.xml" Force="1" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/vocabularies/case_00523_remove_keyword_from_group4deletion.xml" Force="1" Order="4" />
+  
+</TestCase>

@@ -1,0 +1,11 @@
+<TestCase>
+	<CaseInfo Description="List Trial Workflow" TargetURL="trial/:id/list/workflow" Type="BLOCKING" />
+  <Delete TargetURL="delete/site/:SiteId" />
+  <INPUT ParaName="TrialId" SrcValue="xml/add_data_no_vcol/experiments/case_00500_add_trialworkflow.xml" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/experiments/case_00500_add_trialworkflow.xml" Order="3" />
+
+</TestCase>
+ 
+

@@ -1,0 +1,16 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record_upload" Description="Add Multimedia for Extract" TargetURL="extract/:ExtractId/add/multimedia" Type="BLOCKING" />
+  <INPUT ParaName="ExtractId" SrcValue="xml/add_data_no_vcol/markers/case_00302_add_extract.xml" />
+  <INPUT ParaName="FileType" SrcValue="xml/add_data_no_vcol/vocabularies/case_00402_add_filetype1.xml" />
+  <INPUT ParaName="FileExtension" Value="txt" />
+  <INPUT ParaName="uploadfile" SrcFile="xml/add_data_no_vcol/extract_file.txt" />
+  <INPUT ParaName="Force" Value="1" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successful)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/markers/case_00302_add_extract.xml" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/vocabularies/case_00402_add_filetype1.xml" Order="4" />
+  <ReturnId ParaName="MultimediaId" Value="5" />
+  
+</TestCase>

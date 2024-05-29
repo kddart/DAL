@@ -1,0 +1,19 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record_upload" Description="Update Analysisgroup" OutputFormat="JSON" TargetURL="update/analysisgroup/:AnalysisGroupId" Type="BLOCKING" />
+  <Delete TargetURL="delete/analysisgroup/:AnalysisGroupId" />
+  <INPUT ParaName="AnalysisGroupName" PrefixVal="Analsysigroup_" Random="1" />
+  <INPUT ParaName="OwnGroupPerm" Value="7" />
+  <INPUT ParaName="AccessGroupPerm" Value="5" />
+  <INPUT ParaName="AccessGroupId" Value="0" />
+  <INPUT ParaName="OtherPerm" Value="0" />
+  <INPUT ParaName="AnalysisGroupDescription" Value="TestTestTest" />
+  <INPUT ParaName="ContactId" Value="22" />
+  <INPUT ParaName="DateCreated" Value="2023-03-20 13:00:00" />
+  <INPUT ParaName="DateUpdated" Value="2023-03-20 13:00:00" />
+  <INPUT ParaName="AnalysisGroupId" SrcValue="xml/add_data_no_vcol/markers/case_00303_add_analysisgroup.xml" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/markers/case_00303_add_analysisgroup.xml" Order="3" />
+</TestCase>

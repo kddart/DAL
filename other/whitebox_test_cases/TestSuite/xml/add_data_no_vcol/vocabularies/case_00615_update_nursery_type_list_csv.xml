@@ -1,0 +1,13 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Update Nursery Type List CSV" OutputFormat="JSON" TargetURL="update/nurserytypelistcsv" Type="BLOCKING" />
+  <INPUT ParaName="TypeId1" SrcValue="xml/add_data_no_vcol/configuration/case_00616_add_nursery_type1.xml" />
+  <INPUT ParaName="TypeId2" SrcValue="xml/add_data_no_vcol/configuration/case_00617_add_nursery_type2.xml" />
+  <INPUT ParaName="NurseryTypeListCSV" Value="|:TypeId1:|,|:TypeId2:|" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/configuration/case_00616_add_nursery_type1.xml" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/configuration/case_00617_add_nursery_type2.xml" Order="4" />
+  
+</TestCase>

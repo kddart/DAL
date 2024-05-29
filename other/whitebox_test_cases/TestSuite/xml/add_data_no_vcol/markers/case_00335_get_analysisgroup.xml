@@ -1,0 +1,11 @@
+<TestCase>
+  <CaseInfo Description="Get Analysis Group" TargetURL="get/analysisgroup/:AnalysisGroupId" Type="BLOCKING" />
+  <INPUT ParaName="AnalysisGroupId" SrcValue="xml/add_data_no_vcol/markers/case_00303_add_analysisgroup.xml" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="COUNT" Tag="AnalysisGroup" TargetDataType="MULTI" Value="boolex(x&gt;0)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/login_testuser/case_00204_switch_extra_data_off.xml" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/markers/case_00303_add_analysisgroup.xml" Order="4" />
+  
+</TestCase>

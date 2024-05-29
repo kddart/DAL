@@ -1,11 +1,11 @@
 #$Id$
 #$Author$
 
-# Copyright (c) 2011, Diversity Arrays Technology, All rights reserved.
+# Copyright (c) 2024, Diversity Arrays Technology, All rights reserved.
 
 # Author    : Puthick Hok
 # Created   : 02/06/2010
-# Modified  :
+# Modified  : 18/01/2024
 # Purpose   :
 #
 #
@@ -46,6 +46,8 @@ use HTTP::Request::Common qw(POST GET);
 use JSON qw(decode_json);
 use CGI::Session;
 
+use Data::Dumper;
+use Crypt::JWT qw(decode_jwt);
 
 BEGIN {
 
@@ -60,7 +62,7 @@ sub setup {
 
   my $self = shift;
 
-  CGI::Session->name("KDDArT_DAL_SESSID");
+  CGI::Session->name($COOKIE_NAME);
 
   my $start_time = [gettimeofday()];
 
@@ -109,6 +111,7 @@ sub setup {
 
   my $domain_name = $COOKIE_DOMAIN->{$ENV{DOCUMENT_ROOT}};
   $self->logger->debug("COOKIE DOMAIN: $domain_name");
+  $self->logger->debug("COOKIE NAME: $COOKIE_NAME");
 
   $self->authen->config(LOGIN_URL => '');
   $self->session_config(
@@ -146,6 +149,7 @@ sub login_runmode {
 }
 =cut
 
+
   my $self       = shift;
 
   my $username   = $self->param('username');
@@ -158,219 +162,422 @@ sub login_runmode {
   $self->logger->debug("Username: $username");
   $self->logger->debug("Random number: $rand");
 
-  my $dbh = connect_kdb_read();
-  my $sql;
+  my $data_for_postrun_href = {};
 
-  $sql  = 'SELECT systemuser.UserPassword, systemuser.UserId ';
-  $sql .= 'FROM systemuser ';
-  $sql .= 'WHERE systemuser.UserName=?';
+  my $write_token_aref    = [];
+  my $session_token_aref  = [];
+  my $user_info_aref      = [];
 
-  my $sth = $dbh->prepare($sql);
-  $sth->execute($username);
+  my $domain_name = $COOKIE_DOMAIN->{$ENV{DOCUMENT_ROOT}};
 
   my $err = 0;
   my $err_msg = '';
   my $write_token;
   my $user_id;
+  my $new_db_session_id = '';
   my $sess_id = '';
   my $rand_number = '';
 
-  my $domain_name = $COOKIE_DOMAIN->{$ENV{DOCUMENT_ROOT}};
-  $self->logger->debug("COOKIE DOMAIN: $domain_name");
 
-  if ( !$dbh->err() ) {
+  my $extra_data_status = 0;    # By default, DAL does not return SystemGroup and Operation tags.
+                                # However, this can be switched on.
 
-    my $pass_db = '';
-    my $gadmin_status;
-    $sth->bind_col(1, \$pass_db);
-    $sth->bind_col(2, \$user_id);
+  my $session_id = $self->session->id();
+  my $now = time();
+  my $cur_dt = DateTime->now( time_zone => $TIMEZONE );
+  $cur_dt = DateTime::Format::MySQL->format_datetime($cur_dt);
 
-    $sth->fetch();
-    $sth->finish();
 
-    if (length($pass_db) > 0) {
+  if ( lc($AUTHENTICATOR_SOURCE) eq 'openid' ) {
 
-      my $session_pass_db = hmac_sha1_hex($rand, $pass_db);
-      my $signature_db = hmac_sha1_hex($url, $session_pass_db);
+    my $browser = LWP::UserAgent->new();
+    my $open_id_param = [];
 
-      if ($signature_db eq $signature) {
+    push(@{$open_id_param}, 'grant_type' => 'password');
+    push(@{$open_id_param}, 'client_id'  => $CLIENTID4OPENID_URL);
+    push(@{$open_id_param}, 'username'   => $username);
+    push(@{$open_id_param}, 'password'   => "${rand}:::${signature}");
 
-        my $start_time = [gettimeofday()];
-        my $cookie_only_rand = makerandom(Size => 32, Strength => 0);
+    my $req = POST($OPENID_URL, $open_id_param);
+    my $response = $browser->request($req);
 
-        $rand_number = $cookie_only_rand;
+    my $result = $response->content();
+    $self->logger->debug("signature: $signature - random number: $rand");
+    $self->logger->debug("response code: " . $response->code());
+    $self->logger->debug("response : " . $result);
 
-        my $f_rand_elapsed = tv_interval($start_time);
-        $self->logger->debug("First random number elapsed: $f_rand_elapsed");
+    if ( $response->is_success ) {
 
-        $self->logger->debug("Password in DB: $pass_db");
+      my $success_data = undef;
 
-        my $session_id = $self->session->id();
+      eval {
 
-        $sess_id = $session_id;
+        $success_data = decode_json($result);
+      };
 
-        my $now = time();
+      if ( ! defined $success_data ) {
 
-        $start_time = [gettimeofday()];
-        my $write_token_rand = makerandom(Size => 128, Strength => 0);
-        my $s_rand_elapsed = tv_interval($start_time);
-        $self->logger->debug("Second random number elapsed: $s_rand_elapsed");
-
-        $write_token = hmac_sha1_hex("$cookie_only_rand", "$write_token_rand");
-
-        my $group_id          = -99;  # Not set at this stage
-        my $gadmin_status     = -99;  # But needs protection from modification from here on
-        my $extra_data_status = 0;    # By default, DAL does not return SystemGroup and Operation tags.
-                                      # However, this can be switched on.
-        my $hash_data = '';
-        $hash_data   .= "$username";
-        $hash_data   .= "$session_id";
-        $hash_data   .= "$rememberme";
-        $hash_data   .= "$write_token";
-        $hash_data   .= "$group_id";
-        $hash_data   .= "$user_id";
-        $hash_data   .= "$gadmin_status";
-
-        my $session_checksum = hmac_sha1_hex($hash_data, "$cookie_only_rand");
-
-        $self->authen->store->save( 'USERNAME'       => $username,
-                                    'LOGIN_ATTEMPTS' => 0,
-                                    'LAST_LOGIN'     => $now,
-                                    'LAST_ACCESS'    => $now,
-                                    'REMEMBER_ME'    => $rememberme,
-                                    'CHECKSUM'       => $session_checksum,
-                                    'WRITE_TOKEN'    => $write_token,
-                                    'GROUP_ID'       => $group_id,
-                                    'USER_ID'        => $user_id,
-                                    'GADMIN_STATUS'  => $gadmin_status,
-                                    'EXTRA_DATA'     => $extra_data_status,
-            );
-
-        my $cookie = $q->cookie(
-          -name        => 'KDDArT_RANDOM_NUMBER',
-          -domain      => $domain_name,
-          -value       => "$cookie_only_rand",
-          -expires     => '+10y',
-            );
-
-        my $sessid_cookie = $q->cookie(
-                                       -name        => 'KDDArT_DAL_SESSID',
-                                       -domain      => $domain_name,
-                                       -value       => "$session_id",
-                                       -expires     => '+10y',
-                                      );
-
-        my $dbh_write = connect_kdb_write();
-
-        my $cur_dt = DateTime->now( time_zone => $TIMEZONE );
-        $cur_dt = DateTime::Format::MySQL->format_datetime($cur_dt);
-
-        $sql  = 'UPDATE systemuser SET ';
-        $sql .= 'LastLoginDateTime=? ';
-        $sql .= 'WHERE UserId=?';
-
-        $sth = $dbh_write->prepare($sql);
-        $sth->execute($cur_dt, $user_id);
-        $sth->finish();
-
-        log_activity($dbh_write, $user_id, 0, 'LOGIN');
-        $dbh_write->disconnect();
-
-        $self->header_add(-cookie => [$sessid_cookie, $cookie]);
-
-        $self->logger->debug("$username");
-        $self->logger->debug("random number: $cookie_only_rand");
-        $self->logger->debug("checksum: $session_checksum");
+        my $err_str = $result;
+        $self->logger->debug("OpenId failure error and cannot parse json return: $err_str");
+        $err = 1;
+        $err_msg = "Unexpected error.";
       }
       else {
 
-        my $now = time();
+        my $access_token = $success_data->{"access_token"};
+        my $refresh_token = $success_data->{"refresh_token"};
 
-        my $sessid_cookie = $q->cookie(
-                                       -name        => 'KDDArT_DAL_SESSID',
-                                       -domain      => $domain_name,
-                                       -value       => '',
-                                       -expires     => '+10y',
-            );
+        my $access_token_json_txt = `jq -R 'split(".") | .[1] | \@base64d | fromjson' <<< \$(echo "$access_token")`;
+        $self->logger->debug("access token json: $access_token_json_txt");
+        #my ($jwt_access_token_header, $jwt_access_token_data) = decode_jwt(token => $access_token, decode_header => 1, key_from_jwk_header => 1);
+        my $jwt_access_token_data = decode_json($access_token_json_txt);
 
-        my $cookie = $q->cookie(
-          -name        => 'KDDArT_RANDOM_NUMBER',
-          -domain      => $domain_name,
-          -value       => '',
-          -expires     => '+10y',
-            );
+        $new_db_session_id = $jwt_access_token_data->{"ONEDART_SESSION_TOKEN"};
+        $write_token = $jwt_access_token_data->{"WRITE_TOKEN"};
+        my $ecommerce_base_url = $jwt_access_token_data->{"ECOMMERCEBASEURL"};
 
-        my $login_attemps = $self->authen->store->fetch('LOGIN_ATTEMPTS');
-        $login_attemps += 1;
+        my $session_dbh = connect_session_db();
 
-        $self->authen->store->save( 'USERNAME'       => '',
-                                    'LOGIN_ATTEMPTS' => $login_attemps,
-                                    'LAST_LOGIN'     => $now,
-                                    'LAST_ACCESS'    => $now,
-                                    'CHECKSUM'       => '',
-                                    'GROUP_ID'       => '',
-                                    'USER_ID'        => '',
-                                    'GADMIN_STATUS'  => '',
-                                    'EXTRA_DATA'     => '0',
-            );
+        my $sql = 'SELECT kddartuserid, kddartgroupid, kddartgroupadminstatus ';
+        $sql   .= 'FROM Session WHERE onedartsession=?';
 
-        $self->header_add(-cookie => [$sessid_cookie, $cookie]);
+        my ($read_session_err, $read_session_msg, $session_aref) = read_data($session_dbh, $sql, [$new_db_session_id]);
 
-        $self->logger->debug("Password signature verification failed db: $signature_db, user: $signature");
+        $session_dbh->disconnect();
+
+        if ( $read_session_err ) {
+
+          my $err_str = $read_session_msg;
+          $self->logger->debug("Cannot read onedartsession from session db: $err_str");
+          $err = 1;
+          $err_msg = "Unexpected error.";
+        }
+        else {
+
+          my $dbh_write = connect_kdb_write();
+          $user_id = $session_aref->[0]->{"kddartuserid"};
+
+          $sql = 'SELECT UserName FROM systemuser WHERE UserId=?';
+
+          my ($kddart_username_err, $kddart_username) = read_cell($dbh_write, $sql, [$user_id]);
+
+          if ( $kddart_username_err ) {
+
+            $self->logger->debug("Cannot read UserName from kddart main database: $sql");
+            $err = 1;
+            $err_msg = "Unexpected error.";
+          }
+          else {
+
+            $username = $kddart_username;
+            my $group_id = $session_aref->[0]->{"kddartgroupid"};
+            my $gadmin_status = $session_aref->[0]->{"kddartgroupadminstatus"};
+
+            $self->authen->store->save( 'SESSION_TOKEN'  => $new_db_session_id,
+                                        'USERNAME'       => $username,
+                                        'LOGIN_ATTEMPTS' => 0,
+                                        'LAST_LOGIN'     => $now,
+                                        'LAST_ACCESS'    => $now,
+                                        'REMEMBER_ME'    => $rememberme,
+                                        'WRITE_TOKEN'    => $write_token,
+                                        'GROUP_ID'       => $group_id,
+                                        'USER_ID'        => $user_id,
+                                        'GADMIN_STATUS'  => $gadmin_status,
+                                        'EXTRA_DATA'     => $extra_data_status,
+                                        'DELETE_FILE'    => '0'
+                                      );
+
+            my $sessid_cookie = $q->cookie(
+                                           -name        => "$COOKIE_NAME",
+                                           -domain      => $domain_name,
+                                           -value       => "$session_id",
+                                           -expires     => '+10y',
+                                          );
+
+            $sql  = 'UPDATE systemuser SET ';
+            $sql .= 'LastLoginDateTime=? ';
+            $sql .= 'WHERE UserId=?';
+
+            my $sth = $dbh_write->prepare($sql);
+            $sth->execute($cur_dt, $user_id);
+            $sth->finish();
+
+            log_activity($dbh_write, $user_id, 0, 'LOGIN');
+
+            $self->header_add(-cookie => [$sessid_cookie]);
+
+            $dbh_write->disconnect();
+
+            $session_token_aref  = [{ "Value"    => "$new_db_session_id",
+                                      "AccessToken" => $access_token,
+                                      "RefreshToken" => $refresh_token,
+                                      "eCommerceBaseUrl" => $ecommerce_base_url
+                                    }];
+          }
+        }
+      }
+
+    }
+    else {
+
+      my $result_data = undef;
+
+      eval {
+
+        $result_data = decode_json($result);
+      };
+
+      if ( ! defined $result_data ) {
+
+        my $err_str = $result;
+        $self->logger->debug("OpenId failure error and cannot parse json return: $err_str");
+        $err = 1;
+        $err_msg = "Unexpected error.";
+      }
+      else {
+        if ( defined $result_data->{'error'} ) {
+
+          $self->logger->debug("OpenID error: $result");
+          $err = 1;
+          $err_msg = $result_data->{'error_description'};
+        }
+        else {
+
+          my $err_str = "Very strange openid failed with json text but no error attribute";
+          $self->logger->debug("OpenId failure error: $err_str");
+          $err = 1;
+          $err_msg = "Unexpected error.";
+        }
+      }
+    }
+    # Finish OpenID if
+  }
+  else {
+    #standlone login
+
+    $self->logger->debug(Dumper $self->query()->http('Definitely-Real-Header'));
+
+    my $dbh = connect_kdb_read();
+    my $sql;
+
+    $sql  = 'SELECT systemuser.UserPassword, systemuser.UserId ';
+    $sql .= 'FROM systemuser ';
+    $sql .= 'WHERE systemuser.UserName=?';
+
+    my $sth = $dbh->prepare($sql);
+    $sth->execute($username);
+    my $domain_name = $COOKIE_DOMAIN->{$ENV{DOCUMENT_ROOT}};
+    $self->logger->debug("COOKIE DOMAIN: $domain_name");
+
+    if ( !$dbh->err() ) {
+
+      my $pass_db = '';
+      my $gadmin_status;
+      $sth->bind_col(1, \$pass_db);
+      $sth->bind_col(2, \$user_id);
+
+      $sth->fetch();
+      $sth->finish();
+
+      if (length($pass_db) > 0) {
+
+        my $session_pass_db = hmac_sha1_hex($rand, $pass_db);
+        my $signature_db = hmac_sha1_hex($url, $session_pass_db);
+
+        if ($signature_db eq $signature) {
+
+          my $start_time = [gettimeofday()];
+          my $cookie_only_rand = makerandom(Size => 32, Strength => 0);
+
+          $rand_number = $cookie_only_rand;
+
+          my $f_rand_elapsed = tv_interval($start_time);
+          $self->logger->debug("First random number elapsed: $f_rand_elapsed");
+
+          $self->logger->debug("Password in DB: $pass_db");
+
+          my $session_id = $self->session->id();
+
+          $sess_id = $session_id;
+
+          my $now = time();
+
+          $start_time = [gettimeofday()];
+          my $write_token_rand = makerandom(Size => 128, Strength => 0);
+          my $s_rand_elapsed = tv_interval($start_time);
+          $self->logger->debug("Second random number elapsed: $s_rand_elapsed");
+
+          $write_token = hmac_sha1_hex("$cookie_only_rand", "$write_token_rand");
+
+          my $group_id          = -99;  # Not set at this stage
+          my $gadmin_status     = -99;  # But needs protection from modification from here on
+          my $extra_data_status = 0;    # By default, DAL does not return SystemGroup and Operation tags.
+                                        # However, this can be switched on.
+          my $hash_data = '';
+          $hash_data   .= "$username";
+          $hash_data   .= "$session_id";
+          $hash_data   .= "$rememberme";
+          $hash_data   .= "$write_token";
+          $hash_data   .= "$group_id";
+          $hash_data   .= "$user_id";
+          $hash_data   .= "$gadmin_status";
+
+          my $session_checksum = hmac_sha1_hex($hash_data, "$cookie_only_rand");
+
+          $self->authen->store->save( 'USERNAME'       => $username,
+                                      'LOGIN_ATTEMPTS' => 0,
+                                      'LAST_LOGIN'     => $now,
+                                      'LAST_ACCESS'    => $now,
+                                      'REMEMBER_ME'    => $rememberme,
+                                      'CHECKSUM'       => $session_checksum,
+                                      'WRITE_TOKEN'    => $write_token,
+                                      'GROUP_ID'       => $group_id,
+                                      'USER_ID'        => $user_id,
+                                      'GADMIN_STATUS'  => $gadmin_status,
+                                      'EXTRA_DATA'     => $extra_data_status,
+              );
+
+          my $cookie = $q->cookie(
+            -name        => 'KDDArT_RANDOM_NUMBER',
+            -domain      => $domain_name,
+            -value       => "$cookie_only_rand",
+            -expires     => '+10y',
+              );
+
+          my $sessid_cookie = $q->cookie(
+                                        -name        => 'KDDArT_DAL_SESSID',
+                                        -domain      => $domain_name,
+                                        -value       => "$session_id",
+                                        -expires     => '+10y',
+                                        );
+
+          my $dbh_write = connect_kdb_write();
+
+          my $cur_dt = DateTime->now( time_zone => $TIMEZONE );
+          $cur_dt = DateTime::Format::MySQL->format_datetime($cur_dt);
+
+          $sql  = 'UPDATE systemuser SET ';
+          $sql .= 'LastLoginDateTime=? ';
+          $sql .= 'WHERE UserId=?';
+
+          $sth = $dbh_write->prepare($sql);
+          $sth->execute($cur_dt, $user_id);
+          $sth->finish();
+
+          log_activity($dbh_write, $user_id, 0, 'LOGIN');
+          $dbh_write->disconnect();
+
+          $self->header_add(-cookie => [$sessid_cookie, $cookie]);
+
+          $self->logger->debug("$username");
+          $self->logger->debug("random number: $cookie_only_rand");
+          $self->logger->debug("checksum: $session_checksum");
+        }
+        else {
+
+          my $now = time();
+
+          my $sessid_cookie = $q->cookie(
+                                        -name        => 'KDDArT_DAL_SESSID',
+                                        -domain      => $domain_name,
+                                        -value       => '',
+                                        -expires     => '+10y',
+              );
+
+          my $cookie = $q->cookie(
+            -name        => 'KDDArT_RANDOM_NUMBER',
+            -domain      => $domain_name,
+            -value       => '',
+            -expires     => '+10y',
+              );
+
+          my $login_attemps = $self->authen->store->fetch('LOGIN_ATTEMPTS');
+          $login_attemps += 1;
+
+          $self->authen->store->save( 'USERNAME'       => '',
+                                      'LOGIN_ATTEMPTS' => $login_attemps,
+                                      'LAST_LOGIN'     => $now,
+                                      'LAST_ACCESS'    => $now,
+                                      'CHECKSUM'       => '',
+                                      'GROUP_ID'       => '',
+                                      'USER_ID'        => '',
+                                      'GADMIN_STATUS'  => '',
+                                      'EXTRA_DATA'     => '0',
+              );
+
+          $self->header_add(-cookie => [$sessid_cookie, $cookie]);
+
+          $self->logger->debug("Password signature verification failed db: $signature_db, user: $signature");
+          $err = 1;
+          $err_msg = "Incorrect username or password.";
+        }
+      }
+      else {
+
+        $self->logger->debug("Fail to retrieve password. username and group id not found.");
         $err = 1;
         $err_msg = "Incorrect username or password.";
       }
     }
     else {
 
-      $self->logger->debug("Fail to retrieve password. username and group id not found.");
+      my $err_str = $dbh->errstr();
+      $self->logger->debug("SQL Error: $err_str");
       $err = 1;
-      $err_msg = "Incorrect username or password.";
+      $err_msg = "Unexpected error.";
     }
+
+    $dbh->disconnect();
+
+    $data_for_postrun_href->{'Error'}       = 0;
+
+    if ($err) {
+
+      my $err_msg_aref                          = [{'Message' => $err_msg}];
+      $data_for_postrun_href->{'Error'}         = 1;
+      $data_for_postrun_href->{'HTTPErrorCode'} = 401;
+      $data_for_postrun_href->{'Data'}          = {'Error' => $err_msg_aref};
+    }
+    else {
+
+      $self->logger->debug("Return WriteToken for Transformation");
+      my $write_token_aref    = [{'Value' => $write_token}];
+
+      my $session_token_aref  = [{ 'KDDArT_DAL_SESSID'    => "$sess_id",
+                                  'KDDArT_RANDOM_NUMBER' => "$rand_number" }];
+
+      my $user_info_aref   = [{'UserId' => $user_id, 'UserName' => $username}];
+
+      $data_for_postrun_href->{'ExtraData'} = 0;
+    }
+
+
+
+  }
+
+  if ($err == 1) {
+        my $err_msg_aref                          = [{'Message' => $err_msg}];
+        $data_for_postrun_href->{'Error'}         = 1;
+        $data_for_postrun_href->{'HTTPErrorCode'} = 401;
+        $data_for_postrun_href->{'Data'}          = {'Error' => $err_msg_aref};
   }
   else {
+        $write_token_aref    = [{ 'Value' => $write_token}];
+        $user_info_aref      = [{ 'UserId' => $user_id, 'UserName' => $username}];
 
-    my $err_str = $dbh->errstr();
-    $self->logger->debug("SQL Error: $err_str");
-    $err = 1;
-    $err_msg = "Unexpected error.";
+        $self->logger->debug("Return WriteToken for Transformation");
+
+        $data_for_postrun_href->{'Data'}      = { 'WriteToken'   => $write_token_aref,
+                                                'SessionToken' => $session_token_aref,
+                                                'User'         => $user_info_aref,
+                                                'RecordMeta'   => [{'TagName' => 'SessionToken'}]
+                                                };
+
+        $data_for_postrun_href->{'ExtraData'} = 0;
   }
 
-  $dbh->disconnect();
-
-  my $data_for_postrun_href = {};
-
-  $data_for_postrun_href->{'Error'}       = 0;
-
-  if ($err) {
-
-    my $err_msg_aref                          = [{'Message' => $err_msg}];
-    $data_for_postrun_href->{'Error'}         = 1;
-    $data_for_postrun_href->{'HTTPErrorCode'} = 401;
-    $data_for_postrun_href->{'Data'}          = {'Error' => $err_msg_aref};
-  }
-  else {
-
-    $self->logger->debug("Return WriteToken for Transformation");
-    my $write_token_aref    = [{'Value' => $write_token}];
-
-    my $session_token_aref  = [{ 'KDDArT_DAL_SESSID'    => "$sess_id",
-                                 'KDDArT_RANDOM_NUMBER' => "$rand_number" }];
-
-    my $user_info_aref   = [{'UserId' => $user_id, 'UserName' => $username}];
-
-    $data_for_postrun_href->{'Data'}      = { 'WriteToken'   => $write_token_aref,
-                                              'SessionToken' => $session_token_aref,
-                                              'User'         => $user_info_aref,
-                                              'RecordMeta'   => [{'TagName' => 'SessionToken'}]
-                                            };
-
-    $data_for_postrun_href->{'ExtraData'} = 0;
-  }
-
-  return $data_for_postrun_href;
+      return $data_for_postrun_href;
 }
-
 sub switch_to_group_runmode {
 
 =pod switch_to_group_HELP_START

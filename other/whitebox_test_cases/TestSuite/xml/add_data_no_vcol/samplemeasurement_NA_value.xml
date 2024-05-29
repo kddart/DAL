@@ -1,20 +1,20 @@
 <DATA>
 <ROW>
-<TrialUnitId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/case_00358_add_trialunit.xml" />
-<SampleTypeId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/case_00201_add_sampletype.xml" />
-<TraitId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/case_00471_add_trait_boolex_with_NA.xml" />
+<TrialUnitId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/experiments/case_00358_add_trialunit.xml" />
+<SampleTypeId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/vocabularies/case_00201_add_sampletype.xml" />
+<TraitId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/vocabularies/case_00471_add_trait_boolex_with_NA.xml" />
 <MeasurementDateTime Value="2011-01-15 14:28:37" />
 <InstanceNumber Value="4" />
 <TraitValue Value="1" />
-<SurveyId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/case_10600_add_survey.xml" />
+<SurveyId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/experiments/case_10600_add_survey.xml" />
 </ROW>
 <ROW>
-<TrialUnitId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/case_00358_add_trialunit.xml" />
-<SampleTypeId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/case_00201_add_sampletype.xml" />
-<TraitId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/case_00471_add_trait_boolex_with_NA.xml" />
+<TrialUnitId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/experiments/case_00358_add_trialunit.xml" />
+<SampleTypeId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/vocabularies/case_00201_add_sampletype.xml" />
+<TraitId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/vocabularies/case_00471_add_trait_boolex_with_NA.xml" />
 <MeasurementDateTime Value="2011-01-15 14:28:37" />
 <InstanceNumber Value="6" />
 <TraitValue Value="NA" />
-<SurveyId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/case_10600_add_survey.xml" />
+<SurveyId Value="" ParaName="Value" SrcValue="xml/add_data_no_vcol/experiments/case_10600_add_survey.xml" />
 </ROW>
 </DATA>

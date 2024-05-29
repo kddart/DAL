@@ -1,0 +1,9 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Get General Unit" TargetURL="get/storage/:GeneralUnitId" Type="BLOCKING" />
+  <INPUT ParaName="GeneralunitId" SrcValue="xml/add_data_no_vcol/vocabularies/case_10652_add_generalunit.xml" />
+  
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/vocabularies/case_10652_add_generalunit.xml" Order="3" />
+
+</TestCase>

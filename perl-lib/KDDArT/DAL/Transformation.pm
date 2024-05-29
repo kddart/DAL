@@ -1,7 +1,7 @@
 #$Id$
 #$Author$
 
-# Copyright (c) 2011, Diversity Arrays Technology, All rights reserved.
+# Copyright (c) 2024, Diversity Arrays Technology, All rights reserved.
 
 # Author    : Puthick Hok
 # Created   : 02/06/2010
@@ -216,6 +216,21 @@ sub cgiapp_postrun {
     }
   }
 
+  if ( lc($AUTHENTICATOR_SOURCE) eq 'openid' ) {
+
+    my $delete_session_file = $self->authen->store->fetch('delete_file');
+
+    if ( defined $delete_session_file ) {
+
+      if ( "$delete_session_file" eq '1' ) {
+
+        my $session_id = $self->session->id();
+        $self->logger->debug("Delete session file with id: $session_id");
+        $self->session->delete();
+      }
+    }
+  }
+
   my $rm_start_time   = $self->authen->get_rm_start_time();
   my $rm_elapsed_time = sprintf("%.3f", tv_interval([$rm_start_time]));
 
@@ -278,6 +293,41 @@ sub cgiapp_postrun {
   #$self->logger->debug("Output text: $output_text");
 
   $$output_ref = $output_text;
+
+  if ($RECORD_ACTIVITY_CFG==1) {
+    #do the log activity function here somehow
+
+    $self->logger->debug($RECORD_ACTIVITY_CFG);
+
+    my $user_id = $self->authen->user_id();
+    
+      
+      # shows the user has logged in and logged out 
+    if (length($user_id) > 0) {
+      $self->logger->debug("User logged in");
+      $self->logger->debug("URL: $uri");
+
+      my $dbh_write = connect_kdb_write(); 
+
+      #code that will look at $uri and simplify it 
+      $uri =~s/\?.*//; #truncates the url
+      $uri =~m/(.*)(dal)(\/)(\w+)(\/)(\w+)(\/)(\w+)(.*)/; #provides spaced words
+       
+       my $log_message =uc("$4 $6 $8");
+      
+       my $formatted_log_message = ("Final Message: $log_message");
+      log_activity($dbh_write, $user_id, 0, $formatted_log_message);
+
+      $dbh_write->disconnect();
+
+    }
+    else {
+      $self->logger->debug("User logged out");  
+
+    }
+    
+  }
+   
 }
 
 sub json_transformation {
@@ -338,7 +388,6 @@ sub xml_transformation {
     my $this_xml_content = '';
     if ( !$is_err ) {
 
-      $self->logger->debug('Get to this point');
       $this_xml_content = recurse_arrayref2xml($transform_data->{$xml_tag}, $xml_tag);
     }
     else {
@@ -399,6 +448,12 @@ sub geojson_transformation {
     my $feature_name_placeholder = $gjson_info->{'FeatureName'};
     my $feature_id_field         = $gjson_info->{'FeatureId'};
 
+    my $extra_properties;
+
+    if (defined $gjson_info->{'ExtraProperties'}) {
+      $extra_properties = $gjson_info->{'ExtraProperties'};
+    } 
+
     for my $record (@{$feature_data}) {
 
       my $geom_wkt      = $record->{$geo_field};
@@ -448,7 +503,18 @@ sub geojson_transformation {
       my $feature_href = {};
       $feature_href->{'geometry'}   = $geojson_href;
       $feature_href->{'type'}       = 'Feature';
-      $feature_href->{'properties'} = { 'name' => $feature_name, 'id' => $feature_id};
+      $feature_href->{'properties'} = { 'name' => $feature_name, 'id' => $feature_id };
+
+      # from $extra_properties cycle through extra properties and put it in $feature_href->{'properties'} 
+      # llke $feature_href->{'properties'}->{[name of extra property]} = $record->{[name of extra property]};
+
+
+      foreach my $property_name (@{$extra_properties}) {
+
+        $self->logger->debug($property_name);
+
+        $feature_href->{'properties'}->{$property_name} = $record->{$property_name};
+      }
 
       push(@{$gjson_transform_data->{'features'}}, $feature_href);
     }

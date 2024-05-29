@@ -1,7 +1,7 @@
 #$Id$
 #$Author$
 
-# Copyright (c) 2011, Diversity Arrays Technology, All rights reserved.
+# Copyright (c) 2024, Diversity Arrays Technology, All rights reserved.
 
 # Author    : Puthick Hok
 # Created   : 02/06/2010
@@ -56,7 +56,7 @@ sub setup {
 
   my $self = shift;
 
-  CGI::Session->name("KDDArT_DAL_SESSID");
+  CGI::Session->name($COOKIE_NAME);
 
   __PACKAGE__->authen->init_config_parameters();
   __PACKAGE__->authen->check_login_runmodes(':all');
@@ -6189,6 +6189,7 @@ sub del_layer_runmode {
 
   $sth = $dbh_write->prepare($sql);
   $sth->execute($layer_id);
+  $self->logger->debug("Layer Id: $layer_id");
 
   if ($dbh_write->err()) {
 

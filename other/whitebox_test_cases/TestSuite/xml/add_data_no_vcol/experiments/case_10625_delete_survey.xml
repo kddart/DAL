@@ -1,0 +1,9 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Delete Survey" TargetURL="delete/survey/:SurveyId" Type="BLOCKING" />
+  <INPUT ParaName="SurveyId" SrcValue="xml/add_data_no_vcol/experiments/case_10600_add_survey.xml" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/experiments/case_10600_add_survey.xml" Force="1" Order="3" />  
+</TestCase>

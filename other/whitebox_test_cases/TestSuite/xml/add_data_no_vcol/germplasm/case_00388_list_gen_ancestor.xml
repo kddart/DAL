@@ -1,0 +1,11 @@
+<TestCase>
+  <CaseInfo Description="List Ancestor" TargetURL="genotype/:GenotypeId/list/ancestor" Type="BLOCKING" />
+  <INPUT ParaName="GenotypeId" SrcValue="xml/add_data_no_vcol/germplasm/case_00386_add_geno_4_genpedigree.xml" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="COUNT" Tag="Ancestor" TargetDataType="MULTI" Value="boolex(x&gt;0)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Force="1" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/germplasm/case_00385_add_genpedigree.xml" Force="1" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/germplasm/case_00391_add_genpedigree.xml" Force="1" Order="4" />
+  
+</TestCase>

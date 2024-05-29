@@ -1,7 +1,7 @@
 #$Id$
 #$Author$
 
-# Copyright (c) 2011, Diversity Arrays Technology, All rights reserved.
+# Copyright (c) 2024, Diversity Arrays Technology, All rights reserved.
 
 # Author    : Puthick Hok
 # Created   : 02/06/2010
@@ -45,7 +45,7 @@ sub setup {
 
   my $self = shift;
 
-  CGI::Session->name("KDDArT_DAL_SESSID");
+  CGI::Session->name($COOKIE_NAME);
 
   __PACKAGE__->authen->init_config_parameters();
   __PACKAGE__->authen->check_login_runmodes(':all');
@@ -6108,10 +6108,12 @@ sub list_trial_unit {
     $self->logger->debug("TrialUnitId list: " . join(',', @trial_unit_id_list));
 
     if (scalar(@trial_unit_id_list) > 0) {
-
-      $tu_specimen_sql   .= 'SELECT trialunitspecimen.*, specimen.SpecimenName, specimen.Pedigree ';
+         
+      $tu_specimen_sql   .= 'SELECT trialunitspecimen.*, specimen.SpecimenName, specimen.Pedigree, specimen.SelectionHistory, specimen.FilialGeneration, breedingmethod.BreedingMethodId, breedingmethod.BreedingMethodName ';
       $tu_specimen_sql   .= 'FROM trialunitspecimen LEFT JOIN specimen ON ';
       $tu_specimen_sql   .= 'trialunitspecimen.SpecimenId = specimen.SpecimenId ';
+      $tu_specimen_sql   .= 'LEFT JOIN breedingmethod ON ';
+      $tu_specimen_sql   .= 'specimen.BreedingMethodId = breedingmethod.BreedingMethodId ';
       $tu_specimen_sql   .= 'WHERE TrialUnitId IN (' . join(',', @trial_unit_id_list) . ')';
 
       my $tu_spec_data_aref = [];
@@ -6873,7 +6875,7 @@ sub update_trial_unit_geography_runmode {
 "SuccessMessageJSON": "{'Info' : [{'Message' : 'TrialUnit (1) geography has been updated successfully.'}]}",
 "ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='TrialUnit (100) not found.' /></DATA>"}],
 "ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'TrialUnit (100) not found.'}]}"}],
-"HTTPParameter": [{"Name": "trial unitlocation", "DataType": "polygon_wkt", "Description": "GIS field defining the polygon geometry object of the trial unit in a standard GIS well-known text.", "Type": "LCol", "Required": "1"},{"Name": "trial unitlocationdt", "DataType": "timestamp", "Description": "DateTime of trial unit location", "Type": "LCol", "Required": "0"},{"Name": "currentloc", "DataType": "tinyint", "Description": "Flag to notify current location", "Type": "LCol", "Required": "0"},{"Name": "description", "DataType": "varchar", "Description": "Description for location", "Type": "LCol", "Required": "0"}],
+"HTTPParameter": [{"Name": "trialunitlocation", "DataType": "polygon_wkt", "Description": "GIS field defining the polygon geometry object of the trial unit in a standard GIS well-known text.", "Type": "LCol", "Required": "1"},{"Name": "trialunitlocationdt", "DataType": "timestamp", "Description": "DateTime of trial unit location", "Type": "LCol", "Required": "0"},{"Name": "currentloc", "DataType": "tinyint", "Description": "Flag to notify current location", "Type": "LCol", "Required": "0"},{"Name": "description", "DataType": "varchar", "Description": "Description for location", "Type": "LCol", "Required": "0"}],
 "URLParameter": [{"ParameterName": "id", "Description": "Existing TrialUnitId"}],
 "HTTPReturnedErrorCode": [{"HTTPCode": 420}]
 }
@@ -9215,7 +9217,7 @@ sub list_trial_unit_advanced_runmode {
   my $perm_str = permission_phrase($group_id, 0, $gadmin_status, 'trial');
 
   my $dbh = connect_kdb_read();
-  my $field_list = ['*', 'VCol*'];
+  my $field_list = ['*', 'VCol*', 'LCol*'];
 
   my ($vcol_err, $trouble_vcol, $sql, $vcol_list) = generate_factor_columns_sql($dbh, $field_list, 'trialunit',
                                                                                 'TrialUnitId', '');
@@ -9233,7 +9235,7 @@ sub list_trial_unit_advanced_runmode {
 
   $self->logger->debug("SQL with VCol: $sql");
 
-  my ($sample_tu_err, $sample_tu_msg, $sample_tu_data) = $self->list_trial_unit(0, $field_list, $sql);
+  my ($sample_tu_err, $sample_tu_msg, $sample_tu_data) = $self->list_trial_unit(0, ['LCol*'], $sql);
 
   if ($sample_tu_err) {
 
@@ -9779,11 +9781,18 @@ sub list_trial_unit_specimen_advanced_runmode {
 
   if ($field_lookup->{'SpecimenId'}) {
 
-    push(@{$final_field_list}, 'specimen.SpecimenName');
+    push(@{$final_field_list}, 'specimen.SpecimenName, specimen.Pedigree, specimen.SelectionHistory ');
     $other_join .= ' LEFT JOIN specimen ON trialunitspecimen.SpecimenId = specimen.SpecimenId ';
+    
   }
+
+   push(@{$final_field_list}, 'breedingmethod.BreedingMethodId, breedingmethod.BreedingMethodName');
+  $other_join .= ' LEFT JOIN breedingmethod ON specimen.BreedingMethodId = breedingmethod.BreedingMethodId ';
+
+
   push(@{$final_field_list}, 'trial.TrialId');
   $other_join .= ' LEFT JOIN trial ON trialunit.TrialId = trial.TrialId ';
+
 
   $self->logger->debug("Final field list: " . join(', ', @{$final_field_list}));
 
@@ -11419,6 +11428,17 @@ sub del_trial_crossing_runmode {
   }
 
 
+  my $specimen_has_crossing = record_existence( $dbh_k_read, 'specimen', 'SourceCrossingId', $crossing_id );
+
+  if ($specimen_has_crossing) {
+
+    my $err_msg = "Crossing ($crossing_id): a specimen contains this crossing, cannot delete. ";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
   my $dbh_write = connect_kdb_write();
 
   $self->logger->debug($crossing_id);
@@ -11431,7 +11451,7 @@ sub del_trial_crossing_runmode {
   if ($dbh_write->err()) {
 
     $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error. Please contact database manager.'}]};
 
     return $data_for_postrun_href;
   }
@@ -12029,7 +12049,7 @@ sub update_project_runmode {
   }
   $sth->finish();
 
-  my $vcol_error = [];
+    my $vcol_error = [];
 
   for my $vcol_id (keys(%{$vcol_data})) {
 
@@ -12761,7 +12781,7 @@ sub get_trial_unit_specimen_runmode {
   if ($r_trial_id_err) {
 
     $self->logger->debug("Read trial id failed");
-    my $err_msg = "Unexpected Error.";
+    my $err_msg = "Unexpected Error. $tu_spec_sql";
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
 
@@ -12797,10 +12817,11 @@ sub get_trial_unit_specimen_runmode {
     return $data_for_postrun_href;
   }
 
-  $sql  = "SELECT trialunitspecimen.*, specimen.SpecimenName, item.ItemBarcode ";
-  $sql .= "FROM trialunitspecimen LEFT JOIN specimen ON trialunitspecimen.SpecimenId = specimen.SpecimenId ";
-  $sql .= "LEFT JOIN item on trialunitspecimen.ItemId = item.ItemId ";
-  $sql .= "WHERE trialunitspecimen.TrialUnitSpecimenId=?";
+  $sql = 'SELECT trialunitspecimen.*, specimen.SpecimenName, specimen.FilialGeneration, specimen.Pedigree, specimen.SelectionHistory, item.ItemBarcode, breedingmethod.BreedingMethodId, breedingmethod.BreedingMethodName ';
+  $sql .= 'FROM trialunitspecimen LEFT JOIN specimen ON trialunitspecimen.SpecimenId = specimen.SpecimenId ';
+  $sql .= 'LEFT JOIN breedingmethod ON specimen.BreedingMethodId = breedingmethod.BreedingMethodId ';
+  $sql .= 'LEFT JOIN item on trialunitspecimen.ItemId = item.ItemId ';
+  $sql .= 'WHERE trialunitspecimen.TrialUnitSpecimenId= ? ';
 
   my ($read_tus_err, $read_tus_msg, $tus_data) = $self->list_trial_unit_specimen(1, $sql, [$tu_spec_id]);
 
@@ -12808,7 +12829,7 @@ sub get_trial_unit_specimen_runmode {
 
     $self->logger->debug($read_tus_msg);
     $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.' }]};
 
     return $data_for_postrun_href;
   }

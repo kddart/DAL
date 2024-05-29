@@ -1,0 +1,12 @@
+<TestCase>
+  <CaseInfo Description="List Genus Genotype" TargetURL="genus/:GenusId/list/genotype" />
+  <Delete TargetURL="delete/genus/:GenusId" />
+  <INPUT ParaName="GenusId" SrcValue="xml/add_data_no_vcol/germplasm/case_00105_add_genus.xml" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="COUNT" Tag="Genotype" TargetDataType="MULTI" Value="boolex(x&gt;0)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/germplasm/case_00105_add_genus.xml" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/germplasm/case_00104_add_geno.xml" Order="4" />
+
+</TestCase>

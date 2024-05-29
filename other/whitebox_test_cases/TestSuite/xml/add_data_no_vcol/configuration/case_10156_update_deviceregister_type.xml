@@ -1,0 +1,13 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Update Device Register Type" TargetURL="update/type/deviceregister/:TypeId" Type="BLOCKING" />
+  <INPUT ParaName="TypeId" SrcValue="xml/add_data_no_vcol/configuration/case_00300_add_device_type.xml" />
+  <INPUT ParaName="TypeName" PrefixVal="DeviceRegisterTypeUpdate - " Random="1" />
+  <INPUT ParaName="IsTypeActive" Value="1" />
+  <INPUT ParaName="IsFixed" Value="0" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/configuration/case_00300_add_device_type.xml" Order="3" />
+  
+</TestCase>

@@ -1,0 +1,8 @@
+<TestCase>
+  <CaseInfo Description="Switch Extra Data Off" TargetURL="switch/extradata/0" Type="BLOCKING" />
+  <INPUT ParaName="GroupId" Value="0" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(Extra data has been switch OFF)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Force="1" Order="1" />
+  
+</TestCase>

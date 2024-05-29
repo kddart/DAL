@@ -1,0 +1,13 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record_upload" Description="Add Layer Attribute Bulk" TargetURL="layer/:LayerId/add/attribute/bulk" Type="BLOCKING" />
+  <INPUT ParaName="LayerId" SrcValue="xml/add_data_no_vcol/environment/case_00449_add_layer2d.xml" />
+  <INPUT ParaName="REPLACEunitid" SrcValue="xml/add_data_no_vcol/vocabularies/case_00225_add_item_unit.xml" />
+  <INPUT ParaName="uploadfile" Process="1" SrcFile="xml/add_data_no_vcol/attribute_bulk.xml" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/environment/case_00449_add_layer2d.xml" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/vocabularies/case_00225_add_item_unit.xml" Order="4" />
+  
+</TestCase>

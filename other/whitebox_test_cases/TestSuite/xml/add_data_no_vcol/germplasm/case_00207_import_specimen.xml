@@ -1,0 +1,33 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record_upload" Description="Import Specimen" TargetURL="import/specimen/csv" Type="NON-BLOCKING" />
+  <INPUT ParaName="SpecimenName" Value="0" />
+  <INPUT ParaName="BreedingMethodId" Value="1" />
+  <INPUT ParaName="SpecimenBarcode" Value="2" />
+  <INPUT ParaName="IsActive" Value="3" />
+  <INPUT ParaName="Pedigree" Value="4" />
+  <INPUT ParaName="SelectionHistory" Value="5" />
+  <INPUT ParaName="FilialGeneration" Value="6" />
+  <INPUT ParaName="GenotypeId1" Value="7" />
+  <INPUT ParaName="GenotypeId2" Value="8" />
+  <INPUT ParaName="Barcode1" PrefixVal="SPEC" Random="1" />
+  <INPUT ParaName="Barcode2" PrefixVal="SPEC" Random="1" />
+  <INPUT ParaName="BMethodRealValue" SrcValue="xml/add_data_no_vcol/vocabularies/case_00208_add_breeding_method.xml" />
+  <INPUT ParaName="Genotype1" SrcValue="xml/add_data_no_vcol/germplasm/case_00106_add_geno1_4_specimen.xml" />
+  <INPUT ParaName="Genotype2" SrcValue="xml/add_data_no_vcol/germplasm/case_00107_add_geno2_4_specimen.xml" />
+  <INPUT ParaName="Genotype3" SrcValue="xml/add_data_no_vcol/germplasm/case_00361_add_geno3.xml" />
+  <INPUT ParaName="Genotype4" SrcValue="xml/add_data_no_vcol/germplasm/case_00362_add_geno4.xml" />
+  <INPUT ParaName="InheritanceGenotype" Value="9" />
+  <INPUT ParaName="RandomNum" PrefixVal="" Random="1" />
+  <INPUT ParaName="uploadfile" SrcFile="xml/add_data_no_vcol/import_specimen_src1.csv" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/vocabularies/case_00208_add_breeding_method.xml" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/germplasm/case_00106_add_geno1_4_specimen.xml" Order="4" />
+  <Parent CaseFile="xml/add_data_no_vcol/germplasm/case_00107_add_geno2_4_specimen.xml" Order="5" />
+  <Parent CaseFile="xml/add_data_no_vcol/germplasm/case_00361_add_geno3.xml" Order="6" />
+  <Parent CaseFile="xml/add_data_no_vcol/germplasm/case_00362_add_geno4.xml" Order="7" />
+  <ReturnId FileFormat="xml" IdFile="./import_specimen_csv_return_id_238.xml" />
+  
+</TestCase>

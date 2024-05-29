@@ -1,7 +1,7 @@
 <DATA>
 <ROW>
 <TrialUnitId Value="" ParaName="Value" SrcValue="json/add_data_no_vcol/add_trialunit.xml" />
-<SampleTypeId Value="" ParaName="Value" SrcValue="json/add_data_no_vcol/case_00201_add_sampletype.xml" />
+<SampleTypeId Value="" ParaName="Value" SrcValue="json/add_data_no_vcol/vocabularies/case_00201_add_sampletype.xml" />
 <TraitId Value="" ParaName="Value" SrcValue="json/add_data_no_vcol/add_trait.xml" />
 <MeasurementDateTime Value="2011-01-15 14:28:37" />
 <InstanceNumber Value="5" />
@@ -9,7 +9,7 @@
 </ROW>
 <ROW>
 <TrialUnitId Value="" ParaName="Value" SrcValue="json/add_data_no_vcol/add_trialunit.xml" />
-<SampleTypeId Value="" ParaName="Value" SrcValue="json/add_data_no_vcol/case_00201_add_sampletype.xml" />
+<SampleTypeId Value="" ParaName="Value" SrcValue="json/add_data_no_vcol/vocabularies/case_00201_add_sampletype.xml" />
 <TraitId Value="" ParaName="Value" SrcValue="json/add_data_no_vcol/add_trait.xml" />
 <MeasurementDateTime Value="2011-01-15 14:28:37" />
 <InstanceNumber Value="6" />

@@ -1,0 +1,13 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Register Device" TargetURL="register/device" Type="NON-BLOCKING" />
+  <INPUT ParaName="DeviceTypeId" SrcValue="xml/add_data_no_vcol/configuration/case_00350_add_device_type_wst.xml" />
+  <INPUT ParaName="DeviceId" Value="autotest-wst01" />
+  <INPUT ParaName="DeviceNote" Value="Created by the automatic test." />
+  <Match Attr="Message" Exception="1" Order="1" Tag="Error" Value="regex(already exists)" />
+  <Match Attr="StatusCode" Order="2" Value="200" />
+  <Match Attr="Message" Order="3" Tag="Info" Value="regex(successfully)" />
+  <Match Attr="ParaName" Order="4" Tag="ReturnId" Value="DeviceRegisterId" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/configuration/case_00350_add_device_type_wst.xml" Order="3" />
+</TestCase>

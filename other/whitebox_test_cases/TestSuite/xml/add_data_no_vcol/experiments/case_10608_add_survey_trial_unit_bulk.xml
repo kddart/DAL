@@ -1,0 +1,15 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record_upload" Description="Add a trial unit bulk to survey" TargetURL="survey/:SurveyId/add/trialunit/bulk" Type="BLOCKING" />
+  <Delete TargetURL="delete/surveytrialunit/:SurveyTrialUnitId" />
+  <INPUT ParaName="SurveyId" SrcValue="xml/add_data_no_vcol/experiments/case_10600_add_survey.xml" />
+  <INPUT ParaName="CollectorId" SrcValue="xml/add_data_no_vcol/configuration/case_00102_add_con.xml" />
+  <INPUT ParaName="surveytrialunit" Process="1" SrcFile="xml/add_data_no_vcol/survey_trial_unit_bulk.xml" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/experiments/case_10600_add_survey.xml" Force="1" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/configuration/case_00102_add_con.xml" Force="1" Order="4" />
+  <Parent CaseFile="xml/add_data_no_vcol/experiments/case_00358_add_trialunit.xml" Force="1" Order="5" />
+
+</TestCase>

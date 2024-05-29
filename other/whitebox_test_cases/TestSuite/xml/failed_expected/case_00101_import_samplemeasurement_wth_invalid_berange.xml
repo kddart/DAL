@@ -11,9 +11,9 @@
   <Match Attr="Message" Tag="Error" Value="regex(not valid)" />
   <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
   <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
-  <Parent CaseFile="xml/add_data_no_vcol/case_00358_add_trialunit.xml" Force="1" Order="3" />
-  <Parent CaseFile="xml/add_data_no_vcol/case_00442_add_trait_with_berange_valid.xml" Order="4" />
-  <Parent CaseFile="xml/add_data_no_vcol/case_00201_add_sampletype.xml" Order="5" />
-  <Parent CaseFile="xml/add_data_no_vcol/case_00443_add_trialtrait_berange_val.xml" Order="6" />
+  <Parent CaseFile="xml/add_data_no_vcol/experiments/case_00358_add_trialunit.xml" Force="1" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/vocabularies/case_00442_add_trait_with_berange_valid.xml" Order="4" />
+  <Parent CaseFile="xml/add_data_no_vcol/vocabularies/case_00201_add_sampletype.xml" Order="5" />
+  <Parent CaseFile="xml/add_data_no_vcol/vocabularies/case_00443_add_trialtrait_berange_val.xml" Order="6" />
   
 </TestCase>

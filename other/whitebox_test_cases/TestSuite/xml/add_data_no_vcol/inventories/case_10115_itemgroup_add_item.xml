@@ -1,0 +1,12 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Itemgroup Add Item" TargetURL="itemgroup/:ItemGroupId/add/item" Type="BLOCKING" />
+  <INPUT ParaName="ItemGroupId" SrcValue="xml/add_data_no_vcol/inventories/case_00324_add_item_group.xml" />
+  <INPUT ParaName="ItemId" SrcValue="xml/add_data_no_vcol/inventories/case_00310_add_item.xml" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/inventories/case_00324_add_item_group.xml" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/inventories/case_00310_add_item.xml" Force="1" Order="4" />
+  
+</TestCase>

@@ -1,4 +1,4 @@
 <DATA>
-<specimengroupentry SpecimenId="" ParaName="SpecimenId" SrcValue="xml/add_data_no_vcol/case_00114_add_specimen1.xml" SpecimenNote="TrialOrigin (testing)" />
-<specimengroupentry SpecimenId="" ParaName="SpecimenId" SrcValue="xml/add_data_no_vcol/case_00115_add_specimen2.xml"  />
+<specimengroupentry SpecimenId="" ParaName="SpecimenId" SrcValue="xml/add_data_no_vcol/germplasm/case_00114_add_specimen1.xml" SpecimenNote="TrialOrigin (testing)" />
+<specimengroupentry SpecimenId="" ParaName="SpecimenId" SrcValue="xml/add_data_no_vcol/germplasm/case_00115_add_specimen2.xml"  />
 </DATA>

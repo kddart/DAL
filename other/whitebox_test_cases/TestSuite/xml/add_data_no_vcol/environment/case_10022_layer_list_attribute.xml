@@ -1,0 +1,12 @@
+<TestCase>
+  <CaseInfo Description="List Layer Attribute" TargetURL="layer/:LayerId/list/layerattrib" Type="BLOCKING" />
+  <INPUT ParaName="LayerId" SrcValue="xml/add_data_no_vcol/environment/case_00345_add_layer.xml" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="COUNT" Tag="layerattrib" TargetDataType="MULTI" Value="boolex(x&gt;0)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/environment/case_00345_add_layer.xml" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/environment/case_00347_add_layer_attribute_tem.xml" Order="4" />
+  <Parent CaseFile="xml/add_data_no_vcol/environment/case_00348_add_layer_attribute_hum.xml" Order="5" />
+  
+</TestCase>

@@ -1,0 +1,25 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record_upload" Description="Import crossing measurement group" TargetURL="trial/:TrialId/import/cmgroupdata/csv" Type="BLOCKING" />
+  <INPUT ParaName="TrialId" SrcValue="xml/add_data_no_vcol/experiments/case_00007_add_trial.xml" />
+  <INPUT ParaName="CrossingIdCol" Value="0" />
+  <INPUT ParaName="SampleTypeIdCol" Value="1" />
+  <INPUT ParaName="TraitIdCol" Value="2"  />
+  <INPUT ParaName="MeasureDateTimeCol" Value="3" />
+  <INPUT ParaName="InstanceNumberCol" Value="4" />
+  <INPUT ParaName="TraitValueCol" Value="5" />
+  <INPUT ParaName="StateReasonCol" Value="6" />
+  <INPUT ParaName="CMGroupName" PrefixVal="CMGroup_Test_" Random="1" />
+  <INPUT ParaName="CMGroupStatus" PrefixVal="Status_" Random="1" />
+  <INPUT ParaName="CMGroupNote" PrefixVal="Note_" Random="1" />
+  <INPUT SrcXML="xml/add_data_no_vcol/crossingmeasurement_1.xml" Transform="1" XSL="xml/add_data_no_vcol/crossingmeasurement_1.xsl" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/experiments/case_00007_add_trial.xml" Force="1" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/experiments/case_00358_add_trialunit.xml" Force="1" Order="4" />
+  <Parent CaseFile="xml/add_data_no_vcol/experiments/case_00631_add_crossing.xml" Force="1" Order="5" />
+  <Parent CaseFile="xml/add_data_no_vcol/vocabularies/case_00359_add_trait.xml" Force="1" Order="6" />
+  <Parent CaseFile="xml/add_data_no_vcol/vocabularies/case_00606_add_trait_text.xml" Force="1" Order="7" />
+  <Parent CaseFile="xml/add_data_no_vcol/vocabularies/case_00201_add_sampletype.xml" Force="1" Order="8" />
+</TestCase>

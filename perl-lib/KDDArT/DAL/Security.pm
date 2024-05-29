@@ -1,7 +1,7 @@
 #$Id$
 #$Author$
 
-# Copyright (c) 2011, Diversity Arrays Technology, All rights reserved.
+# Copyright (c) 2024, Diversity Arrays Technology, All rights reserved.
 
 # Author    : Puthick Hok
 # Created   : 02/06/2010
@@ -61,7 +61,7 @@ use Crypt::Random qw( makerandom );
 use Time::HiRes qw( tv_interval gettimeofday );
 use DateTime;
 use Digest::MD5;
-
+use Data::Dumper;
 
 sub import {
   my $pkg     = shift;
@@ -872,6 +872,9 @@ sub setup_runmodes {
   $self->_cgiapp->run_modes( ctrl_char_not_allowed    => \&ctrl_char_not_allowed_runmode );
   $self->_cgiapp->run_modes( content_type_not_allowed => \&content_type_not_allowed_runmode );
   $self->_cgiapp->run_modes( genotype_config_error    => \&genotype_config_error_runmode );
+  $self->_cgiapp->run_modes( unexpected_error         => \&unexpected_error_runmode );
+  $self->_cgiapp->run_modes( token_already_expired    => \&token_already_expired_runmode );
+
 
   return;
 }
@@ -894,10 +897,59 @@ sub last_access {
   my $new  = shift;
   $self->initialize;
 
-  return unless $self->username;
-  my $old = $self->store->fetch('last_access');
-  $self->store->save('last_access' => $new) if $new;
-  return $old;
+  if ($AUTHENTICATOR_SOURCE  eq "openid") {
+    return unless $self->username;
+    my $old = $self->store->fetch('last_access');
+    my $return_time = $old;
+
+    if ( $new ) {
+
+      my $session_token = $self->store->fetch('session_token');
+
+      if ( defined $session_token ) {
+
+        if ( length($session_token) > 0 ) {
+
+          my $session_dbh = connect_session_db();
+
+          my $sql = 'UPDATE Session SET refreshtime=? WHERE onedartsession=?';
+          my ($update_refreshtime_err, $update_refreshtime_msg) = execute_sql($session_dbh, $sql, [$new, $session_token]);
+
+          if ($update_refreshtime_err) {
+
+            $self->logger->debug("Update refreshtime in database failed: $update_refreshtime_msg");
+            $return_time = undef;  
+          }
+          else {
+
+            $self->store->save('last_access' => $new);
+            $return_time = $new;  
+          }
+
+          $session_dbh->disconnect();
+        }
+        else {
+
+    $return_time = undef;
+        }
+      }
+      else {
+
+        $return_time = undef;
+      }
+    }
+    
+    return $return_time;
+  }
+  else {
+    return unless $self->username;
+    my $old = $self->store->fetch('last_access');
+    $self->store->save('last_access' => $new) if $new;
+
+    return $old;
+  }
+
+  
 }
 
 sub is_login_timeout {
@@ -932,7 +984,7 @@ sub remember_me {
 
   my $rememberme = $self->store->fetch('remember_me');
 
-  if ( $self->_verify_session_checksum ) {
+  if ( $self->_verify_session ) {
 
     return $rememberme;
   }
@@ -951,9 +1003,26 @@ sub username {
 
   #$self->logger->debug("Retrieving the username");
 
-  if ( $self->_verify_session_checksum ) {
+  if ( $self->_verify_session ) {
 
     return $u;
+  }
+  else {
+
+    return '';
+  }
+}
+
+sub session_token {
+
+  my $self = shift;
+  $self->initialize;
+
+  my $session_token = $self->store->fetch('session_token');
+
+  if ( $self->_verify_session ) {
+
+    return $session_token;
   }
   else {
 
@@ -968,7 +1037,7 @@ sub group_id {
 
   my $g = $self->store->fetch('group_id');
 
-  if ( $self->_verify_session_checksum ) {
+  if ( $self->_verify_session ) {
 
     return $g;
   }
@@ -985,7 +1054,7 @@ sub gadmin_status {
 
   my $gadmin = $self->store->fetch('gadmin_status');
 
-  if ( $self->_verify_session_checksum ) {
+  if ( $self->_verify_session ) {
 
     if ($gadmin eq '1') {
 
@@ -1009,7 +1078,7 @@ sub user_id {
 
   my $uid = $self->store->fetch('user_id');
 
-  if ( $self->_verify_session_checksum ) {
+  if ( $self->_verify_session ) {
 
     return $uid;
   }
@@ -1050,7 +1119,7 @@ sub write_token {
 
   my $wt = $self->store->fetch('write_token');
 
-  if ( $self->_verify_session_checksum ) {
+  if ( $self->_verify_session ) {
 
     return $wt;
   }
@@ -1080,6 +1149,43 @@ sub logout {
 
   my $self = shift;
   $self->initialize;
+
+  if ($AUTHENTICATOR_SOURCE  eq "openid") {
+
+    my $session_token = $self->store->fetch('session_token');
+
+    if (defined $session_token) {
+
+        if ( length($session_token) > 0 ) {
+
+          my $session_dbh = connect_session_db();
+
+          my $sql = 'SELECT expired FROM Session WHERE onedartsession=?';
+
+          my ($chk_sess_err, $db_expired) = read_cell($session_dbh, $sql, [$session_token]);
+
+          if ( length($db_expired) > 0 ) {
+
+            if ( "$db_expired" eq '0' ) {
+
+              $sql = 'UPDATE Session SET expired=1 WHERE onedartsession=?';
+              my ($update_expired_err, $update_expired_msg) = execute_sql($session_dbh, $sql, [$session_token]);
+
+              if ($update_expired_err) {
+
+                $self->logger->debug("Update expiry in database failed: $update_expired_msg");
+              }
+            }
+          }
+          else {
+
+            $self->logger->debug("Session ($session_token): not found.");
+          }
+          
+          $session_dbh->disconnect();
+        }
+    }
+  }
 
   $self->store->clear;
 }
@@ -1251,6 +1357,116 @@ sub prerun_callback {
   my $query           = $self->query();
   my $config          = $authen->_config;
   my $rand            = $query->param('rand_num');
+
+  my $session_token = undef;
+
+  my $authorization_header;
+  my $delete_session_file = 0;
+
+
+  if ($AUTHENTICATOR_SOURCE  eq "openid") {
+
+      $authorization_header = $query->http('HTTP_AUTHORIZATION');
+      
+      if (length $authorization_header) {
+
+        $authen->logger->debug("Authorization header: $authorization_header");
+
+        my @authorization_header_items = split(' ', $authorization_header);
+
+        if ( $authorization_header_items[0] eq 'Bearer' ) {
+
+          $session_token = $authorization_header_items[1];
+          $delete_session_file = 1;
+        }
+
+        $authen->logger->debug("Authorization token: $session_token");
+      }
+
+      my $env_cookie            = $ENV{'HTTP_COOKIE'};
+      my $session_token_cookie  = read_cookie($env_cookie, 'ONEDART_SESSION_TOKEN');
+
+      if (length $session_token_cookie) {
+
+        $session_token = $session_token_cookie;
+        $delete_session_file = 0;
+      }
+
+      if ( defined $query->param('token') ) {
+
+        $session_token = $query->param('token');
+        $delete_session_file = 1;
+      }
+
+      if ( defined $session_token ) {
+
+        if ( length($session_token) > 0 ) {
+
+          my $session_dbh = connect_session_db();
+
+          my $sql  = "SELECT writetoken, username, kddartuserid, kddartgroupid, kddartgroupadminstatus, ";
+          $sql    .= "rememberme, logintime, refreshtime, expired ";
+          $sql    .= "FROM Session WHERE onedartsession=?";
+
+          my ($read_token_err, $read_token_msg, $token_aref) = read_data($session_dbh, $sql, [$session_token]);
+          $self->logger->debug("SQL ($sql)");
+
+          if ( $read_token_err ) {
+
+            $self->logger->debug("SQL ($sql) error: $read_token_msg");
+            return $authen->redirect_to_unexpected_error();
+          }
+
+          if (scalar(@{$token_aref}) < 1) {
+
+            $authen->logger->debug("Session token ($session_token): not found.");
+            return $authen->redirect_to_login;
+          }
+          elsif ( scalar(@{$token_aref}) == 1) {
+
+            my $username = $token_aref->[0]->{'username'};
+            my $writetoken = $token_aref->[0]->{'writetoken'};
+            my $user_id = $token_aref->[0]->{'kddartuserid'};
+            my $group_id = $token_aref->[0]->{'kddartgroupid'};
+            my $gadmin_status = $token_aref->[0]->{'kddartgroupadminstatus'};
+            my $rememberme = $token_aref->[0]->{'rememberme'};
+            my $login_time = $token_aref->[0]->{'logintime'};
+            my $last_access_time = $token_aref->[0]->{'refreshtime'};
+            my $expired = $token_aref->[0]->{'expired'};
+
+            if ( "$expired" eq '0' ) {
+
+              $authen->logger->debug("Session token ($session_token) - user ($username): is still active");
+              $authen->store->save( 'SESSION_TOKEN'  => $session_token,
+                                    'USERNAME'       => $username,
+                                    'LOGIN_ATTEMPTS' => 0,
+                                    'LAST_LOGIN'     => $login_time,
+                                    'LAST_ACCESS'    => $last_access_time,
+                                    'REMEMBER_ME'    => $rememberme,
+                                    'WRITE_TOKEN'    => $writetoken,
+                                    'GROUP_ID'       => $group_id,
+                                    'USER_ID'        => $user_id,
+                                    'GADMIN_STATUS'  => $gadmin_status,
+                                    'EXTRA_DATA'     => 0,
+                                    'DELETE_FILE'    => $delete_session_file
+                                  );
+            }
+            else {
+
+              $authen->logger->debug("Session token ($session_token): already expired.");
+              return $authen->redirect_to_token_already_expired;
+            }
+          }
+          else {
+
+            $self->logger->debug("Session_token ($session_token): more than one found.");
+            return $authen->redirect_to_unexpected_error();
+          }
+
+          $session_dbh->disconnect();
+        }
+      }
+  }
 
   if (!$authen->is_ignore_ctrl_char_checking_runmode($current_runmode)) {
 
@@ -1570,6 +1786,22 @@ sub redirect_to_defer_request {
   $cgiapp->prerun_mode('defer_request');
 }
 
+sub redirect_to_unexpected_error {
+
+  my $self   = shift;
+  my $cgiapp = $self->_cgiapp;
+
+  $cgiapp->prerun_mode('unexpected_error');
+}
+
+sub redirect_to_token_already_expired {
+
+  my $self   = shift;
+  my $cgiapp = $self->_cgiapp;
+
+  $cgiapp->prerun_mode('token_already_expired');
+}
+
 sub redirect_to_logout {
   my $self = shift;
   my $cgiapp = $self->_cgiapp;
@@ -1875,6 +2107,46 @@ sub logout_runmode {
   $self->logout();
 }
 
+sub unexpected_error_runmode {
+  
+  my $self = shift;
+  
+  my $msg_aref = [{'Message' => 'Unexpected Error.'}];
+
+  my $data_for_postrun_href = {};
+
+  $data_for_postrun_href->{'Error'}         = 1;
+  $data_for_postrun_href->{'HTTPErrorCode'} = 420;
+  $data_for_postrun_href->{'Data'}          = {'Error' => $msg_aref};
+  
+  if (uc($self->authen->transform_xml_error_message()) eq 'YES') {
+
+    $data_for_postrun_href->{'XSL'} = $self->authen->xsl_url();
+  }
+
+  return $data_for_postrun_href;
+}
+
+sub token_already_expired_runmode {
+  
+  my $self = shift;
+  
+  my $msg_aref = [{'Message' => 'Session token already expired.' }];
+
+  my $data_for_postrun_href = {};
+
+  $data_for_postrun_href->{'Error'}         = 1;
+  $data_for_postrun_href->{'HTTPErrorCode'} = 401;
+  $data_for_postrun_href->{'Data'}          = {'Error' => $msg_aref};
+  
+  if (uc($self->authen->transform_xml_error_message()) eq 'YES') {
+
+    $data_for_postrun_href->{'XSL'} = $self->authen->xsl_url();
+  }
+
+  return $data_for_postrun_href;
+}
+
 ###
 ### Helper methods
 ###
@@ -1949,59 +2221,111 @@ sub _time_to_seconds {
   return $offset;
 }
 
-sub _verify_session_checksum {
+sub _verify_session {
 
   my $self  = shift;
   my $query = $self->_cgiapp->query();
 
-  my $env_cookie      = $ENV{'HTTP_COOKIE'};
+  if ( lc($AUTHENTICATOR_SOURCE) eq 'openid' ) {
+    my $username        = $self->store->fetch('username');
+    my $session_token   = $self->store->fetch('session_token');
 
-  my $cookie_key      = read_cookie($env_cookie, 'KDDArT_RANDOM_NUMBER');
+    if ( !$username ) { return 0; }
 
-  if (defined $query->param('KDDArT_RANDOM_NUMBER')) {
+    $self->logger->debug("Session token: $session_token - Username: $username");
 
-    $cookie_key = trim($query->param('KDDArT_RANDOM_NUMBER'));
-  }
+    my $rememberme      = $self->store->fetch('remember_me');
+    my $write_token     = $self->store->fetch('write_token');
+    my $user_id         = $self->store->fetch('user_id');
 
-  my $username        = $self->store->fetch('username');
+    my $session_dbh = connect_session_db();
 
-  if ( !$username ) { return 0; }
+    my $sql = "SELECT expired FROM Session WHERE ";
+    $sql   .= "onedartsession=? AND ";
+    $sql   .= "writetoken=? AND ";
+    $sql   .= "kddartuserid=?";
 
-  my $session_id      = $self->_cgiapp->session->id();
+    my ($chk_sess_err, $db_expired) = read_cell($session_dbh, $sql, [$session_token, $write_token, $user_id]);
 
-  $self->logger->debug("SessionID: $session_id - Username: $username");
+    $session_dbh->disconnect();
 
-  my $rememberme      = $self->store->fetch('remember_me');
-  my $write_token     = $self->store->fetch('write_token');
-  my $group_id        = $self->store->fetch('group_id');
-  my $user_id         = $self->store->fetch('user_id');
-  my $gadmin_status   = $self->store->fetch('gadmin_status');
+    if ($chk_sess_err) {
 
-  my $stored_checksum = $self->store->fetch('checksum');
+      $self->logger->debug("SQL ($sql): error");
+      return 0;  
+    }
+    else {
 
-  my $hash_data = "$username";
-  $hash_data   .= "$session_id";
-  $hash_data   .= "$rememberme";
-  $hash_data   .= "$write_token";
-  $hash_data   .= "$group_id";
-  $hash_data   .= "$user_id";
-  $hash_data   .= "$gadmin_status";
+      if ( length($db_expired) > 0 ) {
 
-  my $derived_checksum = hmac_sha1_hex($hash_data, $cookie_key);
+    if ( "$db_expired" eq '0' ) {
 
-  if ( $derived_checksum eq $stored_checksum ) {
+      return 1;
+    }
+    else {
 
-    #$self->logger->debug("Stored checksum: $stored_checksum, Derived checksum: $derived_checksum");
-    return 1;
+      $self->logger->debug("Session ($session_token): already expired.");
+      return 0;
+    }
+      }
+      else {
+
+        $self->logger->debug("Session ($session_token): not found in session database.");
+        return 0;
+      }
+    }
   }
   else {
+    my $env_cookie      = $ENV{'HTTP_COOKIE'};
 
-    $self->logger->debug("COOKIE: $env_cookie");
-    $self->logger->debug("Checksum failed: $hash_data Key: $cookie_key");
-    $self->logger->debug("Stored checksum: $stored_checksum, Derived checksum: $derived_checksum");
-    return 0;
+    my $cookie_key      = read_cookie($env_cookie, 'KDDArT_RANDOM_NUMBER');
+
+    if (defined $query->param('KDDArT_RANDOM_NUMBER')) {
+
+      $cookie_key = trim($query->param('KDDArT_RANDOM_NUMBER'));
+    }
+
+    my $username        = $self->store->fetch('username');
+
+    if ( !$username ) { return 0; }
+
+    my $session_id      = $self->_cgiapp->session->id();
+
+    $self->logger->debug("SessionID: $session_id - Username: $username");
+
+    my $rememberme      = $self->store->fetch('remember_me');
+    my $write_token     = $self->store->fetch('write_token');
+    my $group_id        = $self->store->fetch('group_id');
+    my $user_id         = $self->store->fetch('user_id');
+    my $gadmin_status   = $self->store->fetch('gadmin_status');
+
+    my $stored_checksum = $self->store->fetch('checksum');
+
+    my $hash_data = "$username";
+    $hash_data   .= "$session_id";
+    $hash_data   .= "$rememberme";
+    $hash_data   .= "$write_token";
+    $hash_data   .= "$group_id";
+    $hash_data   .= "$user_id";
+    $hash_data   .= "$gadmin_status";
+
+    my $derived_checksum = hmac_sha1_hex($hash_data, $cookie_key);
+
+    if ( $derived_checksum eq $stored_checksum ) {
+
+      #$self->logger->debug("Stored checksum: $stored_checksum, Derived checksum: $derived_checksum");
+      return 1;
+    }
+    else {
+
+      $self->logger->debug("COOKIE: $env_cookie");
+      $self->logger->debug("Checksum failed: $hash_data Key: $cookie_key");
+      $self->logger->debug("Stored checksum: $stored_checksum, Derived checksum: $derived_checksum");
+      return 0;
+    }
   }
 }
+
 
 sub recalculate_session_checksum {
 

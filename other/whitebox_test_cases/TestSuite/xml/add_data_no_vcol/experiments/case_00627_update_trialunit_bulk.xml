@@ -1,0 +1,14 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record_upload" Description="Update trial units in bulk" TargetURL="trial/:TrialId/update/trialunit/bulk" Type="BLOCKING" />
+  <Delete TargetURL="delete/trialunit/:TrialUnitId" />
+  <INPUT ParaName="TrialId" SrcValue="xml/add_data_no_vcol/experiments/case_00007_add_trial.xml" />
+  <INPUT ParaName="TULastUpdateTimeStamp" SrcValue="xml/add_data_no_vcol/experiments/case_10053_get_trial.xml" />
+  <INPUT ParaName="trialunit" Process="1" SrcFile="xml/add_data_no_vcol/update_trialunit_bulk2.xml" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Order="2" Force="1"  />
+  <Parent CaseFile="xml/add_data_no_vcol/experiments/case_00358_add_trialunit.xml" Order="3" />
+  <Parent CaseFile="xml/add_data_no_vcol/experiments/case_10053_get_trial.xml" Order="4" />
+  <Parent CaseFile="xml/add_data_no_vcol/germplasm/case_00114_add_specimen1.xml" Order="5" />
+</TestCase>

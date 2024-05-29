@@ -1,4 +1,4 @@
 <DATA>
-  <keywordgroupentry KeywordId="" ParaName="KeywordId" SrcValue="xml/add_data_no_vcol/case_00515_add_keyword.xml" />
-  <keywordgroupentry KeywordId="" ParaName="KeywordId" SrcValue="xml/add_data_no_vcol/case_00517_add_keyword1.xml" />
+  <keywordgroupentry KeywordId="" ParaName="KeywordId" SrcValue="xml/add_data_no_vcol/vocabularies/case_00515_add_keyword.xml" />
+  <keywordgroupentry KeywordId="" ParaName="KeywordId" SrcValue="xml/add_data_no_vcol/vocabularies/case_00517_add_keyword1.xml" />
 </DATA>

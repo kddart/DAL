@@ -1,0 +1,425 @@
+# DAL Deployment
+#
+# Author: Greene Vu
+# Date: 21/09/2023
+# Description: Supporting ansible playbook script
+
+- name: DAL's Debian 11 Deployment Script
+  become: true
+  hosts: kddartserver
+  gather_facts: no
+
+  vars_prompt:
+    - name: "local_tar_gz_file"
+      prompt: "Enter the source tar.gz file of KDDart wih either relative or full path."
+      private: no
+
+    - name: "dbpass"
+      prompt: "Password for kddart_dal user"
+      private: yes
+
+    - name: "ip_network"
+      prompt: "Enter IP network of the target machine, eg. 192.168.78.0/24"
+      private: no
+
+    - name: "dal_address_name"
+      prompt: "Enter address of the target machine"
+      private: no
+
+  vars:
+    dal_version: v2.7.0
+    src_file:  /root/KDDArT-DAL-{{ dal_version }}.tar.gz
+    dal_db_version: v2_7_0
+    local_dir: /home/localadmin/dal
+    local_src_dir: /usr/local
+    apache_base_dir: /var/www
+    dest_apache_conf_dir: /etc/apache2/sites-enabled
+    monetdbpass: monetdb
+    #
+    solr_workspace: /root/tmp_install_solr
+    solr_config_file: /etc/default/solr.in.sh
+    solr_install_dir: /opt
+    solr_home: /var/solr
+    solr_version: "8.11.1"
+    mysql_jdbc_jar: mysql-connector-java-*-bin.jar
+    monetdb_jdbc_jar: monetdb-jdbc-*.jar
+    config_cron_job: False
+
+  tasks:
+    - name: Install supporting binaries
+      apt:
+        state: present
+        update_cache: true
+        name:
+          - make
+          - gcc
+          - nmap
+          - build-essential
+          - bison
+          - openssl
+          - libssl-dev
+          - libxml2
+          - libxml2-dev
+          - apache2
+          - apache2-dev
+          - default-mysql-server
+          - shapelib
+          - libshp-dev
+          - python3-selinux
+          - openjdk-11-jdk
+          - lsof
+          - curl
+          - libcurl4-openssl-dev
+          - libbz2-dev
+          - unzip
+          - lsb-release
+          - gnupg
+          - acl
+          - pkg-config
+    
+    - name: Add Postgresql Repo
+      shell:
+        install -d /usr/share/postgresql-common/pgdg;
+        curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc --fail https://www.postgresql.org/media/keys/ACCC4CF8.asc;
+        echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list
+
+    - name: Install Postgresql
+      apt:
+        state: present
+        update_cache: true
+        name:
+          - postgresql-16
+          - postgresql-16-postgis-3
+          - postgresql-16-postgis-3-scripts
+
+    - name: Add MonetDB Repo
+      shell: >
+         echo 'deb https://dev.monetdb.org/downloads/deb/ bullseye monetdb' > /etc/apt/sources.list.d/monetdb.list;
+         echo 'deb-src https://dev.monetdb.org/downloads/deb/ bullseye monetdb' >> /etc/apt/sources.list.d/monetdb.list;
+         wget --output-document=/etc/apt/trusted.gpg.d/monetdb.gpg https://www.monetdb.org/downloads/MonetDB-GPG-KEY.gpg;
+
+    - name: Install MonetDB client (mclient)
+      apt:
+        state: present
+        update_cache: true
+        name:
+          - monetdb-client
+
+    - name: Install perl packages
+      apt:
+        state: present
+        name:
+          - libpath-tiny-perl
+          - cpanminus
+          - perl
+          - libdbi-perl
+          - libapache2-mod-perl2 #apache2-mod_perl
+          - libclass-dbi-perl
+          - libdbd-mysql-perl
+          - libdbd-pg-perl
+          - libdbd-sqlite2-perl
+          - libmodule-manifest-perl
+          - libextutils-makemaker-cpanfile-perl
+          - libdata-dumper-simple-perl
+          - libdigest-sha-perl
+          - libdigest-md5-file-perl
+          - libcompress-raw-bzip2-perl
+          - libcompress-raw-zlib-perl
+          - libdatetime-format-mysql-perl
+          - libdatetime-format-pg-perl
+          - libcgi-application-perl
+          - libauthen-simple-perl
+          - libapache-htpasswd-perl
+          - libuniversal-require-perl
+          - libstring-random-perl
+          - libconfig-simple-perl
+          - libtext-csv-perl
+          - libtext-csv-xs-perl
+          - libjson-xs-perl
+          - libxml-dom-perl
+          - libenv-path-perl # - perl-Env #not sure
+          - libcgi-session-perl
+          - libxml-sax-perl
+          - libtest-tcp-perl
+          - libstring-escape-perl
+          - libconfig-crontab-perl # - crontabs
+          - libmariadb-dev #libmysqlclient-dev
+          - libapache2-mod-perl2
+          - pari-gp
+
+    - name: Make cpan run without asking
+      shell: >
+        export PERL_MM_USE_DEFAULT=1;
+        export PERL_EXTUTILS_AUTOINSTALL="--defaultdeps";
+        perl -MCPAN -e "install 'Parse::PMFile'";
+
+    - name: Install Perl Libraries used in DAL
+      cpanm: name={{ item }}
+      with_items:
+         - Geo::Coder::Google
+         - DBI
+         - DBD::SQLite
+         - Text::CSV::Simple
+         - Text::CSV
+         - Text::CSV_XS
+         - Email::Valid
+         - Apache2_4::AuthCookie
+         - Color::Calc
+         - CGI::Session
+         - CGI::Application::Dispatch
+         - CGI::Application::Plugin::AutoRunmode
+         - CGI::Application::Plugin::ActionDispatch
+         - CGI::Application::Plugin::DevPopup
+         - CGI::Application::Plugin::Session
+         - CGI::Application::Plugin::Config::Simple
+         - Log::Log4perl
+         - Net::OAuth2::Client
+         - Net::OAuth2::AccessToken
+         - Net::SSLeay
+         - IO::Socket::SSL
+         - Mozilla::CA
+         - Tree::R
+         - Hash::Merge
+         - XML::Parser::PerlSAX
+         - File::Lockfile
+         - Mojolicious
+         - JSON::Validator
+         - XML::XSLT
+         - XML::Writer
+         - XML::Simple
+         - Apache::Solr
+         - MCE
+         - MCE::Shared
+         - DateTime::Format::Flexible
+         - DBD::mysql
+         - Scalar::Util
+         - CGI
+         - Time::HiRes
+         - DateTime
+         - Digest::MD5
+         - LWP::UserAgent
+         - HTTP::Request::Common
+         - JSON::XS
+         - File::Spec
+         - XML::Simple
+         - Getopt::Long
+         - Authen::Simple
+         - DateTime::Format::MySQL
+         - DateTime::Format::Pg
+         - UNIVERSAL::require
+         - Class::Loader
+         - File::Copy::Recursive
+         - Crypt::JWT
+
+    - name: Copy the tar.gz file
+      copy: src={{ local_tar_gz_file }} dest={{ src_file }}
+
+    - name: Create local_dir
+      shell: >
+        if [ ! -d {{ local_dir }} ]; then
+        mkdir -p {{ local_dir }};
+        fi
+
+    - name: Untar and decompress KDDart source
+      shell: >
+        if [ -d {{ local_dir }} ]; then
+          cd {{ local_dir }};
+          tar -zxvf {{ src_file }} --strip 1;
+        fi;         
+    
+    - name: Install Math/pari (This will take some time)
+      shell: >
+         cd /tmp;
+         curl -L https://cpan.metacpan.org/authors/id/I/IL/ILYAZ/modules/Math-Pari-2.130400_030523.tar.gz | tar --no-same-owner -zx;
+         cd /tmp/Math-Pari-2.130400_030523;
+         cp {{local_dir}}/other/pari-2.13.4.tar.gz ./;
+         tar -xf pari-2.13.4.tar.gz;
+         perl -w Makefile.PL;
+         make;
+         make install;
+         rm -rf /tmp/Math-Pari-2.130400_030523;
+
+    - name: Install Crypt::Random
+      shell: >
+         cd /tmp;
+         curl -L https://cpan.metacpan.org/authors/id/V/VI/VIPUL/Crypt-Random-1.54.tar.gz | tar zx;
+         cd /tmp/Crypt-Random-1.54;
+         perl -w Makefile.PL;
+         make;
+         make install;
+         rm -rf /tmp/Crypt-Random-1.54
+
+    - name: Install Geo::Shapelib manually
+      shell: >
+         cd /tmp;
+         curl -L http://search.cpan.org/CPAN/authors/id/A/AJ/AJOLMA/Geo-Shapelib-0.22.tar.gz | tar zx;
+         cd /tmp/Geo-Shapelib-0.22;
+         perl -w Makefile.PL --shapelib=/usr/lib/x86_64-linux-gnu/libshp.so;
+         make install;
+         rm -rf /tmp/Geo-Shapelib-0.22;
+
+    - name: Install CGI::Application::Plugin::Authentication manually
+      shell: >
+         cd /tmp;
+         curl -L http://www.cpan.org/authors/id/S/SI/SILASMONK/CGI-Application-Plugin-Authentication-0.20.tar.gz | tar zx;
+         cd /tmp/CGI-Application-Plugin-Authentication-0.20;
+         perl -w Makefile.PL;
+         make install;
+         rm -rf /tmp/CGI-Application-Plugin-Authentication-0.20
+
+    - name: Install XML::Checker manually
+      shell: >
+         cd /tmp;
+         curl -L http://search.cpan.org/CPAN/authors/id/T/TJ/TJMATHER/XML-Checker-0.13.tar.gz | tar zx;
+         cd /tmp/XML-Checker-0.13;
+         perl -w Makefile.PL;
+         make;
+         make install;
+         rm -rf /tmp/XML-Checker-0.13
+
+    - name: Added nobody user which is required to run perl test for Apache2_4::AuthCookie
+      user:
+        name: nobody
+        shell: /bin/bash
+
+    - name: Copy apache configuration
+      shell: "[[ -f {{ dest_apache_conf_dir }}/http-{{ dal_address_name }}.conf ]] || cp {{local_dir}}/other/http-kddart.example.com.conf {{ dest_apache_conf_dir }}/http-{{ dal_address_name }}.conf"
+
+    - name: Adjust Apache conf to Debian
+      shell: >
+         sed -i 's|/srv|/var|g' {{ dest_apache_conf_dir }}/http-{{ dal_address_name }}.conf;
+         sed -i 's|kddart.example.com|{{ dal_address_name }}|g' {{ dest_apache_conf_dir }}/http-{{ dal_address_name }}.conf;
+
+    - name: Add perl module load to sysconfig
+      shell: "[[ `grep 'APACHE_MODULES=.*perl' /etc/sysconfig/apache2` ]] || a2enmod perl"
+
+    - name: Add headers module load to sysconfig
+      shell: "[[ `grep 'APACHE_MODULES=.*headers' /etc/sysconfig/apache2` ]] || a2enmod headers"
+
+    - name: Create directories
+      file: path={{ item }} state=directory owner=www-data group=	www-data mode=0755
+      with_items:
+         - '{{ apache_base_dir }}/cgi-bin/kddart'
+         - '{{ apache_base_dir }}/tmp/kddart'
+         - '{{ apache_base_dir }}/perl-lib'
+         - '{{ apache_base_dir }}/vhosts'
+         - '{{ apache_base_dir }}/vhosts/{{ dal_address_name }}'
+         - '{{ apache_base_dir }}/session/kddart'
+         - '{{ apache_base_dir }}/secure'
+         - '{{ apache_base_dir }}/vhosts/{{ dal_address_name }}/storage'
+         - '{{ apache_base_dir }}/vhosts/{{ dal_address_name }}/storage/multimedia'
+
+    - name: Copy files to the relevant direcotries - due to * it needs in one line
+      shell: >
+        cp -rp {{ local_dir }}/vhosts/kddart.example.com/* {{ apache_base_dir }}/vhosts/{{ dal_address_name }};
+        cp -rp {{ local_dir}}/perl-lib/* {{ apache_base_dir }}/perl-lib;
+        cp {{local_dir}}/other/kddart_dal.cfg {{ apache_base_dir }}/secure;
+        cp {{local_dir}}/cgi-bin/kddart/* {{ apache_base_dir }}/cgi-bin/kddart;         
+
+    - name: Change /tmp/kddart to {{ apache_base_dir }}/tmp/kddart (Apache2.4 cannot write to /tmp)
+      shell: >
+        sed -i "s|/tmp/kddart/|{{ apache_base_dir }}/tmp/kddart/|" {{ apache_base_dir }}/secure/kddart_dal.cfg;
+        sed -i "s|kddart.example.com|{{ dal_address_name }}|g" {{ apache_base_dir }}/secure/kddart_dal.cfg;
+        sed -i "s|/srv/www|/var/www|g" {{ apache_base_dir }}/secure/kddart_dal.cfg;
+
+    - name: Change owner to wwwrun
+      shell: chown www-data {{ apache_base_dir }}/vhosts/{{ dal_address_name }} -Rf
+
+    - name: Change owner to wwwrun for dal config file
+      shell: chown www-data {{ apache_base_dir }}/secure/kddart_dal.cfg
+
+    - name: Update base URL for test cases
+      shell: echo "http://{{ dal_address_name }}/dal" > {{ local_dir }}/other/whitebox_test_cases/TestSuite/dal_base_url.conf
+    
+    - name: Create monetdb password file
+      shell: "[[ -f {{ apache_base_dir }}/secure/monetdb_user.txt ]] || echo \"username = monetdb\npassword = {{ monetdbpass }}\" > {{ apache_base_dir }}/secure/monetdb_user.txt"
+
+    - name: Create mysql password file
+      shell: "[[ -f {{ apache_base_dir }}/secure/mysql_user.txt ]] || echo \"username = kddart_dal\npassword = {{ dbpass }}\" > {{ apache_base_dir }}/secure/mysql_user.txt"
+
+    - name: Create postgres password file
+      shell: "[[ -f {{ apache_base_dir }}/secure/postgres_user.txt ]] || echo \"username = kddart_dal\npassword = {{ dbpass }}\" > {{ apache_base_dir }}/secure/postgres_user.txt"
+
+    - name: Set perl-lib environment variable in apache config file
+      shell: >
+        grep 'PERL5LIB' /etc/apache2/envvars || echo 'export PERL5LIB=/var/www/perl-lib' >> /etc/apache2/envvars
+
+    - name: Change ACL for tmp directory
+      shell: >
+        setfacl -d -m o::rx {{ apache_base_dir }}/tmp/kddart;
+        setfacl -d -m g::rwx {{ apache_base_dir }}/tmp/kddart;        
+
+    - name: Configure PostgreSQL access permission settings
+      shell: >
+        mv /etc/postgresql/16/main/pg_hba.conf /etc/postgresql/16/main/pg_hba.conf`date +'%Y%m%d'`;
+        echo 'local   all             all                                   trust' > /etc/postgresql/16/main/pg_hba.conf;
+        echo 'host    all             all             127.0.0.1/32          trust' >> /etc/postgresql/16/main/pg_hba.conf;
+        echo 'host    all             all             ::1/128               trust' >> /etc/postgresql/16/main/pg_hba.conf;
+        echo 'host    kddart_gis_enviro_{{ dal_db_version }}  all           {{ ip_network }}        password' >> /etc/postgresql/16/main/pg_hba.conf;
+        echo 'host    kddart_gis_enviro_{{ dal_db_version }}  all           127.0.0.1/24            password' >> /etc/postgresql/16/main/pg_hba.conf;
+
+    - name: Make host entry
+      shell: |
+        publicIP=`hostname -I | awk '{print $1}'`
+        if ! grep -q "$publicIP {{ dal_address_name }} $(hostname)" /etc/hosts; then
+          echo -n "$publicIP {{ dal_address_name }} $(hostname)" >> /etc/hosts;
+        fi
+
+    - name: Make Apache2 start on boot
+      shell: systemctl enable apache2
+
+    - service: name=apache2 state=restarted       
+    
+    - name: Make MySQL start on boot
+      shell: systemctl enable mysql
+
+    - service: name=mysql state=restarted
+
+    - name: Make Postgresql start on boot
+      shell: systemctl enable postgresql
+
+    - service: name=postgresql state=restarted
+
+    - name: Install MonetDB
+      shell: >
+        if [ ! -e /usr/local/bin/monetdbd ]; then
+        cd {{local_src_dir}};
+        curl --insecure -L https://www.monetdb.org/downloads/sources/archive/MonetDB-11.35.9.tar.bz2 | tar jx;
+        cd {{local_src_dir}}/MonetDB-11.35.9;
+        {{local_src_dir}}/MonetDB-11.35.9/configure;
+        make;
+        make install;
+        ldconfig;
+        cd {{local_src_dir}};
+        curl --insecure -L https://github.com/MonetDB/monetdb-perl/archive/v1.1-1.tar.gz | tar zx;
+        cd {{local_src_dir}}/monetdb-perl-1.1-1;
+        make;
+        make install;
+        rm -rf {{local_src_dir}}/MonetDB-11.35.9;
+        rm -rf {{local_src_dir}}/monetdb-perl-1.1-1;
+        fi;
+    
+    - name: Start monetdb service
+      shell: >
+        ldconfig;
+        mkdir -p /var/lib/monetdb;
+        [[ -d /var/lib/monetdb/dbfarm ]] || /usr/local/bin/monetdbd create /var/lib/monetdb/dbfarm;
+        [[ `pidof /usr/local/bin/monetdbd` -gt 1 ]] || /usr/local/bin/monetdbd start /var/lib/monetdb/dbfarm;
+
+    - name: Install Perl DBI for Monetdb
+      shell: cpanm -n DBD::monetdb
+
+    - name: Adjust create_dbs.sh update the password
+      shell: >
+        sed -i "s|DB_PASS='yourSecurePassword'|DB_PASS='{{ dbpass }}'|g" {{ local_dir }}/other/create_dbs.sh;
+
+    - name: Create KDDart Databases
+      shell: "/bin/bash {{ local_dir }}/other/create_dbs.sh 1 kddart_gis_enviro_{{ dal_db_version }} {{ local_dir }}/other/db_files/kddart_gis_enviro_dal_{{ dal_version }}_postgis2.sql kddart_{{ dal_db_version }} {{ local_dir }}/other/db_files/kddart_dal_{{ dal_version }}.sql kddart_marker_{{ dal_db_version }} {{ local_dir }}/other/db_files/kddart_marker_dal_{{ dal_version }}.sql 1"
+
+    - name: Save create dbs command for demo databases
+      shell: echo "{{ local_dir }}/other/create_dbs.sh 2 kddart_gis_enviro_{{ dal_db_version }} {{ local_dir }}/other/db_files/demo/kddart_gis_enviro_demo_{{ dal_db_version }}.sql kddart_{{ dal_db_version }} {{ local_dir }}/other/db_files/demo/kddart_demo_{{ dal_db_version }}.sql kddart_marker_{{ dal_db_version }} {{ local_dir }}/other/db_files/demo/kddart_marker_demo_{{ dal_db_version }}.sql 1" > {{ local_dir }}/other/run_create_demo_dbs.sh; chmod 755 {{ local_dir }}/other/run_create_demo_dbs.sh;
+
+    - name: Save create dbs command for blank databases
+      shell: echo "{{ local_dir }}/other/create_dbs.sh 2 kddart_gis_enviro_{{ dal_db_version }} {{ local_dir }}/other/db_files/kddart_gis_enviro_dal_{{ dal_version }}_postgis2.sql kddart_{{ dal_db_version }} {{ local_dir }}/other/db_files/kddart_dal_{{ dal_version }}.sql kddart_marker_{{ dal_db_version }} {{ local_dir }}/other/db_files/kddart_marker_dal_{{ dal_version }}.sql 1"  > {{ local_dir }}/other/run_create_empty_dbs.sh; chmod 755 {{ local_dir }}/other/run_create_empty_dbs.sh;
+
+    - include: kddart_dal_v2_7_0_solr_debian11.yml

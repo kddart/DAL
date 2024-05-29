@@ -1,0 +1,9 @@
+<TestCase>
+  <CaseInfo Description="Get crossing" TargetURL="get/crossing/:CrossingId" Type="BLOCKING" OutputFormat="JSON" />
+  <INPUT ParaName="CrossingId" SrcValue="xml/add_data_no_vcol/experiments/case_00631_add_crossing.xml" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="COUNT" Tag="Crossing" TargetDataType="MULTI" Value="boolex(x&gt;0)" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/experiments/case_00631_add_crossing.xml" Order="3" />
+</TestCase>

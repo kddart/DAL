@@ -1,12 +1,12 @@
 <TestCase>
   <CaseInfo></CaseInfo>
   <ROW>
-    <KeywordId ParaName="Value" SrcValue="xml/add_data_no_vcol/case_00515_add_keyword.xml" Value="" />
-    <TrialUnitId ParaName="Value" SrcValue="xml/add_data_no_vcol/case_00358_add_trialunit.xml" Value="" />
+    <KeywordId ParaName="Value" SrcValue="xml/add_data_no_vcol/vocabularies/case_00515_add_keyword.xml" Value="" />
+    <TrialUnitId ParaName="Value" SrcValue="xml/add_data_no_vcol/experiments/case_00358_add_trialunit.xml" Value="" />
   </ROW>
   <ROW>
-    <KeywordId ParaName="Value" SrcValue="xml/add_data_no_vcol/case_00517_add_keyword1.xml" Value="" />
-    <TrialUnitId ParaName="Value" SrcValue="xml/add_data_no_vcol/case_00358_add_trialunit.xml" Value="" />
+    <KeywordId ParaName="Value" SrcValue="xml/add_data_no_vcol/vocabularies/case_00517_add_keyword1.xml" Value="" />
+    <TrialUnitId ParaName="Value" SrcValue="xml/add_data_no_vcol/experiments/case_00358_add_trialunit.xml" Value="" />
   </ROW>
   
 </TestCase>

@@ -1,0 +1,9 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Delete Trial Event Type" TargetURL="delete/type/trialevent/:TypeId" Type="BLOCKING" />
+  <INPUT ParaName="TypeId" SrcValue="xml/add_data_no_vcol/experiments/case_00338_add_trialevent_type.xml" />
+  <Match Attr="StatusCode" Value="200" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/experiments/case_00338_add_trialevent_type.xml" Force="1" Order="3" />
+  
+</TestCase>

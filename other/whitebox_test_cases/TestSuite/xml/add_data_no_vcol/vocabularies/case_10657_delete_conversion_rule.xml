@@ -1,0 +1,11 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Delete Conversion Rule" TargetURL="generalunit/:UnitId/delete/conversionrule" Type="BLOCKING" />
+  <Delete TargetURL="delete/conversionrule/:ConversionRuleId" />
+  <INPUT ParaName="UnitId" SrcValue="xml/add_data_no_vcol/vocabularies/case_00491_add_conversion_rule.xml" />
+  <INPUT ParaName="ConversionFormula" Value="1" />
+  
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <Parent CaseFile="xml/add_data_no_vcol/vocabularies/case_00491_add_conversion_rule.xml" Order="3" />
+
+</TestCase>

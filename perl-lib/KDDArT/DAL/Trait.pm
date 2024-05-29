@@ -1,7 +1,7 @@
 #$Id$
 #$Author$
 
-# Copyright (c) 2011, Diversity Arrays Technology, All rights reserved.
+# Copyright (c) 2024, Diversity Arrays Technology, All rights reserved.
 
 # Author    : Puthick Hok
 # Created   : 02/06/2010
@@ -44,7 +44,7 @@ sub setup {
 
   my $self = shift;
 
-  CGI::Session->name("KDDArT_DAL_SESSID");
+  CGI::Session->name($COOKIE_NAME);
 
   __PACKAGE__->authen->init_config_parameters();
   __PACKAGE__->authen->check_login_runmodes(':all');
@@ -1337,19 +1337,34 @@ sub list_samplemeasurement_advanced_runmode {
 
   $dbh->disconnect();
 
-  my $sql_field_lookup = {};
+  my $sql_field_lookup = {
+    'SampleTypeId' => 1,
+    'OperatorId'  => 1,
+
+  };
 
   my $other_join = '';
+  my $extra_fields = '';
 
   if ($sql_field_lookup->{'SampleTypeId'}) {
 
-    $other_join .=  ' LEFT JOIN generatype ON samplemeasurement.SampleTypeId = generaltype.TypeId ';
+    $other_join .=  ' LEFT JOIN generaltype ON samplemeasurement.SampleTypeId = generaltype.TypeId ';
+    $extra_fields .= ', generaltype.TypeName ';
   }
 
-  $sql    =  "SELECT samplemeasurement.*, trait.TraitName  FROM samplemeasurement ";
+  if ($sql_field_lookup->{'OperatorId'}) {
+    $extra_fields .= ", concat(contact.ContactFirstName,' ',contact.ContactLastName) As Contact, contact.ContactId";
+
+    $other_join .=  ' LEFT JOIN systemuser ON samplemeasurement.OperatorId = systemuser.UserId  LEFT JOIN contact on systemuser.ContactId = contact.ContactId ';
+  }
+
+
+  $sql    =  "SELECT samplemeasurement.*, trait.TraitName $extra_fields FROM samplemeasurement ";
   $sql   .=  "LEFT JOIN trait ON trait.TraitId = samplemeasurement.TraitId ";
   $sql   .=  "$other_join ";
   $sql   .=  "$filtering_exp ";
+
+  $self->logger->debug($sql);
 
   my ($sort_err, $sort_msg, $sort_sql) = parse_sorting($sorting, $final_field_list);
 
@@ -9020,6 +9035,8 @@ sub insert_samplemeasurement_data_v2 {
   my $trait_id2val_href       = {};
   my $trait_id2idx_href       = {};
 
+  my $row_with_survey_href    = {};
+
   my $date_error_flag = 0;
   my $date_error_aref = [];
 
@@ -9147,6 +9164,8 @@ sub insert_samplemeasurement_data_v2 {
         $uniq_survey_href->{$survey_id} = 1;
         push(@{$survey_val_aref}, $survey_id);
         push(@{$survey_idx_aref}, $row_counter);
+
+        $row_with_survey_href->{$row_counter} = $survey_id;
 
         #$survey_tu_check_href->{$survey_id} = {};
         #$survey_tu_check_href->{$survey_id}->{$trialunit_id} = 1;
@@ -9299,6 +9318,8 @@ sub insert_samplemeasurement_data_v2 {
     my $trait_id   = $tu_rec->{'TraitId'};
     my $tu_spec_id = $tu_rec->{'TrialUnitSpecimenId'};
 
+    my $trialtrait_id   = $tu_rec->{'TraitId'};
+
     $uniq_trial_href->{$trial_id} = 1;
 
     if (! defined $trialunit_info_href->{$tu_id}) {
@@ -9314,7 +9335,7 @@ sub insert_samplemeasurement_data_v2 {
       $trialunit_info_href->{$tu_id}->{'TraitInfo'} = {};
     }
 
-    $trialunit_info_href->{$tu_id}->{'TraitInfo'}->{$trait_id} = 1;
+    $trialunit_info_href->{$tu_id}->{'TraitInfo'}->{$trialtrait_id} = 1;
 
     if (! defined $trialunit_info_href->{$tu_id}->{'TrialUnitSpecInfo'}) {
 
@@ -9323,6 +9344,47 @@ sub insert_samplemeasurement_data_v2 {
 
     $trialunit_info_href->{$tu_id}->{'TrialUnitSpecInfo'}->{$tu_spec_id} = 1;
   }
+
+  $sql  = "SELECT surveytrialunit.TrialUnitId, surveytrialunit.SurveyId, $perm_str AS UltimatePerm, ";
+  $sql .= "surveytrait.TraitId ";
+  $sql .= "FROM trialunit LEFT JOIN trial ON trial.TrialId = trialunit.TrialId ";
+  $sql .= "LEFT JOIN surveytrialunit ON surveytrialunit.TrialUnitId = trialunit.TrialUnitId ";
+  $sql .= "LEFT JOIN trialunitspecimen ON surveytrialunit.TrialUnitId = trialunitspecimen.TrialUnitId ";
+  $sql .= "LEFT JOIN surveytrait ON surveytrait.SurveyId = surveytrialunit.SurveyId ";
+  $sql .= "WHERE trialunit.TrialUnitId IN (" . join(',', @tu_id_list) . ')';
+
+  my ($r_stu_err, $r_stu_msg, $stu_data) = read_data($dbh_write, $sql, []);
+
+  if ($r_stu_err) {
+
+    $self->logger->debug("Get survey trial unit info failed: $r_stu_msg");
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+   foreach my $stu_rec (@{$stu_data}) {
+
+    my $tu_id      = $stu_rec->{'TrialUnitId'};
+    my $trait_id   = $stu_rec->{'TraitId'};
+    my $survey_id  = $stu_rec->{'SurveyId'};
+
+    my $surveytrait_id   = $stu_rec->{'TraitId'};
+
+    if (! defined $trialunit_info_href->{$tu_id}->{'SurveyInfo'}) {
+
+      $trialunit_info_href->{$tu_id}->{'SurveyInfo'} = {};
+    }
+
+    if (! defined $trialunit_info_href->{$tu_id}->{'SurveyInfo'}->{$survey_id}) {
+
+      $trialunit_info_href->{$tu_id}->{'SurveyInfo'}->{$survey_id} = {};
+    }
+
+    $trialunit_info_href->{$tu_id}->{'SurveyInfo'}->{$survey_id}->{$surveytrait_id} = 1;
+  }
+
 
   if ($enforce_single_trial_data == 1) {
 
@@ -9430,21 +9492,68 @@ sub insert_samplemeasurement_data_v2 {
           push(@{$full_error_aref}, $error_obj);
         }
 
-        if ( ! defined $trialunit_info_href->{$tu_id}->{'TraitInfo'}->{$trait_id} ) {
+        #is the csv row trying add a sm with SurveyId? 
 
-          my $trial_id = $trialunit_info_href->{$tu_id}->{'TrialId'};
+        if (defined $row_with_survey_href->{$row_num}) {
+          
+          my $row_survey_id = $row_with_survey_href->{$row_num};
 
-          my $err_msg = "Row ($row_num): Trait ($trait_id) is not attached to Trial ($trial_id).";
-          my $error_obj = {};
+          if ( ! defined $trialunit_info_href->{$tu_id}->{'SurveyInfo'}->{$row_survey_id} ) {
+            
+            #issue because this tu is not part of this survey 
 
-          $error_obj->{'Message'} = $err_msg;
-          $error_obj->{'Row'} = $row_num;
-          $error_obj->{'Type'} = "Trait Attach";
-          #$error_obj->{'Date'} = $measure_dt;
-          $error_obj->{'ErrorInput'} = "Trait ($trait_id) and Trial ($trial_id)";
+            my $error_obj = {};
 
-          push(@{$full_error_aref}, $error_obj);
+            $error_obj->{'Message'} = "Trial Unit $tu_id is not part of Survey $row_survey_id";
+            $error_obj->{'Row'} = $row_num;
+            $error_obj->{'Type'} = "Survey Trial Unit";
+            #$error_obj->{'Date'} = $measure_dt;
+            $error_obj->{'ErrorInput'} = "Trial Unit ($tu_id) and Survey ($row_survey_id)";
+
+            push(@{$full_error_aref}, $error_obj);
+          
+          }
+          else {
+
+            if ( ! defined $trialunit_info_href->{$tu_id}->{'SurveyInfo'}->{$row_survey_id}->{$trait_id} ) {
+
+              my $err_msg = "Row ($row_num): Trait ($trait_id) is not attached to Survey ($row_survey_id).";
+              my $error_obj = {};
+
+              $error_obj->{'Message'} = $err_msg;
+              $error_obj->{'Row'} = $row_num;
+              $error_obj->{'Type'} = "Trait Attach";
+              #$error_obj->{'Date'} = $measure_dt;
+              $error_obj->{'ErrorInput'} = "Trait ($trait_id) and Survey ($row_survey_id)";
+
+              push(@{$full_error_aref}, $error_obj);
+
+            }
+
+          }
+
+
         }
+        else {
+          if ( ! defined $trialunit_info_href->{$tu_id}->{'TraitInfo'}->{$trait_id} ) {
+
+            my $trial_id = $trialunit_info_href->{$tu_id}->{'TrialId'};
+
+            my $err_msg = "Row ($row_num): Trait ($trait_id) is not attached to Trial ($trial_id).";
+            my $error_obj = {};
+
+            $error_obj->{'Message'} = $err_msg;
+            $error_obj->{'Row'} = $row_num;
+            $error_obj->{'Type'} = "Trait Attach";
+            #$error_obj->{'Date'} = $measure_dt;
+            $error_obj->{'ErrorInput'} = "Trait ($trait_id) and Trial ($trial_id)";
+
+            push(@{$full_error_aref}, $error_obj);
+          }
+        }
+
+
+        
       }
     }
   }
@@ -9725,7 +9834,7 @@ sub insert_samplemeasurement_data_v2 {
   }
 
   if (scalar(@{$full_error_aref}) > 0) {
-    my $err_msg = 'Issues with CSV identified.';
+    my $err_msg = 'Issues with CSV identified while inserting sample measurement data';
 
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg,'ErrorList' => $full_error_aref}]};
@@ -11179,7 +11288,7 @@ sub insert_itemmeasurement_data_v2 {
   }
 
   if (scalar(@{$full_error_aref}) > 0) {
-    my $err_msg = 'Issues with CSV identified.';
+    my $err_msg = 'Issues with CSV identified while inserting item measurement data';
 
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg,'ErrorList' => $full_error_aref}]};
@@ -11484,16 +11593,28 @@ sub list_itemmeasurement_advanced_runmode {
 
   $dbh->disconnect();
 
-  my $sql_field_lookup = {};
+  my $sql_field_lookup = {
+     'OperatorId'  => 1
+  };
 
   my $other_join = '';
+  my $extra_fields = '';
 
   if ($sql_field_lookup->{'SampleTypeId'}) {
 
     $other_join .=  ' LEFT JOIN generaltype ON itemmeasurement.SampleTypeId = generaltype.TypeId ';
+    $extra_fields .= ', generaltype.TypeName ';
   }
 
-  $sql    =  "SELECT itemmeasurement.*, trait.TraitName  FROM itemmeasurement ";
+  if ($sql_field_lookup->{'OperatorId'}) {
+
+    $extra_fields .= ", concat(contact.ContactFirstName,' ',contact.ContactLastName) As Contact, contact.ContactId";
+
+    $other_join .=  ' LEFT JOIN systemuser ON itemmeasurement.OperatorId = systemuser.UserId  LEFT JOIN contact on systemuser.ContactId = contact.ContactId ';
+  }
+
+
+  $sql    =  "SELECT itemmeasurement.*, trait.TraitName $extra_fields FROM itemmeasurement ";
   $sql   .=  "LEFT JOIN trait ON trait.TraitId = itemmeasurement.TraitId ";
   $sql   .=  "$other_join ";
   $sql   .=  "$filtering_exp ";
@@ -12383,19 +12504,34 @@ sub list_crossingmeasurement_advanced_runmode {
 
   $dbh->disconnect();
 
-  my $sql_field_lookup = {};
+  my $sql_field_lookup = {
+    'SampleTypeId' => 1,
+    'OperatorId'  => 1,
+
+  };
 
   my $other_join = '';
+  my $extra_fields = '';
 
   if ($sql_field_lookup->{'SampleTypeId'}) {
 
     $other_join .=  ' LEFT JOIN generaltype ON crossingmeasurement.SampleTypeId = generaltype.TypeId ';
+    $extra_fields .= ', generaltype.TypeName ';
   }
 
-  $sql    =  "SELECT crossingmeasurement.*, trait.TraitName FROM crossingmeasurement ";
+  if ($sql_field_lookup->{'OperatorId'}) {
+    
+    $extra_fields .= ", concat(contact.ContactFirstName,' ',contact.ContactLastName) As Contact, contact.ContactId";
+
+    $other_join .=  ' LEFT JOIN systemuser ON crossingmeasurement.OperatorId = systemuser.UserId  LEFT JOIN contact on systemuser.ContactId = contact.ContactId ';
+  }
+
+
+  $sql    =  "SELECT crossingmeasurement.*, trait.TraitName $extra_fields FROM crossingmeasurement ";
   $sql   .=  "LEFT JOIN trait ON trait.TraitId = crossingmeasurement.TraitId ";
   $sql   .=  "$other_join ";
   $sql   .=  "$filtering_exp ";
+
 
   my ($sort_err, $sort_msg, $sort_sql) = parse_sorting($sorting, $final_field_list);
 
@@ -13575,7 +13711,7 @@ sub insert_crossingmeasurement_data_v2 {
 
       my $v_trait_id = $invalid_obj->{'Trait'};
       my $v_trait_idx = $invalid_obj->{'Index'};
-      my $v_trait_val_msg = $invalid_obj->{'Message'};
+      my $v_trait_val_msg = $v_trait_id . ": ". $invalid_obj->{'Message'};
       my $v_trait_val = $invalid_obj->{'Value'};
 
       $self->logger->debug("Validation error on TraitId: $v_trait_id - index: $v_trait_idx");
@@ -13600,7 +13736,7 @@ sub insert_crossingmeasurement_data_v2 {
   }
 
   if (scalar(@{$full_error_aref}) > 0) {
-    my $err_msg = 'Issues with CSV identified.';
+    my $err_msg = 'Issues with CSV identified while inserting crossing measurement data';
 
     $data_for_postrun_href->{'Error'} = 1;
     $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg,'ErrorList' => $full_error_aref}]};

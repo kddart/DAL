@@ -1,0 +1,5 @@
+#GenotypeId,Tissue,Quality,Status
+|:Genotype1:|,|:TissueRealValue:|,"Good","old"
+|:Genotype2:|,|:TissueRealValue:|,"Bad","dont use"
+|:Genotype3:|,|:TissueRealValue:|,"Okay","used up"
+|:Genotype4:|,|:TissueRealValue:|,"Unknown","okay"

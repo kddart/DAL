@@ -1,0 +1,16 @@
+<TestCase>
+  <CaseInfo CustomMethod="add_record" Description="Add General Unit" TargetURL="add/generalunit" Type="BLOCKING" />
+  <Delete TargetURL="delete/generalunit/:GeneralunitId" />
+  <INPUT ParaName="UnitName" PrefixVal="S_"  Random="1" Size="12" />
+  <INPUT ParaName="UseByItem" Value="0" />
+  <INPUT ParaName="UseByTrait" Value="0" />
+  <INPUT ParaName="UseByTrialEvent"  Value="0" />
+  <INPUT ParaName="UseBylayerattrib"  Value="0" />
+  <Match Attr="StatusCode" Value="200" />
+  <Match Attr="Message" Tag="Info" Value="regex(successfully)" />
+  <Match Attr="ParaName" Tag="ReturnId" Value="UnitId" />
+  <Parent CaseFile="xml/login_testuser/case_00201_login_testuser.xml" Order="1" />
+  <Parent CaseFile="xml/login_testuser/case_00203_switch4testu.xml" Force="1" Order="2" />
+  <ReturnId ParaName="UnitId" Value="11" />
+
+</TestCase>
