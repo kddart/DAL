@@ -1,7 +1,7 @@
 #$Id$
 #$Author$
 
-# Copyright (c) 2024, Diversity Arrays Technology, All rights reserved.
+# Copyright (c) 2025, Diversity Arrays Technology, All rights reserved.
 
 # Author    : Puthick Hok
 # Created   : 02/06/2010
@@ -58,7 +58,7 @@ our @EXPORT   = qw($DTD_PATH $RPOSTGRES_UP_FILE $GIS_BUFFER_DISTANCE
                    $GENOTYPE2SPECIMEN_CFG $MULTIMEDIA_STORAGE_PATH $EXTRACTDATAFILE_STORAGE_PATH $ERR_INFO_AREF
                    $CFG_FILE_PATH $DSN_KDB_READ $DSN_KDB_WRITE $DSN_MDB_READ
                    $DSN_MDB_WRITE $DSN_GIS_READ $DSN_GIS_WRITE $RMYSQL_UP_FILE
-                   $MONETDB_UP_FILE $GENOTYPE2SPECIMEN_CFG $GENOTYPEFACTORFILTERING_CFG $RECORD_ACTIVITY_CFG $TRIALUNITFACTORFILTERING_CFG $OAUTH2_SITE
+                   $MONETDB_UP_FILE $GENOTYPE2SPECIMEN_CFG $GENOTYPEFACTORFILTERING_CFG $RECORD_ACTIVITY_CFG $TRIALUNITFACTORFILTERING_CFG $OAUTH2_SITE $SMGCOUNT_CFG
                    $OAUTH2_AUTHORIZE_PATH $OAUTH2_CLIENT_ID $OAUTH2_CLIENT_SECRET
                    $OAUTH2_SCOPE $OAUTH2_ACCESS_TOKEN_URL $JSON_SCHEMA_PATH
                    $SOLR_URL $POINT2POLYGON_BUFFER4SITE $POINT2POLYGON_BUFFER4TRIAL
@@ -147,6 +147,8 @@ our $COOKIE_NAME = "FROM CFG_FILE";
 
 our $RECORD_ACTIVITY_CFG = "FROM CFG_FILE";
 
+our $SMGCOUNT_CFG = "FROM CFG_FILE";
+
 our $OPENID_URL = "FROM CFG_FILE";
 
 our $CLIENTID4OPENID_URL = "FROM CFG_FILE";
@@ -192,8 +194,8 @@ our $ACCEPT_HEADER_LOOKUP   = { 'application/json' => 'JSON',
 
 our $VALID_CTYPE            = {'xml' => 1, 'json' => 1, 'geojson' => 1};
 
-our $DAL_VERSION            = '2.7.6';
-our $DAL_COPYRIGHT          = 'Copyright (c) 2024, Diversity Arrays Technology, All rights reserved.';
+our $DAL_VERSION            = '2.7.7';
+our $DAL_COPYRIGHT          = 'Copyright (c) 2025, Diversity Arrays Technology, All rights reserved.';
 our $DAL_ABOUT              = 'Data Access Layer';
 
 our $GENO_SPEC_ONE2ONE      = '1-TO-1';
@@ -6067,6 +6069,13 @@ sub recurse_read {
     $global_frequency_id_href = $_[6];
   }
 
+  my $ref_id_href = {};
+
+  if (defined $_[7]) {
+
+    $ref_id_href = $_[7];
+  }
+
   my $err          = 0;
   my $msg          = '';
   my $data         = [];
@@ -6082,8 +6091,7 @@ sub recurse_read {
     return ($err, $msg, $finish_level, $data);
   }
 
-  if ( (scalar(@{$read_data_aref}) == 0) ||
-       ($current_level == $stopping_level) ) {
+  if ( (scalar(@{$read_data_aref}) == 0) || ($current_level == $stopping_level) ) {
 
     $err          = 0;
     $msg          = '';
@@ -6105,9 +6113,14 @@ sub recurse_read {
       else {
         $global_frequency_id_href->{$id} += 1;
       }
+
+      if (! (defined $ref_id_href->{$id}) ) {
+
+        $ref_id_href->{$id} = 1;
+      }
     }
 
-    return ($err, $msg, $finish_level, $data);
+    return ($err, $msg, $finish_level, $data, $ref_id_href);
   }
 
   my %next_level_id_dict;
@@ -6134,9 +6147,16 @@ sub recurse_read {
 
   for my $next_level_id (keys(%next_level_id_dict)) {
 
-    my ($nlevel_err, $nlevel_msg, $nlevel_fl, $nlevel_data) = recurse_read($dbh, $sql, [$next_level_id],
+    if (! (defined $ref_id_href->{$next_level_id}) ) {
+      $ref_id_href->{$next_level_id} = 1;
+    } 
+    else {
+      next;
+    }
+
+    my ($nlevel_err, $nlevel_msg, $nlevel_fl, $nlevel_data, $nref) = recurse_read($dbh, $sql, [$next_level_id],
                                                                            $seeking_id_field, $current_level+1,
-                                                                           $stopping_level, $global_frequency_id_href);
+                                                                           $stopping_level, $global_frequency_id_href, $ref_id_href);
 
     if ($nlevel_err) {
 
@@ -6148,6 +6168,7 @@ sub recurse_read {
     }
 
     $finish_level = $nlevel_fl;
+    $ref_id_href = $nref;
 
     for my $nlevel_rec (@{$nlevel_data}) {
 
@@ -6155,7 +6176,7 @@ sub recurse_read {
     }
   }
 
-  return ($err, $msg, $finish_level, $data);
+  return ($err, $msg, $finish_level, $data, $ref_id_href);
 }
 
 # There is a similar function called parse_filtering_v2 which can filter filter virtual columns.

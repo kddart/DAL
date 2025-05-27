@@ -1,7 +1,7 @@
 #$Id$
 #$Author$
 
-# Copyright (c) 2024, Diversity Arrays Technology, All rights reserved.
+# Copyright (c) 2025, Diversity Arrays Technology, All rights reserved.
 
 # Author    : Puthick Hok
 # Created   : 02/06/2010
@@ -170,6 +170,7 @@ sub setup {
     'add_genus_gadmin'                          => 'add_genus_runmode',
     'list_genus'                                => 'list_genus_runmode',
     'get_genotype'                              => 'get_genotype_runmode',
+    'list_genotype_tus'                         => 'list_genotype_tus_runmode',
     'add_specimen'                              => 'add_specimen_runmode',
     'list_specimen_advanced'                    => 'list_specimen_advanced_runmode',
     'update_genotype'                           => 'update_genotype_runmode',
@@ -237,6 +238,7 @@ sub setup {
     'del_taxonomy_gadmin'                       => 'del_taxonomy_gadmin_runmode',
     'list_taxonomy_ancestor'                    => 'list_taxonomy_ancestor_runmode',
     'update_specimen_geography'                 => 'update_specimen_geography_runmode',
+    'find_germplasm_name'                       => 'find_germplasm_name_runmode',
     );
 
   my $logger = get_logger();
@@ -851,6 +853,9 @@ sub list_genotype {
     my $geno_alias_lookup = {};
     my $taxonomy_lookup   = {};
 
+
+    my $gen_ped_lookup = {};
+
     my $chk_id_err        = 0;
     my $chk_id_msg        = '';
     my $used_id_href      = {};
@@ -908,7 +913,16 @@ sub list_genotype {
       $group_lookup = $dbh->selectall_hashref($group_sql, 'SystemGroupId');
     }
 
+    my $tus_lookup = {};
+
     if (scalar(@{$geno_id_aref}) > 0) {
+
+      #count the number of trial units associated with genotpe
+      my $count_trialunitspecimen_associated_sql = "select GenotypeId, count(trialunitspecimen.TrialUnitSpecimenId) as NumTrialUnitSpecimens FROM trialunitspecimen LEFT JOIN genotypespecimen ON genotypespecimen.SpecimenId = trialunitspecimen.SpecimenId where genotypespecimen.GenotypeId In (". join(',', @{$geno_id_aref}) .") group by genotypespecimen.GenotypeId;";
+
+      $self->logger->debug("COUNT TUS: $count_trialunitspecimen_associated_sql");
+      
+      $tus_lookup = $dbh->selectall_hashref($count_trialunitspecimen_associated_sql, 'GenotypeId');
 
       #include genotype alias as part of genotype response
       my $geno_alias_sql = 'SELECT genotypealias.GenotypeId, genotypealias.GenotypeAliasId, genotypealias.GenotypeAliasName, generaltype.TypeName, genotypealias.GenotypeAliasType, ';
@@ -942,6 +956,40 @@ sub list_genotype {
           delete($row->{'GenotypeId'});
           $geno_alias_lookup->{$geno_id} = [$row];
         }
+      }
+
+      my $get_genpedigree_sql = "SELECT generaltype.TypeName AS GenParentType, genpedigree.GenParentType AS GenParentTypeId, ";
+      $get_genpedigree_sql .= " genotype.GenotypeName AS ParentGenotypeName, genotype.GenotypeId AS ParentGenotypeId, genpedigree.GenotypeId AS GenotypeId ";
+      $get_genpedigree_sql .= " FROM genpedigree ";
+      $get_genpedigree_sql .= " LEFT JOIN generaltype ON generaltype.TypeId = genpedigree.GenParentType ";
+      $get_genpedigree_sql .= " LEFT JOIN genotype ON genotype.GenotypeId = genpedigree.ParentGenotypeId ";
+      $get_genpedigree_sql .= " WHERE genpedigree.GenotypeId IN (" . join(',', @{$geno_id_aref}) . ") GROUP BY genpedigree.GenPedigreeId; ";
+
+      $self->logger->debug("GENO_ALIAS_SQL: $get_genpedigree_sql");
+
+      my ($geno_ped_err, $geno_ped_msg, $geno_ped_data) = read_data($dbh, $get_genpedigree_sql, []);
+
+      if ($geno_ped_err) {
+
+      return ($geno_ped_err, "$geno_ped_msg", []);
+      }
+
+      for my $row (@{$geno_ped_data}) {
+
+          my $geno_id = $row->{'GenotypeId'};
+
+          if (defined $gen_ped_lookup->{$geno_id}) {
+
+              my $ped_aref = $gen_ped_lookup->{$geno_id};
+              delete($row->{'GenotypeId'});
+              push(@{$ped_aref}, $row);
+              $gen_ped_lookup->{$geno_id} = $ped_aref;
+          }
+          else {
+
+              delete($row->{'GenotypeId'});
+              $gen_ped_lookup->{$geno_id} = [$row];
+          }
       }
 
       my $chk_table_aref = [{'TableName' => 'genotype', 'FieldName' => 'GenotypeId'}];
@@ -989,6 +1037,27 @@ sub list_genotype {
         $row->{'Alias'} = $geno_alias_aref;
       }
 
+      if (defined $gen_ped_lookup->{$geno_id}) {
+
+        my $geno_ped_aref = [];
+        my $geno_ped_data = $gen_ped_lookup->{$geno_id};
+        for my $ped_info (@{$geno_ped_data}) {
+
+          push(@{$geno_ped_aref}, $ped_info);
+        }
+        $row->{'GenPedigree'} = $geno_ped_aref;
+      }
+
+      my $number_tus = 0;
+
+      if (defined $tus_lookup->{$geno_id}) {
+
+        $number_tus = $tus_lookup->{$geno_id}->{'NumTrialUnitSpecimens'};
+
+      }
+
+      $row->{'NumTrialUnitSpecimen'} = $number_tus;
+ 
       my $own_grp_id   = $row->{'OwnGroupId'};
       my $acc_grp_id   = $row->{'AccessGroupId'};
       my $own_perm     = $row->{'OwnGroupPerm'};
@@ -1149,6 +1218,87 @@ sub get_genotype_runmode {
   $data_for_postrun_href->{'Data'}      = {'Genotype'   => $geno_data,
                                            'VCol'       => $vcol_list,
                                            'RecordMeta' => [{'TagName' => 'Genotype'}],
+  };
+
+  return $data_for_postrun_href;
+}
+
+sub list_genotype_tus_runmode {
+
+=pod list_genotype_tus_HELP_START
+{
+"OperationName": "List trial unit related to a genotype",
+"Description": "List the whole association of specimens with trial units for a genotype. ",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "FILTERING"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Pagination NumOfRecords='103' NumOfPages='103' Page='1' NumPerPage='1' /><RecordMeta TagName='TrialUnitSpecimen' /><TrialUnitSpecimen SpecimenName='Specimen_0435994' Notes='None' remove='remove/trialunitspecimen/109' ItemId='0' TrialUnitId='76' TrialUnitSpecimenId='109' HarvestDate='0000-00-00' UltimatePermission='Read/Write/Link' PlantDate='0000-00-00' HasDied='0' update='update/trialunitspecimen/109' UltimatePerm='7' SpecimenId='477' TrialId='1' /></DATA>",
+"SuccessMessageJSON": "{'RecordMeta' : [{'TagName' : 'TrialUnitSpecimen'}],'TrialUnitSpecimen' : [{'SpecimenName' : 'Specimen_0435994', 'remove' : 'remove/trialunitspecimen/109', 'Notes' : 'None', 'ItemId' : '0', 'TrialUnitId' : '76', 'TrialUnitSpecimenId' : '109', 'HarvestDate' : '0000-00-00', 'UltimatePermission' : 'Read/Write/Link', 'PlantDate' : '0000-00-00', 'HasDied' : '0', 'update' : 'update/trialunitspecimen/109', 'SpecimenId' : '477', 'UltimatePerm' : '7', 'TrialId' : 1 }]}",
+"ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
+"ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
+"URLParameter": [{"ParameterName": "genoid", "Description": "Genotype Id"}],
+"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database field name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "FieldList", "Description": "Comma separated value of wanted fields."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases."}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self    = shift;
+  my $geno_id = $self->param('genoid');
+
+  my $data_for_postrun_href = {};
+
+  my $dbh = connect_kdb_read();
+
+  my $group_id      = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+  my $perm_str      = permission_phrase($group_id, 0, $gadmin_status, 'genotype');
+
+  my $geno_perm_sql = "SELECT $perm_str as UltimatePerm ";
+  $geno_perm_sql   .= "FROM genotype ";
+  $geno_perm_sql   .= "WHERE GenotypeId=?";
+
+  my ($r_geno_perm_err, $geno_perm) = read_cell($dbh, $geno_perm_sql, [$geno_id]);
+
+  if (length($geno_perm) == 0) {
+
+    my $err_msg = "Genotype ($geno_id) not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+  elsif ( ($geno_perm & $READ_PERM) != $READ_PERM ) {
+
+    my $err_msg = "Permission denied: genotype ($geno_id).";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+
+  my $other_join = '';
+
+  my $tus_data = [];
+
+  my $get_tus_from_genotype_sql = "SELECT trialunitspecimen.*,trialunit.*, trial.TrialName, site.SiteName as SiteName FROM trialunitspecimen ";
+  $get_tus_from_genotype_sql .= " LEFT JOIN genotypespecimen ON genotypespecimen.SpecimenId = trialunitspecimen.SpecimenId ";
+  $get_tus_from_genotype_sql .= " LEFT JOIN trialunit ON trialunitspecimen.TrialUnitId = trialunit.TrialUnitId ";
+  $get_tus_from_genotype_sql .= " LEFT JOIN trial ON trial.TrialId = trialunit.TrialId ";
+  $get_tus_from_genotype_sql .= " LEFT JOIN site ON trial.SiteId = site.SiteId ";
+  $get_tus_from_genotype_sql .= " WHERE genotypespecimen.GenotypeId=$geno_id";
+
+
+  $self->logger->debug("GET TUS FROM GENOTYPE: $get_tus_from_genotype_sql");
+  
+
+  my ($err, $msg, $tu_spec_data_aref) = read_data($dbh, $get_tus_from_genotype_sql, []);
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'TrialUnitSpecimen'   => $tu_spec_data_aref,
+                                           'RecordMeta' => [{'TagName' => 'TrialUnitSpecimen'}],
   };
 
   return $data_for_postrun_href;
@@ -1834,6 +1984,8 @@ sub list_specimen {
   my $breedingmeth_lookup = {};
   my $geno_spec_lookup    = {};
   my $parent_lookup       = {};
+  my $grandparent_lookup  = {};
+  my $grandchildren_lookup = {};
   my $keyword_lookup      = {};
 
   my $bmethod_id_href     = {};
@@ -1944,13 +2096,16 @@ sub list_specimen {
       }
 
 
-      my $parent_sql = "SELECT pedigree.SpecimenId, ParentSpecimenId, ParentType, SelectionReason, ";
-      $parent_sql   .= "generaltype.TypeName as ParentTypeName ";
+      my $parent_sql = "SELECT pedigree.SpecimenId, pedigree.ParentSpecimenId, ParentType, SelectionReason,  ";
+      $parent_sql   .= "specimen.SpecimenName As ParentSpecimenName, generaltype.TypeName as ParentTypeName ";
       $parent_sql   .= "FROM pedigree LEFT JOIN generaltype ON ";
       $parent_sql   .= "pedigree.ParentType=generaltype.TypeId ";
+      $parent_sql   .= "LEFT JOIN specimen on specimen.SpecimenId = pedigree.ParentSpecimenId ";
       $parent_sql   .= "WHERE pedigree.SpecimenId IN (" . join(',', @{$spec_id_aref}) . ')';
 
       $self->logger->debug("PARENT_SQL: $parent_sql");
+
+      my $parent_spec_id_aref = [];
 
       my ($parent_err, $parent_msg, $parent_data) = read_data($dbh, $parent_sql, []);
 
@@ -1962,20 +2117,65 @@ sub list_specimen {
       for my $parent_row (@{$parent_data}) {
 
         my $spec_id = $parent_row->{'SpecimenId'};
+        my $parent_spec_id = $parent_row->{'ParentSpecimenId'};
+
+        push(@{$parent_spec_id_aref},$parent_spec_id);
 
         if (defined $parent_lookup->{$spec_id}) {
 
           my $parent_aref = $parent_lookup->{$spec_id};
           delete($parent_row->{'SpecimenId'});
           push(@{$parent_aref}, $parent_row);
+
+          $parent_row->{'Level'} = "1";
+
           $parent_lookup->{$spec_id} = $parent_aref;
         }
         else {
 
           delete($parent_row->{'SpecimenId'});
+
+          $parent_row->{'Level'} = "1";
+
           $parent_lookup->{$spec_id} = [$parent_row];
         }
       }
+
+      #next level of pedigree (only one level since we are in list mode and we don't want too many jumps)
+
+      my $grandparent_sql = "SELECT pedigree.SpecimenId, pedigree.ParentSpecimenId, ParentType, SelectionReason,  ";
+      $grandparent_sql   .= "specimen.SpecimenName As ParentSpecimenName, generaltype.TypeName as ParentTypeName ";
+      $grandparent_sql   .= "FROM pedigree LEFT JOIN generaltype ON ";
+      $grandparent_sql   .= "pedigree.ParentType=generaltype.TypeId ";
+      $grandparent_sql   .= "LEFT JOIN specimen on specimen.SpecimenId = pedigree.ParentSpecimenId ";
+      $grandparent_sql   .= "WHERE pedigree.SpecimenId IN (" . join(',', @{$parent_spec_id_aref}) . ')';
+
+      $self->logger->debug("Specimen Grand Parent SQL: $grandparent_sql");
+
+      my ($grandparent_err, $grandparent_msg, $grandparent_data) = read_data($dbh, $grandparent_sql, []);
+
+      for my $grandparent_row (@{$grandparent_data}) {
+
+        my $spec_id = $grandparent_row->{'SpecimenId'};
+
+        if (defined $grandparent_lookup->{$spec_id}) {
+
+          my $grandparent_aref = $grandparent_lookup->{$spec_id};
+          delete($grandparent_row->{'SpecimenId'});
+          $grandparent_row->{'Level'} = "2";
+          push(@{$grandparent_aref}, $grandparent_row);
+          $grandparent_lookup->{$spec_id} = $grandparent_aref;
+        }
+        else {
+
+          delete($grandparent_row->{'SpecimenId'});
+          $grandparent_row->{'Level'} = "2";
+          $grandparent_lookup->{$spec_id} = [$grandparent_row];
+        }
+
+      }
+
+
 
       my $keyword_sql = 'SELECT SpecimenId, keyword.KeywordId, KeywordName ';
       $keyword_sql   .= 'FROM specimenkeyword LEFT JOIN keyword ON ';
@@ -2095,8 +2295,24 @@ sub list_specimen {
     if ($extra_attr_yes) {
 
       if (defined $parent_lookup->{$specimen_id}) {
+        my $ancestor_aref = [];
+        my $first_gen_parent = $parent_lookup->{$specimen_id};
 
-        $specimen_row->{'Parent'} = $parent_lookup->{$specimen_id};
+        foreach my $parent_href (@{$first_gen_parent}) {
+
+          my $parent_specimen_id = $parent_href->{'ParentSpecimenId'};
+
+          if (defined $grandparent_lookup->{$parent_specimen_id}) {
+
+            push(@{$ancestor_aref}, @{$grandparent_lookup->{$parent_specimen_id}});
+          }
+
+        }
+
+        push(@{$ancestor_aref}, @{$first_gen_parent});
+
+
+        $specimen_row->{'Parent'} = $ancestor_aref;
       }
 
       if (defined $specimen_row->{'BreedingMethodId'}) {
@@ -14131,15 +14347,15 @@ sub list_pedigree_advanced_runmode {
 
 =pod list_pedigree_advanced_HELP_START
 {
-"OperationName": "List pedigree",
-"Description": "Returns list of pedigree records. This listing requires pagination definition.",
+"OperationName": "List specimen pedigree",
+"Description": "Return list of specimen pedigree records. This listing requires pagination definition.",
 "AuthRequired": 1,
 "GroupRequired": 1,
 "GroupAdminRequired": 0,
 "SignatureRequired": 0,
 "AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "FILTERING"}, {"MethodName": "GET"}],
-"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Pagination Page='1' NumOfRecords='3' NumOfPages='3' NumPerPage='1' /><Pedigree NumberOfSpecimens='' ParentSpecimenId='11' SelectionReason='' ParentType='7' PedigreeId='6' delete='delete/pedigree/6' update='update/pedigree/6' SpecimenId='10' ParentTypeName='Male-5673950' /><RecordMeta TagName='Pedigree' /></DATA>",
-"SuccessMessageJSON": "{'Pagination' : [{'NumOfRecords' : '3','NumOfPages' : 3,'NumPerPage' : '1','Page' : '1'}],'Pedigree' : [{'ParentSpecimenId' : '11','NumberOfSpecimens' : null,'ParentType' : '7','SelectionReason' : null,'PedigreeId' : '6','delete' : 'delete/pedigree/6','update' : 'update/pedigree/6','ParentTypeName' : 'Male-5673950','SpecimenId' : '10'}],'RecordMeta' : [{'TagName' : 'Pedigree'}]}",
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><Pagination NumOfRecords='5' NumOfPages='5' Page='1' NumPerPage='1' /><Pedigree NumberOfSpecimens='' ParentSpecimenId='2' ParentType='59' PedigreeId='5' delete='delete/pedigree/5' SpecimenId='1' update='update/pedigree/5' ParentTypeName='ParentType - 8659523' /><RecordMeta TagName='Pedigree' /></DATA>",
+"SuccessMessageJSON": "{'Pagination' : [{'NumOfRecords' : '5','NumOfPages' : 5,'NumPerPage' : '1','Page' : '1'}],'Pedigree' : [{'ParentSpecimenId' : '2','NumberOfSpecimens' : null,'PedigreeId' : '5','ParentType' : '59','delete' : 'delete/pedigree/5','SpecimenId' : '1','update' : 'update/pedigree/5','ParentTypeName' : 'ParentType - 8659523'}],'RecordMeta' : [{'TagName' : 'Pedigree'}]}",
 "ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
 "ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
 "URLParameter": [{"ParameterName": "nperpage", "Description": "Number of records in a page for pagination"}, {"ParameterName": "num", "Description": "The page number of the pagination"}],
@@ -14168,6 +14384,8 @@ sub list_pedigree_advanced_runmode {
   my $field_list_csv = $query->param('FieldList') ? $query->param('FieldList') : '';
   my $filtering_csv  = $query->param('Filtering') ? $query->param('Filtering') : '';
   my $sorting        = $query->param('Sorting')   ? $query->param('Sorting')   : '';
+
+  $self->logger->debug("Filtering CSV: $filtering_csv");
 
   my $data_for_postrun_href = {};
 
@@ -14220,6 +14438,7 @@ sub list_pedigree_advanced_runmode {
   $self->logger->debug("Field list all: " . join(',', @field_list_all));
 
   my $final_field_list = \@field_list_all;
+  my @filtering_field_list = ('SpecimenId','ParentSpecimenId', 'SpecimenName','ParentSpecimenName', 'ParentTypeId','ParentTypeName','PedigreeId', 'ParentType');
 
   $self->logger->debug("Final field list: " . join(',', @{$final_field_list}));
 
@@ -14244,26 +14463,45 @@ sub list_pedigree_advanced_runmode {
   for my $field (@{$final_field_list}) {
 
     if ($field eq 'ParentType') {
-
       push(@{$final_field_list}, 'generaltype.TypeName AS ParentTypeName');
       $join = ' LEFT JOIN generaltype ON pedigree.ParentType = generaltype.TypeId ';
     }
+
+    if ($field eq 'SpecimenId') {
+      push(@{$final_field_list}, 's1.SpecimenId AS SpecimenId');
+      $field = 's1.SpecimenId';
+    }
+
+    if ($field eq 'ParentSpecimenId') {
+      push(@{$final_field_list}, 'pedigree.ParentSpecimenId AS ParentSpecimenId');
+      $field = 'pedigree.ParentSpecimenId';
+    }
+
+
   }
+
+  #get parent names
+  push(@{$final_field_list}, 's1.SpecimenName AS SpecimenName');
+  push(@{$final_field_list}, 's2.SpecimenName AS ParentSpecimenName');
+
+  $join = ' LEFT JOIN generaltype ON pedigree.ParentType = generaltype.TypeId ';
+  $join .= ' LEFT JOIN specimen s1 ON s1.SpecimenId = pedigree.SpecimenId ';
+  $join .= ' LEFT JOIN specimen s2 ON s2.SpecimenId = pedigree.ParentSpecimenId ';
 
   $self->logger->debug("Final field list: " . join(',', @{$final_field_list}));
 
   $sql  = 'SELECT ' . join(',', @{$final_field_list}) . ' ';
   $sql .= "FROM pedigree $join ";
 
-  my ( $filter_err, $filter_msg, $filter_phrase, $where_arg ) = parse_filtering('PedigreeId', 'pedigree',
-                                                                                $filtering_csv, $final_field_list );
+  my ( $filter_err, $filter_msg, $filter_phrase, $where_arg, $debug_array ) = parse_filtering('PedigreeId', 'pedigree',
+                                                                                $filtering_csv, \@filtering_field_list );
   if ($filter_err) {
 
     $self->logger->debug("Parse filtering failed: $filter_msg");
     my $err_msg = $filter_msg;
 
     $data_for_postrun_href->{'Error'} = 1;
-    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg }]};
 
     return $data_for_postrun_href;
   }
@@ -14358,7 +14596,7 @@ sub list_pedigree_advanced_runmode {
 
   $sql .= " $paged_limit_clause ";
 
-  $self->logger->debug("Final list itemgroup SQL: $sql");
+  $self->logger->debug("Final list SQL: $sql");
 
   my ($pedigree_err, $pedigree_msg, $pedigree_data) = $self->list_pedigree(1, $sql, $where_arg);
 
@@ -14373,7 +14611,7 @@ sub list_pedigree_advanced_runmode {
   }
 
   $data_for_postrun_href->{'Error'}     = 0;
-  $data_for_postrun_href->{'Data'}      = {'Pedigree'      => $pedigree_data,
+  $data_for_postrun_href->{'Data'}      = {'Pedigree'   => $pedigree_data,
                                            'Pagination'    => $pagination_aref,
                                            'RecordMeta'    => [{'TagName' => 'Pedigree'}],
   };
@@ -17173,6 +17411,80 @@ sub list_taxonomy_ancestor_runmode {
                                           };
 
   return $data_for_postrun_href;
+}
+
+sub find_germplasm_name_runmode {
+=pod find_germplasm_name_HELP_START
+{
+"OperationName": "General endpoint to find table entites",
+"Description": "List all entities based on identifier from table.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><RecordMeta TagName='specimen' /><specimen SpecimenId='12345' SpecimenName='Specimen 123'/><specimen SpecimenId='12346' SpecimenName='Specimen 124'/><specimen SpecimenId='12347' SpecimenName='Specimen 125'/></DATA>",
+"SuccessMessageJSON": "{'specimen' : [{'SpecimenId': 12345, 'SpecimenName': 'Specimen 123'},{'SpecimenId': 12346, 'SpecimenName': 'Specimen 124'},{'SpecimenId': 12347, 'SpecimenName': 'Specimen 125'} ], 'message' : '', 'RecordMeta' : [{'TagName' : 'specimen'}]}",
+"ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
+"ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
+"URLParameter": [{"ParameterName": "tablename", "Description": "Either genotype, specimen or item"}],
+"HTTPParameter": [{"Required": 0, "Name": "name", "Description": "Depending on the table name, search entities for this name (GenotypeName for genotype, SpecimenName for specimen and ItemBarcode for Item)"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self    = shift;
+  my $query   = $self->query();
+
+  my $data_for_postrun_href = {};
+
+
+  my $table_name = $self->param('tablename');
+  my $germplasm_name = $query->param('Name');
+
+  my $default_fields = {
+    'genotype' => "GenotypeId, GenotypeName",
+    'specimen' => "SpecimenId, SpecimenName",
+    'item' => "ItemId, ItemBarcode",
+  };
+
+  my $field_search_term = {
+
+    'genotype' => "GenotypeName",
+    'specimen' => "SpecimenName",
+    'item' => "ItemBarcode",
+  };
+
+  my $sql = "";
+
+  if (defined $default_fields->{$table_name}) {
+    $sql = "SELECT " . $default_fields->{$table_name} . " from " . $table_name . " WHERE " . $field_search_term->{$table_name} . " LIKE '%" . $germplasm_name ."%'";
+  
+    my $dbh = connect_kdb_read();
+
+    my ($err, $msg, $results_aref) = read_data($dbh, $sql, []);
+
+    $data_for_postrun_href->{'Error'}     = $err;
+    $data_for_postrun_href->{'Data'}      = {
+                                            $table_name   => $results_aref,
+                                            'RecordMeta'  => [{'TagName' => $table_name}],
+                                            'Msg' => $msg,
+                                            };
+  
+  }
+  else {
+    $data_for_postrun_href->{'Error'}     = 1;
+    $data_for_postrun_href->{'Data'}      = {
+                                            $table_name   => [],
+                                            'RecordMeta'  => [{'TagName' => $table_name}],
+                                            'Msg' => "None found",
+                                            };
+  }
+
+  
+
+  return $data_for_postrun_href;
+
 }
 
 1;

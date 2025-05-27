@@ -1,3 +1,21 @@
+Version 2.7.7
+Date: 27/05/2025
+Description: Bug Fixing Patch and Improvements
+
++ Upgrade deployment scripts added for Debian 11.
+
++ New end point to return trial unit specimens for Genotype .
+
++ New end point to return summarised data for Genotype.
+
++ New end point to return summarised data CSV for a trial.
+
++ New end point to return Genotypes present in a trial.
+
++ New end point assist searching Genotype, Specimen and Item tables.
+
++ Fix to v2.7.0 deployment script.
+
 Version 2.7.6
 Date: 29/05/2023
 Description: Bug Fixing Patch and Improvements
@@ -8,7 +26,7 @@ Description: Bug Fixing Patch and Improvements
 
 + Configuration support added for OpenID authentication model. A key change is that now the session name is now defined by configuration, rather than hard coded as it was previously. 
 
-+ Wider activity logging based on configuration.
++ Wider activity logging based on confiugration.
 
 + Fixing issue with user directory not being created correctly with wrong permission settings.
 

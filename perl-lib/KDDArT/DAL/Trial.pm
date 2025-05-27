@@ -1,7 +1,7 @@
 #$Id$
 #$Author$
 
-# Copyright (c) 2024, Diversity Arrays Technology, All rights reserved.
+# Copyright (c) 2025, Diversity Arrays Technology, All rights reserved.
 
 # Author    : Puthick Hok
 # Created   : 02/06/2010
@@ -180,6 +180,7 @@ sub setup {
     'delete_trial_unit_specimen'             => 'delete_trial_unit_specimen_runmode',
     'update_trial_unit_specimen'             => 'update_trial_unit_specimen_runmode',
     'list_trial_unit_advanced'               => 'list_trial_unit_advanced_runmode',
+    'list_trial_genotype'                    => 'list_trial_genotype_runmode',
     'list_trial_unit_specimen_advanced'      => 'list_trial_unit_specimen_advanced_runmode',
     'del_designtype_gadmin'                  => 'del_designtype_runmode',
     'del_site_gadmin'                        => 'del_site_runmode',
@@ -4483,23 +4484,29 @@ sub list_trial {
         return ($err, $msg, []);
       }
       $sth_crossing->finish();
+      
+      if ($SMGCOUNT_CFG == 1) {
+        my $trait_value_sql = 'SELECT TrialId, count(TraitValue) AS NumOfTraitValue ';
+        $trait_value_sql   .= 'FROM trialunit LEFT JOIN samplemeasurement ';
+        $trait_value_sql   .= 'ON trialunit.TrialUnitId = samplemeasurement.TrialUnitId ';
+        $trait_value_sql   .= 'WHERE TrialId IN (' . join(',', @trial_id_list) . ') ';
+        $trait_value_sql   .= 'GROUP BY TrialId';
 
-      my $trait_value_sql = 'SELECT TrialId, count(TraitValue) AS NumOfTraitValue ';
-      $trait_value_sql   .= 'FROM trialunit LEFT JOIN samplemeasurement ';
-      $trait_value_sql   .= 'ON trialunit.TrialUnitId = samplemeasurement.TrialUnitId ';
-      $trait_value_sql   .= 'WHERE TrialId IN (' . join(',', @trial_id_list) . ') ';
-      $trait_value_sql   .= 'GROUP BY TrialId';
+        my $sth_trait_val = $dbh->prepare($trait_value_sql);
+        $sth_trait_val->execute();
 
-      my $sth_trait_val = $dbh->prepare($trait_value_sql);
-      $sth_trait_val->execute();
+        if (!$dbh->err()) {
+          my $count_href = $sth_trait_val->fetchall_hashref('TrialId');
 
-      if (!$dbh->err()) {
-
-        my $count_href = $sth_trait_val->fetchall_hashref('TrialId');
-
-        if (!$sth_trait_val->err()) {
-
-          $trait_value_count_href = $count_href;
+          if (!$sth_trait_val->err()) {
+            $trait_value_count_href = $count_href;
+          }
+          else {
+            $err = 1;
+            $msg = 'Unexpected error';
+            $self->logger->debug('Err: ' . $dbh->errstr());
+            return ($err, $msg, []);
+          }
         }
         else {
 
@@ -4508,15 +4515,8 @@ sub list_trial {
           $self->logger->debug('Err: ' . $dbh->errstr());
           return ($err, $msg, []);
         }
+        $sth_trait_val->finish();
       }
-      else {
-
-        $err = 1;
-        $msg = 'Unexpected error';
-        $self->logger->debug('Err: ' . $dbh->errstr());
-        return ($err, $msg, []);
-      }
-      $sth_trait_val->finish();
 
       my $trial_dimension_sql = 'SELECT * FROM trialdimension WHERE TrialId IN (' . join(',', @trial_id_list) . ')';
 
@@ -4820,10 +4820,10 @@ sub list_trial {
         $row->{'expDkTmpl'} = "trial/$trial_id/export/datakapturetemplate";
       }
 
-      if ($trait_value_count_href->{$trial_id}->{'NumOfTraitValue'} > 0) {
+      # if ($trait_value_count_href->{$trial_id}->{'NumOfTraitValue'} > 0) {
 
-        $row->{'expDkData'} = "trial/$trial_id/export/dkdata";
-      }
+      $row->{'expDkData'} = "trial/$trial_id/export/dkdata";
+      # }
 
       if ($trialunit_count_href->{$trial_id}->{'NumOfTrialUnit'} > 0) {
 
@@ -9591,6 +9591,84 @@ sub list_trial_unit_advanced_runmode {
                                        'Pagination' => $pagination_aref,
                                        'RecordMeta' => [{'TagName' => 'TrialUnit'}],
   };
+
+  return $data_for_postrun_href;
+}
+
+sub list_trial_genotype_runmode {
+=pod list_trial_genotype_HELP_START
+{
+"OperationName": "List genotypes",
+"Description": "List all the genotypes in the trial.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><RecordMeta TagName='Genotype' /><Genotype GenotypeAcronym='AAA' GenotypeNote='AAA' OwnGroupId='0' GenotypeColor='None' SpeciesName='T. aestivum' AccessGroupId='0' GenotypeId='1741' GenusId='1' CanPublishGenotype='0' OtherPerm='5' GenotypeName='Genotype_111' TaxonomyId='1' OriginId='1' AccessGroupPerm='5' OwnGroupPerm='7'/></DATA>",
+"SuccessMessageJSON": "{'RecordMeta' : [{'TagName' : 'Genotype'}], 'Genotype' : [{'GenotypeAcronym': 'AAA', 'GenotypeNote': 'AAA', 'OwnGroupId': '0', 'GenotypeColor': 'None', 'SpeciesName': 'T. aestivum', 'AccessGroupId': '0', 'GenotypeId': '1741', 'GenusId': '1', 'CanPublishGenotype': '0', 'OtherPerm': '5', 'GenotypeName': 'Genotype_111', 'TaxonomyId': '1', 'OriginId': '1', 'AccessGroupPerm': '5', 'OwnGroupPerm': '7'} ]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Trial (27) not found.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'Trial (27) not found.'}]}"}],
+"URLParameter": [{"ParameterName": "trialid", "Description": "Existing TrialId"}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+  my $self        = shift;
+  my $trial_id = $self->param('trialid');
+
+  my $data_for_postrun_href = {};
+
+  my $dbh = connect_kdb_read();
+
+  $self->logger->debug("TrialId: $trial_id");
+
+  my $trial_exist = record_existence($dbh, 'trial', 'TrialId', $trial_id);
+
+  if (!$trial_exist) {
+
+    my $err_msg = "Trial ($trial_id) not found.";
+    return $self->_set_error($err_msg);
+  }
+
+  my $group_id = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  my $perm_str = permission_phrase($group_id, 0, $gadmin_status, 'trial');
+
+  my $geno_trial_sql = 'SELECT genotype.* ';
+  $geno_trial_sql   .= 'FROM trial ';
+  $geno_trial_sql   .= 'LEFT JOIN trialunit on trialunit.TrialId = trial.TrialId ';
+  $geno_trial_sql   .= 'LEFT JOIN trialunitspecimen on trialunitspecimen.TrialUnitId = trialunit.TrialUnitId ';
+  $geno_trial_sql   .= 'LEFT JOIN genotypespecimen on genotypespecimen.SpecimenId = trialunitspecimen.SpecimenId ';
+  $geno_trial_sql   .= 'LEFT JOIN genotype on genotype.GenotypeId = genotypespecimen.GenotypeId ';
+  $geno_trial_sql   .= 'WHERE trial.TrialId=? ';
+
+  my $read_geno_start_time = [gettimeofday()];
+
+  $geno_trial_sql   .= " GROUP BY genotype.GenotypeId";
+
+  my ($geno_trial_err, $geno_trial_msg, $geno_trial_data) = read_data($dbh,
+                                                                               $geno_trial_sql,
+                                                                               [$trial_id]);
+
+  my $read_geno_elapsed = tv_interval($read_geno_start_time);
+
+  $self->logger->debug("Read genotype time: $read_geno_elapsed");
+
+  if ($geno_trial_err) {
+
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => 'Unexpected error.'}]};
+
+    return $data_for_postrun_href;
+  }
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'Genotype'   => $geno_trial_data,
+                                           'RecordMeta' => [{'TagName' => 'Genotype'}],
+  };
+
+  $dbh->disconnect();
 
   return $data_for_postrun_href;
 }

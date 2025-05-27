@@ -40,9 +40,9 @@
 
   vars:
     dal_version: v2.7.0
-    src_file:  /root/KDDArT-DAL-{{ dal_version }}.tar.gz
+    src_file:  /home/localadmin/KDDArT-DAL-{{ dal_version }}.tar.gz
     dal_db_version: v2_7_0
-    local_dir: /root/KDDArT-DAL-{{ dal_version }}
+    local_dir: /home/localadmin/KDDArT-DAL-{{ dal_version }}
     apache_base_dir: /srv/www
     local_src_dir: /usr/local
     force_tasks: True
@@ -65,7 +65,7 @@
              After=mysql.service
 
              [Service]
-             User=root
+             User=localadmin
              Type=forking
              ExecStart=/usr/local/bin/monetdbd start /var/lib/monetdb/dbfarm
              ExecStop=/usr/local/bin/monetdbd stop /var/lib/monetdb/dbfarm
@@ -86,7 +86,7 @@
     - name: Add zypper repo from Geo
       shell: >
         if [ ! `zypper lr | grep 'Geo'` ]; then
-        zypper ar --no-gpgcheck https://mirrorcache-au.opensuse.org/repositories/Application:/Geo/15.5 Geo;
+        zypper ar --no-gpgcheck https://mirrorcache-au.opensuse.org/repositories/Application:/Geo:/OpenCPN/15.4 Geo;
         fi;
 
     - name: Add zypper repo for Perl-dev
@@ -125,6 +125,7 @@
         - perl-XML-LibXML
         - perl-Math-Pari
         - perl-Crypt-Random
+        - perl-Term-Table
         - libpq5
         - postgresql15
         - postgresql15-server
@@ -183,6 +184,10 @@
         name: nobody
         shell: /bin/bash
 
+    - name: Force install dependencies
+      shell: >
+        sudo cpanm Module::Pluggable --force
+
     - name: Install Perl Libraries used in DAL
       cpanm: name={{item}}
       with_items:
@@ -192,6 +197,8 @@
         - Text::CSV
         - Text::CSV_XS
         - Text::CSV::Simple
+        - Test2::Plugin::NoWarnings
+        - DateTime::Locale::Base
         - DateTime::Format::MySQL
         - DateTime::Format::Flexible
         - DateTime::Format::Pg
@@ -419,16 +426,16 @@
         /usr/local/bin/monetdbd start /var/lib/monetdb/dbfarm;
 
     - name: Restart apache
-      shell: systemctl restart apache2
+      shell: sudo systemctl restart apache2
 
     - name: Make mysql start on reboot
-      shell: systemctl disable mysql && systemctl enable mysql
+      shell: sudo systemctl disable mysql && systemctl enable mysql
 
     - name: Make postgresql start on reboot
-      shell: systemctl enable postgresql
+      shell:  sudo systemctl enable postgresql
 
     - name: Make apache2 start on reboot
-      shell: systemctl enable apache2
+      shell: sudo systemctl enable apache2
 
     - name: Create JAVA Home environment variable
       shell: "[[ `grep 'export JAVA_HOME' /etc/bash.bashrc` ]] || echo 'export JAVA_HOME=/usr/lib64/jvm/java-1.8.0-openjdk-1.8.0/jre' >> /etc/bash.bashrc"

@@ -1,7 +1,7 @@
 #$Id$
 #$Author$
 
-# Copyright (c) 2024, Diversity Arrays Technology, All rights reserved.
+# Copyright (c) 2025, Diversity Arrays Technology, All rights reserved.
 
 # Author    : Puthick Hok
 # Created   : 02/06/2010
@@ -133,6 +133,8 @@ sub setup {
     'del_trait_gadmin'                 => 'del_trait_runmode',
     'del_treatment_gadmin'             => 'del_treatment_runmode',
     'export_datakapture_template'      => 'export_datakapture_template_runmode',
+    'export_dkdata_summary'            => 'export_dkdata_summary_runmode',
+    'get_genotypedata'                 => 'get_genotypedata_runmode',
     'import_datakapture_data_csv'      => 'import_datakapture_data_csv_runmode',
     'export_datakapture_data'          => 'export_datakapture_data_runmode',
     'list_instancenumber'              => 'list_instancenumber_runmode',
@@ -2774,6 +2776,19 @@ sub export_samplemeasurement_csv_runmode {
     $smgroup_id_csv = $query->param('SMGroupIdCSV');
   }
 
+  my $specimen_id_csv = '';
+
+  if (defined $query->param('SpecimenIdCSV')) {
+
+    $specimen_id_csv = $query->param('SpecimenIdCSV');
+  }
+  my $genotype_id_csv = '';
+
+  if (defined $query->param('GenotypeIdCSV')) {
+
+    $genotype_id_csv = $query->param('GenotypeIdCSV');
+  }
+
   my $dbh = connect_kdb_read();
 
   $self->logger->debug("TrialUnitIdCSV: $tunit_id_csv");
@@ -2942,6 +2957,18 @@ sub export_samplemeasurement_csv_runmode {
 
   push(@where_phrases, $where_measure_time);
 
+  if (length($specimen_id_csv) > 0) {
+    
+    push(@where_phrases, "specimen.SpecimenId IN ($specimen_id_csv)");
+  
+  }
+
+  if (length($genotype_id_csv) > 0) {
+    
+    push(@where_phrases, "genotypespecimen.GenotypeId IN ($genotype_id_csv)");
+  
+  }
+
   my @field_headers = ('TrialUnitId', 'TraitId', 'OperatorId', 'MeasureDateTime',
                        'InstanceNumber', 'SampleTypeId', 'TrialUnitSpecimenId', 'TraitValue',
                        'SMGroupId', 'StateReason', 'SurveyId');
@@ -2955,6 +2982,25 @@ sub export_samplemeasurement_csv_runmode {
 
   my $sql = 'SELECT ' . join(',', @sql_field_list) . ' ';
   $sql   .= 'FROM samplemeasurement LEFT JOIN trialunit ';
+
+  my $genotype_specimen_sql = "";
+
+  if (length($specimen_id_csv) > 0) {
+
+    $genotype_specimen_sql = 'LEFT JOIN trialunitspecimen ON trialunit.TrialUnitId = trialunitspecimen.TrialUnitId LEFT JOIN specimen on specimen.SpecimenId = trialunitspecimen.SpecimenId '
+
+  }
+  
+  if (length($genotype_id_csv) > 0) {
+    #really can't do genotype id and specimen id at the same time for now
+    $genotype_specimen_sql = 'LEFT JOIN trialunitspecimen ON trialunit.TrialUnitId = trialunitspecimen.TrialUnitId ';
+    $genotype_specimen_sql .= 'LEFT JOIN specimen on specimen.SpecimenId = trialunitspecimen.SpecimenId ';
+    $genotype_specimen_sql .= 'LEFT JOIN genotypespecimen on genotypespecimen.SpecimenId = specimen.SpecimenId ';
+
+  }
+
+  $sql .= $genotype_specimen_sql;
+
   $sql   .= 'ON samplemeasurement.TrialUnitId = trialunit.TrialUnitId ';
 
   my $where_clause = '';
@@ -8104,9 +8150,10 @@ sub list_traitgroup {
 
     if (scalar(@{$t_grp_id_aref}) > 0) {
 
-      my $entry_sql = 'SELECT traitgroupentry.* ';
+      my $entry_sql = 'SELECT traitgroupentry.*,trait.TraitName ';
       $entry_sql   .= 'FROM traitgroupentry ';
-      $entry_sql   .= 'WHERE TraitGroupId IN (' . join(',', @{$t_grp_id_aref}) . ')';
+      $entry_sql   .= 'LEFT JOIN trait ON traitgroupentry.TraitId=trait.TraitId ';
+      $entry_sql   .= 'WHERE traitgroupentry.TraitGroupId IN (' . join(',', @{$t_grp_id_aref}) . ')';
 
       my ($entry_err, $entry_msg, $entry_data) = read_data($dbh, $entry_sql, []);
 
@@ -14414,5 +14461,355 @@ sub delete_cmgroup_runmode {
 
   return $data_for_postrun_href;
 }
+
+sub export_dkdata_summary_runmode {
+
+=pod export_dkdata_summary_HELP_START
+{
+"OperationName": "Export trial data",
+"Description": "Exports current phenotypic data summary for the trial.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><OutputFile csv='http://kddart-d.diversityarrays.com/data/admin/export_dkdata_7_9b96633c51925e8c74f2b87bdc10c785.csv' /></DATA>",
+"SuccessMessageJSON": "{'OutputFile' : [{'csv' : 'http://kddart-d.diversityarrays.com/data/admin/export_dkdata_7_9b96633c51925e8c74f2b87bdc10c785.csv'}]}",
+"ErrorMessageXML": [{"IdNotFound": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='SampleType (143) invalid.' /></DATA>"}],
+"ErrorMessageJSON": [{"IdNotFound": "{'Error' : [{'Message' : 'SampleType (143) invalid.'}]}"}],
+"HTTPParameter": [{"Required": 1, "Name": "SampleTypeId", "Description": "Value for SampleTypeId. This value is needed to restrict the data in 2-dimensional."}, {"Required": 1, "Name": "TrialId", "Description": "Value for TrialId."}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self  = shift;
+  my $query = $self->query();
+  my $group_id = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+
+  my $query = $self->query();
+  my $trial_id = $query->param('TrialId');
+  my $sample_type_id = $query->param('SampleTypeId');
+  my $custom_format = $query->param('CustomFormat'); #Use summarised format when the value is '1', otherwise use the detailed format.
+
+  my $data_for_postrun_href = {};
+
+  my $dbh = connect_kdb_read();
+
+  if (length($trial_id) > 0) {
+
+    my ($trial_exist_err, $trial_rec_str) = record_exist_csv($dbh, 'trial', 'TrialId', $trial_id);
+
+    if ($trial_exist_err) {
+
+      my $err_msg = "Trial ($trial_rec_str) not found.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  if (length($sample_type_id) > 0) {
+
+    my ($stype_exist_err, $stype_rec_str) = type_existence_csv($dbh, 'sample', $sample_type_id);
+
+    if ($stype_exist_err) {
+
+      my $err_msg = "SampleType ($stype_rec_str) not found.";
+      $data_for_postrun_href->{'Error'} = 1;
+      $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+      return $data_for_postrun_href;
+    }
+  }
+
+  #Detailed format
+  my $sql = "SELECT trial.TrialId, trial.TrialName, site.SiteName, genotype.GenotypeId, genotype.GenotypeName, specimen.SpecimenId, specimen.SpecimenName, ";
+  $sql   .= "samplemeasurement.TrialUnitId, trait.TraitId, trait.TraitName, AVG(samplemeasurement.TraitValue) as AVG_TraitValue ";
+  $sql   .= "FROM samplemeasurement ";
+  $sql   .= "LEFT JOIN trait ON samplemeasurement.TraitId=trait.TraitId ";
+  $sql   .= "LEFT JOIN trialunit ON samplemeasurement.TrialUnitId=trialunit.TrialUnitId ";
+  $sql   .= "LEFT JOIN trial ON trialunit.TrialId=trial.TrialId ";
+  $sql   .= "LEFT JOIN trialunitspecimen ON trialunit.TrialUnitId=trialunitspecimen.TrialUnitId ";
+  $sql   .= "LEFT JOIN site ON trial.SiteId=site.SiteId ";
+  $sql   .= "LEFT JOIN specimen ON trialunitspecimen.SpecimenId=specimen.SpecimenId ";
+  $sql   .= "LEFT JOIN genotypespecimen ON specimen.SpecimenId=genotypespecimen.SpecimenId ";
+  $sql   .= "LEFT JOIN genotype ON genotypespecimen.GenotypeId=genotype.GenotypeId ";
+  $sql   .= "WHERE trial.TrialId IN ($trial_id) AND samplemeasurement.SampleTypeId IN ($sample_type_id) ";
+  $sql   .= "GROUP BY trial.TrialId, trait.TraitId, genotype.GenotypeId ";
+  $sql   .= "ORDER BY samplemeasurement.TrialUnitId";
+
+  $self->logger->debug("SQL: $sql");
+
+  my $sth_pheno_data = $dbh->prepare($sql);
+  $sth_pheno_data->execute();
+  
+  my $detailed_data_aref = $sth_pheno_data->fetchall_arrayref({});
+
+  if ($sth_pheno_data->err()) {
+    my $err_msg = "Get phenotypic data from trial failed.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (scalar(@{$detailed_data_aref}) == 0) {
+    my $err_msg = "No data attached to Trial ($trial_id).";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $pheno_data_aref = $detailed_data_aref;
+
+  #Summarised format
+  if ($custom_format eq '1') {
+    my $genotype_id_list = [ map { $_->{'GenotypeId'} } @$detailed_data_aref ];
+
+    $sql  = "SELECT AVG(TraitValue) as AVG_TraitValue, trait.TraitName, trait.TraitId, genotype.GenotypeId, genotype.GenotypeName ";
+    $sql .= "FROM samplemeasurement ";
+    $sql .= "LEFT JOIN trialunit on samplemeasurement.TrialUnitId=trialunit.TrialUnitId ";
+    $sql .= "LEFT JOIN trialunitspecimen on trialunitspecimen.TrialUnitId=trialunit.TrialUnitId ";
+    $sql .= "LEFT JOIN specimen on specimen.SpecimenId = trialunitspecimen.SpecimenId ";
+    $sql .= "LEFT JOIN genotypespecimen on specimen.SpecimenId = genotypespecimen.SpecimenId ";
+    $sql .= "LEFT JOIN genotype on genotype.GenotypeId = genotypespecimen.GenotypeId ";
+    $sql .= "LEFT JOIN trait on samplemeasurement.TraitId=trait.TraitId ";
+    $sql .= "WHERE genotype.GenotypeId IN (".join(',', @{$genotype_id_list}).") ";
+    $sql .= "GROUP BY trait.TraitId, genotype.GenotypeId ";
+    $sql .= "ORDER BY trait.TraitId";
+
+    $self->logger->debug("SQL: $sql");
+
+    $sth_pheno_data = $dbh->prepare($sql);
+    $sth_pheno_data->execute();
+  
+    $pheno_data_aref = $sth_pheno_data->fetchall_arrayref({});
+  }
+
+  my %output_data_row;
+  for my $pheno_rec (@{$pheno_data_aref}) {
+    my $genotypeid = $pheno_rec->{'GenotypeId'};
+    my $genotypename = $pheno_rec->{'GenotypeName'};
+    my $traitname = $pheno_rec->{'TraitName'};
+    my $avg = $pheno_rec->{'AVG_TraitValue'};
+
+    my $output_data_row  = {};
+    if (!exists $output_data_row{$genotypeid}) {
+      $output_data_row{$genotypeid} = {
+        "GenotypeName" => $genotypename,
+        "GenotypeId"   => $genotypeid
+      };
+
+      if ($custom_format ne '1') {
+        $output_data_row{$genotypeid}->{'TrialId'}   = $pheno_rec->{'TrialId'};
+        $output_data_row{$genotypeid}->{'TrialName'} = $pheno_rec->{'TrialName'};
+        $output_data_row{$genotypeid}->{'SiteName'}  = $pheno_rec->{'SiteName'};
+      }
+    }
+    $output_data_row{$genotypeid}->{$traitname} = $avg;
+  }
+
+  my @output_data_aref = values %output_data_row;
+
+  my $field_order_href = $custom_format eq '1' ? { 'GenotypeId' => 0, 'GenotypeName' => 1 } : { 'TrialId' => 0, 'TrialName' => 1, 'SiteName' => 2, 'GenotypeId' => 3, 'GenotypeName' => 4 };
+
+  $sql    = "SELECT DISTINCT trialtrait.TraitId, trait.TraitName ";
+  $sql   .= "FROM trialtrait ";
+  $sql   .= "LEFT JOIN trait ON trialtrait.TraitId = trait.TraitId ";
+  $sql   .= "LEFT JOIN samplemeasurement ON trialtrait.TraitId = samplemeasurement.TraitId ";
+  $sql   .= "WHERE TrialId IN ($trial_id) AND SampleTypeId IN ($sample_type_id) ";
+  $sql   .= "ORDER BY TraitId";
+
+  my $sth_trait_data = $dbh->prepare($sql);
+  $sth_trait_data->execute();
+
+  my $trait_aref = $sth_trait_data->fetchall_arrayref({});
+
+  if ($sth_trait_data->err()) {
+    my $err_msg = "Get trialtrait failed.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (scalar(@{$trait_aref}) == 0) {
+    my $err_msg = "No trial trait attached to Trial ($trial_id).";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $count_field_href = scalar(keys %{$field_order_href});
+
+  for my $trait_rec (@{$trait_aref}) {
+    my $trialtraitname = $trait_rec->{'TraitName'};
+    $field_order_href->{$trialtraitname} = $count_field_href;
+    $count_field_href++;
+  }
+
+  my $md5               = md5_hex($sql);
+  my $username          = $self->authen->username();
+  my $doc_root          = $ENV{'DOCUMENT_ROOT'};
+  my $export_data_path  = "${doc_root}/data/$username";
+  my $filename          = "export_dkdata_${trial_id}_$md5";
+  my $csv_file          = "${export_data_path}/${filename}.csv";
+
+  if (!(-e $export_data_path)) {
+    mkdir($export_data_path);
+  }
+
+  arrayref2csvfile($csv_file, $field_order_href, \@output_data_aref);
+
+  my $url = reconstruct_server_url();
+
+  my $output_file_aref = [{ 'csv' => "$url/data/$username/${filename}.csv" }];
+
+  $data_for_postrun_href->{'Error'} = 0;
+  $data_for_postrun_href->{'Data'}  = {'OutputFile' => $output_file_aref};
+
+  return $data_for_postrun_href;
+};
+
+sub get_genotypedata_runmode {
+
+=pod get_genotypedata_HELP_START
+{
+"OperationName": "List summarised genotype data",
+"Description": "List summarised sample measurements based on genotypes.",
+"AuthRequired": 1,
+"GroupRequired": 1,
+"GroupAdminRequired": 0,
+"SignatureRequired": 0,
+"AccessibleHTTPMethod": [{"MethodName": "POST", "Recommended": 1, "WHEN": "FILTERING"}, {"MethodName": "GET"}],
+"SuccessMessageXML": "<?xml version='1.0' encoding='UTF-8'?><DATA><StatInfo ServerElapsedTime='0.444' Unit='second' /><RecordMeta TagName='GenotypeData' /><GenotypeData SpecimenId='500' TraitUnitName='kg' GenotypeId='111' TrialUnitId='111' GenotypeName='Genotype_111' AVG_TraitValue='2.23' SpecimenName='Specimen_111' TrialName='Trial_111' TrialId='3' TraitId='111' SiteName='Site_111' TraitName='Trait_111'/></DATA>",
+"SuccessMessageJSON": "{'StatInfo' : [{'Unit' : 'second', 'ServerElapsedTime' : '0.006'}],'RecordMeta' : [{'TagName' : 'GenotypeData'}],'GenotypeData' : [{ 'SpecimenId':'500', 'TraitUnitName':'kg', 'GenotypeId':'111', 'TrialUnitId':'111', 'GenotypeName':'Genotype_111', 'AVG_TraitValue':'2.23', 'SpecimenName':'Specimen_111', 'TrialName':'Trial_111', 'TrialId':'3', 'TraitId':'111', 'SiteName':'Site_111', 'TraitName':'Trait_111'}]}",
+"ErrorMessageXML": [{"UnexpectedError": "<?xml version='1.0' encoding='UTF-8'?><DATA><Error Message='Unexpected Error.' /></DATA>"}],
+"ErrorMessageJSON": [{"UnexpectedError": "{'Error' : [{'Message' : 'Unexpected Error.' }]}"}],
+"URLParameter": [{"ParameterName": "id", "Description": "Genotype Id"}],
+"HTTPParameter": [{"Required": 0, "Name": "Filtering", "Description": "Filtering parameter string consisting of filtering expressions which are separated by ampersand (&) which needs to be encoded if HTTP GET method is used. Each filtering expression is composed of a database field name, a filtering operator and the filtering value."}, {"Required": 0, "Name": "FieldList", "Description": "Comma separated value of wanted fields."}, {"Required": 0, "Name": "Sorting", "Description": "Comma separated value of SQL sorting phrases."}],
+"HTTPReturnedErrorCode": [{"HTTPCode": 420}]
+}
+=cut
+
+  my $self    = shift;
+  my $geno_id = $self->param('id');
+  my $query         = $self->query();
+
+  my $data_for_postrun_href = {};
+
+  my $dbh = connect_kdb_read();
+
+  my $group_id      = $self->authen->group_id();
+  my $gadmin_status = $self->authen->gadmin_status();
+  my $perm_str      = permission_phrase($group_id, 0, $gadmin_status, 'genotype');
+
+  my $geno_perm_sql = "SELECT $perm_str as UltimatePerm ";
+  $geno_perm_sql   .= "FROM genotype ";
+  $geno_perm_sql   .= "WHERE GenotypeId=?";
+
+  my ($r_geno_perm_err, $geno_perm) = read_cell($dbh, $geno_perm_sql, [$geno_id]);
+
+  if (length($geno_perm) == 0) {
+
+    my $err_msg = "Genotype ($geno_id) not found.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+  elsif ( ($geno_perm & $READ_PERM) != $READ_PERM ) {
+
+    my $err_msg = "Permission denied: genotype ($geno_id).";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  #1 for detailed and 0 for summarised (i.e averaged across trials)
+  my $out_put_format = 0;
+
+  if (defined $query->param('CustomFormat')) {
+    $out_put_format = $query->param('CustomFormat');
+  }
+
+  #Summarised format
+  my $sql = "SELECT trial.TrialId, trial.TrialName, site.SiteName, genotype.GenotypeId, genotype.GenotypeName, specimen.SpecimenId, specimen.SpecimenName, generalunit.UnitName as TraitUnitName, ";
+
+  if ($out_put_format == 1) {
+    $sql .= "trialunit.TrialUnitBarcode, samplemeasurement.TraitValue as TraitValue, samplemeasurement.InstanceNumber, samplemeasurement.MeasureDateTime, ";
+  }
+  else {
+    $sql .= "AVG(samplemeasurement.TraitValue) as AVG_TraitValue, ";
+  }
+
+  $sql   .= "samplemeasurement.TrialUnitId, trait.TraitId, trait.TraitName ";
+  $sql   .= "FROM samplemeasurement ";
+  $sql   .= "LEFT JOIN trait ON samplemeasurement.TraitId=trait.TraitId ";
+  $sql   .= "LEFT JOIN trialunit ON samplemeasurement.TrialUnitId=trialunit.TrialUnitId ";
+  $sql   .= "LEFT JOIN trial ON trialunit.TrialId=trial.TrialId ";
+  $sql   .= "LEFT JOIN trialunitspecimen ON trialunit.TrialUnitId=trialunitspecimen.TrialUnitId ";
+  $sql   .= "LEFT JOIN site ON trial.SiteId=site.SiteId ";
+  $sql   .= "LEFT JOIN specimen ON trialunitspecimen.SpecimenId=specimen.SpecimenId ";
+  $sql   .= "LEFT JOIN genotypespecimen ON specimen.SpecimenId=genotypespecimen.SpecimenId ";
+  $sql   .= "LEFT JOIN genotype ON genotypespecimen.GenotypeId=genotype.GenotypeId ";
+  $sql   .= "LEFT JOIN generalunit on trait.UnitId = generalunit.UnitId ";
+  $sql   .= "WHERE genotype.GenotypeId IN ($geno_id) ";
+
+  if ($out_put_format == 1) {
+
+    $sql   .= "GROUP BY trialunit.TrialUnitId, trait.TraitId, genotype.GenotypeId ";
+    $sql   .= "ORDER BY samplemeasurement.TrialUnitId";
+
+  }
+  else {
+    $sql   .= "GROUP BY trial.TrialId, trait.TraitId, genotype.GenotypeId ";
+    $sql   .= "ORDER BY samplemeasurement.TrialUnitId";
+  }
+
+  
+
+  $self->logger->debug("SQL: $sql");
+
+  my $sth_pheno_data = $dbh->prepare($sql);
+  $sth_pheno_data->execute();
+  
+  my $detailed_data_aref = $sth_pheno_data->fetchall_arrayref({});
+
+  if ($sth_pheno_data->err()) {
+    my $err_msg = "Get phenotypic data from genotype failed.";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  if (scalar(@{$detailed_data_aref}) == 0) {
+    my $err_msg = "No data attached to Genotype ($geno_id).";
+    $data_for_postrun_href->{'Error'} = 1;
+    $data_for_postrun_href->{'Data'}  = {'Error' => [{'Message' => $err_msg}]};
+
+    return $data_for_postrun_href;
+  }
+
+  my $pheno_data_aref = $detailed_data_aref;
+
+  #Summarised format
+
+  $data_for_postrun_href->{'Error'}     = 0;
+  $data_for_postrun_href->{'Data'}      = {'GenotypeData'   => $pheno_data_aref,
+                                           'RecordMeta' => [{'TagName' => 'GenotypeData'}],
+  };
+
+  return $data_for_postrun_href;
+};
+
+
+
 
 1;

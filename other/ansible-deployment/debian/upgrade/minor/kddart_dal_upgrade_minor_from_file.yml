@@ -1,0 +1,70 @@
+#
+# DAL upgrade script for Opensuse
+# Copyright (c) 2025, Diversity Arrays Technology, All rights reserved.
+#
+# Author: Thao (Greene) Vu
+# Date: 07/03/2025
+# Usage: ansible-playbook kddart_dal_upgrade_minor_from_file.yml
+# Description: By running the usage command, ansible will simply copy the code base
+#
+
+- hosts: kddartserver
+  gather_facts: yes
+
+  vars_prompt:
+    - name: "local_tar_gz_file"
+      prompt: "Enter the source tar.gz file of KDDart wih either relative or full path."
+      private: no
+
+    - name: "dal_version"
+      prompt: "Enter the version of DAL (e.g. v2.7.1)"
+      private: no
+
+    - name: "dal_db_version"
+      prompt: "Enter the version of DAL db (e.g. v2_7_0)"
+      private: no
+
+    - name: "task_file"
+      prompt: "Enter the task file with either relative or full path."
+      private: no
+
+  vars:
+    src_file: /home/localadmin/KDDArT-DAL-{{ dal_version }}.tar.gz
+    local_dir: /home/localadmin/KDDArT-DAL-{{ dal_version }}
+    backup_dir: /home/localadmin/dal_upgrade_db_backup
+    apache_base_dir: /var/www
+    force_tasks: True
+
+  tasks:
+    - name: Copy the tar.gz file
+      copy: src={{ local_tar_gz_file }} dest={{ src_file }}
+
+    - name: Create local_dir
+      shell: >
+        if [ ! -d {{ local_dir }} ]; then
+        mkdir -p {{ local_dir }};
+        fi
+
+    - name: Untar and decompress KDDart source
+      shell: >
+        if [ -d {{ local_dir }} ]; then
+        cd {{ local_dir }};
+        tar -zxvf {{ src_file }} --strip 1;
+        fi;
+
+    - name: Copy perl package
+      shell: >
+        export VHOST_DIRS=`sed -n -e '/DSN_KDB_READ/,/DSN_KDB_WRITE/p' {{ apache_base_dir }}/secure/kddart_dal.cfg | grep 'DBI:mysql:database' | gawk 'BEGIN{FS="="}{print $1}END{}'`;
+
+        for EACH_VHOST_DIR in $VHOST_DIRS; do
+        cp -rp {{ local_dir }}/vhosts/kddart.example.com/* {{ apache_base_dir }}/$EACH_VHOST_DIR;
+        chown www-data:www-data {{ apache_base_dir }}/$EACH_VHOST_DIR -R;
+        done;
+
+        cp -rp {{ local_dir}}/perl-lib/* {{ apache_base_dir }}/perl-lib;
+        cp {{local_dir}}/cgi-bin/kddart/* {{ apache_base_dir }}/cgi-bin/kddart;
+        
+    - include_tasks: "{{ task_file }}"
+
+    - name: Restart apache
+      shell: systemctl restart apache2

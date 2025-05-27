@@ -1,0 +1,13 @@
+#
+# DAL upgrade script for Opensuse
+# Copyright (c) 2024, Diversity Arrays Technology, All rights reserved.
+#
+# Author: Thao (Greene) Vu
+# Date: 05/03/2025
+# Description: DAL upgrade script from 2.7.6 to 2.7.7
+
+- name: Install perl packages
+  apt:
+    state: present
+    name:
+      - libclass-loader-perl

@@ -1,0 +1,19 @@
+#
+# DAL upgrade script for Opensuse
+# Copyright (c) 2025, Diversity Arrays Technology, All rights reserved.
+#
+# Author: Thao (Greene) Vu
+# Date: 05/03/2025
+# Description: DAL upgrade script from 2.7.6 to 2.7.7
+
+- name: Install supporting binaries
+  zypper: pkg={{item}} state=present disable_gpg_check=yes
+  with_items:
+    - perl-Term-Table
+
+- name: Install new Perl packages
+  cpanm: name={{item}}
+  with_items:
+    - Test2::Plugin::NoWarnings
+    - DateTime::Locale::Base
+

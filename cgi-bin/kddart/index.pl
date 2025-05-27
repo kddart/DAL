@@ -283,6 +283,10 @@ CGI::Application::Dispatch->dispatch(
     'list/genotype/:nperpage/page/:num'                 => { app => 'KDDArT::DAL::Genotype',
                                                              rm  => 'list_genotype_advanced' },
 
+
+    'find/:tablename/name'                               => { app => 'KDDArT::DAL::Genotype',
+                                                             rm  => 'find_germplasm_name' },
+
     'update/genotype/:id'                               => { app => 'KDDArT::DAL::Genotype',
                                                              rm  => 'update_genotype' },
 
@@ -298,8 +302,14 @@ CGI::Application::Dispatch->dispatch(
     'genotype/:genoid/list/alias'                       => { app => 'KDDArT::DAL::Genotype',
                                                              rm  => 'list_genotype_alias_advanced' },
 
+    'genotype/:genoid/list/trialunitspecimen'           => { app => 'KDDArT::DAL::Genotype',
+                                                             rm  => 'list_genotype_tus' },
+
     'list/genotypealias/:nperpage/page/:num'            => { app => 'KDDArT::DAL::Genotype',
                                                              rm  => 'list_genotype_alias_advanced' },
+
+    'genotype/:id/data'                                 => { app => 'KDDArT::DAL::Trait',
+                                                             rm  => 'get_genotypedata' },
 
     'import/genotype/csv'                               => { app => 'KDDArT::DAL::Genotype',
                                                              rm  => 'import_genotype_csv' },
@@ -390,8 +400,6 @@ CGI::Application::Dispatch->dispatch(
 
     'specimen/:id/list/genotype'                        => { app => 'KDDArT::DAL::Genotype',
                                                              rm  => 'list_genotype_in_specimen' },
-
-
 
     'import/pedigree/csv'                               => { app => 'KDDArT::DAL::Genotype',
                                                              rm  => 'import_pedigree_csv' },
@@ -615,6 +623,9 @@ CGI::Application::Dispatch->dispatch(
     'trial/:id/export/datakapturetemplate'              => { app => 'KDDArT::DAL::Trait',
                                                              rm  => 'export_datakapture_template' },
 
+    'export/dkdata/summary'                             => { app => 'KDDArT::DAL::Trait',
+                                                             rm  => 'export_dkdata_summary' },
+
     'trial/:id/export/datakapturetemplate'              => { app => 'KDDArT::DAL::Trait',
                                                              rm  => 'export_datakapture_template' },
 
@@ -656,6 +667,9 @@ CGI::Application::Dispatch->dispatch(
 
     'trial/:trialid/list/trialunit'                     => { app => 'KDDArT::DAL::Trial',
                                                              rm  => 'list_trial_unit_advanced' },
+
+    'trial/:trialid/list/genotype'                     => { app => 'KDDArT::DAL::Trial',
+                                                             rm  => 'list_trial_genotype' },
 
     'trial/:trialid/list/trialunit/:nperpage/page/:num' => { app => 'KDDArT::DAL::Trial',
                                                               rm  => 'list_trial_unit_advanced' },

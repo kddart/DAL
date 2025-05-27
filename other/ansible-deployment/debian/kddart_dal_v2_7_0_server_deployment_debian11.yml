@@ -49,7 +49,7 @@
     - name: Install supporting binaries
       apt:
         state: present
-        update_cache: true
+        update_cache: yes
         name:
           - make
           - gcc
@@ -115,6 +115,7 @@
           - libdbi-perl
           - libapache2-mod-perl2 #apache2-mod_perl
           - libclass-dbi-perl
+          - libclass-loader-perl
           - libdbd-mysql-perl
           - libdbd-pg-perl
           - libdbd-sqlite2-perl
@@ -207,7 +208,6 @@
          - DateTime::Format::MySQL
          - DateTime::Format::Pg
          - UNIVERSAL::require
-         - Class::Loader
          - File::Copy::Recursive
          - Crypt::JWT
 

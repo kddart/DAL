@@ -1,7 +1,7 @@
 #$Id$
 #$Author$
 
-# Copyright (c) 2024, Diversity Arrays Technology, All rights reserved.
+# Copyright (c) 2025, Diversity Arrays Technology, All rights reserved.
 
 # Author    : Puthick Hok
 # Created   : 19/04/2012
@@ -2503,8 +2503,10 @@ sub list_item_advanced_runmode {
 
       push( @{$final_field_list}, 'gt_itemtype.TypeName as ItemTypeName' );
       push( @{$final_field_list}, 'gt_itemstate.TypeName as ItemStateName' );
+      push( @{$final_field_list}, 'gt_containertype.TypeName as ItemContainerType' );
       $join .= ' LEFT JOIN generaltype as gt_itemtype ON gt_itemtype.TypeId = item.ItemTypeId ';
       $join .= ' LEFT JOIN generaltype as gt_itemstate ON gt_itemstate.TypeId = item.ItemStateId ';
+      $join .= ' LEFT JOIN generaltype as gt_containertype ON gt_containertype.TypeId = item.ContainerTypeId ';
     }
     elsif ($field =~ /^ScaleId$/i) {
 
@@ -9095,11 +9097,14 @@ sub show_item_log_runmode {
 
   $dbh->disconnect();
 
-  my $sql = 'SELECT itemlog.*, systemuser.UserName, generaltype.TypeName AS LogTypeName ';
+  my $sql = 'SELECT itemlog.*, systemuser.UserName, generaltype.TypeName AS LogTypeName, item.ItemBarcode AS ItemBarcode ';
   $sql   .= 'FROM itemlog LEFT JOIN systemuser ON itemlog.SystemUserId = systemuser.UserId ';
   $sql   .= 'LEFT JOIN generaltype ON itemlog.LogTypeId = generaltype.TypeId ';
-  $sql   .= 'WHERE ItemId = ? ';
+  $sql   .= 'LEFT JOIN item ON item.ItemId = itemlog.ItemId ';
+  $sql   .= 'WHERE itemlog.ItemId = ? ';
   $sql   .= 'ORDER BY ItemLogId DESC';
+
+  $self->logger->debug($sql);
 
   my ($read_itemlog_err, $read_itemlog_msg, $itemlog_data) = $self->list_item_log($sql, [$item_id]);
 
